@@ -7,6 +7,8 @@ import type { ProviderWireProtocol } from '../domain/model-config.js';
  * - openai wire:      GET {baseUrl}/models       — baseUrl already carries /v1
  *                     (custom.ts appends /chat/completions the same way)
  * - anthropic wire:   GET {baseUrl}/v1/models    — x-api-key + anthropic-version
+ * - gemini wire:      GET {baseUrl}/v1beta/models — x-goog-api-key; response is
+ *                     {models:[{name:'models/<id>', displayName?}]} (REST v1beta)
  *
  * The parser is tolerant and HONEST: only fields present in the response are
  * reported; missing context windows / capabilities surface as undefined, never
@@ -39,19 +41,24 @@ export const discoverModels = async (
   fetchImpl: FetchLike,
 ): Promise<DiscoveryResult> => {
   const base = input.baseUrl.replace(/\/+$/, '');
-  const url = input.wire === 'anthropic' ? `${base}/v1/models` : `${base}/models`;
+  const url =
+    input.wire === 'anthropic' ? `${base}/v1/models`
+    : input.wire === 'gemini' ? `${base}/v1beta/models`
+    : `${base}/models`;
   const headers: Record<string, string> =
     input.wire === 'anthropic'
       ? { 'x-api-key': input.apiKey, 'anthropic-version': '2023-06-01' }
-      : input.apiKey.length > 0
-        ? { authorization: `Bearer ${input.apiKey}` }
-        : {};
+      : input.wire === 'gemini'
+        ? { 'x-goog-api-key': input.apiKey }
+        : input.apiKey.length > 0
+          ? { authorization: `Bearer ${input.apiKey}` }
+          : {};
   const res = await fetchImpl(url, { method: 'GET', headers });
   if (!res.ok) {
     throw new Error(`model discovery failed: HTTP ${res.status} from ${url}`);
   }
   const body = await res.json(); // only parsed after the ok gate — an HTML error page never becomes a parse error
-  const models = parseModels(body);
+  const models = input.wire === 'gemini' ? parseGeminiModels(body) : parseModels(body);
   return { models, httpStatus: res.status, rawCount: models.length };
 };
 
@@ -79,6 +86,34 @@ export const parseModels = (body: unknown): DiscoveredModel[] => {
       ...(str(r.owned_by) !== undefined ? { ownedBy: str(r.owned_by) } : {}),
       ...(str(r.display_name) !== undefined ? { displayName: str(r.display_name) } : {}),
       ...(str(r.created_at) !== undefined ? { createdAt: str(r.created_at) } : {}),
+    });
+  }
+  return out.sort((a, b) => a.id.localeCompare(b.id));
+};
+
+/**
+ * Parse Gemini v1beta `{models:[{name:'models/<id>', displayName?, description?}]}`.
+ * The REST name carries the 'models/' prefix; the config form wants the bare model
+ * id (what :generateContent's URL segment takes). Same fail-closed rule as
+ * parseModels: an unexpected shape throws instead of presenting an empty catalog.
+ */
+export const parseGeminiModels = (body: unknown): DiscoveredModel[] => {
+  if (body === null || typeof body !== 'object' || !Array.isArray((body as { models?: unknown }).models)) {
+    throw new Error('model discovery: response is not a {models:[...]} catalog');
+  }
+  const seen = new Set<string>();
+  const out: DiscoveredModel[] = [];
+  for (const raw of (body as { models: unknown[] }).models) {
+    if (raw === null || typeof raw !== 'object') continue;
+    const r = raw as Record<string, unknown>;
+    const name = str(r.name);
+    if (name === undefined) continue;
+    const id = name.replace(/^models\//, '');
+    if (id.length === 0 || seen.has(id)) continue;
+    seen.add(id);
+    out.push({
+      id,
+      ...(str(r.displayName) !== undefined ? { displayName: str(r.displayName) } : {}),
     });
   }
   return out.sort((a, b) => a.id.localeCompare(b.id));

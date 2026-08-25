@@ -6,14 +6,17 @@ import {
 } from './index.js';
 import { createZaiProvider } from './zai.js';
 import { createDashScopeProvider } from './dashscope.js';
+import { createDeepSeekProvider } from './deepseek.js';
+import { createUniversalProvider } from './universal.js';
 import type { ModelProvider } from '../shared/ports.js';
 
 /**
- * Product configuration layer for BUILT-IN env routes (zai/dashscope): UI-declared
- * modelId override + list pricing + default-route switch, persisted in store meta.
- * The env chain itself (FARLAB_MODEL_PROVIDER & per-provider env) stays untouched —
- * this layer sits ON TOP of it for the interactive product, exactly like mcfg does;
- * CLI/automation paths that construct providers directly keep pure env semantics.
+ * Product configuration layer for BUILT-IN env routes (zai/dashscope/deepseek/
+ * universal): UI-declared modelId override + list pricing + default-route switch,
+ * persisted in store meta. The env chain itself (FARLAB_MODEL_PROVIDER &
+ * per-provider env) stays untouched — this layer sits ON TOP of it for the
+ * interactive product, exactly like mcfg does; CLI/automation paths that construct
+ * providers directly keep pure env semantics.
  *
  * Pricing semantics mirror mcfg (BP-4 cost honesty): FAR-Lab ships no invented
  * price tables — cost appears only after the researcher declares real prices here.
@@ -35,6 +38,8 @@ export type BuiltinRouteOverride = z.infer<typeof BuiltinRouteOverride>;
 export const BuiltinRouteOverrides = z.object({
   zai: BuiltinRouteOverride.optional(),
   dashscope: BuiltinRouteOverride.optional(),
+  deepseek: BuiltinRouteOverride.optional(),
+  universal: BuiltinRouteOverride.optional(),
 });
 export type BuiltinRouteOverrides = z.infer<typeof BuiltinRouteOverrides>;
 
@@ -87,9 +92,13 @@ const isLiveName = (name: string): name is (typeof LIVE_PROVIDER_NAMES)[number] 
 /** Construct a live provider with the UI modelId override applied (env model still the fallback). */
 const constructLive = (name: (typeof LIVE_PROVIDER_NAMES)[number], store: MetaReader): ModelProvider => {
   const modelId = builtinModelIdFor(store, name);
-  return name === 'zai'
-    ? createZaiProvider(modelId === undefined ? {} : { model: modelId })
-    : createDashScopeProvider(modelId === undefined ? {} : { model: modelId });
+  const modelOpts = modelId === undefined ? {} : { model: modelId };
+  switch (name) {
+    case 'zai': return createZaiProvider(modelOpts);
+    case 'dashscope': return createDashScopeProvider(modelOpts);
+    case 'deepseek': return createDeepSeekProvider(modelOpts);
+    case 'universal': return createUniversalProvider(modelOpts);
+  }
 };
 
 export interface BuiltinDefaultResolution {
@@ -110,7 +119,7 @@ export const builtinDefaultName = (store: MetaReader): BuiltinDefaultResolution 
   try {
     return { name: defaultLiveProvider().name as (typeof LIVE_PROVIDER_NAMES)[number], source: 'env' };
   } catch {
-    return { name: 'zai', source: 'env' }; // env names a banned/unknown route: health owns that failure
+    return { name: 'zai', source: 'env' }; // env names an unknown route: health owns that failure story
   }
 };
 

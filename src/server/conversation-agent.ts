@@ -9,6 +9,7 @@ import { assembleSessionCapabilities } from '../agent/capabilities/assembly.js';
 import { SessionTelemetry } from '../agent/telemetry.js';
 import { runAgentLoop, type AgentLoopStatus } from '../agent/loop.js';
 import type { AgentEventSink, ReceiptSink, TranscriptEntry } from '../agent/protocol.js';
+import type { ReasoningStyle, ReasoningGear } from '../domain/model-config.js';
 import { openRolloutWriter, readRollout, reconstructSession, rolloutFile, type InterruptedTurnDisposition } from '../agent/rollout.js';
 import { analyzeTrajectory } from '../app/supervisor.js';
 
@@ -131,7 +132,7 @@ export interface ConversationTurnInput {
    * (conversations.ts effectiveConversationReasoning — kept out of this module to
    * avoid an import cycle). Absent/undefined = nothing is sent on the wire.
    */
-  reasoning?: { style: 'reasoning_effort' | 'enable_thinking' | 'thinking_budget'; gear: 'low' | 'medium' | 'high' };
+  reasoning?: { style: ReasoningStyle; gear: ReasoningGear };
 }
 
 export interface ConversationTurnUsage {

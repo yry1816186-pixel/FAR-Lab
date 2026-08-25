@@ -4,7 +4,6 @@ import path from 'node:path';
 import { createApp } from '../app/composition.js';
 import { verifyBundle } from '../app/verify.js';
 import { readFile } from 'node:fs/promises';
-
 import { ingestSdm, ingestTextToSdm, ingestBytes, ingestSvgPlot, persistDatasetProfile, type TextIngestResult, type BytesIngestResult } from '../ingest/service.js';
 import { FeedbackSignal, FeedbackSourceKind, ObjectRef, ResearchQuestion, ScientificGoalType, newId, runProgress } from '../domain/index.js';
 import type { ResearchRun } from '../domain/index.js';
@@ -658,6 +657,31 @@ const main = async (): Promise<void> => {
     } finally { app.close(); }
     return;
   }
+  if (cmd === 'inspect') {
+    // RU-12 GO-2: time-travel projection of a run AS OF an event seq (or latest).
+    const runId = process.argv[3];
+    if (runId === undefined || !/^run_[a-z0-9]+$/.test(runId)) die('usage: far inspect <runId> [seq]', 2);
+    const seqRaw = process.argv[4];
+    const app = await createApp({});
+    try {
+      const run = app.store.getRun(runId);
+      if (run === null) die(`run not found: ${runId}`, 1);
+      const events = app.store.listEvents(runId);
+      const seq = seqRaw !== undefined ? Number(seqRaw) : events.length > 0 ? events[events.length - 1]!.seq : 0;
+      if (!Number.isInteger(seq) || seq < 0) die('seq must be a non-negative integer', 2);
+      const state = app.store.stateAtSeq(runId, seq);
+      if (json()) {
+        jsonOutput({ runId, seq: state.seq, stage: state.stage, questionId: state.questionId, objectIdsByKind: state.objectIdsByKind, eventCount: state.events.length });
+      } else {
+        console.log(`run ${runId} @seq ${state.seq} (stage: ${state.stage ?? 'n/a'}, events: ${state.events.length})`);
+        for (const [kind, ids] of Object.entries(state.objectIdsByKind)) console.log(`  ${kind}: ${ids.length}`);
+        const tail = state.events.slice(-5);
+        for (const e of tail) console.log(`  #${e.seq} ${e.type}${e.stage !== undefined ? ` (${e.stage})` : ''}`);
+      }
+    } finally { app.close(); }
+    return;
+  }
+
   if (cmd === 'memory') {
     // Re-audit queue: memory search surface (the substrate had no consumer
     // outside generation). Reads only; trust labels always travel with items.
