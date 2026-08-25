@@ -1,6 +1,6 @@
 # COMPETITION.md — XH-202619 Current Competition Truth
 
-**Verified:** 2026-08-25 against the official pages (URLs below; previous rechecks 2026-08-24, 2026-08-22, 2026-08-21). Re-check before any consequential compliance/submission claim; this file is not allowed to override a newer official rule.
+**Verified:** 2026-08-26 against the official pages (URLs below; previous rechecks 2026-08-25, 2026-08-24, 2026-08-22, 2026-08-21). Re-check before any consequential compliance/submission claim; this file is not allowed to override a newer official rule.
 
 **Official sources (recorded 2026-08-22, re-fetched 2026-08-25):**
 

@@ -40,6 +40,7 @@ import type {
   SourceDocument,
 } from '../../domain/index.js';
 import { canonicalJson, canonicalSha256, sha256Hex } from '../../shared/crypto.js';
+import { truthProfileFromReceipts, truthDisclosureLine, type RunTruthProfile } from '../../app/truth-profile.js';
 import { buildPaperOutline, renderPaperMarkdown } from '../paper-outline.js';
 import { buildCorpusDepthFigure, buildWinRateFigure } from '../../report/figures.js';
 import { buildClaimBindingTable, buildCorpusTable, buildResultsTable, tableToCsv, tableToMarkdown } from '../../report/tables.js';
@@ -145,7 +146,7 @@ const collectMissing = (
   return out;
 };
 
-const buildReport = (d: ExportInputs, missingItems: string[]): string => {
+const buildReport = (d: ExportInputs, missingItems: string[], truth: RunTruthProfile): string => {
   const L: string[] = [];
   const push = (...lines: string[]) => L.push(...lines);
 
@@ -546,6 +547,7 @@ const buildReport = (d: ExportInputs, missingItems: string[]): string => {
         : `否（${nonLive.length} 条非 live：${nonLive.map((r) => r.executionMode).join('、')}）`
     }`,
   );
+  push(`- ${truthDisclosureLine(truth)}`);
   push(`- 缺失项：${missingItems.length === 0 ? '无已知缺失项' : missingItems.join('；')}`);
   push('');
 
@@ -645,7 +647,10 @@ export const exportStage: StageHandler = {
       statReports: ctx.store.listObjects('stat_report', run.id),
     };
     const missingItems = collectMissing(inputs, { lockMissing, receipts });
-    const report = buildReport(inputs, missingItems);
+    // §5.5 execution truth: one deterministic projection over the SAME receipt window
+    // the report §9 summarizes (pre-export). Local export receipts never affect the class.
+    const truth = truthProfileFromReceipts(run.id, receipts);
+    const report = buildReport(inputs, missingItems, truth);
     const reportPut = await ctx.artifacts.put(report);
 
     // BP-3 research-product layer: IMRaD paper outline + deterministic limitations +
@@ -719,8 +724,13 @@ export const exportStage: StageHandler = {
     });
 
     const allReceipts = ctx.store.listObjects('receipt', run.id);
+    // Bundle limitations carry the full-window truth line whenever the run is not
+    // fully live (synthetic / replayed / mixed external evidence must not be able
+    // to hide inside a bundle that looks reproducible-live).
+    const truthAll = truthProfileFromReceipts(run.id, allReceipts);
     const limitations = [
       '模型环节为 LLM 生成、具有非确定性：bundle 可复放的是输入快照、模型元数据、receipts 与工件哈希，不保证重新生成逐字节一致的输出。',
+      ...(truthAll.klass !== 'live' ? [truthDisclosureLine(truthAll)] : []),
       ...collectMissing(inputs, { lockMissing, receipts: allReceipts }),
     ];
 

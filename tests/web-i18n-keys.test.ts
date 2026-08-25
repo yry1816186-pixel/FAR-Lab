@@ -3,7 +3,7 @@ import { zh, en } from '../web/src/i18n/dict';
 import {
   stageKey, goalTypeKey, qualityKey, receiptKindKey, executionModeKey,
   availabilityKey, stepKindKey, contentDepthKey, accessStateKey, bindingKey,
-  bindingZhKey, relationKey, retrievalPurposeKey,
+  bindingZhKey, relationKey, retrievalPurposeKey, truthClassKey,
 } from '../web/src/i18n/keys';
 
 /**
@@ -24,6 +24,7 @@ const ACCESS = ['open', 'restricted', 'paywalled', 'unavailable', 'unknown'] as 
 const BINDINGS = ['verified', 'resolved_unaligned', 'unresolved', 'missing'] as const;
 const RELATIONS = ['supports', 'contradicts', 'weakens', 'qualifies', 'depends_on', 'derived_from', 'replicates', 'fails_to_replicate', 'alternative_explanation', 'methodological_limitation', 'unknown'] as const;
 const PURPOSES = ['discovery', 'supporting', 'counter_evidence', 'methodological', 'identifier_resolution', 'gap_followup'] as const;
+const TRUTH_CLASSES = ['live', 'mixed', 'recorded_replay', 'synthetic', 'empty'] as const;
 
 describe('i18n key builders — domain-union to dictionary exhaustiveness', () => {
   it('every stage/goalType/quality value has zh+en entries', () => {
@@ -49,5 +50,8 @@ describe('i18n key builders — domain-union to dictionary exhaustiveness', () =
     expect(zh).toHaveProperty(bindingZhKey('verified'));
     for (const k of RELATIONS.map(relationKey)) { expect(zh).toHaveProperty(k); expect(en).toHaveProperty(k); }
     for (const k of PURPOSES.map(retrievalPurposeKey)) { expect(zh).toHaveProperty(k); expect(en).toHaveProperty(k); }
+    for (const k of TRUTH_CLASSES.map(truthClassKey)) { expect(zh).toHaveProperty(k); expect(en).toHaveProperty(k); }
+    expect(zh).toHaveProperty('truth.title');
+    expect(en).toHaveProperty('truth.title');
   });
 });

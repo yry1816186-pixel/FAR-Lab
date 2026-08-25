@@ -3,6 +3,7 @@ import path from 'node:path';
 import { z } from 'zod';
 import { EvidenceLevel, ReproducibilityBundle } from '../domain/provenance.js';
 import type { ProvenanceReceipt } from '../domain/provenance.js';
+import { truthProfileFromReceipts } from './truth-profile.js';
 import { sha256Hex } from '../shared/crypto.js';
 import type { DomainObject, ObjectKind, Store } from '../persistence/store.js';
 import type { ArtifactStore } from '../shared/ports.js';
@@ -140,12 +141,21 @@ const checkReceipts = (store: Store, bundle: ReproducibilityBundle): Verificatio
     }
   }
 
+  // §5.5 run-level truth disclosure: a bundle whose receipt set is not fully live
+  // MUST carry the execution-truth limitation line (written by the export stage).
+  // This is the regression lock that keeps synthetic/replayed/mixed runs from
+  // hiding inside a bundle that reads as reproducible-live.
+  const truth = truthProfileFromReceipts(bundle.runId, receipts);
+  if (truth.klass !== 'live' && !bundle.limitations.some((l) => l.includes('执行真实性'))) {
+    problems.push(`bundle 执行真实性为 ${truth.klass} 但 limitations 未携带执行真实性披露行`);
+  }
+
   const pairsText = (pairs: readonly string[]): string => `{${pairs.join(', ')}}`;
   return {
     name,
     passed: problems.length === 0,
     detail: problems.length === 0
-      ? `${bundle.receiptIds.length} 条 receipt 全部可读取；receipts 模型组合 ${pairsText([...actual.keys()])} 与 modelMetadata ${pairsText([...declared.keys()])} 一致（含 route/executionMode 方向）`
+      ? `${bundle.receiptIds.length} 条 receipt 全部可读取；receipts 模型组合 ${pairsText([...actual.keys()])} 与 modelMetadata ${pairsText([...declared.keys()])} 一致（含 route/executionMode 方向）；执行真实性=${truth.klass}`
       : problems.join('；'),
   };
 };

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { RunTruthProfile } from '../../api/types';
 
 /**
  * AVO fusion G2/G3/G8 web projection — the "Living Research Workspace" data
@@ -31,6 +32,24 @@ async function getJson<T>(path: string): Promise<T> {
   const res = await fetch(path);
   if (!res.ok) throw Object.assign(new Error(`GET ${path} -> ${res.status}`), { status: res.status });
   return res.json() as Promise<T>;
+}
+
+/**
+ * Execution-truth projection (§5.5, GET /runs/:id/truth): the run-level receipt-derived
+ * class (live / mixed / synthetic / recorded_replay / empty) shown in the run header.
+ * Silent-fail by design: the badge simply stays absent when the projection is unavailable.
+ */
+export function useRunTruth(runId: string | undefined): RunTruthProfile | null {
+  const [truth, setTruth] = useState<RunTruthProfile | null>(null);
+  useEffect(() => {
+    if (runId === undefined || runId === '') { setTruth(null); return; }
+    const ctrl = new AbortController();
+    void getJson<RunTruthProfile>(`/api/v1/runs/${encodeURIComponent(runId)}/truth`)
+      .then((t) => { if (!ctrl.signal.aborted) setTruth(t); })
+      .catch(() => { if (!ctrl.signal.aborted) setTruth(null); });
+    return () => ctrl.abort();
+  }, [runId]);
+  return truth;
 }
 
 /** One fetch per projection, abortable; failures surface per-section, never blank the page. */

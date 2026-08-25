@@ -1,9 +1,14 @@
 import { Badge, TimeAgo } from '../common';
 import { runProgress } from '../../api/types';
-import type { ResearchRun } from '../../api/types';
+import type { ResearchRun, RunTruthClass } from '../../api/types';
 import { useI18n } from '../../i18n/LanguageContext';
 import { runStatusKey, runStatusTone } from '../../tones';
-import { stageKey } from '../../i18n/keys';
+import { stageKey, truthClassKey } from '../../i18n/keys';
+import { useRunTruth } from './ResearchStatePanel';
+import type { BadgeTone } from '../common';
+
+/** §5.5: the truth badge never lies by tone — only live is green; every non-live class warns. */
+const truthTone = (c: RunTruthClass): BadgeTone => (c === 'live' ? 'ok' : c === 'empty' ? 'muted' : 'warn');
 
 /**
  * Research page header: the study IS the page. The question the researcher
@@ -17,11 +22,29 @@ export function RunHeader({ run }: { run: ResearchRun }): JSX.Element {
   const active = run.status === 'running' || run.status === 'queued';
   const settling = run.status === 'paused' || run.status === 'partial';
   const question = run.questionText?.trim();
+  const truth = useRunTruth(run.id);
 
   return (
     <header className="run-header">
       <div className="run-header-meta">
         <Badge tone={runStatusTone(run.status)}>{t(runStatusKey(run.status))}</Badge>
+        {truth !== null && (
+          <Badge
+            tone={truthTone(truth.klass)}
+            title={t('truth.title', {
+              klass: truth.klass,
+              live: truth.modelCalls.live,
+              test: truth.modelCalls.test,
+              rlive: truth.retrieval.live,
+              hit: truth.retrieval.hit,
+              stale: truth.retrieval.stale,
+              replay: truth.retrieval.replay,
+              total: truth.totalReceipts,
+            })}
+          >
+            {t(truthClassKey(truth.klass))}
+          </Badge>
+        )}
         {run.domain !== undefined && run.domain.length > 0 && (
           <span className="run-header-domain" title={t('runs.domain')}>{run.domain}</span>
         )}

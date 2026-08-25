@@ -15,6 +15,7 @@ import { ink, log, marker, out, table, padColumns } from './term.js';
 import { isActiveStatus, statusInk, watchLines } from './watch.js';
 import { analyzeTrajectory } from '../app/supervisor.js';
 import { buildLineageGraph } from '../app/lineage.js';
+import { runTruthProfile, truthDisclosureLine } from '../app/truth-profile.js';
 
 /** D-031: refuse to execute stages on a dist older than src (stale-build live incident). */
 const assertDistFresh = (): void => {
@@ -814,13 +815,17 @@ const main = async (): Promise<void> => {
       // (recoverable via `far research resume <id>`: expired leases are reclaimable).
       const lease = app.store.getRunLease(rid);
       const live = lease.holder !== null && (lease.expiresAt ?? '') > new Date().toISOString();
+      // §5.5 execution truth: deterministic receipt-derived class, visible on the
+      // same surface researchers already use to judge a run.
+      const truth = runTruthProfile(app.store, rid);
       if (json()) {
         // single JSON object for machine consumers (two blobs would break JSON.parse(stdout))
         const { stages, ...rest } = run;
-        jsonOutput({ ...rest, progress: runProgress(run), stages, lease: { holder: lease.holder, expiresAt: lease.expiresAt, live } });
+        jsonOutput({ ...rest, progress: runProgress(run), stages, lease: { holder: lease.holder, expiresAt: lease.expiresAt, live }, truth });
       } else {
         printRun(run);
         out(`  ${ink.bold('lease')}: ${lease.holder === null ? 'none' : `${lease.holder} (expires ${lease.expiresAt})`}${run.status === 'running' && !live ? `  ${ink.warn('[FROZEN — resume to recover]')}` : ''}`);
+        out(`  ${truthDisclosureLine(truth)}`);
       }
     } finally { app.close(); }
     return;
