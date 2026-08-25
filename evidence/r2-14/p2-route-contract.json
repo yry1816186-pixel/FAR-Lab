@@ -1,7 +1,7 @@
 {
   "probe": "p2-route-contract",
   "verdict": "PASS",
-  "summary": "69 client-declared routes probed against the real server: {\"OK\":13,\"EXISTS_VALID\":46,\"EXISTS_UNAVAIL\":2,\"EXISTS_404\":8}",
+  "summary": "70 client-declared routes probed against the real server: {\"OK\":13,\"EXISTS_VALID\":47,\"EXISTS_UNAVAIL\":2,\"EXISTS_404\":8}",
   "findings": [],
   "meta": {
     "routes": [
@@ -305,7 +305,7 @@
             "method": "GET",
             "status": 200,
             "code": null,
-            "message": "{\"bundleId\":\"probe_x\",\"runId\":\"unknown\",\"declaredEvidenceLevel\":\"unknown\",\"verifiedAt\":\"2026-08-25T16:12:08.437Z\",\"check"
+            "message": "{\"bundleId\":\"probe_x\",\"runId\":\"unknown\",\"declaredEvidenceLevel\":\"unknown\",\"verifiedAt\":\"2026-08-25T17:48:35.903Z\",\"check"
           }
         ]
       },
@@ -385,7 +385,7 @@
             "method": "GET",
             "status": 200,
             "code": null,
-            "message": "{\"status\":\"ok\",\"db\":\"ok\",\"auditChain\":{\"ok\":true,\"brokenRuns\":[],\"verifiedAt\":\"2026-08-25T16:12:08.444Z\"},\"watchdog\":\"ok"
+            "message": "{\"status\":\"ok\",\"db\":\"ok\",\"auditChain\":{\"ok\":true,\"brokenRuns\":[],\"verifiedAt\":\"2026-08-25T17:48:35.911Z\"},\"watchdog\":\"ok"
           }
         ]
       },
@@ -689,7 +689,7 @@
             "method": "POST",
             "status": 201,
             "code": null,
-            "message": "{\"conversation\":{\"id\":\"conv_vw45sk272js1q17c4k2aw4cyab\",\"title\":\"新对话\",\"status\":\"open\",\"messages\":[],\"runIds\":[],\"turns\":"
+            "message": "{\"conversation\":{\"id\":\"conv_sefjnxanhpe4qqtw4ay8cfkjfb\",\"title\":\"新对话\",\"status\":\"open\",\"messages\":[],\"runIds\":[],\"turns\":"
           }
         ]
       },
@@ -913,7 +913,7 @@
             "method": "GET",
             "status": 200,
             "code": null,
-            "message": "{\"version\":\"0.1.0\",\"dataDir\":\"C:\\\\Users\\\\RICHAR~1\\\\AppData\\\\Local\\\\Temp\\\\r14-api-0AZD3k\"}"
+            "message": "{\"version\":\"0.1.0\",\"dataDir\":\"C:\\\\Users\\\\RICHAR~1\\\\AppData\\\\Local\\\\Temp\\\\r14-api-GboCTU\"}"
           }
         ]
       },
@@ -1106,6 +1106,22 @@
             "status": 400,
             "code": "validation",
             "message": "invalid runId format: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/ingest",
+        "declaredMethod": "POST",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/utils/ingest.ts"
+        ],
+        "attempts": [
+          {
+            "method": "POST",
+            "status": 400,
+            "code": "validation",
+            "message": "ingest: fileName must be a 1-300 char basename (no path separators)"
           }
         ]
       }

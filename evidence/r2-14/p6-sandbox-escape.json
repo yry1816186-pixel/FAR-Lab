@@ -1,12 +1,12 @@
 {
   "probe": "p6-sandbox-escape",
   "verdict": "ADVISORY",
-  "summary": "layer A (TS policy): 8/8; layer B (python namespace, live sidecar): 11/11",
+  "summary": "layer A (TS policy): 8/8; layer B (python namespace, live sidecar): 10/11",
   "findings": [
     {
       "severity": "ADV",
-      "id": "P6-NUMPY-LIMITED",
-      "detail": "layer B observation numpy-submodule-import-limitation: {\"id\":\"numpy-submodule-import-limitation\",\"ok\":false,\"errorKind\":\"ImportError\",\"errorMessage\":\"exploration namespace does not provide 'numpy._core._methods'; allowed: ['collections', 'csv', 'datetime', 'decimal', 'fractions', 'hashlib', 'itertools', 'json\",\"stdout\":\"\"} — numpy surface partially functional; submodule-importing ops fail closed (handoff to lane 10)"
+      "id": "P6-NUMPY-OK",
+      "detail": "layer B observation numpy-submodule-import-limitation: {\"id\":\"numpy-submodule-import-limitation\",\"ok\":true,\"errorKind\":null,\"errorMessage\":\"None\",\"stdout\":\"6\\n\"} — numpy surface partially functional; submodule-importing ops fail closed (handoff to lane 10)"
     }
   ],
   "meta": {
@@ -91,10 +91,10 @@
       },
       {
         "id": "numpy-submodule-import-limitation",
-        "ok": false,
-        "errorKind": "ImportError",
-        "errorMessage": "exploration namespace does not provide 'numpy._core._methods'; allowed: ['collections', 'csv', 'datetime', 'decimal', 'fractions', 'hashlib', 'itertools', 'json",
-        "stdout": ""
+        "ok": true,
+        "errorKind": null,
+        "errorMessage": "None",
+        "stdout": "6\n"
       },
       {
         "id": "open-cwd",

@@ -56,7 +56,10 @@ describe('approve + rerun: the confirmatory arc (meta path)', () => {
       createdAt: new Date().toISOString(),
     });
     store.putObject('hypothesis', hyp);
-    const claims = ['OR 0.55 (95% CI 0.35 to 0.85)', 'OR 0.65 (95% CI 0.45 to 0.92)', 'OR 0.50 (95% CI 0.30 to 0.80)']
+    // 06-10 s2 (HK): narrow homogeneous CIs so the HONEST t_{k-2} interval still
+    // excludes the log null at k=4 (pre-computed: pooled -0.698, HK CI [-0.772, -0.624]);
+    // the old wide-CI fixture only cleared the now-corrected small-k z under-coverage.
+    const claims = ['OR 0.50 (95% CI 0.48 to 0.52)', 'OR 0.48 (95% CI 0.46 to 0.50)', 'OR 0.52 (95% CI 0.50 to 0.54)', 'OR 0.49 (95% CI 0.47 to 0.51)']
       .map((t) => ScientificClaim.parse({
         id: newId('clm'), runId, text: `Trial reports ${t}.`,
         locators: [{ sourceDocumentId: newId('src'), quote: t }],
@@ -82,7 +85,7 @@ describe('approve + rerun: the confirmatory arc (meta path)', () => {
     rawOutput: JSON.stringify({
       estimates: claimIds.map((cid, i) => ({
         claimId: cid, sourceDocumentId: docIds[i], measure: 'or',
-        point: [0.55, 0.65, 0.5][i], ciLow: [0.35, 0.45, 0.3][i], ciHigh: [0.85, 0.92, 0.8][i],
+        point: [0.5, 0.48, 0.52, 0.49][i], ciLow: [0.48, 0.46, 0.5, 0.47][i], ciHigh: [0.52, 0.5, 0.54, 0.51][i],
       })),
     }),
   });

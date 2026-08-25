@@ -1,43 +1,8 @@
 {
   "probe": "p1-wiring",
   "verdict": "ADVISORY",
-  "summary": "209 src modules; 13 unreachable from [src/server/main.ts, src/cli/main.ts]: 0 orphans, 13 test-only, 0 script-only; 3 files with non-literal dynamic imports",
+  "summary": "208 src modules; 5 unreachable from [src/server/main.ts, src/cli/main.ts]: 0 orphans, 5 test-only, 0 script-only; 3 files with non-literal dynamic imports",
   "findings": [
-    {
-      "severity": "ADV",
-      "id": "P1-TEST-ONLY",
-      "detail": "src module wired only from tests: src/app/campaign-driver.ts (importers: test:tests/campaign-driver.test.ts, test:tests/science-rank-statistics.test.ts)"
-    },
-    {
-      "severity": "ADV",
-      "id": "P1-TEST-ONLY",
-      "detail": "src module wired only from tests: src/app/campaign.ts (importers: test:tests/campaign-driver.test.ts, test:tests/campaign-runtime.test.ts)"
-    },
-    {
-      "severity": "ADV",
-      "id": "P1-TEST-ONLY",
-      "detail": "src module wired only from tests: src/domain/campaign.ts (importers: test:tests/campaign-driver.test.ts, test:tests/campaign-runtime.test.ts, test:tests/campaign-spec.test.ts)"
-    },
-    {
-      "severity": "ADV",
-      "id": "P1-TEST-ONLY",
-      "detail": "src module wired only from tests: src/domain/conformal.ts (importers: test:tests/stat-forensics.test.ts)"
-    },
-    {
-      "severity": "ADV",
-      "id": "P1-TEST-ONLY",
-      "detail": "src module wired only from tests: src/domain/search-allocation.ts (importers: test:tests/search-allocation.test.ts)"
-    },
-    {
-      "severity": "ADV",
-      "id": "P1-TEST-ONLY",
-      "detail": "src module wired only from tests: src/experiment/executor-simulation.ts (importers: test:tests/experiment-simulation.test.ts)"
-    },
-    {
-      "severity": "ADV",
-      "id": "P1-TEST-ONLY",
-      "detail": "src module wired only from tests: src/experiment/matrix.ts (importers: test:tests/experiment-screening.test.ts, test:tests/experiment.test.ts)"
-    },
     {
       "severity": "ADV",
       "id": "P1-TEST-ONLY",
@@ -65,11 +30,6 @@
     },
     {
       "severity": "ADV",
-      "id": "P1-TEST-ONLY",
-      "detail": "src module wired only from tests: src/providers/deepseek.ts (importers: test:tests/providers.test.ts)"
-    },
-    {
-      "severity": "ADV",
       "id": "P1-DYNAMIC-IMPORT",
       "detail": "non-literal dynamic import() present — graph may under-count reachability: src/plugins/host-main.ts"
     },
@@ -89,72 +49,17 @@
       "src/server/main.ts",
       "src/cli/main.ts"
     ],
-    "totalModules": 209,
-    "reachable": 196,
+    "totalModules": 208,
+    "reachable": 203,
     "unreachable": [
-      "src/app/campaign-driver.ts",
-      "src/app/campaign.ts",
-      "src/domain/campaign.ts",
-      "src/domain/conformal.ts",
-      "src/domain/search-allocation.ts",
-      "src/experiment/executor-simulation.ts",
-      "src/experiment/matrix.ts",
       "src/model-plane/benchmark.ts",
       "src/model-plane/plane.ts",
       "src/model-plane/prompts.ts",
       "src/model-plane/routing.ts",
-      "src/plugins/host-main.ts",
-      "src/providers/deepseek.ts"
+      "src/plugins/host-main.ts"
     ],
     "orphans": [],
     "testOnly": [
-      {
-        "m": "src/app/campaign-driver.ts",
-        "importers": [
-          "test:tests/campaign-driver.test.ts",
-          "test:tests/science-rank-statistics.test.ts"
-        ]
-      },
-      {
-        "m": "src/app/campaign.ts",
-        "importers": [
-          "test:tests/campaign-driver.test.ts",
-          "test:tests/campaign-runtime.test.ts"
-        ]
-      },
-      {
-        "m": "src/domain/campaign.ts",
-        "importers": [
-          "test:tests/campaign-driver.test.ts",
-          "test:tests/campaign-runtime.test.ts",
-          "test:tests/campaign-spec.test.ts"
-        ]
-      },
-      {
-        "m": "src/domain/conformal.ts",
-        "importers": [
-          "test:tests/stat-forensics.test.ts"
-        ]
-      },
-      {
-        "m": "src/domain/search-allocation.ts",
-        "importers": [
-          "test:tests/search-allocation.test.ts"
-        ]
-      },
-      {
-        "m": "src/experiment/executor-simulation.ts",
-        "importers": [
-          "test:tests/experiment-simulation.test.ts"
-        ]
-      },
-      {
-        "m": "src/experiment/matrix.ts",
-        "importers": [
-          "test:tests/experiment-screening.test.ts",
-          "test:tests/experiment.test.ts"
-        ]
-      },
       {
         "m": "src/model-plane/benchmark.ts",
         "importers": [
@@ -184,12 +89,6 @@
         "m": "src/plugins/host-main.ts",
         "importers": [
           "test:tests/plugins.test.ts"
-        ]
-      },
-      {
-        "m": "src/providers/deepseek.ts",
-        "importers": [
-          "test:tests/providers.test.ts"
         ]
       }
     ],
