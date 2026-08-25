@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { grimCheck, eValue, extractMeanN, rangeGuard, extractStats, extractRiskRatios } from '../src/domain/stat-forensics.js';
+import { grimCheck, eValue, extractMeanN, rangeGuard, extractStats, extractRiskRatios, ciPairContext } from '../src/domain/stat-forensics.js';
 import { conformalInterval } from '../src/domain/conformal.js';
 
 // RU-6 GO4 — deterministic statistical forensics (clean-room; scrutiny/statcheck
@@ -43,6 +43,21 @@ describe('quote statistics extraction (deterministic regex)', () => {
     expect(extractMeanN('mean 5.22 but no sample size')).toEqual([]);
   });
 
+  it('lane-06 precision: no mean×n cross-product — ambiguous segments pair nothing', () => {
+    // One sentence carrying two group statistics: old code emitted 4 pairs (2 spurious
+    // GRIM failures that downgraded claim certainty). Ambiguity = honest silence.
+    expect(
+      extractMeanN('mean 3.4 (n=42) for treatment and mean 3.1 (n=40) for controls.'),
+    ).toEqual([]);
+    // mean and n in DIFFERENT sentences are never paired across the boundary
+    expect(extractMeanN('The mean accuracy was 87.3. We enrolled n=30 participants.')).toEqual([]);
+    // semicolons are segment boundaries too — "n=40" (enrollment) and the mean are
+    // in different clauses; pairing them would be the over-pairing this fix removes
+    expect(extractMeanN('enrollment: n=40; the mean score was 5.22')).toEqual([]);
+    // the clean same-segment shape still pairs: this is the check's real target
+    expect(extractMeanN('the mean score was 5.22 (n = 40) across groups')).toEqual([{ mean: 5.22, n: 40, decimals: 2 }]);
+  });
+
   it('SCIENCE lane: extractRiskRatios feeds the (now wired) E-value — RR vocabulary only, bounded', () => {
     expect(extractRiskRatios('the intervention showed RR 2.5 across cohorts')).toEqual([2.5]);
     expect(extractRiskRatios('a risk ratio of 0.4 was observed')).toEqual([0.4]);
@@ -71,6 +86,23 @@ describe('RU-5 GO2 — range/domain guard', () => {
     expect(s.sd).toBe(0.8);
     expect(s.ci).toEqual({ low: 0.9, high: 2.7, point: 1.8 });
     expect(extractStats('no numbers here')).toEqual({});
+  });
+
+  it('lane-06: ciPairContext computes the arithmetic anchor between two quoted CIs', () => {
+    const disjoint = ciPairContext(
+      'an effect of 2.1 (95% CI [1.2, 3.0])',
+      'an effect of 0.4 (95% CI [0.1, 0.9])',
+    );
+    expect(disjoint).not.toBeNull();
+    expect(disjoint!.disjoint).toBe(true); // [1.2,3.0] vs [0.1,0.9] share no interval
+    expect(disjoint!.oppositeSigns).toBe(false);
+    const overlap = ciPairContext('an effect of 1.0 (95% CI [0.5, 1.5])', 'an effect of 1.2 (95% CI [0.8, 1.6])');
+    expect(overlap!.disjoint).toBe(false);
+    const opposite = ciPairContext('a difference of 1.0 (95% CI [0.4, 1.6])', 'a difference of -0.8 (95% CI [-1.5, -0.1])');
+    expect(opposite!.disjoint).toBe(true);
+    expect(opposite!.oppositeSigns).toBe(true);
+    // no CI on one side = no anchor, never fabricated
+    expect(ciPairContext('an effect of 1.8 (95% CI [0.9, 2.7])', 'no interval here')).toBeNull();
   });
 });
 

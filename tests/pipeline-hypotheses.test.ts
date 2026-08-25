@@ -1234,10 +1234,22 @@ describe('rank stage', () => {
     const hc = makeHyp(run.id, 'hypothesis C (lower)', { createdAt: ts(2) });
     const hdup = makeHyp(run.id, 'duplicate of A', { duplicateOf: ha.id, createdAt: ts(3) });
     for (const h of [ha, hb, hc, hdup]) store.putObject('hypothesis', h);
+    // lane-06: one supporting relation for A — ungraded claim carries no LR weight but
+    // DOES count as an independent source, so A's deterministic grounding is
+    // mean(band none 0.1, QBAF 0.5) = 0.300; B and C have zero relations -> 0.000.
+    store.putObject(
+      'evidence_relation',
+      EvidenceRelation.parse({
+        id: newId('ev'), runId: run.id, relation: 'supports', claimId: c1.id,
+        targetHypothesisId: ha.id, rationale: 'fixture support link',
+        strength: 'unrated', uncertainties: [], createdAt: ts(0),
+      }),
+    );
 
-    // A composite = 0.2*0.8 + 0.8-weighted rest at 0.5 = 0.56
-    // B composite = 0.2*0.6 + rest at 0.55             = 0.56  -> tie broken by evidence_grounding
-    // C composite = (0.3 + 0.05*(1-0.2)) / 1.05        = 0.3238 (direction-known resource_cost)
+    // lane-06: evidence_grounding is now the DETERMINISTIC body value (LLM self-scores replaced).
+    // A: eg 0.3 (1 unrated source) -> 0.2*0.3 + 0.8*0.5        = 0.4600
+    // B: eg 0.0 (no relations)    -> 0.8*0.575                 = 0.4600 -> tie broken by grounding 0.3 > 0.0
+    // C: eg 0.0                   -> (0.8*0.3 + 0.05*0.8)/1.05 = 0.2667 (direction-known resource_cost)
     const rankOut = {
       assessments: [
         {
@@ -1250,7 +1262,7 @@ describe('rank stage', () => {
         },
         {
           hypothesisId: hb.id,
-          dimensions: [{ ...dim('evidence_grounding', 0.6) }, ...CORE_DIMS(0.55).slice(1), dim('uncertainty', null)],
+          dimensions: [{ ...dim('evidence_grounding', 0.6) }, ...CORE_DIMS(0.575).slice(1), dim('uncertainty', null)],
         },
         {
           hypothesisId: hc.id,
@@ -1284,16 +1296,25 @@ describe('rank stage', () => {
     expect(cardOf(ha.id)).toMatchObject({ rank: 1, rankedOutOf: 3 });
     expect(cardOf(hb.id)).toMatchObject({ rank: 2, rankedOutOf: 3 });
     expect(cardOf(hc.id)).toMatchObject({ rank: 3, rankedOutOf: 3 });
-    expect(cardOf(ha.id)?.overallRationale).toContain('0.5600');
-    expect(cardOf(hc.id)?.overallRationale).toContain('0.3238');
+    expect(cardOf(ha.id)?.overallRationale).toContain('0.4600');
+    expect(cardOf(hc.id)?.overallRationale).toContain('0.2667');
+    expect(cardOf(hb.id)?.overallRationale).toContain('0.4600'); // engineered tie with A
     expect(cardOf(ha.id)?.overallRationale).toContain('evidence_grounding 0.2');
     expect(cardOf(ha.id)?.comparisonNote).toBe(COMPARISON_NOTE);
     for (const c of cards) {
-      expect(c.dimensions.every((d) => d.producer === 'test-stub/test-stub structured critique')).toBe(true);
-      expect(c.dimensions.every((d) => d.calibration === 'uncalibrated_llm_judgment')).toBe(true);
+      // every NON-grounding dimension stays an uncalibrated stub judgment...
+      expect(c.dimensions.filter((d) => d.dimension !== 'evidence_grounding')
+        .every((d) => d.producer === 'test-stub/test-stub structured critique' && d.calibration === 'uncalibrated_llm_judgment')).toBe(true);
+      // ...while the grounding dimension is the deterministic measurement
+      const g = c.dimensions.find((d) => d.dimension === 'evidence_grounding');
+      expect(g?.calibration).toBe('deterministic');
+      expect(g?.producer).toContain('deterministic-evidence-body');
     }
     const eg = cardOf(ha.id)?.dimensions.find((d) => d.dimension === 'evidence_grounding');
-    expect(eg?.evidenceClaimIds).toEqual([c1.id]); // invalid ref filtered
+    expect(eg?.value).toBe(0.3); // mean(band none 0.1, QBAF 0.5) — 1 unrated source
+    expect(eg?.evidenceClaimIds).toEqual([c1.id]); // deterministic supporting-relation claim ids
+    expect(cardOf(hb.id)?.dimensions.find((d) => d.dimension === 'evidence_grounding')?.value).toBe(0);
+    expect(summary).toContain('replaced by the deterministic evidence-body measurement');
 
     // deterministic top-2 comparison persisted as a content-addressed artifact
     const refs = outcome.kind === 'done' ? outcome.artifacts ?? [] : [];
