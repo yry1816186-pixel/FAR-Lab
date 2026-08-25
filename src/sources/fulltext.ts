@@ -1,6 +1,10 @@
 import type { SourceDocument } from '../domain/source.js';
 import { httpGet, type SourceAdapterOptions } from './http.js';
 import { isSourceAdapterError } from './error.js';
+import { parseJats } from '../ingest/parsers/jats.js';
+import { parseTei } from '../ingest/parsers/tei.js';
+import { parseLatexml } from '../ingest/parsers/latexml.js';
+import type { SdmDocument } from '../ingest/sdm.js';
 
 /**
  * Fulltext phase A (2026-08-22, W-EV2): deepen selected corpus documents from
@@ -30,6 +34,15 @@ export interface FullTextFetch {
   sourceUrl: string;
   /** Extracted plain text (paragraph breaks preserved, markup removed). */
   text: string;
+  /**
+   * SDM-1 structured understanding of the SAME payload (MULTIMODAL lane,
+   * 2026-08-24): typed blocks/figures/tables/equations/citations with
+   * elementPath provenance and honest parseStatus. Present on every 'fetched'
+   * result; `text` above stays byte-identical to the legacy projection so
+   * corpus artifacts and receipts are unaffected. Consumers persist via
+   * ingestSdm/persistSdm and keep the artifact ref on the document.
+   */
+  sdm: SdmDocument;
   /** License statement carried by the source, when present (recorded on the document). */
   license?: string;
   httpStatus: number;
@@ -238,7 +251,13 @@ export const fetchArxivHtmlFullText = async (
     }
     return {
       status: 'fetched',
-      fetch: { variant: 'arxiv_html_v1', sourceUrl: route.sourceUrl, text, httpStatus: res.status },
+      fetch: {
+        variant: 'arxiv_html_v1',
+        sourceUrl: route.sourceUrl,
+        text,
+        sdm: parseLatexml(res.bodyText, { name: `arxiv-${route.id}-latexml.html`, url: route.sourceUrl }),
+        httpStatus: res.status,
+      },
     };
   } catch (e) {
     return { status: 'error', message: `arxiv html ${route.id}: ${e instanceof Error ? e.message : String(e)}` };
@@ -278,6 +297,11 @@ export const fetchEuropePmcFullText = async (
           variant: 'europepmc_jats_v1',
           sourceUrl: route.sourceUrl,
           text: jats.text,
+          sdm: parseJats(res.bodyText, {
+            name: `europepmc-${route.id}-jats.xml`,
+            url: route.sourceUrl,
+            ...(jats.license !== undefined ? { license: jats.license } : {}),
+          }),
           license: jats.license,
           httpStatus: res.status,
         },
@@ -338,7 +362,13 @@ export const fetchOpenAlexTeiFullText = async (
     }
     return {
       status: 'fetched',
-      fetch: { variant: 'openalex_tei_v1', sourceUrl: route.sourceUrl, text, httpStatus: res.status },
+      fetch: {
+        variant: 'openalex_tei_v1',
+        sourceUrl: route.sourceUrl,
+        text,
+        sdm: parseTei(res.bodyText, { name: `openalex-${route.id}-tei.xml`, url: route.sourceUrl }),
+        httpStatus: res.status,
+      },
     };
   } catch (e) {
     return { status: 'error', message: `openalex tei ${route.id}: ${e instanceof Error ? e.message : String(e)}` };

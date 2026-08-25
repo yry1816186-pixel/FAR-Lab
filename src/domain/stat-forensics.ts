@@ -127,3 +127,26 @@ export const extractStats = (quote: string): { pValue?: number; percent?: number
   }
   return out;
 };
+
+/**
+ * Extract risk-ratio point estimates from a verbatim quote (SCIENCE lane 2026-08-24;
+ * feeds eValue — the one quantitative unmeasured-confounding tool). Bounded regexes:
+ * "RR 1.8", "risk ratio of 2.3", "relative risk 0.6". Positivity enforced downstream.
+ */
+export const extractRiskRatios = (quote: string): number[] => {
+  const out: number[] = [];
+  const patterns = [
+    /\bRR\s*(?:=|:|of)?\s*(\d+(?:\.\d+)?)/i,
+    /\brisk ratio\s*(?:=|:|of)?\s*(\d+(?:\.\d+)?)/i,
+    /\brelative risk\s*(?:=|:|of)?\s*(\d+(?:\.\d+)?)/i,
+  ];
+  for (const re of patterns) {
+    const m = re.exec(quote);
+    if (m !== null) {
+      const v = Number(m[1]);
+      // 0 is degenerate and >100 is almost certainly a misparse of unrelated text
+      if (Number.isFinite(v) && v > 0 && v <= 100) out.push(v);
+    }
+  }
+  return [...new Set(out)];
+};

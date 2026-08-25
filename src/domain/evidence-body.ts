@@ -102,8 +102,15 @@ export const buildEvidenceBody = (input: BuildEvidenceBodyInput): EvidenceBody =
   // QBAF: claim nodes (base = graded certainty level / 4, ungraded 0.5) + the hypothesis node.
   const nodes: { id: string; base: number }[] = [{ id: hypothesisId, base: 0.5 }];
   const edges: { from: string; to: string; weight: number }[] = [];
+  const linkedClaimIds = new Set<string>();
+  const ensureClaimNode = (cid: string): void => {
+    if (nodes.some((n) => n.id === cid)) return;
+    const grade = claimsById.get(cid)?.gradeCertainty;
+    nodes.push({ id: cid, base: grade !== undefined ? (GRADE_ORDER.indexOf(grade) + 1) / 4 : 0.5 });
+  };
   for (const r of mine) {
     if (r.claimId === undefined) continue;
+    linkedClaimIds.add(r.claimId);
     const interval = logLrInterval(r.relation, r.strength);
     if (interval === null) continue;
     const polarity = RELATION_POLARITY[r.relation];
@@ -111,10 +118,30 @@ export const buildEvidenceBody = (input: BuildEvidenceBodyInput): EvidenceBody =
     const sign = polarity === 'supporting' ? 1 : -1;
     const weight = sign * clamp01(Math.abs((interval[0] + interval[1]) / 2) / 2);
     if (weight === 0) continue;
-    const grade = claimsById.get(r.claimId)?.gradeCertainty;
-    const base = grade !== undefined ? (GRADE_ORDER.indexOf(grade) + 1) / 4 : 0.5;
-    if (!nodes.some((n) => n.id === r.claimId)) nodes.push({ id: r.claimId, base });
+    ensureClaimNode(r.claimId);
     edges.push({ from: r.claimId, to: hypothesisId, weight });
+  }
+  // SCIENCE lane (2026-08-24): claim-claim cross relations (D-018) enter the
+  // argument graph as claim->claim attack/support edges when either endpoint is
+  // part of this body — previously they were persisted but consumed by nothing,
+  // so an adjudicated contradiction could never influence any score. They do
+  // NOT join Σlog-LR (both endpoints' hyp-links already count once there);
+  // the QBAF propagation is where inter-claim conflict belongs mathematically.
+  let crossEdges = 0;
+  for (const r of relations) {
+    if (r.targetClaimId === undefined || r.claimId === undefined) continue;
+    if (!linkedClaimIds.has(r.claimId) && !linkedClaimIds.has(r.targetClaimId)) continue;
+    const interval = logLrInterval(r.relation, r.strength);
+    if (interval === null) continue;
+    const polarity = RELATION_POLARITY[r.relation];
+    if (polarity === 'neutral') continue;
+    const sign = polarity === 'supporting' ? 1 : -1;
+    const weight = sign * clamp01(Math.abs((interval[0] + interval[1]) / 2) / 2);
+    if (weight === 0) continue;
+    ensureClaimNode(r.claimId);
+    ensureClaimNode(r.targetClaimId);
+    edges.push({ from: r.claimId, to: r.targetClaimId, weight });
+    crossEdges += 1;
   }
   const strengths = qbafStrength(nodes, edges);
   const qbafScore = Number((strengths.get(hypothesisId) ?? 0.5).toFixed(6));
@@ -128,7 +155,8 @@ export const buildEvidenceBody = (input: BuildEvidenceBodyInput): EvidenceBody =
   const disclosure =
     `${summary.contributions} evidential relation(s) from ${independentSources} independent source(s); ` +
     `${summary.sourcesCapped} dropped by the per-source cap (correlated evidence ≠ independent confirmation); ` +
-    `${summary.excluded} neutral/structural relation(s) excluded; floor certainty=${floorCertainty ?? 'ungraded'}; ` +
+    `${summary.excluded} neutral/structural relation(s) excluded${crossEdges > 0 ? `; ${crossEdges} claim-claim conflict/support edge(s) propagating in the argument graph` : ''}; ` +
+    `floor certainty=${floorCertainty ?? 'ungraded'}; ` +
     `Σlog10LR ∈ [${summary.low.toFixed(2)}, ${summary.high.toFixed(2)}] → band ${bandOf(summary.midpoint)}; ` +
     `experimentalAxes=${experimentalAxes} → promotion=${promotion} (g7: ≥2 orthogonal axes required for full promotion).`;
 

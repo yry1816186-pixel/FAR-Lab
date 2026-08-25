@@ -342,7 +342,10 @@ describe('build_evidence stage', () => {
     expect(rel.relation).toBe('supports');
     expect(rel.claimId).toBe(claim.id);
     expect(rel.targetHypothesisId).toBeUndefined();
-    expect(rel.strength).toBe('unrated');
+    // SCIENCE lane: deterministic strength — verified + non-quantitative text grades
+    // moderate (imprecision domain) -> 'weak'; derivation note is auditable.
+    expect(rel.strength).toBe('weak');
+    expect(rel.uncertainties.some((u) => u.includes('strength-v1'))).toBe(true);
     expect(RELATION_POLARITY[rel.relation]).toBe('supporting');
 
     const receipts = store.listObjects('receipt', ctx.run.id);
@@ -351,6 +354,34 @@ describe('build_evidence stage', () => {
     expect(receipts[0]?.kind).toBe('model_call');
     expect(receipts[0]?.stage).toBe('build_evidence');
     expect(receipts[1]?.modelCall?.usage).toBeDefined();
+  });
+
+  it('SCIENCE lane: quote carrying a risk ratio gets the E-value confounding disclosure (eValue activated)', async () => {
+    // The VanderWeele-Ding closed form existed with ZERO production callers; this
+    // locks the wiring: RR in the verbatim quote -> E-value note on the claim.
+    const ABSTRACT_RR =
+      'A cohort study of 4,000 workers found the exposure carried a risk ratio of 2.5 for the respiratory endpoint. ' +
+      'Adjustment for smoking attenuated the estimate only marginally.';
+    const { ctx, store } = bench([
+      extractionStep([
+        {
+          text: 'Exposure doubles respiratory risk (RR 2.5).',
+          quote: 'the exposure carried a risk ratio of 2.5 for the respiratory endpoint',
+          stance: 'supports',
+        },
+      ]),
+    ]);
+    const src = mkSource(ctx.run.id, newId('src'), { abstractText: ABSTRACT_RR });
+    corpusOf(ctx, [src]);
+    const outcome = await buildEvidenceStage.execute(ctx);
+    expect(outcome.kind).toBe('done');
+    const claims = store.listObjects('claim', ctx.run.id);
+    expect(claims).toHaveLength(1);
+    const claim = defined(claims[0], 'claim');
+    expect(claim.bindingStatus).toBe('verified');
+    const eNote = claim.uncertainties.find((u) => u.includes('E-value'));
+    expect(eNote).toBeDefined();
+    expect(eNote).toContain('RR');
   });
 
   it('D-018: cross-paper claim pairs with topical overlap get adjudicated claim-claim relations (targetClaimId)', async () => {
@@ -418,6 +449,18 @@ describe('build_evidence stage', () => {
     expect(a?.locators[0]?.sourceDocumentId).not.toBe(b?.locators[0]?.sourceDocumentId);
     expect(cross.rationale).toContain('claim-claim contradicts');
     expect(cross.rationale).toContain('direction of the yield effect');
+
+    // SCIENCE lane (2026-08-24): the contradiction loop now CLOSES —
+    // (a) cross-relation strength derives deterministically (verified + quantitative
+    //     endpoints -> moderate), and (b) both endpoint claims' certainty is rescored
+    //     one step down (high -> moderate) with an auditable uncertainty note.
+    expect(cross.strength).toBe('moderate');
+    expect(cross.uncertainties.some((u) => u.includes('weaker endpoint'))).toBe(true);
+    expect(outcome.kind === 'done' && outcome.summary.includes('2 claim(s) certainty-downgraded by contradiction rescore')).toBe(true);
+    for (const c of [a, b]) {
+      expect(c?.gradeCertainty).toBe('moderate');
+      expect(c?.uncertainties.some((u) => u.includes('inconsistency rescore'))).toBe(true);
+    }
 
     // 4 model calls: 2 extractions + gap assessment + cross adjudication
     const modelCalls = store.listObjects('receipt', ctx.run.id).filter((r) => r.kind === 'model_call');
@@ -559,7 +602,10 @@ describe('build_evidence stage', () => {
       expect(rel.relation).toBe(e.relation);
       expect(RELATION_POLARITY[rel.relation]).toBe(e.polarity);
       expect(rel.rationale.length).toBeGreaterThan(0);
-      expect(rel.strength).toBe('unrated');
+      // 'M1'..'M4' contain digits -> quantitative -> grade high -> 'moderate'
+      // (deterministic mapping; every relation carries its derivation note).
+      expect(rel.strength).toBe('moderate');
+      expect(rel.uncertainties.some((u) => u.includes('strength-v1'))).toBe(true);
     }
     if (outcome.kind === 'done') {
       expect(outcome.summary).toContain('supports=1');

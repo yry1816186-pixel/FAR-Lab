@@ -38,12 +38,13 @@ const PLAN_SYSTEM_PROMPT = [
   'Multiple-testing discipline (POPPER-extracted): when the plan discriminates between MORE THAN ONE hypothesis, several ' +
     'inferential checks will run and the chance that something looks falsified/supportive by luck grows with their number. ' +
     'State multipleTestingPolicy explicitly — "single_primary" (designate THE primary comparison that carries the decision; ' +
-    'everything else is secondary/descriptive), "alpha_spending" (split a pre-declared error budget across staged checks), ' +
-    'or "e_value_accumulation" (anytime-valid e-values aggregated across checks) — and justify the allocation in ' +
-    'multipleTestingNote. Single-hypothesis plans may omit it (one primary comparison by construction).',
+    'everything else is secondary/descriptive) or "alpha_spending" (split a pre-declared error budget across staged checks) — ' +
+    'and justify the allocation in multipleTestingNote. Do NOT declare "e_value_accumulation": no e-value estimator is ' +
+    'implemented, such plans fail validation. Single-hypothesis plans may omit it (one primary comparison by construction).',
   'Structured preregistration (Wave-S): alongside the prose fields, provide metricSpecs (name/definition/role primary|secondary/' +
-    'direction higher_better|lower_better|two_sided), testSpecs (metric binding + statistic permutation|bootstrap_ci|wilson|kappa|' +
-    'mde_gate|descriptive + predicted effect supports|weakens|excludes + threshold + thresholdOp), and predictions per hypothesis ' +
+    'direction higher_better|lower_better|two_sided), testSpecs (metric binding + statistic bootstrap_ci|descriptive — ONLY these ' +
+    'have executors today, do NOT promise permutation/wilson/kappa/mde_gate; such specs fail the preregistration-integrity gate — ' +
+    '+ predicted effect supports|weakens|excludes + threshold + thresholdOp), and predictions per hypothesis ' +
     '{observable, condition, expectedRelation} — two hypotheses genuinely compete ONLY if they predict different relations for the ' +
     'same observable+condition. Provide expectedInfoGain {decisionAtStake, ambiguitySource, discriminatingMetric, expectedSeparation} ' +
     'when the plan discriminates >1 hypothesis or has branches; step gates {proceedIf, killIf} for experiment steps; replication ' +

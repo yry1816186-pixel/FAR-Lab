@@ -17,6 +17,14 @@ export interface StructuredCallRequest {
    */
   jsonSchema?: unknown;
   /**
+   * Server-enforced json_schema response_format (OpenAI-style
+   * response_format:{type:'json_schema',strict:true} — verified on Bailian qwen3.7-plus/
+   * 3.7-max/3.8-max, 2026-08-24). Distinct from jsonSchema (beta tools mode): the plane's
+   * dashscope negotiation sets this ONLY when the capability registry verified the model
+   * supports it; callers keep passing jsonSchema and the adapter decides the wire mode.
+   */
+  responseJsonSchema?: unknown;
+  /**
    * Reasoning-effort override for THIS call (conversation gear > config default).
    * Emitted only when the resolved model route declared a reasoning capability;
    * undefined = zero thinking fields on the wire (legacy behavior, safe for any
@@ -55,6 +63,23 @@ export interface StructuredCallResult<T> {
      * declared capability or the call carried no override) — reproducibility evidence.
      */
     reasoningGear?: 'low' | 'medium' | 'high';
+    /**
+     * Model-plane provenance (2026-08-24): echo of the generation parameters actually
+     * sent (reproducibility — requestHash covers payload, this covers knobs) and the
+     * routing decision that selected this route (task class + selection rule). Absent
+     * on legacy/pre-plane results.
+     */
+    params?: {
+      temperature?: number;
+      maxTokens?: number;
+      structuredOutput?: 'json_object' | 'json_schema_strict' | 'strict_tools' | 'prompt_contract';
+      reasoning?: { style: string; gear: string };
+    };
+    routing?: {
+      taskClass: string;
+      route: string;
+      selectedVia: string;
+    };
     executionMode: 'live' | 'test';
   };
 }
@@ -94,6 +119,13 @@ export interface RawSourceRecord {
 export interface SourceAdapter {
   readonly family: SourceFamily;
   search(query: string, opts?: { limit?: number }): Promise<RawRetrievalResult>;
+  /**
+   * SCIENCE lane (2026-08-24) — citation-graph querying (filter= API param), e.g.
+   * OpenAlex `cites:W123` (forward snowballing) or `ids.openalex:W1|W2` (backward
+   * batch resolve). OPTIONAL: families without filter-style APIs simply omit it and
+   * the retrieve-stage citation chase skips them honestly (no degradation, disclosed).
+   */
+  searchFiltered?(filter: string, opts?: { limit?: number }): Promise<RawRetrievalResult>;
   /** Resolve a persistent identifier to a record (citation resolution path). */
   resolve(identifier: SourceIdentifier): Promise<{ found: boolean; record?: RawSourceRecord; httpStatus: number }>;
 }

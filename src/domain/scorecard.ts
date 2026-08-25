@@ -81,6 +81,13 @@ export const TournamentStanding = z.object({
   /** (wins + 0.5*ties) / contested matches; 0 when never contested. */
   winRate: z.number().min(0).max(1),
   rank: z.number().int().positive(),
+  /**
+   * Seeded nonparametric bootstrap 95% percentile CI on the BT score (SCIENCE lane
+   * 2026-08-24; Chatbot-Arena-style resampled-MLE uncertainty). Absent for legacy
+   * records and for candidates with no contested matches.
+   */
+  ciLow: z.number().nonnegative().optional(),
+  ciHigh: z.number().nonnegative().optional(),
 });
 export type TournamentStanding = z.infer<typeof TournamentStanding>;
 

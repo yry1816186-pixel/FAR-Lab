@@ -72,7 +72,7 @@ export const SourceDocument = z.object({
 export type SourceDocument = z.infer<typeof SourceDocument>;
 
 export const RetrievalQuery = z.object({
-  purpose: z.enum(['discovery', 'supporting', 'counter_evidence', 'methodological', 'identifier_resolution', 'gap_followup']),
+  purpose: z.enum(['discovery', 'supporting', 'counter_evidence', 'methodological', 'identifier_resolution', 'gap_followup', 'citation_chase']),
   text: z.string().min(1),
   family: SourceFamily.optional(),
 });
@@ -101,6 +101,12 @@ export const RetrievalFusion = z.object({
   failoverSearches: z.number().int().nonnegative().optional(),
   /** W6/F4: listwise-rerank sliding windows executed (absent = single window / no rerank). */
   rerankWindows: z.number().int().positive().optional(),
+  /**
+   * SCIENCE lane (2026-08-24): citation-graph chase searches executed (PRISMA-style
+   * backward referenced_works batch + forward cites: batches). Absent when the
+   * adapter lacks filter support or the pool was empty.
+   */
+  citationChaseSearches: z.number().int().nonnegative().optional(),
   /** Compact human-auditable note of the selection (e.g. "cap 12 of pool 31"). */
   selection: z.string().min(1),
 });

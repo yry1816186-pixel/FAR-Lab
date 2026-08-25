@@ -271,7 +271,17 @@ const buildRequestBody = (modelId: string, messages: ChatMessage[], req: Structu
     model: modelId,
     messages,
   };
-  if (req.jsonSchema !== undefined) {
+  if (req.responseJsonSchema !== undefined) {
+    // Bailian-verified json_schema strict mode (official qwen-structured-output doc
+    // 2026-08-24: qwen3.7-plus / qwen3.7-max / qwen3.8-max families): the server
+    // enforces the schema server-side. Takes precedence over json_object; the caller's
+    // zod parse stays the SEMANTIC authority; adapters set this ONLY after the
+    // capability registry verified the model supports it (dashscope.ts negotiation).
+    body.response_format = {
+      type: 'json_schema',
+      json_schema: { name: 'respond', strict: true, schema: req.responseJsonSchema },
+    };
+  } else if (req.jsonSchema !== undefined) {
     // Strict function-calling mode (DeepSeek beta, probe-verified 2026-08-22): the server
     // enforces the tool's JSON schema on the tool-call arguments — transport-level shape
     // guarantee. The zod parse in the caller stays the SEMANTIC authority (min-lengths,
@@ -298,6 +308,28 @@ const buildRequestBody = (modelId: string, messages: ChatMessage[], req: Structu
   if (req.reasoning !== undefined) Object.assign(body, reasoningBodyFields('openai', req.reasoning));
   return JSON.stringify(body);
 };
+
+/**
+ * Which structured-output wire mode this call actually used (receipt.params echo —
+ * reproducibility: requestHash covers the payload; this records the knobs sent).
+ */
+export const structuredOutputModeOf = (
+  req: StructuredCallRequest,
+  wire: 'openai' | 'anthropic' = 'openai',
+): 'json_object' | 'json_schema_strict' | 'strict_tools' | 'prompt_contract' => {
+  if (wire === 'anthropic') return 'prompt_contract';
+  if (req.responseJsonSchema !== undefined) return 'json_schema_strict';
+  if (req.jsonSchema !== undefined) return 'strict_tools';
+  return 'json_object';
+};
+
+/** receipt.params fragment — the generation parameters actually sent on the wire. */
+const paramsEchoOf = (req: StructuredCallRequest, wire: 'openai' | 'anthropic' = 'openai') => ({
+  ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
+  ...(req.maxTokens !== undefined ? { maxTokens: req.maxTokens } : {}),
+  structuredOutput: structuredOutputModeOf(req, wire),
+  ...(req.reasoning !== undefined ? { reasoning: { style: req.reasoning.style, gear: req.reasoning.gear } } : {}),
+});
 
 /**
  * Internal sentinel: this zod node has NO strict-FC-acceptable JSON-Schema shape
@@ -820,6 +852,7 @@ export const authFailClosedResult = <T>(
     usage: {},
     requestHash: computeRequestHash(req),
     outputHash: canonicalSha256(''),
+    params: paramsEchoOf(req),
     executionMode: cfg.executionMode,
   },
 });
@@ -882,6 +915,7 @@ export async function runOpenAICompatStructuredCall<T>(
       transportRetries,
       correctiveReasks: invalidOutputRetries,
       ...(req.reasoning !== undefined ? { reasoningGear: req.reasoning.gear } : {}),
+      params: paramsEchoOf(req, wire),
       executionMode: cfg.executionMode,
     },
   });
@@ -953,6 +987,7 @@ export async function runOpenAICompatStructuredCall<T>(
               transportRetries,
               correctiveReasks: invalidOutputRetries,
               ...(req.reasoning !== undefined ? { reasoningGear: req.reasoning.gear } : {}),
+              params: paramsEchoOf(req, wire),
               executionMode: cfg.executionMode,
             },
           };
