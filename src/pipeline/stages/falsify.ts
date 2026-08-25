@@ -313,6 +313,9 @@ export const falsifyStage: StageHandler = {
           availableClaims: runClaims.map((c) => ({ id: c.id, text: c.text, quote: c.locators[0]?.quote, bindingStatus: c.bindingStatus, ...(c.gradeCertainty !== undefined ? { gradeCertainty: c.gradeCertainty } : {}) })),
         },
         schema: FalsifyOut,
+        // Lane-06: spec authoring is a structured judgment — pinned so provider
+        // defaults cannot vary falsification-spec decoding across runs.
+        temperature: 0.2,
       });
       const out = res.data;
 
