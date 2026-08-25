@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { McpToolInfo } from './mcp.js';
+import { McpToolAnnotations, type McpToolInfo } from './mcp.js';
 
 /**
  * MCP streamable-HTTP client (TIS): same narrow surface as McpStdioClient —
@@ -36,14 +36,20 @@ const pageSchema = z.object({
     name: z.string().min(1),
     description: z.string().optional(),
     inputSchema: z.unknown().optional(),
+    annotations: McpToolAnnotations.optional(),
   })),
   nextCursor: z.string().min(1).optional(),
+});
+
+const ServerInfoSchema = z.object({
+  serverInfo: z.object({ name: z.string().optional(), version: z.string().optional() }).optional(),
 });
 
 export class McpHttpClient {
   private nextId = 1;
   private sessionId: string | null = null;
   private closed = false;
+  private serverIdentity: { name?: string; version?: string } = {};
   constructor(private readonly opts: McpHttpOptions) {}
 
   private get fetchImpl(): typeof fetch {
@@ -52,14 +58,26 @@ export class McpHttpClient {
 
   async connect(): Promise<void> {
     if (this.closed) throw new Error('mcp-http: client closed');
-    await this.request('initialize', {
+    const initResult = await this.request('initialize', {
       protocolVersion: this.opts.protocolVersion ?? '2025-06-18',
       capabilities: {},
       clientInfo: { name: this.opts.clientName ?? 'far-lab-agent', version: '0.1.0' },
     });
+    const parsed = ServerInfoSchema.safeParse(initResult);
+    if (parsed.success && parsed.data.serverInfo !== undefined) {
+      this.serverIdentity = {
+        ...(parsed.data.serverInfo.name !== undefined ? { name: parsed.data.serverInfo.name } : {}),
+        ...(parsed.data.serverInfo.version !== undefined ? { version: parsed.data.serverInfo.version } : {}),
+      };
+    }
     // notifications/initialized — 202 Accepted, no body expected; failure is tolerated
     // per transport spec (the handshake already succeeded above).
     await this.notify('notifications/initialized');
+  }
+
+  /** Server identity from the initialize handshake (capability provenance; empty when the server declared none). */
+  serverInfo(): { name?: string; version?: string } {
+    return this.serverIdentity;
   }
 
   async listTools(): Promise<McpToolInfo[]> {

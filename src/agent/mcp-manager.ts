@@ -1,5 +1,5 @@
 import type { McpServerIntegration, ToolTestRecord } from '../domain/tool-integration.js';
-import { McpStdioClient, mcpToolAdapter, type McpToolInfo } from './mcp.js';
+import { McpStdioClient, mcpToolAdapter, type McpToolAnnotations, type McpToolInfo } from './mcp.js';
 import { McpHttpClient } from './mcp-http.js';
 import type { ToolRegistry } from './tool.js';
 
@@ -27,6 +27,10 @@ export interface McpRegistration {
   serverLabel: string;
   remoteName: string;
   registeredAs: string;
+  /** Server identity from the initialize handshake (absent when the server declared none). */
+  serverVersion?: string;
+  /** Untrusted server self-declared hints (display-only; never affect riskClass/permissions). */
+  serverHints?: McpToolAnnotations;
 }
 
 export interface McpSkip {
@@ -135,6 +139,7 @@ export class McpManager {
       }
       const prefix = integration.toolNamePrefix ?? `mcp_${sanitizeLabel(integration.label)}`;
       this.statuses.set(id, { integrationId: id, label: integration.label, state: 'connected', toolCount: tools.length });
+      const serverVersion = client.serverInfo().version;
       const usedNames = new Set(registry.names());
       for (const info of tools) {
         const base = sanitizeMcpToolName(prefix, info.name);
@@ -158,8 +163,23 @@ export class McpManager {
         const adapter = mcpToolAdapter(client, info, integration.label);
         // RU-3 T1: MCP server output is third-party content — mark trust 'external'
         // so the loop flags every tool_result from it as untrusted data.
-        registry.register({ ...adapter, name, riskClass: integration.riskClass, trust: 'external' });
-        registered.push({ serverLabel: integration.label, remoteName: info.name, registeredAs: name });
+        // R2-09 identity: source label + handshake version stamp the adapted
+        // tool's provenance; info.annotations already carry (untrusted) server hints.
+        registry.register({
+          ...adapter,
+          name,
+          riskClass: integration.riskClass,
+          trust: 'external',
+          source: integration.label,
+          ...(serverVersion !== undefined ? { version: serverVersion } : {}),
+        });
+        registered.push({
+          serverLabel: integration.label,
+          remoteName: info.name,
+          registeredAs: name,
+          ...(serverVersion !== undefined ? { serverVersion } : {}),
+          ...(info.annotations !== undefined ? { serverHints: info.annotations } : {}),
+        });
       }
     }
     return { registered, skipped };
