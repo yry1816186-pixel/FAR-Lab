@@ -594,6 +594,18 @@ export interface VersionDiff {
 export type ReceiptKind = 'model_call' | 'source_retrieval' | 'tool_exec' | 'stage_transition' | 'export' | 'revision';
 export type ExecutionMode = 'live' | 'test';
 
+/** Execution-truth class (server projection src/app/truth-profile.ts, §5.5). */
+export type RunTruthClass = 'live' | 'mixed' | 'recorded_replay' | 'synthetic' | 'empty';
+
+export interface RunTruthProfile {
+  runId: string;
+  klass: RunTruthClass;
+  modelCalls: { live: number; test: number };
+  retrieval: { live: number; hit: number; stale: number; replay: number };
+  toolExecs: number;
+  totalReceipts: number;
+}
+
 export interface ProvenanceReceipt {
   id: string;
   runId: string;

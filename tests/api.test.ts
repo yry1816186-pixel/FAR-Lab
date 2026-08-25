@@ -558,6 +558,33 @@ describe('GET /api/v1/runs and /api/v1/runs/:id', () => {
     expect(missing.status).toBe(404);
   });
 
+  it('projects the execution-truth profile (§5.5) from real receipts', async () => {
+    // run1's fixture carries a single export-kind receipt: no external evidence => empty class.
+    const bare = await getJson(`${base}/api/v1/runs/${run1}/truth`);
+    expect(bare.status).toBe(200);
+    expect(bare.body).toMatchObject({ runId: run1, klass: 'empty', totalReceipts: 1 });
+    expect(bare.body.modelCalls).toEqual({ live: 0, test: 0 });
+    expect(bare.body.retrieval).toEqual({ live: 0, hit: 0, stale: 0, replay: 0 });
+
+    // Seed a live model receipt + a replay retrieval receipt onto run2 => mixed.
+    app.store.putObject('receipt', ProvenanceReceipt.parse({
+      id: newId('rcp'), runId: run2, kind: 'model_call', executionMode: 'live', at: ts(60),
+      modelCall: { provider: 'zai', modelId: 'glm-4.6', usage: {}, latencyMs: 12, requestHash: 'c'.repeat(64), outputHash: 'd'.repeat(64) },
+    }));
+    app.store.putObject('receipt', ProvenanceReceipt.parse({
+      id: newId('rcp'), runId: run2, kind: 'source_retrieval', executionMode: 'live', at: ts(61),
+      sourceRetrieval: { family: 'openalex', query: 'q', httpStatus: 200, resultCount: 3, contentHashes: [], cache: 'replay' },
+    }));
+    const mixed = await getJson(`${base}/api/v1/runs/${run2}/truth`);
+    expect(mixed.status).toBe(200);
+    expect(mixed.body.klass).toBe('mixed');
+    expect(mixed.body.modelCalls).toEqual({ live: 1, test: 0 });
+    expect(mixed.body.retrieval.replay).toBe(1);
+
+    const ghostTruth = await getJson(`${base}/api/v1/runs/${'run_' + 'a'.repeat(24)}/truth`);
+    expect(ghostTruth.status).toBe(404);
+  });
+
   it('projects the evaluator family for a run (AVO fusion G8)', async () => {
     const { status, body } = await getJson(`${base}/api/v1/runs/${run1}/evaluations`);
     expect(status).toBe(200);

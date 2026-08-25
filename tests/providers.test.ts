@@ -211,10 +211,12 @@ describe('extractJsonText repair layer (live strict-FC failure class 2026-08-22)
 });
 
 describe('dashscope transport shell (mock fetch) — the OpenAI-compat core suite', () => {
-  // 2026-08-26: src/providers/deepseek.ts DELETED per the project-wide DeepSeek ban
-  // (user directive 2026-08-22; lane-14 red-team F-3). The transport-mechanics suite
-  // below (receipts/re-asks/truncation/classification/auth/deadline) exercises the
-  // shared http.ts core through the dashscope shell — the production OpenAI-compat route.
+  // History: src/providers/deepseek.ts was DELETED 2026-08-26 per the then project-wide
+  // DeepSeek ban (user directive 2026-08-22; lane-14 red-team F-3), and this suite was
+  // re-homed onto the dashscope shell. The module was later RESTORED when the product
+  // layer went model-agnostic (providers/index.ts "unbanned 2026-08-26"); the transport
+  // suite stays on the dashscope shell (same http.ts core), and competition-mode routing
+  // still rejects deepseek (tests/model-plane.test.ts competition-policy assertions).
   it('succeeds with a complete, correctly hashed receipt', async () => {
     const { fetchImpl, calls } = recorderFetch([() => Promise.resolve(chatOk(RAW_OK))]);
     const provider = createDashScopeProvider({ apiKey: 'test-fixture-key-dashscope', fetchImpl });

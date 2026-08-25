@@ -12,6 +12,7 @@ import {
 } from '../providers/builtin-overrides.js';
 import { createCustomProvider } from '../providers/custom.js';
 import { analyzeTrajectory } from '../app/supervisor.js';
+import { runTruthProfile } from '../app/truth-profile.js';
 import { buildLineageGraph } from '../app/lineage.js';
 import { runEvaluators } from '../app/evaluators.js';
 import { runResearchAction, ActionError } from './actions.js';
@@ -1703,6 +1704,14 @@ function parseSeedSources(raw: unknown): string | {
         // stored snapshot) so UX shows the live trajectory health. Read-only.
         mustGetRun(runId);
         sendJson(res, 200, analyzeTrajectory({ store: app.store, runId }));
+        return;
+      }
+      if (segments.length === 5 && segments[4] === 'truth' && method === 'GET') {
+        // Execution-truth projection (goal §5.5): deterministic receipt-derived
+        // view of HOW this run executed (live / mixed / synthetic / recorded_replay),
+        // incl. retrieval cache/replay composition. Read-only; receipts stay authoritative.
+        mustGetRun(runId);
+        sendJson(res, 200, runTruthProfile(app.store, runId));
         return;
       }
       if (segments.length === 4) {

@@ -17,6 +17,7 @@ import type {
   ExecutionMode,
   ReceiptKind,
   RunStageName,
+  RunTruthClass,
   ScientificGoalType,
 } from '../api/types';
 
@@ -32,6 +33,7 @@ export const goalTypeKey = (g: ScientificGoalType): DictKey => key('goalType', g
 export const qualityKey = (q: QualityStatus): DictKey => key('quality', q);
 export const receiptKindKey = (k: ReceiptKind): DictKey => key('receiptKind', k);
 export const executionModeKey = (m: ExecutionMode): DictKey => key('mode', m);
+export const truthClassKey = (c: RunTruthClass): DictKey => key('truth', c);
 export const availabilityKey = (a: Availability): DictKey => key('availability', a);
 export const stepKindKey = (k: StepKind): DictKey => key('stepKind', k);
 export const contentDepthKey = (d: ContentDepth): DictKey => key('depth', d);
