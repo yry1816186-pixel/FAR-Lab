@@ -54,6 +54,12 @@ export const classifyError = (e: unknown): ClassifiedError => {
   const message = e instanceof Error ? e.message : String(e);
   const name = e instanceof Error ? e.name : '';
   const code = (e as NodeJS.ErrnoException | undefined)?.code;
+  // undici wraps fetch failures in `TypeError: fetch failed` with the real errno
+  // on `.cause` — DNS/reset/refused failures reach the taxonomy that way (one
+  // guarded hop; deeper chains are not our contract).
+  const cause = (e as { cause?: unknown } | undefined)?.cause;
+  const causeCode = cause instanceof Error ? (cause as NodeJS.ErrnoException).code : undefined;
+  const errno = code ?? causeCode;
   // provider-plane result errors carry their own kind + retryable (ports.ts)
   const kind = (e as { kind?: unknown } | undefined)?.kind;
   if (typeof kind === 'string' && CATEGORIES.has(kind as ErrorCategory)) {
@@ -64,6 +70,12 @@ export const classifyError = (e: unknown): ClassifiedError => {
   if (name === 'RunLeaseLostError') return { category: 'lease_lost', retryable: false, needsHuman: false, message };
   if (name === 'RunLeaseHeldError') return { category: 'lease_held', retryable: false, needsHuman: false, message };
   if (name === 'RunBudgetExhaustedError') return { category: 'budget_exhausted', retryable: false, needsHuman: true, message };
+  // source adapters normalize every transport failure (fetch reject/abort) into
+  // SourceAdapterError(kind='network', httpStatus=0) with the errno already lost —
+  // map that shape to the network category instead of the provider fallback.
+  if (name === 'SourceAdapterError' && kind === 'network') {
+    return { category: 'network_error', retryable: true, needsHuman: false, message };
+  }
   // Stringified provider failures keep their kind inline (src/pipeline/llm.ts throws
   // `model call failed (<kind>) in <stage>/<purpose>`); recover it from the text.
   const inline = /\bmodel call failed \((rate_limited|timeout|auth_error|quota_exceeded|provider_error|invalid_output)\)/.exec(message);
@@ -74,23 +86,23 @@ export const classifyError = (e: unknown): ClassifiedError => {
   if (/^run token budget exhausted/i.test(message)) return { category: 'budget_exhausted', retryable: false, needsHuman: true, message };
   if (/workspace spend limit reached/i.test(message)) return { category: 'spend_limit', retryable: false, needsHuman: true, message };
   if (/^cancelled/i.test(message)) return { category: 'cancelled', retryable: false, needsHuman: false, message };
-  if (code === 'SQLITE_BUSY' || code === 'SQLITE_BUSY_SNAPSHOT' || /database is locked/i.test(message)) {
+  if (errno === 'SQLITE_BUSY' || errno === 'SQLITE_BUSY_SNAPSHOT' || /database is locked/i.test(message)) {
     return { category: 'db_busy', retryable: true, needsHuman: false, message };
   }
-  if (code === 'SQLITE_CORRUPT' || /database disk image is malformed/i.test(message)) {
+  if (errno === 'SQLITE_CORRUPT' || /database disk image is malformed/i.test(message)) {
     return { category: 'db_corrupt', retryable: false, needsHuman: true, message };
   }
-  if (code === 'ENOSPC' || /no space left on device/i.test(message)) {
+  if (errno === 'ENOSPC' || /no space left on device/i.test(message)) {
     return { category: 'disk_full', retryable: false, needsHuman: true, message };
   }
-  if (code === 'EACCES' || code === 'EPERM') {
+  if (errno === 'EACCES' || errno === 'EPERM') {
     return { category: 'permission_denied', retryable: false, needsHuman: true, message };
   }
-  if (code === 'ECONNRESET' || code === 'ECONNREFUSED' || code === 'EAI_AGAIN' || code === 'ENOTFOUND'
-    || code === 'EHOSTUNREACH' || code === 'ETIMEDOUT' || code === 'EPIPE') {
+  if (errno === 'ECONNRESET' || errno === 'ECONNREFUSED' || errno === 'EAI_AGAIN' || errno === 'ENOTFOUND'
+    || errno === 'EHOSTUNREACH' || errno === 'ETIMEDOUT' || errno === 'EPIPE') {
     return { category: 'network_error', retryable: true, needsHuman: false, message };
   }
-  if (code === 'ENOENT') return { category: 'io_error', retryable: false, needsHuman: false, message };
+  if (errno === 'ENOENT') return { category: 'io_error', retryable: false, needsHuman: false, message };
   return { category: 'provider_error', retryable: true, needsHuman: false, message };
 };
 

@@ -100,7 +100,18 @@ export const expandPluginManifest = (
     push({ kind: 'hook_rule', label: `${manifest.name}/${rule.label}`, event: rule.event, match: rule.match, action: rule.action });
   }
   for (const server of manifest.mcpServers) {
-    push({ kind: 'mcp_server', label: `${manifest.name}/${server.label}`, transport: server.transport, command: server.command, args: server.args, env: server.env, url: server.url, headers: server.headers, toolNamePrefix: server.toolNamePrefix, riskClass: server.riskClass, timeoutMs: server.timeoutMs });
+    // R2-13 F-1 floor: plugin authors cannot self-classify their MCP servers
+    // below 'execute'. The integration's riskClass flows into permission
+    // decisions (explore-mode auto-allow, RU-3 T3 embed-guard exemption at
+    // loop level), so a manifest-declared 'read' would let third-party tools
+    // bypass the execute-class approval boundary. Higher severity survives
+    // ('destructive' stays destructive); read/edit are overridden with a
+    // recorded warning so the reviewer sees the override at import time.
+    const riskClass = server.riskClass === 'read' || server.riskClass === 'edit' ? 'execute' : server.riskClass;
+    if (riskClass !== server.riskClass) {
+      warnings.push(`mcp server '${server.label}': manifest-declared riskClass '${server.riskClass}' floored to 'execute' (plugin self-classification is not trusted below execute)`);
+    }
+    push({ kind: 'mcp_server', label: `${manifest.name}/${server.label}`, transport: server.transport, command: server.command, args: server.args, env: server.env, url: server.url, headers: server.headers, toolNamePrefix: server.toolNamePrefix, riskClass, timeoutMs: server.timeoutMs });
   }
   if (manifest.entry !== undefined) {
     push({
