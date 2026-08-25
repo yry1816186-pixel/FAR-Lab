@@ -6,7 +6,7 @@
     "start": "node --experimental-strip-types src/main.ts",
     "test": "node --experimental-strip-types --test test/core.test.ts test/render.test.ts test/liveCore.test.ts test/chatCore.test.ts test/render-v3.test.ts test/seedAttach.test.ts test/e2e.test.ts"
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "type": "module",
   "bin": {
     "far-tui": "./src/main.ts"

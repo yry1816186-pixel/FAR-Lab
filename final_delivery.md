@@ -1,5 +1,7 @@
 # final_delivery.md — FAR-Lab 赛道一方向 1A 正式开发交付报告
 
+> **历史快照（R1，截至 2026-08-22）。** 本报告只记录当时的交付状态，不代表当前状态；文中的基线/分支/测试数字均为 R1 时点事实。当前权威：验收契约 `project-spec/ACCEPTANCE.md`、动态状态 `.control/ACCEPTANCE_STATUS.json`、发布差距 `submission/RELEASE_BLOCKERS.md`、R2 各车道报告 `.planning/concurrency/reports/r2/`。任务完成时本文件将被最终交付报告整体替换（`FINAL_BUILD_PROMPT.md` §交付）。
+>
 > 生成时间：2026-08-21（R1 施工与验收）｜**增补 2026-08-22（EV1→Wave-3 演进，见 §六/§七）**
 > 任务书：`FAR-LAB_DEVELOPMENT_MISSION.md`（98 节总指令）｜规划：`task_plan.md`
 > R1 代码基线：branch `build/far-lab-r1`，提交 `1b0e622`，测试 194/194；**当前基线：branch `build/ev2-closeout`（R1 已合入 main），测试 274/274，完成门禁 NOT_READY——唯一失败项为外部余额阻塞（§七）**
