@@ -22,6 +22,18 @@ const parsePort = (): number => {
 const port = parsePort();
 const host = process.env.HOST ?? '127.0.0.1';
 
+// R2-13 F-3 guard: the API is unauthenticated by design for a single-user
+// local tool (loopback bind + Host/Origin guards are the boundary). A
+// non-loopback HOST would expose read/write/spend endpoints to every network
+// peer — refuse it unless the operator explicitly acknowledges the exposure.
+const isLoopbackHost = (h: string): boolean => h === '127.0.0.1' || h === 'localhost' || h === '::1' || h === '[::1]';
+if (!isLoopbackHost(host) && process.env.FARLAB_ALLOW_REMOTE !== '1') {
+  process.stderr.write(
+    `far-server: refusing to bind ${host}: the API is unauthenticated. Set FARLAB_ALLOW_REMOTE=1 to accept the exposure.\n`,
+  );
+  process.exit(1);
+}
+
 const app = await createApp(process.env.FARLAB_DATA_DIR ? { dataDir: process.env.FARLAB_DATA_DIR } : {});
 const api = createApiServer(app, { port, host, automations: { enabled: process.env.FARLAB_AUTOMATIONS !== 'off' } });
 

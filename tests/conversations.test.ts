@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -374,5 +375,32 @@ describe('one turn per conversation at a time (concurrent turns serialized)', ()
     const msgs = (done.data.conversation as JsonBody).messages as JsonBody[];
     expect(msgs).toHaveLength(2); // researcher + agent — the rejected second text never landed
     expect(msgs.some((m) => m.content === '第二条应被拒绝')).toBe(false);
+  });
+});
+
+describe('R2-13 F-5: conversation allow-expansion is keyed on riskClass, not registry membership', () => {
+  it('read-class tools (incl. propose_action) get allow rules; execute-class and undeclared tools fall to deny', async () => {
+    const { conversationAllowRules } = await import('../src/server/conversation-agent.js');
+    const { ToolRegistry } = await import('../src/agent/tool.js');
+    const { PermissionEngine } = await import('../src/agent/permissions.js');
+    const mkTool = (name: string, riskClass?: 'read' | 'execute') => ({
+      name, description: name,
+      inputSchema: z.object({}),
+      ...(riskClass !== undefined ? { riskClass } : {}),
+      async execute() { return { ok: true, data: {} }; },
+    });
+    const tools = new ToolRegistry()
+      .register(mkTool('list_runs', 'read'))
+      .register(mkTool('propose_action', 'read'))
+      .register(mkTool('mcp_shell_exec', 'execute')) // hypothetical future registration
+      .register(mkTool('undeclared_tool')); // no riskClass declared
+    const rules = conversationAllowRules(tools);
+    expect(rules.map((r) => r.tool).sort()).toEqual(['list_runs', 'propose_action']);
+    // The real engine with exactly this construction: execute-class is denied
+    // fail-closed; only read-class passes without an ask handler.
+    const engine = new PermissionEngine({ rules, defaultEffect: 'deny' });
+    expect((await engine.decide('list_runs', {}, 'read')).effect).toBe('allow');
+    expect((await engine.decide('mcp_shell_exec', { cmd: 'curl x.invalid' }, 'execute')).effect).toBe('deny');
+    expect((await engine.decide('undeclared_tool', {}, 'execute')).effect).toBe('deny');
   });
 });

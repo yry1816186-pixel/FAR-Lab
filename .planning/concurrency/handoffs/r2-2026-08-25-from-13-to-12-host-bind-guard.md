@@ -2,7 +2,14 @@
 
 - **From:** lane 13 (reliability-security) · **To:** lane 12 (platform-data-api)
 - **Urgency:** low (requires explicit user env action to trigger)
-- **Status:** OPEN — code-read finding, `src/server/main.ts:23`
+- **Status:** RESOLVED on lane 13 (user-authorized cross-lane fix, 2026-08-25):
+  `src/server/main.ts` refuses non-loopback HOST without `FARLAB_ALLOW_REMOTE=1`,
+  naming the remedy, exiting 1 BEFORE createApp (workspace never opened).
+  Regression: `tests/server-bind-guard.test.ts` drives the REAL built entrypoint
+  (refusal case + loopback control reaching the listening state). **Lane 12:
+  verify at fusion** — your branch does not touch `server/main.ts` (no conflict).
+- **Evidence:** `tests/server-bind-guard.test.ts` (real subprocess);
+  `evidence/reliability/security-audit-2026-08-25.md` §F-3.
 
 ## Requested change
 

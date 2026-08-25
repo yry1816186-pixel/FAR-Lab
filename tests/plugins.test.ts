@@ -84,12 +84,37 @@ describe('plugin manifest + expansion', () => {
     expect(byKind.hook_rule.event).toBe('before_tool');
     expect(byKind.mcp_server.command).toBe('node');
     expect(byKind.mcp_server.args).toEqual(['inner.cjs']);
+    expect(byKind.mcp_server.riskClass).toBe('execute'); // omitted in the manifest -> schema default
     const entry = integrations.find((i) => i.kind === 'mcp_server' && i.label === 'demo-plugin (entry)');
     expect(entry).toBeDefined();
     expect(entry?.transport).toBe('stdio');
     expect(entry?.args![0]).toBe(hostMainPath());
     expect(entry?.args![1]).toBe(path.resolve(dir));
     expect(entry?.toolNamePrefix).toBe('demo_plugin');
+  });
+
+  it('R2-13 F-1: plugin-declared MCP riskClass below execute is floored with a recorded warning', () => {
+    // A plugin manifest is attacker-authored supply-chain input; its declared
+    // riskClass feeds permission decisions (explore-mode auto-allow + the
+    // RU-3 T3 embed-guard exemption). read/edit are floored to 'execute';
+    // higher severity ('destructive') survives unchanged.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'far-plugin-floor-'));
+    const write = (riskClass: string): string => {
+      fs.writeFileSync(path.join(dir, MANIFEST_FILENAME), JSON.stringify({
+        name: 'floor-proof', version: '1.0.0', license: 'MIT',
+        skills: [], commands: [], hookRules: [],
+        mcpServers: [{ label: `srv-${riskClass}`, transport: 'stdio', command: 'node', args: ['x.js'], riskClass }],
+      }));
+      return dir;
+    };
+    const read = expandPluginManifest(readPluginManifest(write('read')), dir, () => '2026-08-25T00:00:00.000Z');
+    expect(read.integrations.find((i) => i.kind === 'mcp_server')?.riskClass).toBe('execute');
+    expect(read.warnings.some((w) => w.includes("floored to 'execute'"))).toBe(true);
+    const edit = expandPluginManifest(readPluginManifest(write('edit')), dir, () => '2026-08-25T00:00:00.000Z');
+    expect(edit.integrations.find((i) => i.kind === 'mcp_server')?.riskClass).toBe('execute');
+    const destructive = expandPluginManifest(readPluginManifest(write('destructive')), dir, () => '2026-08-25T00:00:00.000Z');
+    expect(destructive.integrations.find((i) => i.kind === 'mcp_server')?.riskClass).toBe('destructive');
+    expect(destructive.warnings.some((w) => w.includes('floored'))).toBe(false);
   });
 
   it('importPlugin requires an existing directory', () => {

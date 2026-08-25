@@ -22,32 +22,38 @@ owning lanes; nothing in another lane's files was modified.
 | Resource exhaustion | 8-channel governance map w/ live enforcement (resource-governance.md); token/money/time/disk/memory/CPU/network/GPU budgets; 1MB API body cap; tool timeouts | VERIFIED |
 | Agent permission audit (independent) | Single tool-dispatch choke point: loop.ts:405 is the ONLY `permissions.decide` site; refine + conversation-agent both inject their engine into the loop; no direct tool-call HTTP route (rg verified) | VERIFIED structurally (CP-C3) — F-1/F-5 are the two carve-outs |
 
-## Findings (reproducible, handed off)
+## Findings (reproducible; F-1/F-5/F-3 RESOLVED on this lane 2026-08-25 by explicit user authorization — cross-lane edits recorded as deviations; F-2 remains an open lane-05 checklist)
 
-### F-1 — MCP/plugin riskClass is attacker-declarable and load-bearing (→ lane 09; medium)
+### F-1 — MCP/plugin riskClass is attacker-declarable and load-bearing (→ lane 09; medium) — **RESOLVED**
 `manifest.ts:56` accepts any riskClass for an MCP server (default 'execute' only on
-omission); `import.ts:103` passes it through; `mcp-manager.ts:161` registers tools
+omission); `import.ts:103` passed it through; `mcp-manager.ts:161` registers tools
 with it; from there the class decides (a) explore-mode auto-allow vs deny
 (refine.ts:299 admission trusts the DECLARED class), (b) whether the RU-3 T3
 untrusted-embed guard applies at all (loop.ts:411 exempts 'read'). Proofs
 F1a/F1b/F1c: a plugin declaring `read` gets auto-allowed effectful calls with no
 ask and no embed guard. Compensating control today: human review at import+enable.
-Fix: execute-floor plugin-declared server riskClass at import expansion (or drop
-the field from manifests). Handoff: `r2-2026-08-25-from-13-to-09-mcp-riskclass-floor.md`.
+**Fix landed (user-authorized)**: `src/plugins/import.ts` floors manifest-declared
+server riskClass at 'execute' with a reviewer-visible warning ('destructive'
+survives). Regression: `tests/plugins.test.ts` R2-13 case; verification:
+`spikes/security-redteam.mjs` fix-F1 PASS (suite now 4/4 in fix-verification mode).
+Handoff record updated to RESOLVED (lane 09 verifies at fusion).
 
-### F-5 — conversation-agent blanket allow ignores risk classes (→ lane 08; hardening)
-`conversation-agent.ts:336` maps EVERY registered tool name to an unconditional
-allow rule. Today's registry is read tools + propose_action (safe by
-construction), but one future registration of an execute-class tool becomes a
-silent unconditional allow (proof F5). Fix: key the allow expansion on
-`registry.get(name).riskClass === 'read'` (or propose_action), so anything else
-falls to defaultEffect deny. Handoff: `r2-2026-08-25-from-13-to-08-conversation-allow-floor.md`.
+### F-5 — conversation-agent blanket allow ignores risk classes (→ lane 08; hardening) — **RESOLVED**
+`conversation-agent.ts:336` mapped EVERY registered tool name to an unconditional
+allow rule. Today's registry was read tools + propose_action (safe by
+construction), but one future registration of an execute-class tool would become a
+silent unconditional allow (proof F5). **Fix landed (user-authorized)**: exported
+`conversationAllowRules(tools)` keys the expansion on `riskClass === 'read'`;
+everything else falls to the fail-closed default. Regression:
+`tests/conversations.test.ts` R2-13 F-5 case; verification: fix-F5 PASS.
+Handoff updated to RESOLVED (lane 08 verifies at fusion).
 
-### F-3 — non-loopback bind is silent (→ lane 12; low)
-`main.ts:23` honors `HOST`; `HOST=0.0.0.0` binds an unauthenticated API on all
-interfaces with no warning. Fix: refuse non-loopback HOST unless
-`FARLAB_ALLOW_REMOTE=1` is set, and log the exposure. Handoff:
-`r2-2026-08-25-from-13-to-12-host-bind-guard.md`.
+### F-3 — non-loopback bind is silent (→ lane 12; low) — **RESOLVED**
+`main.ts:23` honored `HOST`; `HOST=0.0.0.0` bound an unauthenticated API on all
+interfaces with no warning. **Fix landed (user-authorized)**: non-loopback HOST
+is refused with the `FARLAB_ALLOW_REMOTE=1` remedy, exit 1 BEFORE createApp.
+Regression: `tests/server-bind-guard.test.ts` drives the real built entrypoint
+(refusal + loopback control). Handoff updated to RESOLVED (lane 12 verifies).
 
 ### F-2 — ingest parser resource caps must be proven at fusion (→ lane 05; note)
 The zip/XML substrate (docx/pptx/epub/svg) is lane-05 residue not in this

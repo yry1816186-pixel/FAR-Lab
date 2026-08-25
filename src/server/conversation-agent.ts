@@ -317,6 +317,19 @@ const makeProposeAction = (app: App, conv: Conversation, proposals: Conversation
 
 // ---- the turn ----
 
+/**
+ * R2-13 F-5 fix: the conversation kernel's allow-expansion is keyed on the
+ * registry's own risk class, not on registry membership. Read-class tools pass
+ * (including propose_action — it only records an approval card; execution is
+ * researcher-gated outside the loop). Anything else — an execute/edit-class
+ * tool registered by a future kernel evolution — gets NO allow rule and falls
+ * to the engine's fail-closed default instead of silently inheriting one.
+ */
+export const conversationAllowRules = (tools: ToolRegistry): Array<{ tool: string; effect: 'allow' }> =>
+  tools.names()
+    .filter((name) => tools.get(name)?.riskClass === 'read')
+    .map((name) => ({ tool: name, effect: 'allow' as const }));
+
 export async function generateConversationTurn(
   app: App,
   provider: ModelProvider,
@@ -333,7 +346,7 @@ export async function generateConversationTurn(
     .register(makeWorkspaceStatus(app))
     .register(makeProposeAction(app, conv, proposals));
   const permissions = new PermissionEngine({
-    rules: tools.names().map((name) => ({ tool: name, effect: 'allow' as const })),
+    rules: conversationAllowRules(tools),
     defaultEffect: 'deny',
   });
 

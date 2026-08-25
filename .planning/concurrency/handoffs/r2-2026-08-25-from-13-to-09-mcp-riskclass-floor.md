@@ -2,9 +2,16 @@
 
 - **From:** lane 13 (reliability-security) · **To:** lane 09 (capability-ecosystem)
 - **Urgency:** medium (defense-in-depth; compensating control = human review at import+enable)
-- **Status:** OPEN — reproduced on ws/r2/13-reliability-security @ b234c9e+
-- **Evidence:** `spikes/security-redteam.mjs` proofs F1a/F1b/F1c (4/4 REPRODUCED,
-  exit 0) → `evidence/reliability/security-redteam.json`;
+- **Status:** RESOLVED on lane 13 (user-authorized cross-lane fix, 2026-08-25):
+  `src/plugins/import.ts` now floors manifest-declared MCP riskClass at
+  'execute' (read/edit overridden with a reviewer-visible warning; destructive
+  survives). Regression: `tests/plugins.test.ts` R2-13 F-1 case; fix-verification
+  `spikes/security-redteam.mjs` fix-F1 PASS. **Lane 09: verify at fusion** — your
+  branch touches `mcp-manager.ts` (orthogonal identity-stamping change; no
+  conflict expected) and this floor composes with it. The alternative
+  registration-layer belt-and-braces noted below remains yours to consider.
+- **Evidence:** `spikes/security-redteam.mjs` (fix-verification edition, 4/4);
+  `evidence/reliability/security-redteam.json`;
   narrative in `evidence/reliability/security-audit-2026-08-25.md` §F-1.
 
 ## Requested change

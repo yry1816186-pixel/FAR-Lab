@@ -12,6 +12,8 @@ path.
 | b234c9e | feat(reliability): observability layer + fault/soak/backup proof + 3 defect fixes (RESIDUE PORT of build/hx-reconstruction 419b86e via `cherry-pick -x`; attribution line preserved; one conflict resolved — see §3) |
 | 823b3bd | feat(security): red-team audit + DNS fault case + taxonomy cause-unwrap |
 | 54d2617 | perf: agent-loop kernel overhead profile + lane-local evidence refresh |
+| 3232ecf | docs(concurrency): R2-13 lane report — port + audit + evidence + handoffs |
+| (this commit) | fix(security): land F-1/F-5/F-3 fixes user-authorized ("先把能解决的解决了", 2026-08-25) — see §4/§5 |
 
 ## 2. Evidence (all commands run in the lane worktree, offline, no live APIs)
 
@@ -113,6 +115,16 @@ workspace. Evidence: `evidence/reliability/backup-drill.json`.
 - `node zcode-harness/scripts/completion-gate.mjs` in the lane worktree reports
   the expected unreadable `.control/*` (workspace-local runtime state lives in
   the primary tree) → global completion is NOT claimed by this lane (see §6).
+- **Post-fix gates (user-authorized F-1/F-5/F-3 landing)**: typecheck/build
+  exit 0; `npx vitest run --exclude tests/gateway.test.ts --exclude
+  tests/remote-executor.test.ts` → **1468 passed / 0 failed / 2 skipped, exit
+  0**. The two excluded files (lane 10's, untouched by this lane) fail on an
+  ENVIRONMENTAL condition verified at the root: `docker build farlab-ssh-target`
+  re-resolves base-image metadata from the registry mirror
+  (`cloudfront-docker-cf.mrs.1ms.run`) which EOFs (network/proxy; the local
+  image already exists). Not a code defect; same class as the documented
+  Windows Docker NAT sensitivity. They passed in this worktree's earlier run
+  (1466/0/4) when the mirror was reachable.
 
 ## 3. Conflict notes (shared files)
 
@@ -131,15 +143,26 @@ workspace. Evidence: `evidence/reliability/backup-drill.json`.
 
 ## 4. Handoffs
 
-**Given (open, this lane authored):**
-- `r2-2026-08-25-from-13-to-09-mcp-riskclass-floor.md` — F-1 fix with proposed
-  patch + regression-test sketch. Status: OPEN (medium).
-- `r2-2026-08-25-from-13-to-08-conversation-allow-floor.md` — F-5 fix (key allow
-  expansion on riskClass; fail-closed for unknowns). Status: OPEN (hardening).
-- `r2-2026-08-25-from-13-to-12-host-bind-guard.md` — F-3 non-loopback bind
-  guard (`FARLAB_ALLOW_REMOTE=1` opt-in). Status: OPEN (low).
-- `r2-2026-08-25-from-13-to-05-ingest-resource-caps.md` — zip/XML resource-cap
-  checklist for their parser fusion. Status: OPEN (note).
+**Given (all authored by this lane; F-1/F-5/F-3 RESOLVED on-lane under explicit
+user authorization "先把能解决的解决了" 2026-08-25 — owning lanes verify at fusion):**
+- `r2-2026-08-25-from-13-to-09-mcp-riskclass-floor.md` — F-1. **RESOLVED on lane
+  13**: `src/plugins/import.ts` floors manifest-declared MCP riskClass at
+  'execute' + reviewer-visible warning ('destructive' survives); regression in
+  `tests/plugins.test.ts`; `spikes/security-redteam.mjs` fix-F1 PASS. Lane 09
+  note: their mcp-manager.ts change (identity stamping) is orthogonal —
+  registration-layer belt-and-braces remains their call.
+- `r2-2026-08-25-from-13-to-08-conversation-allow-floor.md` — F-5. **RESOLVED on
+  lane 13**: exported `conversationAllowRules(tools)` keys allow-expansion on
+  `riskClass === 'read'` (fail-closed otherwise); regression in
+  `tests/conversations.test.ts`; fix-F5 PASS. Lane 08's own hunks in that file
+  are non-overlapping (expected auto-merge).
+- `r2-2026-08-25-from-13-to-12-host-bind-guard.md` — F-3. **RESOLVED on lane
+  13**: `src/server/main.ts` refuses non-loopback HOST without
+  `FARLAB_ALLOW_REMOTE=1` (exit 1 before createApp); regression in
+  `tests/server-bind-guard.test.ts` (real built entrypoint, refusal + loopback
+  control). Lane 12 does not touch `server/main.ts`.
+- `r2-2026-08-25-from-13-to-05-ingest-resource-caps.md` — F-2. **OPEN** (their
+  parser substrate is not in this baseline; checklist only — not solvable here).
 
 **Received:** none.
 
@@ -153,10 +176,17 @@ workspace. Evidence: `evidence/reliability/backup-drill.json`.
    requires exactly this. Conflict resolution documented in §3.
 3. **`git fetch --all` failed** at setup (proxy unreachable from this sandbox);
    the baseline tag is local so setup proceeded; push will retry.
-4. No files outside lane ownership were modified except via the ported residue
-   commit (§3). The four findings above were handed off, not hot-patched —
-   none met the security-blocker bar (each has a human-gate compensating
-   control today).
+4. **User-authorized cross-lane security fixes (2026-08-25)**: after handing off
+   F-1/F-5/F-3, the user instructed "先把能解决的解决了" (solve what you can).
+   Under the workspace authority order (explicit user instruction outranks the
+   concurrency contract) lane 13 applied the three fixes directly in the owning
+   lanes' files — `src/plugins/import.ts` (09), `src/server/conversation-agent.ts`
+   (08), `src/server/main.ts` (12) — each surgical, each with a regression test,
+   each recorded as a deviation here and flagged RESOLVED-but-verify-at-fusion in
+   the handoff records. Conflict risk assessed beforehand: lane 09 does not touch
+   import.ts; lane 08's hunks in conversation-agent.ts are non-overlapping; lane
+   12 does not touch main.ts. Not done unilaterally: F-2 (lane 05's parsers are
+   not in this baseline — genuinely unsolvable here).
 
 ## 6. Honest boundaries / unverified claims
 

@@ -3,8 +3,15 @@
 - **From:** lane 13 (reliability-security) · **To:** lane 08 (agent-kernel)
 - **Urgency:** hardening (latent, not currently exploitable — today's registry is
   read tools + propose_action only)
-- **Status:** OPEN — hazard shape reproduced on ws/r2/13-reliability-security
-- **Evidence:** `spikes/security-redteam.mjs` proof F5 (REPRODUCED);
+- **Status:** RESOLVED on lane 13 (user-authorized cross-lane fix, 2026-08-25):
+  `conversationAllowRules(tools)` exported from `conversation-agent.ts` keys the
+  allow expansion on `riskClass === 'read'`; everything else falls to the
+  fail-closed default. Regression: `tests/conversations.test.ts` R2-13 F-5 case
+  (execute-class + undeclared tools denied on the real engine); fix-verification
+  `spikes/security-redteam.mjs` fix-F5 PASS. **Lane 08: verify at fusion** — your
+  branch also modifies this file (prompt/turn-area hunks, non-overlapping with
+  the PermissionEngine construction; expected to auto-merge — Integrator decides).
+- **Evidence:** `spikes/security-redteam.mjs` (fix-verification edition, 4/4);
   `evidence/reliability/security-audit-2026-08-25.md` §F-5.
 
 ## Requested change
