@@ -1,9 +1,13 @@
 import type { Store } from '../persistence/store.js';
 import type { ReasoningStyle, ReasoningGear } from '../domain/model-config.js';
+import type { ModelProviderConfig } from '../domain/model-config.js';
 import type { ResearchRun } from '../domain/run.js';
-import type { ModelProvider } from '../shared/ports.js';
+import type { ModelProvider, StructuredCallRequest, StructuredCallResult } from '../shared/ports.js';
 import { createCustomProvider, missingConfigProvider, CUSTOM_PROVIDER_PREFIX } from '../providers/custom.js';
 import { createFallbackProvider } from '../providers/fallback.js';
+import { computeRequestHash } from '../providers/http.js';
+import { canonicalSha256 } from '../shared/crypto.js';
+import { isQwenFamily, isBailianEndpoint } from '../model-plane/capabilities.js';
 
 /**
  * Runtime model-route resolution for the user configuration layer:
@@ -20,9 +24,69 @@ import { createFallbackProvider } from '../providers/fallback.js';
  * BP-4: when the resolved config declares fallbackConfigIds, the returned provider is
  * a failover CHAIN (primary first, then its fallbacks, cycles cut, depth-bounded).
  * A config without fallbacks resolves exactly as before — opt-in behavior change.
+ *
+ * COMPETITION ROUTE MODE (R2 lane 11, opt-in meta switch `competition_route_mode`):
+ * when ON, every route this resolver can hand to production (pipeline runs via
+ * composition.ts and the resident agent via conversations.ts — both flow through
+ * here) is held to the official XH-202619 calling rule (re-verified 2026-08-25,
+ * evidence/W-MP/RESEARCH-competition-2026-08-25.md §A1): base model Qwen-family AND
+ * served via a Bailian (*.aliyuncs.com) endpoint. Violations — including a NO-config
+ * resolution, which would otherwise leak into the env-chain default (zai, non-Bailian)
+ * — resolve to a fail-closed refusal provider instead of a usable route. OFF (default)
+ * = exact legacy behavior. The switch itself is exposed for the API/settings surface
+ * (lane 12/01 handoff); the gate re-reads the meta on every resolution.
  */
 
 export const ACTIVE_MODEL_CONFIG_META_KEY = 'activeModelConfigId';
+
+/** Opt-in competition route enforcement: 'on' = enforce Qwen-via-Bailian at this chokepoint. */
+export const COMPETITION_ROUTE_META_KEY = 'competition_route_mode';
+
+export const readCompetitionRouteMode = (store: Store): boolean =>
+  store.getMeta(COMPETITION_ROUTE_META_KEY) === 'on';
+
+export const writeCompetitionRouteMode = (store: Store, on: boolean): void => {
+  if (on) store.setMeta(COMPETITION_ROUTE_META_KEY, 'on');
+  else store.deleteMeta(COMPETITION_ROUTE_META_KEY);
+};
+
+/** Fail-closed refusal provider for competition-route violations (no network, no fabricated output). */
+const competitionRefusalProvider = (reason: string): ModelProvider => ({
+  name: 'competition-route-gate',
+  liveReady: false,
+  structuredCall<T>(req: StructuredCallRequest): Promise<StructuredCallResult<T>> {
+    return Promise.resolve({
+      ok: false,
+      error: {
+        kind: 'provider_error',
+        message:
+          `competition-route-gate: ${reason} — official rule requires Qwen-family base via Alibaba Bailian ` +
+          `(evidence/W-MP/RESEARCH-competition-2026-08-25.md §A1); turn competition route mode off only if this workspace is not used for the submission route`,
+        retryable: false,
+      },
+      receipt: {
+        provider: 'competition-route-gate',
+        modelId: '(refused)',
+        latencyMs: 0,
+        usage: {},
+        requestHash: computeRequestHash(req),
+        outputHash: canonicalSha256(''),
+        executionMode: 'live',
+      },
+    });
+  },
+});
+
+/** Official-rule compliance of one config: Qwen-family model on a Bailian endpoint. Null = compliant. */
+const competitionViolationOf = (cfg: ModelProviderConfig): string | null => {
+  if (!isQwenFamily(cfg.modelId)) {
+    return `model config "${cfg.label}" (${cfg.id}): modelId "${cfg.modelId}" is not Qwen-family`;
+  }
+  if (!isBailianEndpoint(cfg.baseUrl)) {
+    return `model config "${cfg.label}" (${cfg.id}): baseUrl "${cfg.baseUrl}" is not a Bailian (*.aliyuncs.com) endpoint`;
+  }
+  return null;
+};
 
 /** Max routes in a chain (primary + declared fallbacks, cycles cut by the visited set). */
 const MAX_CHAIN_ROUTES = 6;
@@ -57,9 +121,26 @@ type ModelProviderConfigChain =
 
 export const resolveRunProvider = (store: Store, run: ResearchRun): ModelProvider | null => {
   const configId = run.providerConfigId ?? store.getMeta(ACTIVE_MODEL_CONFIG_META_KEY);
-  if (configId === null) return null;
+  const competition = readCompetitionRouteMode(store);
+  if (configId === null) {
+    // Competition mode must not leak into the caller's env-chain default (zai — a
+    // non-Bailian route): a fail-closed refusal beats a silently non-compliant default.
+    return competition
+      ? competitionRefusalProvider('no model config selected while competition route mode is ON — declare a Bailian-served Qwen model config (or set the active default)')
+      : null;
+  }
   const chain = buildChain(store, configId);
   if (chain.kind === 'missing') return missingConfigProvider(configId);
+  if (competition) {
+    // EVERY route in the chain (primary + declared failovers) must comply: a mid-run
+    // failover onto a non-compliant route would breach the official rule invisibly.
+    for (const route of chain.routes) {
+      const cfg = store.getObject('model_config', route.configId);
+      if (cfg === null) continue; // unreachable: buildChain only emits existing configs
+      const violation = competitionViolationOf(cfg);
+      if (violation !== null) return competitionRefusalProvider(violation);
+    }
+  }
   if (chain.routes.length === 1) return chain.routes[0]!.provider;
   return createFallbackProvider(chain.routes);
 };
