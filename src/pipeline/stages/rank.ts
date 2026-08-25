@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { StageContext, StageHandler, StageOutcome } from '../types.js';
 import { callStructured } from '../llm.js';
 import { HypothesisComparison, HypothesisScorecard, HypothesisTournament, ScoreDimension, newId, buildAchAnalysis, buildEvidenceBody, countExperimentalAxes } from '../../domain/index.js';
-import type { TournamentMatch } from '../../domain/index.js';
+import type { EvidenceBody, LogLrBand, TournamentMatch } from '../../domain/index.js';
 import type { HypothesisCandidate } from '../../domain/index.js';
 import { assertNotCancelled, isRepresentative, mapBounded, partitionClaimRefs, runClaimIds, STAGE_CONCURRENCY } from './shared.js';
 import { canonicalSha256 } from '../../shared/crypto.js';
@@ -375,6 +375,59 @@ Answer 'a' or 'b' for the stronger hypothesis in BOTH judgments; 'tie' only when
 Return ONE JSON object: { "aFirstVerdict": "a"|"b"|"tie"|"incomparable", "bFirstVerdict": (same options), "rationale": "at least 10 chars citing the decisive substantive difference" }.`;
 
 // ---------------------------------------------------------------------------
+// Lane-06 (2026-08-25): DETERMINISTIC evidence grounding. The evidence_grounding
+// dimension carried the composite's largest weight (0.20) while being an
+// uncalibrated LLM self-score; the deterministic evidence body (Σlog-LR band,
+// QBAF, independent sources) was computed after ordering and shown as display
+// only. That is inverted: the one dimension we can MEASURE must be the
+// measurement. The mapping below turns the body into the 0..1 dimension value;
+// the LLM still scores every other dimension and sees the body digest as an
+// anchor. Pure, exported, offline-testable.
+// ---------------------------------------------------------------------------
+
+/** Base grounding per Σlog-LR band (counter bands ground lower than neutral-none:
+ * net counter-evidence is strictly worse evidence than no evidence at all). */
+export const BAND_GROUNDING_BASE: Readonly<Record<LogLrBand, number>> = {
+  very_strong_support: 0.9,
+  strong_support: 0.75,
+  moderate_support: 0.55,
+  weak_support: 0.35,
+  none: 0.1,
+  weak_counter: 0.05,
+  moderate_counter: 0.02,
+  strong_counter: 0.0,
+  very_strong_counter: 0.0,
+};
+
+export interface DeterministicGrounding {
+  value: number;
+  rationale: string;
+}
+
+export const GROUNDING_PRODUCER = 'deterministic-evidence-body (Σlog-LR band + QBAF, relationStrength-v1 inputs)';
+
+/** Map one hypothesis's evidence body to the evidence_grounding dimension value. */
+export const deterministicEvidenceGrounding = (body: EvidenceBody): DeterministicGrounding => {
+  if (body.independentSources === 0) {
+    return {
+      value: 0,
+      rationale:
+        `deterministic grounding 0.000: zero evidential relations bound to this hypothesis ` +
+        `(${body.disclosure}) — nothing in the corpus grounds it, whatever a reader intuits`,
+    };
+  }
+  const base = BAND_GROUNDING_BASE[body.logLrBand];
+  const value = Math.round(((base + body.qbafScore) / 2) * 1e3) / 1e3;
+  return {
+    value,
+    rationale:
+      `deterministic grounding ${value.toFixed(3)} = mean(Σlog-LR band base ${base}, QBAF ${body.qbafScore.toFixed(3)}); ` +
+      `band=${body.logLrBand} (Σlog10LR ∈ [${body.sumLogLrLow.toFixed(2)}, ${body.sumLogLrHigh.toFixed(2)}]); ` +
+      `floorCertainty=${body.floorCertainty ?? 'ungraded'}; ${body.independentSources} independent source(s); ${body.disclosure}`,
+  };
+};
+
+// ---------------------------------------------------------------------------
 // stage handler
 // ---------------------------------------------------------------------------
 
@@ -398,6 +451,56 @@ export const rankStage: StageHandler = {
 
     assertNotCancelled(ctx, 'rank');
     const existingClaimIds = runClaimIds(ctx);
+    // ---- Lane-06: deterministic evidence bodies FIRST — the grounding measurement
+    // exists before scoring so it can (a) anchor the scoring payload, (b) override the
+    // evidence_grounding dimension, and (c) be persisted once. Bodies are pure
+    // functions of stored relations/claims/feedback; scoring writes none of those,
+    // so pre- and post-scoring computation coincide.
+    const relationsForBody = ctx.store.listObjects('evidence_relation', runId);
+    const claimsForBody = ctx.store.listObjects('claim', runId);
+    const feedbackForBody = ctx.store.listObjects('feedback', runId);
+    const bodyByHyp = new Map<string, EvidenceBody>();
+    const groundingByHyp = new Map<string, DeterministicGrounding>();
+    {
+      const now0 = new Date().toISOString();
+      for (const h of targets) {
+        try {
+          const relevant = feedbackForBody.filter((s) => {
+            const target = s.target;
+            return target === undefined || target.kind !== 'hypothesis' || target.id === h.id;
+          });
+          const body = buildEvidenceBody({
+            id: deterministicId('evb', runId, h.id),
+            runId,
+            hypothesisId: h.id,
+            relations: relationsForBody,
+            claims: claimsForBody,
+            experimentalAxes: countExperimentalAxes(relevant),
+            now: now0,
+          });
+          bodyByHyp.set(h.id, body);
+          groundingByHyp.set(h.id, deterministicEvidenceGrounding(body));
+        } catch (e) {
+          ctx.log(
+            `rank: evidence body for ${h.id} failed (${e instanceof Error ? e.message : String(e)}) — grounding falls back to the LLM-scored dimension for this hypothesis`,
+          );
+        }
+      }
+    }
+    const digestOf = (h: HypothesisCandidate):
+      | { grounding: number; logLrBand: LogLrBand; sumLogLr: [number, number]; qbafScore: number; independentSources: number }
+      | undefined => {
+      const body = bodyByHyp.get(h.id);
+      const grounding = groundingByHyp.get(h.id);
+      if (body === undefined || grounding === undefined) return undefined;
+      return {
+        grounding: grounding.value,
+        logLrBand: body.logLrBand,
+        sumLogLr: [body.sumLogLrLow, body.sumLogLrHigh],
+        qbafScore: body.qbafScore,
+        independentSources: body.independentSources,
+      };
+    };
     // Batch the scoring calls: large single outputs (10+ hypotheses) exceed the model's
     // practical JSON output budget and truncate mid-array. 4 per call keeps outputs well
     // inside budget; scores are per-hypothesis independent so batching is semantically safe.
@@ -417,7 +520,10 @@ export const rankStage: StageHandler = {
       'evidence is used. For resource_cost and risk you MUST state the value direction: ' +
       '"higher_value_is_better" (e.g. you scored low-cost as high) or "higher_value_is_worse" (high value = ' +
       'high cost/risk); use "unclear" only if you cannot commit — the dimension is then excluded. ' +
-      'Scores are ordinal decision aids, not probabilities.';
+      'Scores are ordinal decision aids, not probabilities. ' +
+      'When a hypothesis carries evidenceBodyDigest, it is the DETERMINISTIC measured evidence body ' +
+      '(Σlog-LR band, QBAF, independent sources) — score every evidence-sensitive dimension (especially ' +
+      'counter_evidence_exposure) CONSISTENTLY with it, never against the measurement.';
     const hypProjection = (h: HypothesisCandidate) => ({
       id: h.id, statement: h.statement, mechanism: h.mechanism,
       assumptions: h.assumptions.map((a) => a.statement), predictions: h.predictions,
@@ -429,6 +535,7 @@ export const rankStage: StageHandler = {
         alternativeExplanations: h.falsification.alternativeExplanations,
       } : null,
       supportingClaimIds: h.supportingClaimIds, counterClaimIds: h.counterClaimIds,
+      ...(digestOf(h) !== undefined ? { evidenceBodyDigest: digestOf(h) } : {}),
     });
     const scoringInputs = canonicalSha256({
       batches: batches.map((b) => b.map((h) => h.id)),
@@ -510,7 +617,38 @@ export const rankStage: StageHandler = {
         producer,
         calibration: 'uncalibrated_llm_judgment',
       }));
-      const composite = compositeScore(dims);
+      // ---- Lane-06: the evidence_grounding dimension is a MEASUREMENT, not a judgment.
+      // The LLM's self-score (if any) is replaced by the deterministic evidence-body
+      // value; other dimensions stay uncalibrated LLM judgments, disclosed as such.
+      const grounding = groundingByHyp.get(hyp.id);
+      let compositeDims: readonly ScoredDim[] = dims;
+      let scorecardDims = dimensions;
+      if (grounding !== undefined) {
+        const supportingIds = relationsForBody
+          .filter((r) => r.targetHypothesisId === hyp.id && r.claimId !== undefined && (r.relation === 'supports' || r.relation === 'replicates'))
+          .map((r) => r.claimId as DimensionScoreT['evidenceClaimIds'][number])
+          .filter((cid, i, arr) => arr.indexOf(cid) === i)
+          .slice(0, 8);
+        if (dims.some((d) => d.dimension === 'evidence_grounding')) {
+          warnings.push(`${hyp.id}: evidence_grounding LLM self-score replaced by the deterministic evidence-body measurement`);
+        }
+        compositeDims = [
+          ...dims.filter((d) => d.dimension !== 'evidence_grounding'),
+          { dimension: 'evidence_grounding', value: grounding.value },
+        ];
+        scorecardDims = [
+          ...dimensions.filter((d) => d.dimension !== 'evidence_grounding'),
+          {
+            dimension: 'evidence_grounding',
+            value: grounding.value,
+            rationale: grounding.rationale,
+            evidenceClaimIds: supportingIds,
+            producer: GROUNDING_PRODUCER,
+            calibration: 'deterministic',
+          },
+        ];
+      }
+      const composite = compositeScore(compositeDims);
       if (composite === null) {
         warnings.push(`${hyp.id}: no valid scored dimensions — assessment discarded`);
         continue;
@@ -518,8 +656,8 @@ export const rankStage: StageHandler = {
       ranked.push({
         hyp,
         composite: composite.value,
-        evidenceGrounding: dims.find((d) => d.dimension === 'evidence_grounding')?.value ?? null,
-        dimensions,
+        evidenceGrounding: compositeDims.find((d) => d.dimension === 'evidence_grounding')?.value ?? null,
+        dimensions: scorecardDims,
         excluded: composite.excluded,
       });
     }
@@ -769,7 +907,8 @@ export const rankStage: StageHandler = {
         `Composite ${r.composite.toFixed(4)} = weighted average of valid dimensions (${weightDescription}). ` +
         `Deterministic tie-break on evidence_grounding. Excluded dimensions: ${r.excluded.length > 0 ? r.excluded.join('; ') : 'none'}. ` +
         tournamentLine +
-        ` All dimension scores are uncalibrated LLM judgments produced by ${producer} — decision support only.`;
+        ` evidence_grounding is the DETERMINISTIC evidence-body measurement (Σlog-LR band + QBAF over relationStrength-v1 weights); ` +
+        `all other dimension scores are uncalibrated LLM judgments produced by ${producer} — decision support only.`;
       ctx.store.putObject(
         'scorecard',
         HypothesisScorecard.parse({
@@ -855,22 +994,21 @@ export const rankStage: StageHandler = {
       const feedbackSignals = ctx.store.listObjects('feedback', runId);
       const now = new Date().toISOString();
       for (const r of ranked) {
-        const relevant = feedbackSignals.filter((s) => {
-          const target = s.target;
-          return target === undefined || target.kind !== 'hypothesis' || target.id === r.hyp.id;
+        // Lane-06: bodies were computed pre-scoring — reuse them (same deterministic id,
+        // upsert semantics); recompute only for hypotheses whose body failed earlier.
+        const body = bodyByHyp.get(r.hyp.id) ?? buildEvidenceBody({
+          id: deterministicId('evb', runId, r.hyp.id),
+          runId,
+          hypothesisId: r.hyp.id,
+          relations,
+          claims: allClaims,
+          experimentalAxes: countExperimentalAxes(feedbackSignals.filter((s) => {
+            const target = s.target;
+            return target === undefined || target.kind !== 'hypothesis' || target.id === r.hyp.id;
+          })),
+          now,
         });
-        ctx.store.putObject(
-          'evidence_body',
-          buildEvidenceBody({
-            id: deterministicId('evb', runId, r.hyp.id),
-            runId,
-            hypothesisId: r.hyp.id,
-            relations,
-            claims: allClaims,
-            experimentalAxes: countExperimentalAxes(relevant),
-            now,
-          }),
-        );
+        ctx.store.putObject('evidence_body', body);
       }
       ctx.store.putObject(
         'ach_analysis',

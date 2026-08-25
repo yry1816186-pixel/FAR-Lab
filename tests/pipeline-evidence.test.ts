@@ -867,3 +867,69 @@ describe('build_evidence fulltext deepening (phase A)', () => {
     expect(artifactText).toBe(longText);
   });
 });
+// ---------------------------------------------------------------------------
+// Lane-06 (2026-08-25): deterministic numeric anchoring of D-018 contradiction
+// judgment — CI-vs-CI arithmetic rides the pair payload, and non-overlapping
+// intervals get a heterogeneity disclosure on BOTH claims regardless of verdict.
+// ---------------------------------------------------------------------------
+
+describe('build_evidence D-018 numeric anchoring (lane-06)', () => {
+  const ABSTRACT_NUM_A =
+    'A multi-site trial of CRISPR base editing of the maize DREB gene reports a substantial yield effect. ' +
+    'Across all sites base editing increased yield with an effect of 2.1 (95% CI [1.2, 3.0]) relative to controls.';
+  const ABSTRACT_NUM_B =
+    'A large-panel study of CRISPR base editing of the maize DREB gene finds no meaningful yield effect. ' +
+    'In every panel base editing showed no yield gain with an effect of 0.4 (95% CI [0.1, 0.9]) relative to controls.';
+
+  it('disjoint quoted CIs anchor the pair and get a deterministic disclosure even when the verdict is not_comparable', async () => {
+    const { ctx, store } = bench([
+      extractionStep([
+        {
+          text: 'Base editing of the maize DREB gene increases kernel yield substantially.',
+          quote: 'base editing increased yield with an effect of 2.1 (95% CI [1.2, 3.0])',
+          stance: 'supports',
+        },
+      ]),
+      extractionStep([
+        {
+          text: 'Base editing of the maize DREB gene does not meaningfully increase kernel yield.',
+          quote: 'base editing showed no yield gain with an effect of 0.4 (95% CI [0.1, 0.9])',
+          stance: 'contradicts',
+        },
+      ]),
+      // verified=2 < floor -> gap assessment runs; script "adequate"
+      { rawOutput: JSON.stringify({ enoughEvidence: true, gapDescription: 'fixture: adequate', queries: [] }) },
+      // the judge abstains — the arithmetic must still be disclosed
+      {
+        rawOutput: JSON.stringify({
+          verdicts: [
+            {
+              pairId: 0,
+              verdict: 'not_comparable',
+              sharedSubject: 'effect of maize DREB base editing on yield',
+              confidence: 'low',
+            },
+          ],
+        }),
+      },
+    ]);
+    const docA = mkSource(ctx.run.id, newId('src'), { abstractText: ABSTRACT_NUM_A });
+    const docB = mkSource(ctx.run.id, newId('src'), { abstractText: ABSTRACT_NUM_B });
+    corpusOf(ctx, [docA, docB]);
+
+    const outcome = await buildEvidenceStage.execute(ctx);
+    expect(outcome.kind).toBe('done');
+    if (outcome.kind === 'done') {
+      // 1 prefiltered pair, judge abstained, but the disclosure fired deterministically
+      expect(outcome.summary).toContain('cross_relations=0 persisted (1 not_comparable) of 1 prefiltered pairs');
+      expect(outcome.summary).toContain('2 numeric-heterogeneity disclosure(s)');
+    }
+    const claims = store.listObjects('claim', ctx.run.id);
+    expect(claims).toHaveLength(2);
+    for (const c of claims) {
+      expect(c.uncertainties.some((u) => u.startsWith('numeric heterogeneity: non-overlapping CIs'))).toBe(true);
+    }
+    // no cross relation persisted for a not_comparable verdict (enrichment honesty)
+    expect(store.listObjects('evidence_relation', ctx.run.id).filter((r) => r.targetClaimId !== undefined)).toHaveLength(0);
+  });
+});

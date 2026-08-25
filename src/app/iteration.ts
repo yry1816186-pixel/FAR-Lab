@@ -65,6 +65,35 @@ export const experimentLegStatus = (store: Store, runId: string): ExperimentLegS
   return { kind: 'current', planId: plan.id };
 };
 
+/** Hypothesis/plan fields whose change is SEMANTIC (not bookkeeping) for the delta count. */
+const HYPOTHESIS_SCOPE_FIELDS = new Set(['statement', 'mechanism', 'predictions']);
+const PLAN_SCOPE_FIELDS = new Set(['steps', 'metrics', 'decisionRules']);
+
+/**
+ * Lane-06: revisions that changed scientific content vs cosmetic rewrites. Derived
+ * deterministically from persisted version_diff entries: an entry counts when a scope
+ * field changed OR a wired revision predicate flagged a violation (falsifiability not
+ * retained / decision rules silently changed). Pure function of stored state.
+ */
+export const countSemanticRevisions = (store: Store, runId: string): number => {
+  let semantic = 0;
+  for (const diff of store.listObjects('version_diff', runId)) {
+    for (const entry of diff.entries) {
+      const scope = entry.objectType === 'hypothesis'
+        ? HYPOTHESIS_SCOPE_FIELDS
+        : entry.objectType === 'plan'
+          ? PLAN_SCOPE_FIELDS
+          : null;
+      const scopeChanged = scope !== null && entry.changedFields.some((f) => scope.has(f));
+      const predicateViolation = entry.semanticFlags.some(
+        (f) => f === 'falsifiability_retained:false' || f === 'decision_rules_preserved:false',
+      );
+      if (scopeChanged || predicateViolation) semantic += 1;
+    }
+  }
+  return semantic;
+};
+
 /** Material domain counts of the run right now — the no-delta fingerprint input. */
 export const computeIterationSnapshot = (store: Store, runId: string, round: number): IterationSnapshot => {
   const claims = store.listObjects('claim', runId);
@@ -85,6 +114,7 @@ export const computeIterationSnapshot = (store: Store, runId: string, round: num
     scorecards: scorecards.length,
     plans: plans.length,
     revisions: revisions.length,
+    semanticRevisionChanges: countSemanticRevisions(store, runId),
     experimentRunsCompleted: experimentRuns.filter((r) => r.status === 'completed').length,
     feedbackSignals: signals.length,
     feedbackConsumed: signals.filter((s) => consumed.has(s.id)).length,

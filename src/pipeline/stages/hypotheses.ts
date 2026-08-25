@@ -270,6 +270,9 @@ const clusterCandidates = async (
       })),
     },
     schema: ClusterOut,
+    // Lane-06: structured grouping judgment — low-variance decoding, deterministic
+    // post-normalization stays the real dedup owner.
+    temperature: 0.2,
   });
   return preMergeNearDuplicates(
     raws.map((r) => `${r.out.statement} ${r.out.mechanism}`),
@@ -558,6 +561,12 @@ export const generateHypothesesStage: StageHandler = {
               : {}),
           },
           schema: StrategyOut,
+          // Lane-06: generation deliberately samples (0.7) — diversity IS the product
+          // here, unlike the judgment calls the SCIENCE lane pinned to 0. Pinned
+          // explicitly so provider defaults can never silently change the search
+          // distribution; anti-dup is enforced deterministically post-hoc (clustering
+          // + pre-merge + paraphrase guard), not by decoding temperature.
+          temperature: 0.7,
         }).then((r) => ({ provider: r.provider, modelId: r.modelId, data: r.data })));
       const modelRef = `${res.provider}/${res.modelId}`;
       const inputIds = (payload.supportingClaims ?? payload.counterDirectionClaims ?? payload.claims ?? []) as {
@@ -634,6 +643,9 @@ export const generateHypothesesStage: StageHandler = {
           })),
         },
         schema: SupplementOut,
+        // Lane-06: operator-based creative search — same deliberate sampling as the
+        // strategy calls; the re-cluster + paraphrase guard bound the noise.
+        temperature: 0.7,
       });
       if (res.data.candidates.length > 4) {
         warnings.push(`diversity-supplement: model returned ${res.data.candidates.length}; keeping first 4`);
@@ -676,6 +688,8 @@ export const generateHypothesesStage: StageHandler = {
         numberedCandidates: raws.map((r, i) => ({ index: i, statement: r.out.statement, mechanism: r.out.mechanism })),
       },
       schema: NoveltyOut,
+      // Lane-06: classification judgment — pinned low, corpus-relative label only.
+      temperature: 0.2,
     });
     const noveltyByIndex = new Map<number, z.infer<typeof NoveltyLabel>>();
     for (const l of noveltyRes.data.labels) {

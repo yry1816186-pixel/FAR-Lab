@@ -54,21 +54,39 @@ export const eValue = (rr: number): { eValue: number; detail: string } => {
 /**
  * Extract mean/n pairs from a verbatim quote (deterministic regex; returns []
  * when the quote carries no such statistics). Feeds grimCheck at claim time.
+ *
+ * Lane-06 precision fix (2026-08-25): pairing was the full mean×n CROSS
+ * PRODUCT over the whole quote — a sentence-pair like "mean 3.4 (n=42) ...
+ * mean 3.1 (n=40)" produced 4 checks, 2 of them spurious, and a spurious
+ * GRIM failure steps the claim's certainty DOWN via forensicFails. Forensic
+ * checks are advisory, so precision outranks recall: a mean is paired with an
+ * n only when they appear in the SAME sentence segment and that segment
+ * contains exactly one mean and exactly one n. Ambiguous segments are skipped
+ * — a missed advisory check is honest silence; a false INCONSISTENT flag
+ * corrupts the grade.
  */
 export const extractMeanN = (quote: string): Array<{ mean: number; n: number; decimals: number }> => {
   const out: Array<{ mean: number; n: number; decimals: number }> = [];
   const meanRe = /(?:mean|M)\b(?:\s+[a-z]+){0,2}[\s:=]+(\d+(?:\.\d+)?)/gi;
   const nRe = /\b(?:n|N)\s*[:=]?\s*(\d{1,6})\b/g;
-  const ns: number[] = [];
-  for (const m of quote.matchAll(nRe)) ns.push(Number(m[1]));
-  if (ns.length === 0) return out;
-  for (const m of quote.matchAll(meanRe)) {
-    const meanStr = m[1]!;
-    const decimals = meanStr.includes('.') ? meanStr.split('.')[1]!.length : 0;
-    const mean = Number(meanStr);
-    if (mean > 0) {
-      for (const n of ns) out.push({ mean, n, decimals });
+  // Sentence-ish segmentation: terminator + whitespace, or a semicolon. Segments
+  // keep their text so the regexes anchor inside one clause, not across the quote.
+  const segments = quote.split(/(?<=[.!?;])\s+/);
+  for (const seg of segments) {
+    const ns: number[] = [];
+    for (const m of seg.matchAll(nRe)) ns.push(Number(m[1]));
+    if (ns.length !== 1) continue; // 0 or 2+ n's in one segment: ambiguous pairing
+    const means: { value: number; decimals: number }[] = [];
+    for (const m of seg.matchAll(meanRe)) {
+      const meanStr = m[1]!;
+      means.push({
+        value: Number(meanStr),
+        decimals: meanStr.includes('.') ? meanStr.split('.')[1]!.length : 0,
+      });
     }
+    if (means.length !== 1) continue; // 2+ means in one segment: ambiguous pairing
+    const mean = means[0]!;
+    if (mean.value > 0) out.push({ mean: mean.value, n: ns[0]!, decimals: mean.decimals });
   }
   return out;
 };
@@ -120,8 +138,11 @@ export const extractStats = (quote: string): { pValue?: number; percent?: number
   if (pct !== null) out.percent = Number(pct[1]);
   const sd = /\bSD\s*(?:=|:)?\s*(\d+(?:\.\d+)?)/i.exec(quote) ?? /\b(?:sd|S\.D\.)\s*(?:=|:)?\s*(\d+(?:\.\d+)?)/i.exec(quote);
   if (sd !== null) out.sd = Number(sd[1]);
-  const ci = /CI\s*[:=]?\s*[([]\s*(\d+(?:\.\d+)?)\s*[,;–-]\s*(\d+(?:\.\d+)?)\s*[)\]]/i.exec(quote);
-  const point = /(?:effect|difference|estimate)\s+(?:of\s+)?(\d+(?:\.\d+)?)/i.exec(quote);
+  // Lane-06: signed captures — difference-measure CIs legitimately span negatives
+  // ("effect of -0.8 (95% CI [-1.5, -0.1])"); dropping the sign would silently
+  // corrupt every downstream numeric check on such quotes.
+  const ci = /CI\s*[:=]?\s*[([]\s*([+-]?\d+(?:\.\d+)?)\s*[,;–-]\s*([+-]?\d+(?:\.\d+)?)\s*[)\]]/i.exec(quote);
+  const point = /(?:effect|difference|estimate)\s+(?:of\s+)?([+-]?\d+(?:\.\d+)?)/i.exec(quote);
   if (ci !== null && point !== null) {
     out.ci = { low: Number(ci[1]), high: Number(ci[2]), point: Number(point[1]) };
   }
@@ -149,4 +170,33 @@ export const extractRiskRatios = (quote: string): number[] => {
     }
   }
   return [...new Set(out)];
+};
+
+export interface CiPairContext {
+  ciA: { low: number; high: number; point?: number };
+  ciB: { low: number; high: number; point?: number };
+  /** The two intervals do not overlap — numeric heterogeneity between the quotes. */
+  disjoint: boolean;
+  /** Intervals sit on opposite sides of zero — a directional conflict (difference/ratio measures). */
+  oppositeSigns: boolean;
+}
+
+/**
+ * Lane-06 (2026-08-25): deterministic CI-vs-CI context for a claim pair. When BOTH
+ * verbatim quotes carry a confidence interval, the geometric relationship of the two
+ * intervals is pure arithmetic — it anchors the D-018 contradiction judgment instead
+ * of leaving it to unanchored text vibes, and disjoint intervals get a deterministic
+ * heterogeneity disclosure on both claims regardless of the LLM verdict. Returns null
+ * when either quote carries no CI (no anchor, no fabrication).
+ */
+export const ciPairContext = (quoteA: string, quoteB: string): CiPairContext | null => {
+  const a = extractStats(quoteA).ci;
+  const b = extractStats(quoteB).ci;
+  if (a === undefined || b === undefined) return null;
+  return {
+    ciA: a,
+    ciB: b,
+    disjoint: a.high < b.low || b.high < a.low,
+    oppositeSigns: (a.low > 0 && b.high < 0) || (a.high < 0 && b.low > 0),
+  };
 };
