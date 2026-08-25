@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bootstrapBtCis, bradleyTerry, compositeScore, BT_BOOTSTRAP_ROUNDS, type ContestedMatch } from '../src/pipeline/stages/rank.js';
+import { bootstrapBtCis, bradleyTerry, compositeScore, BT_BOOTSTRAP_ROUNDS, deterministicEvidenceGrounding, type ContestedMatch } from '../src/pipeline/stages/rank.js';
 import { stateFromReports } from '../src/app/campaign-driver.js';
 import type { ExperimentRun } from '../src/domain/index.js';
 
@@ -114,5 +114,58 @@ describe('composite weight-perturbation stability (property)', () => {
     const out = compositeScore(partial)!;
     expect(out.included).toEqual(['evidence_grounding', 'falsifiability', 'testability']);
     expect(out.excluded.length).toBe(4);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Lane-06 (2026-08-25): deterministic evidence grounding ladder. The
+// evidence_grounding composite dimension (weight 0.20, the largest) is no longer
+// an uncalibrated LLM self-score — it is the deterministic evidence-body value.
+// ---------------------------------------------------------------------------
+
+describe('deterministicEvidenceGrounding ladder (evidence_body -> dimension value)', () => {
+  const body = (over: Partial<import('../src/domain/index.js').EvidenceBody>): import('../src/domain/index.js').EvidenceBody =>
+    ({
+      id: id('evb', 'x'), runId: id('run', 'x'), hypothesisId: id('hyp', 'x'),
+      independentSources: 2, sumLogLrLow: 0.4, sumLogLrHigh: 0.9,
+      logLrBand: 'strong_support', qbafScore: 0.7, proofStandard: 'scintilla_evidence',
+      experimentalAxes: 0, promotion: 'literature_only_unverified',
+      disclosure: 'fixture body', createdAt: '2026-08-25T00:00:00.000Z',
+      ...over,
+    }) as import('../src/domain/index.js').EvidenceBody;
+
+  it('zero independent sources ground at exactly 0 — nothing grounds the hypothesis', () => {
+    const g = deterministicEvidenceGrounding(body({ independentSources: 0 }));
+    expect(g.value).toBe(0);
+    expect(g.rationale).toContain('zero evidential relations');
+  });
+
+  it('value is the mean of the band base and the QBAF score, rounding to 1e-3', () => {
+    // strong_support base 0.75, QBAF 0.7 -> 0.725
+    expect(deterministicEvidenceGrounding(body({})).value).toBe(0.725);
+    // moderate_support base 0.55, QBAF 0.5 -> 0.525
+    expect(deterministicEvidenceGrounding(body({ logLrBand: 'moderate_support', qbafScore: 0.5 })).value).toBe(0.525);
+  });
+
+  it('counter bands ground below neutral: net counter-evidence is worse than no evidence', () => {
+    const neutral = deterministicEvidenceGrounding(body({ logLrBand: 'none', qbafScore: 0.5 })).value;
+    const weakCounter = deterministicEvidenceGrounding(body({ logLrBand: 'weak_counter', qbafScore: 0.5 })).value;
+    const strongCounter = deterministicEvidenceGrounding(body({ logLrBand: 'strong_counter', qbafScore: 0.5 })).value;
+    expect(neutral).toBeGreaterThan(weakCounter);
+    expect(weakCounter).toBeGreaterThan(strongCounter);
+    expect(strongCounter).toBe(0.25); // mean(0.0, 0.5)
+  });
+
+  it('the band ladder is monotone across the support direction', () => {
+    const bands = ['very_strong_counter', 'strong_counter', 'moderate_counter', 'weak_counter', 'none', 'weak_support', 'moderate_support', 'strong_support', 'very_strong_support'] as const;
+    let prev = -1;
+    for (const b of bands) {
+      const v = deterministicEvidenceGrounding(body({ logLrBand: b, qbafScore: 0.5 })).value;
+      expect(v).toBeGreaterThanOrEqual(prev);
+      prev = v;
+    }
+    // and the strongest support with maximal QBAF stays inside [0,1]
+    const top = deterministicEvidenceGrounding(body({ logLrBand: 'very_strong_support', qbafScore: 1 })).value;
+    expect(top).toBeLessThanOrEqual(1);
   });
 });
