@@ -1,0 +1,267 @@
+{
+  "schema": "r2-14-scorecard/1",
+  "generatedAt": "2026-08-25T15:07:16.859Z",
+  "evaluatedTree": {
+    "baseline": "baseline/parallel-r2",
+    "commit": "47cc373",
+    "note": "unfused sibling lane branches are NOT in this tree; integration (lane 99) must re-run this battery on the fused tree"
+  },
+  "overall": "PASS_WITH_DIVERGENCES",
+  "probes": [
+    {
+      "id": "p1-wiring",
+      "verdict": "ADVISORY",
+      "summary": "160 src modules; 6 unreachable from [src/server/main.ts, src/cli/main.ts]: 0 orphans, 6 test-only, 0 script-only; 3 files with non-literal dynamic imports",
+      "exit": 0
+    },
+    {
+      "id": "p2-route-contract",
+      "verdict": "PASS",
+      "summary": "69 client-declared routes probed against the real server: {\"OK\":13,\"EXISTS_VALID\":46,\"EXISTS_UNAVAIL\":2,\"EXISTS_404\":8}",
+      "exit": 0
+    },
+    {
+      "id": "p3-live-masquerade",
+      "verdict": "PASS",
+      "summary": "stub-in-production: clean; 14 literal 'live' receipt sites (src/agent/capabilities/refine.ts, src/agent/exploration-runner.ts, src/app/spend-limit.ts, src/pipeline/stages/evidence.ts, src/pipeline/stages/export.ts, src/pipeline/stages/hypotheses.ts, src/pipeline/stages/retrieve.ts, src/pipeline/stages/verify.ts, src/providers/custom.ts, src/providers/dashscope.ts, src/providers/deepseek.ts, src/providers/http.ts, src/providers/zai.ts, src/shared/ports.ts); DB audit: 5072/5072 live receipts, 0 masquerades; 0 fake-vocabulary lines for review",
+      "exit": 0
+    },
+    {
+      "id": "p4-stale-web",
+      "verdict": "PASS",
+      "summary": "D-031 guard: missing-dist flagged, older-dist flagged, fresh-worktree clean; real serve on stale tree refused, on fresh tree started",
+      "exit": 0
+    },
+    {
+      "id": "p5-citation-grounding",
+      "verdict": "PASS",
+      "summary": "1261 verified / 5 non-verified claims; 1261 verified locators re-checked under the product's own alignment gate: 0 missing sources, 0 failing even the fuzzy bar, 21 fuzzy-aligned (near-verbatim), 0 malformed DOIs",
+      "exit": 0
+    },
+    {
+      "id": "p6-sandbox-escape",
+      "verdict": "ADVISORY",
+      "summary": "layer A (TS policy): 8/8; layer B (python namespace, live sidecar): 11/11",
+      "exit": 0
+    },
+    {
+      "id": "p7-memory-benefit",
+      "verdict": "PASS",
+      "summary": "write OK; idempotence OK (memory=2/fts=2); compile OK; consume wiring present",
+      "exit": 0
+    },
+    {
+      "id": "p8-agent-isolation",
+      "verdict": "PASS",
+      "summary": "permission decisions: 4/4 as expected; loop enforcement wired; subagent policy inheritance present, depth cap present",
+      "exit": 0
+    }
+  ],
+  "invalidClaims": [],
+  "divergences": [
+    {
+      "probe": "p1-wiring",
+      "finding": {
+        "severity": "ADV",
+        "id": "P1-TEST-ONLY",
+        "detail": "src module wired only from tests: src/domain/conformal.ts (importers: test:tests/stat-forensics.test.ts)"
+      }
+    },
+    {
+      "probe": "p1-wiring",
+      "finding": {
+        "severity": "ADV",
+        "id": "P1-TEST-ONLY",
+        "detail": "src module wired only from tests: src/domain/revision-predicates.ts (importers: test:tests/revision-predicates.test.ts)"
+      }
+    },
+    {
+      "probe": "p1-wiring",
+      "finding": {
+        "severity": "ADV",
+        "id": "P1-TEST-ONLY",
+        "detail": "src module wired only from tests: src/domain/search-allocation.ts (importers: test:tests/search-allocation.test.ts)"
+      }
+    },
+    {
+      "probe": "p1-wiring",
+      "finding": {
+        "severity": "ADV",
+        "id": "P1-TEST-ONLY",
+        "detail": "src module wired only from tests: src/experiment/matrix.ts (importers: test:tests/experiment-screening.test.ts, test:tests/experiment.test.ts)"
+      }
+    },
+    {
+      "probe": "p1-wiring",
+      "finding": {
+        "severity": "ADV",
+        "id": "P1-TEST-ONLY",
+        "detail": "src module wired only from tests: src/plugins/host-main.ts (importers: test:tests/plugins.test.ts)"
+      }
+    },
+    {
+      "probe": "p1-wiring",
+      "finding": {
+        "severity": "ADV",
+        "id": "P1-TEST-ONLY",
+        "detail": "src module wired only from tests: src/providers/deepseek.ts (importers: test:tests/providers.test.ts)"
+      }
+    },
+    {
+      "probe": "p1-wiring",
+      "finding": {
+        "severity": "ADV",
+        "id": "P1-DYNAMIC-IMPORT",
+        "detail": "non-literal dynamic import() present — graph may under-count reachability: src/plugins/host-main.ts"
+      }
+    },
+    {
+      "probe": "p1-wiring",
+      "finding": {
+        "severity": "ADV",
+        "id": "P1-DYNAMIC-IMPORT",
+        "detail": "non-literal dynamic import() present — graph may under-count reachability: src/plugins/import.ts"
+      }
+    },
+    {
+      "probe": "p1-wiring",
+      "finding": {
+        "severity": "ADV",
+        "id": "P1-DYNAMIC-IMPORT",
+        "detail": "non-literal dynamic import() present — graph may under-count reachability: src/server/api.ts"
+      }
+    },
+    {
+      "probe": "p6-sandbox-escape",
+      "finding": {
+        "severity": "ADV",
+        "id": "P6-NUMPY-LIMITED",
+        "detail": "layer B observation numpy-submodule-import-limitation: {\"id\":\"numpy-submodule-import-limitation\",\"ok\":false,\"errorKind\":\"ImportError\",\"errorMessage\":\"exploration namespace does not provide 'numpy._core._methods'; allowed: ['collections', 'csv', 'datetime', 'decimal', 'fractions', 'hashlib', 'itertools', 'json\",\"stdout\":\"\"} — numpy surface partially functional; submodule-importing ops fail closed (handoff to lane 10)"
+      }
+    }
+  ],
+  "benchmarks": {
+    "metrics": {
+      "exit": 0,
+      "stdoutTail": "=== FAR-Lab per-run ===\nP1 run_7zez1a8ezbbrrgw9begtta0gsw completed: srcVer=8/8 (100.0%) claimBind=15/15 (100.0%) counter=12/56 reps=6/11 falsif=83.3% planExec=true live=100.0% span=35.7min tokens=71939\nP2 run_yhp0m4kg6qnjmemhj9k5wbmk00 completed: srcVer=9/9 (100.0%) claimBind=4/4 (100.0%) counter=23/43 reps=9/10 falsif=100.0% planExec=true live=100.0% span=13.4min tokens=110377\nP3 run_rnjevw1teza5bmjesxybc0g98y completed: srcVer=11/11 (100.0%) claimBind=4/4 (100.0%) counter=2/21 reps=5/10 falsif=100.0% planExec=true live=100.0% span=3.3min tokens=45008\nP4 run_fr67580x6asqm0mgnncbmpppph completed: srcVer=12/12 (100.0%) claimBind=12/12 (100.0%) counter=20/51 reps=6/10 falsif=100.0% planExec=true live=100.0% span=5.0min tokens=112702\nP5 run_1egthjvkgwbssw93bz2y7yqzdk completed: srcVer=12/15 (80.0%) claimBind=0/0 (n/a) counter=0/0 reps=0/0 falsif=n/a planExec=null live=100.0% span=0.7min tokens=14787\nP6 run_tmse5hms5d60ek3299v7ceybt9 created: srcVer=0/0 (n/a) claimBind=0/0 (n/a) counter=0/0 reps=0/0 falsif=n/a planExec=null live=n/a span=0.0min tokens=0\n=== baselines (aggregate) ===\ndirect: call_ok=0/0 shape=0 zodHyp=0 zodPlan=0 falsif=n/a planExec=0 hypN=null cites=0 resolved=0 matched=0 quoteGrounded=0 unsupported=n/a\nrag: call_ok=0/0 shape=0 zodHyp=0 zodPlan=0 falsif=n/a planExec=0 hypN=null cites=0 resolved=0 matched=0 quoteGrounded=0 unsupported=n/a\nWROTE eval/results/metrics.json\n",
+      "stderrTail": "(node:2748) ExperimentalWarning: SQLite is an experimental feature and might change at any time\n(Use `node --trace-warnings ...` to show where the warning was created)\n"
+    },
+    "retrieval": {
+      "exit": 0,
+      "stdoutTail": "runs=67 pooledVerifyRate=0.9847 counterGatePass=1 rerankApplied=0.791 truncated=0.8209\nmedians: holeRate=0 abstractCov=0.75 identResolv=1 zeroResultRate=0.4286 counterZero=1 poolSize=31\n",
+      "stderrTail": "(node:28892) ExperimentalWarning: SQLite is an experimental feature and might change at any time\n(Use `node --trace-warnings ...` to show where the warning was created)\n"
+    }
+  },
+  "northStarMetrics": [
+    {
+      "id": "rediscovery-mean-f1",
+      "current": {
+        "value": 0.58,
+        "at": "2026-08-22",
+        "evidence": "eval/results/rediscovery-v2-pass1.jsonl (W9 renamed; legacy: rediscovery-v1-degraded.jsonl); evidence/W-EV2/rediscovery.md",
+        "note": "live re-measurement BLOCKED (D-036); W5-F4 diversity loop landed (premise: measured 30% duplicate rate, spikes/wave5-diversity-probe.mjs) — effect UNVERIFIED-live until a model route returns (D-050)"
+      }
+    },
+    {
+      "id": "rediscovery-judge-variance",
+      "current": {
+        "value": 0.19,
+        "unit": "max abs swing, task-level F1",
+        "detail": "LIVE MEASURED 2026-08-22, FULL 5/5 scope (3 runs generated on glm-5.3, all completed): arg 0/0/0, egfr 0/0/0, cdiff 0/0(1 repeat failed)/0, crispr 0/0/0 (swing 0 each — deterministic layer variance is ZERO), crc 0.333/0.143/0.235 (swing 0.19 — RESIDUAL SOURCE IS THE ADJUDICATION LAYER: 9-13 borderline pairs per pass, majority votes flip between passes). Supersedes the 2/5-scope 0.061 (which had not yet included the variance-carrying task). Honest verdict: target 0.15 NOT met on full scope; matching-layer hardening fully successful, adjudication hardening is the remaining lever (votes 3->5, anchored adjudication prompt, or claim-count stabilization on borderline-heavy tasks).",
+        "at": "2026-08-22",
+        "evidence": "eval/results/judge-variance-live-R3.json (5 tasks); evidence/W9/judge-variance-hardening.md; D-059"
+      }
+    },
+    {
+      "id": "relation-blind-agreement",
+      "current": {
+        "value": 0.61,
+        "detail": "supports 11/18 pooled; contradicts structurally eliminated (0/21 post-fix)",
+        "at": "2026-08-22",
+        "evidence": "evidence/W-EV2/relation-precision.md",
+        "note": "live re-measurement BLOCKED (D-036); W5-F5 anchored bands + independent link audit landed (D-050) — expected direction: audited labels are modal labels, raising expected single-draw agreement; NOT claimed as measured until re-judged live"
+      }
+    },
+    {
+      "id": "mlr-bench-overall",
+      "current": {
+        "value": 7,
+        "detail": "idea 7.00 / proposal 6.20; Feasibility 7.40 already exceeds anchors",
+        "at": "2026-08-22",
+        "evidence": "eval/results/mlr-bench.jsonl; evidence/W-EV2/mlr-bench.md",
+        "note": "W5-F3 adapter fidelity landed (D-050): judging protocol now includes idea-consistency context — post-D-050 numbers NOT directly comparable to the recorded 30/30 (old/new protocols must both be reported); farlab-vs-anchor internal comparisons stay symmetric; live re-run queued on D-036"
+      }
+    },
+    {
+      "id": "structured-output-failure",
+      "current": {
+        "value": 0.011,
+        "detail": "Live value 0.011 stands (1 mixed-provenance rejection / ~91 calls, run_prrxcee6 41/41 after schema fix). W7 (2026-08-22): per-call live re-measurement BLOCKED (DeepSeek 402, wave-open probe archived); deterministic same-corpus repair-layer coverage improved 12/75 -> 75/75 corruption classes (evidence/W7/repair-benchmark.md), live-class 192/192 held, repair worst-path 1.39ms vs 2s budget",
+        "at": "2026-08-22",
+        "evidence": "D-026/D-029b; run_prrxcee6; evidence/W7/repair-benchmark.md; spikes/model-spike/runs/2026-08-22T02-38-26-825Z-deepseek.json"
+      }
+    },
+    {
+      "id": "retrieval-verified-rate",
+      "current": {
+        "value": 0.9667,
+        "at": "2026-08-21",
+        "evidence": "eval/results/metrics-ev1.json"
+      }
+    },
+    {
+      "id": "counter-evidence-substantive-hit",
+      "current": {
+        "value": 0.143,
+        "detail": "strict (judge in contradicts/weakens) post-fix fullfix blind re-judge sample: 1/7, Wilson 95% [0.026,0.513]; limiting (+qualifies) also 0.143; misses mostly EMPTY (5 unrelated) not inverted (1 supports) — semantic residual per D-038, fix route = judge v2 adjudication layer once routes funded; pre-fix pooled was 0.308 strict / 0.615 limiting (relation-precision.jsonl n=13)",
+        "at": "2026-08-22",
+        "evidence": "eval/counter-evidence-metric.mjs run on spikes/output/relation-precision{,-contradicts-r2,-fullfix}.jsonl; evidence/W9/counter-evidence-metric.md",
+        "note": "strict 1/7 Wilson [0.026,0.513] stands (live-gated). W-G/F-A anchored counter queries LANDED offline: anchor pass-rate 0.563->0.825 on 80 real historical counter queries (retrieval-side root cause of EMPTY misses); live re-measure of the metric gated on D-036. W-G/F-B GRADE-lite certainty labels now surface to relation judges."
+      }
+    },
+    {
+      "id": "run-reliability",
+      "current": {
+        "value": "lease-watchdog-auto",
+        "detail": "D-054 offline 20/20 (kill->adoption 5033-5060ms, redo <=1, outputs identical); LIVE single-shot on zai glm-4.6 Anthropic wire verified same semantics (62.02s adoption = TTL+1 poll, calls 1x1/2x2/3x1, evidence/W8/live-fault-injection.json)",
+        "at": "2026-08-22",
+        "evidence": "evidence/W8/fault-injection.json; evidence/W8/fusion-verification.md; tests/wave8-durability.test.ts 12/12 (D-054)"
+      }
+    },
+    {
+      "id": "run-wall-clock",
+      "current": {
+        "value": "6-8min typical; pre-fusion outliers were network stalls",
+        "at": "2026-08-22",
+        "evidence": "evidence/W-EV1/ev1-before-after.md (P4 5.0min, P6 8.0min post)",
+        "note": "W-G (2026-08-22): bounded intra-stage concurrency LANDED (mapBounded, falsify/rank/evidence; stub benchmark 1.96x falsify segment, outputs byte-identical; receipts-profile projection: full-run wall-clock cut ~35-45%, stretch p50<=4.5min potentially met) — live full-run re-measurement BLOCKED on model routes (D-036), projection is UNVERIFIED-live."
+      }
+    },
+    {
+      "id": "plan-executability",
+      "current": {
+        "value": "5/5",
+        "at": "2026-08-21",
+        "evidence": "eval/results/metrics-ev1.json"
+      }
+    },
+    {
+      "id": "hci-audit-p1",
+      "current": {
+        "value": "unaudited-this-cycle",
+        "detail": "R1 audits passed; P2/P3 residuals known (PlanTab provenance)",
+        "at": "2026-08-22",
+        "evidence": ".control/ACCEPTANCE_STATUS.json"
+      }
+    },
+    {
+      "id": "delivery-number-honesty",
+      "current": {
+        "value": 0,
+        "detail": "after D-022 correction wave",
+        "at": "2026-08-22",
+        "evidence": "evidence/W-EV1/ev1-before-after.md audit note"
+      }
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "probe": "p3-live-masquerade",
+  "verdict": "PASS",
+  "summary": "stub-in-production: clean; 14 literal 'live' receipt sites (src/agent/capabilities/refine.ts, src/agent/exploration-runner.ts, src/app/spend-limit.ts, src/pipeline/stages/evidence.ts, src/pipeline/stages/export.ts, src/pipeline/stages/hypotheses.ts, src/pipeline/stages/retrieve.ts, src/pipeline/stages/verify.ts, src/providers/custom.ts, src/providers/dashscope.ts, src/providers/deepseek.ts, src/providers/http.ts, src/providers/zai.ts, src/shared/ports.ts); DB audit: 5072/5072 live receipts, 0 masquerades; 0 fake-vocabulary lines for review",
+  "findings": [],
+  "meta": {
+    "liveSites": [
+      "src/agent/capabilities/refine.ts",
+      "src/agent/exploration-runner.ts",
+      "src/app/spend-limit.ts",
+      "src/pipeline/stages/evidence.ts",
+      "src/pipeline/stages/export.ts",
+      "src/pipeline/stages/hypotheses.ts",
+      "src/pipeline/stages/retrieve.ts",
+      "src/pipeline/stages/verify.ts",
+      "src/providers/custom.ts",
+      "src/providers/dashscope.ts",
+      "src/providers/deepseek.ts",
+      "src/providers/http.ts",
+      "src/providers/zai.ts",
+      "src/shared/ports.ts"
+    ],
+    "markerHits": [],
+    "dbAudit": {
+      "receiptsTotal": 5072,
+      "liveReceipts": 5072,
+      "liveWithUsage": 0,
+      "byProvider": {
+        "unknown": 5072
+      },
+      "masqueradeCount": 0
+    }
+  }
+}

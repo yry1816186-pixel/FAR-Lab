@@ -1,0 +1,154 @@
+{
+  "probe": "p6-sandbox-escape",
+  "verdict": "ADVISORY",
+  "summary": "layer A (TS policy): 8/8; layer B (python namespace, live sidecar): 11/11",
+  "findings": [
+    {
+      "severity": "ADV",
+      "id": "P6-NUMPY-LIMITED",
+      "detail": "layer B observation numpy-submodule-import-limitation: {\"id\":\"numpy-submodule-import-limitation\",\"ok\":false,\"errorKind\":\"ImportError\",\"errorMessage\":\"exploration namespace does not provide 'numpy._core._methods'; allowed: ['collections', 'csv', 'datetime', 'decimal', 'fractions', 'hashlib', 'itertools', 'json\",\"stdout\":\"\"} — numpy surface partially functional; submodule-importing ops fail closed (handoff to lane 10)"
+    }
+  ],
+  "meta": {
+    "layerA": [
+      {
+        "id": "benign-analysis",
+        "allowed": true,
+        "codes": [],
+        "ok": true
+      },
+      {
+        "id": "env-probe",
+        "allowed": false,
+        "codes": [
+          "E-CREDENTIALS"
+        ],
+        "ok": true
+      },
+      {
+        "id": "dunder-import",
+        "allowed": false,
+        "codes": [
+          "E-ESCAPE"
+        ],
+        "ok": true
+      },
+      {
+        "id": "string-laundered-getattr",
+        "allowed": false,
+        "codes": [
+          "E-ESCAPE"
+        ],
+        "ok": true
+      },
+      {
+        "id": "subprocess",
+        "allowed": false,
+        "codes": [
+          "E-SUBPROCESS"
+        ],
+        "ok": true
+      },
+      {
+        "id": "os-system",
+        "allowed": false,
+        "codes": [
+          "E-SUBPROCESS"
+        ],
+        "ok": true
+      },
+      {
+        "id": "network",
+        "allowed": false,
+        "codes": [
+          "E-NETWORK"
+        ],
+        "ok": true
+      },
+      {
+        "id": "verdict-fabrication",
+        "allowed": false,
+        "codes": [
+          "E-CONFIRMATORY"
+        ],
+        "ok": true
+      }
+    ],
+    "layerB": [
+      {
+        "id": "benign-numpy",
+        "ok": true,
+        "errorKind": null,
+        "errorMessage": "None",
+        "stdout": "2.0\n"
+      },
+      {
+        "id": "benign-print",
+        "ok": true,
+        "errorKind": null,
+        "errorMessage": "None",
+        "stdout": "hello from sandbox\n"
+      },
+      {
+        "id": "numpy-submodule-import-limitation",
+        "ok": false,
+        "errorKind": "ImportError",
+        "errorMessage": "exploration namespace does not provide 'numpy._core._methods'; allowed: ['collections', 'csv', 'datetime', 'decimal', 'fractions', 'hashlib', 'itertools', 'json",
+        "stdout": ""
+      },
+      {
+        "id": "open-cwd",
+        "ok": false,
+        "errorKind": "NameError",
+        "errorMessage": "name 'open' is not defined",
+        "stdout": ""
+      },
+      {
+        "id": "open-parent-traversal",
+        "ok": false,
+        "errorKind": "NameError",
+        "errorMessage": "name 'open' is not defined",
+        "stdout": ""
+      },
+      {
+        "id": "open-absolute",
+        "ok": false,
+        "errorKind": "NameError",
+        "errorMessage": "name 'open' is not defined",
+        "stdout": ""
+      },
+      {
+        "id": "dunder-subclasses-chain",
+        "ok": "gate-rejected",
+        "errorKind": "ValueError",
+        "errorMessage": "attribute '__subclasses__' is forbidden: interpreter introspection is the sandbox-escape chain"
+      },
+      {
+        "id": "laundered-import",
+        "ok": false,
+        "errorKind": "AttributeError",
+        "errorMessage": "'dict' object has no attribute '__import__'",
+        "stdout": ""
+      },
+      {
+        "id": "np-f2py-os-escape",
+        "ok": "gate-rejected",
+        "errorKind": "ValueError",
+        "errorMessage": "deep module-attribute chain from a bound root (e.g. np.x.y(...)) is forbidden — numpy re-exports os/sys via auto-imported submodules"
+      },
+      {
+        "id": "import-os",
+        "ok": "gate-rejected",
+        "errorKind": "ValueError",
+        "errorMessage": "import of 'os' is outside the exploration allowlist"
+      },
+      {
+        "id": "exec-recovery",
+        "ok": false,
+        "errorKind": "NameError",
+        "errorMessage": "name 'exec' is not defined",
+        "stdout": ""
+      }
+    ]
+  }
+}

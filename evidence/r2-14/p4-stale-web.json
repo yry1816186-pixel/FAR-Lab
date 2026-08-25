@@ -1,0 +1,23 @@
+{
+  "probe": "p4-stale-web",
+  "verdict": "PASS",
+  "summary": "D-031 guard: missing-dist flagged, older-dist flagged, fresh-worktree clean; real serve on stale tree refused, on fresh tree started",
+  "findings": [],
+  "meta": {
+    "missing": [
+      "a.js (missing in dist)"
+    ],
+    "older": [
+      "a.js"
+    ],
+    "freshCount": 0,
+    "staleServe": {
+      "code": 3,
+      "out": "far-serve: dist is stale/missing (a.js) — run npm run build first (D-031).\n"
+    },
+    "freshServe": {
+      "code": "timeout-killed",
+      "out": "(node:12836) ExperimentalWarning: SQLite is an experimental feature and might change at any time\n(Use `node --trace-warnings ...` to show where the warning was created)\nFAR-Lab API listening on http://127.0.0.1:49724\nweb workbench NOT built (web/dist absent — API only)\n"
+    }
+  }
+}

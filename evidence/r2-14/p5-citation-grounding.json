@@ -1,0 +1,17 @@
+{
+  "probe": "p5-citation-grounding",
+  "verdict": "PASS",
+  "summary": "1261 verified / 5 non-verified claims; 1261 verified locators re-checked under the product's own alignment gate: 0 missing sources, 0 failing even the fuzzy bar, 21 fuzzy-aligned (near-verbatim), 0 malformed DOIs",
+  "findings": [],
+  "meta": {
+    "claimsTotal": 1266,
+    "verified": 1261,
+    "unverified": 5,
+    "locatorsChecked": 1261,
+    "fuzzyAligned": 21,
+    "missingSource": [],
+    "ungrounded": [],
+    "badDoi": [],
+    "crossRun": []
+  }
+}
