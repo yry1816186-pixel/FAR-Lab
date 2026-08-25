@@ -4,7 +4,9 @@
  * Writes: eval/results/metrics.json (+ stdout tables)
  * Uses the SAME dist checkers as the pipeline: checkFalsificationCompleteness, checkPlanExecutability,
  * and isRepresentative for clustering. Citation validity = live Crossref DOI resolution.
- * Run: node eval/metrics.mjs
+ * Run: node eval/metrics.mjs [--db path/to/far.db]   (default: workspace .far-run/far.db;
+ * --db added by the R2-14 evaluation lane so replay benchmarks can point at a
+ * read-only DB copy without a workspace — output semantics unchanged.)
  */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -16,7 +18,12 @@ import { checkPlanExecutability } from '../dist/pipeline/stages/plan.js';
 import { isRepresentative } from '../dist/pipeline/stages/shared.js';
 import { createCrossrefAdapter } from '../dist/sources/crossref.js';
 
-const DB_PATH = new URL('../.far-run/far.db', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
+const flagDb = (argv) => {
+  const i = argv.indexOf('--db');
+  return i >= 0 && argv[i + 1] ? resolve(argv[i + 1]) : null;
+};
+const DB_PATH = flagDb(process.argv)
+  ?? new URL('../.far-run/far.db', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 const RESULTS_DIR = new URL('./results/', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 
 const db = new DatabaseSync(DB_PATH, { readOnly: true });
