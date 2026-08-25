@@ -1,36 +1,74 @@
 import { z } from 'zod';
 
+/**
+ * Canonical kind -> id-prefix vocabulary: the ONE place entity id prefixes are
+ * defined (R2-12 stewardship). The branded schemas below and the ObjectRef
+ * shape check both derive from it — a new kind is added once, here.
+ */
+const ID_PREFIX = {
+  question: 'q',
+  run: 'run',
+  corpus_snapshot: 'corp',
+  source_document: 'src',
+  claim: 'clm',
+  evidence_relation: 'ev',
+  hypothesis: 'hyp',
+  plan: 'pln',
+  task: 'task',
+  feedback: 'fbk',
+  revision: 'rev',
+  receipt: 'rcp',
+  bundle: 'bnd',
+  scorecard: 'sc',
+  tournament: 'trn',
+  experiment_spec: 'xsp',
+  experiment_run: 'xrun',
+  dataset_record: 'ds',
+  result_set: 'rset',
+  stat_report: 'srep',
+  model_config: 'mcfg',
+  evidence_body: 'evb',
+  ach_analysis: 'ach',
+  prediction: 'prd',
+  effect_estimate: 'efx',
+  iteration: 'itr',
+  tool_integration: 'tint',
+} as const;
+
+/** The single id-shape grammar: <prefix>_[0-9a-z]{20,32} (26-char ULID-style body from newId). */
+const idShape = (prefix: string): RegExp => new RegExp(`^${prefix}_[0-9a-z]{20,32}$`);
+
 /** Branded entity IDs. Prefix encodes the entity kind; body is opaque. */
 export const idOf = (prefix: string) =>
-  z.string().regex(new RegExp(`^${prefix}_[0-9a-z]{20,32}$`), `must be ${prefix}_<random>`);
+  z.string().regex(idShape(prefix), `must be ${prefix}_<random>`);
 
-export const RunId = idOf('run');
-export const QuestionId = idOf('q');
-export const SourceDocumentId = idOf('src');
-export const CorpusSnapshotId = idOf('corp');
-export const ClaimId = idOf('clm');
-export const EvidenceRelationId = idOf('ev');
-export const HypothesisId = idOf('hyp');
-export const PlanId = idOf('pln');
-export const FeedbackId = idOf('fbk');
-export const RevisionId = idOf('rev');
-export const ReceiptId = idOf('rcp');
-export const BundleId = idOf('bnd');
-export const TaskId = idOf('task');
-export const ScorecardId = idOf('sc');
-export const TournamentId = idOf('trn');
-export const ExperimentSpecId = idOf('xsp');
-export const ExperimentRunId = idOf('xrun');
-export const DatasetRecordId = idOf('ds');
-export const ResultSetId = idOf('rset');
-export const StatReportId = idOf('srep');
-export const ModelConfigId = idOf('mcfg');
-export const EvidenceBodyId = idOf('evb');
-export const AchAnalysisId = idOf('ach');
-export const PredictionId = idOf('prd');
-export const EffectEstimateId = idOf('efx');
-export const IterationId = idOf('itr');
-export const ToolIntegrationId = idOf('tint');
+export const RunId = idOf(ID_PREFIX.run);
+export const QuestionId = idOf(ID_PREFIX.question);
+export const SourceDocumentId = idOf(ID_PREFIX.source_document);
+export const CorpusSnapshotId = idOf(ID_PREFIX.corpus_snapshot);
+export const ClaimId = idOf(ID_PREFIX.claim);
+export const EvidenceRelationId = idOf(ID_PREFIX.evidence_relation);
+export const HypothesisId = idOf(ID_PREFIX.hypothesis);
+export const PlanId = idOf(ID_PREFIX.plan);
+export const FeedbackId = idOf(ID_PREFIX.feedback);
+export const RevisionId = idOf(ID_PREFIX.revision);
+export const ReceiptId = idOf(ID_PREFIX.receipt);
+export const BundleId = idOf(ID_PREFIX.bundle);
+export const TaskId = idOf(ID_PREFIX.task);
+export const ScorecardId = idOf(ID_PREFIX.scorecard);
+export const TournamentId = idOf(ID_PREFIX.tournament);
+export const ExperimentSpecId = idOf(ID_PREFIX.experiment_spec);
+export const ExperimentRunId = idOf(ID_PREFIX.experiment_run);
+export const DatasetRecordId = idOf(ID_PREFIX.dataset_record);
+export const ResultSetId = idOf(ID_PREFIX.result_set);
+export const StatReportId = idOf(ID_PREFIX.stat_report);
+export const ModelConfigId = idOf(ID_PREFIX.model_config);
+export const EvidenceBodyId = idOf(ID_PREFIX.evidence_body);
+export const AchAnalysisId = idOf(ID_PREFIX.ach_analysis);
+export const PredictionId = idOf(ID_PREFIX.prediction);
+export const EffectEstimateId = idOf(ID_PREFIX.effect_estimate);
+export const IterationId = idOf(ID_PREFIX.iteration);
+export const ToolIntegrationId = idOf(ID_PREFIX.tool_integration);
 
 export type RunId = z.infer<typeof RunId>;
 export type QuestionId = z.infer<typeof QuestionId>;
@@ -60,33 +98,7 @@ export type EffectEstimateId = z.infer<typeof EffectEstimateId>;
 export type IterationId = z.infer<typeof IterationId>;
 export type ToolIntegrationId = z.infer<typeof ToolIntegrationId>;
 
-/** kind -> the ID shape that kind legitimately takes. */
-const OBJECT_REF_ID_SHAPES: Readonly<Record<ObjectRefKind, RegExp>> = {
-  question: /^q_[0-9a-z]{20,32}$/,
-  run: /^run_[0-9a-z]{20,32}$/,
-  corpus_snapshot: /^corp_[0-9a-z]{20,32}$/,
-  source_document: /^src_[0-9a-z]{20,32}$/,
-  claim: /^clm_[0-9a-z]{20,32}$/,
-  evidence_relation: /^ev_[0-9a-z]{20,32}$/,
-  hypothesis: /^hyp_[0-9a-z]{20,32}$/,
-  plan: /^pln_[0-9a-z]{20,32}$/,
-  task: /^task_[0-9a-z]{20,32}$/,
-  feedback: /^fbk_[0-9a-z]{20,32}$/,
-  revision: /^rev_[0-9a-z]{20,32}$/,
-  receipt: /^rcp_[0-9a-z]{20,32}$/,
-  bundle: /^bnd_[0-9a-z]{20,32}$/,
-  experiment_spec: /^xsp_[0-9a-z]{20,32}$/,
-  experiment_run: /^xrun_[0-9a-z]{20,32}$/,
-  dataset_record: /^ds_[0-9a-z]{20,32}$/,
-  result_set: /^rset_[0-9a-z]{20,32}$/,
-  stat_report: /^srep_[0-9a-z]{20,32}$/,
-  evidence_body: /^evb_[0-9a-z]{20,32}$/,
-  ach_analysis: /^ach_[0-9a-z]{20,32}$/,
-  prediction: /^prd_[0-9a-z]{20,32}$/,
-  // Artifact refs are content addresses, not prefixed entity ids.
-  artifact: /^sha256:[0-9a-f]{64}$/,
-};
-
+/** Kinds an ObjectRef may point at (the referenceable subset of id-bearing kinds). */
 const OBJECT_REF_KINDS = [
   'question', 'run', 'corpus_snapshot', 'source_document', 'claim',
   'evidence_relation', 'hypothesis', 'plan', 'task', 'feedback', 'revision',
@@ -94,18 +106,21 @@ const OBJECT_REF_KINDS = [
   'experiment_spec', 'experiment_run', 'dataset_record', 'result_set', 'stat_report',
   'evidence_body', 'ach_analysis', 'prediction',
 ] as const;
-type ObjectRefKind = (typeof OBJECT_REF_KINDS)[number];
 
 /**
  * Cross-kind object reference inside a run, e.g. { kind: 'hypothesis', id: 'hyp_...' }.
  * The id is shape-checked against the kind (WP2 F5): a garbage id previously parsed
  * fine and only failed later at store lookup — now fabrication fails at the boundary.
+ * Artifact refs are content addresses (sha256:<64-hex>), not prefixed entity ids.
  */
 export const ObjectRef = z.object({
   kind: z.enum(OBJECT_REF_KINDS),
   id: z.string().min(1),
 }).superRefine((ref, ctx) => {
-  if (!OBJECT_REF_ID_SHAPES[ref.kind].test(ref.id)) {
+  const idOk = ref.kind === 'artifact'
+    ? /^sha256:[0-9a-f]{64}$/.test(ref.id)
+    : idShape(ID_PREFIX[ref.kind]).test(ref.id);
+  if (!idOk) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: `id '${ref.id}' does not match the ${ref.kind} id shape`,
