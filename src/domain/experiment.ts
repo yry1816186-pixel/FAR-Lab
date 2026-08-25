@@ -121,20 +121,8 @@ export const REGRESSOR_BUILDERS: readonly BuilderId[] = [
 export const CLASSIFICATION_COMPARISON_METRICS: readonly MetricKey[] = ['accuracy'];
 export const REGRESSION_COMPARISON_METRICS: readonly MetricKey[] = ['mean_squared_error'];
 
-/** Hyperparameters are primitives only — deterministic serialization, no code injection surface. */
 export const Hyperparams = z.record(z.string(), z.union([z.string(), z.number(), z.boolean()]));
-export type Hyperparams = z.infer<typeof Hyperparams>;
-
-export const ModelSpec = z.object({
-  name: z.string().min(1),
-  builderId: BuilderId,
-  hyperparams: Hyperparams.default({}),
-  seed: z.number().int().nonnegative(),
-  /** Ablation/matrix provenance (P2): factor assignments like ['n_estimators=200','depth=full']. */
-  tags: z.array(z.string().min(1)).default([]),
-});
-export type ModelSpec = z.infer<typeof ModelSpec>;
-
+export type Hyperparams = z.infer<typeof Hyperparams>;
 /**
  * P2 ablation matrix: factors are NAMED hyperparameter-override LEVELS over one base
  * model — declarative and LLM-safe (no free-form code/values). Full factorial expansion;
@@ -147,7 +135,24 @@ export const AblationFactor = z.object({
     hyperparams: Hyperparams.default({}),
   })).min(1),
 });
-export type AblationFactor = z.infer<typeof AblationFactor>;
+export type AblationFactor = z.infer<typeof AblationFactor>;
+
+/** Hyperparameters are primitives only — deterministic serialization, no code injection surface. */
+
+export const ModelSpec = z.object({
+  name: z.string().min(1),
+  builderId: BuilderId,
+  hyperparams: Hyperparams.default({}),
+  seed: z.number().int().nonnegative(),
+  /** Ablation/matrix provenance (P2): factor assignments like ['n_estimators=200','depth=full']. */
+  tags: z.array(z.string().min(1)).default([]),
+  /** 14→10 wiring: full-factorial expansion at executor intake (expandAblationModels).
+   * Expanded cells are APPENDED after all base models — comparison indices stay valid. */
+  ablationFactors: z.array(AblationFactor).optional(),
+});
+export type ModelSpec = z.infer<typeof ModelSpec>;
+
+
 
 // ---- metrics & comparisons ----
 
@@ -381,6 +386,17 @@ export const ResultCell = z.object({
   nTrain: z.number().int().positive(),
   nTest: z.number().int().positive(),
   timingMs: z.number().nonnegative(),
+  /** 06→10 handoff: split-conformal band over this cell's per-row outcomes (center = per-row mean).
+   * Guarantee: marginal P(next row outcome in [low, high]) >= 1-alpha under exchangeability
+   * (preregistered i.i.d. split). Absent when n cannot support alpha (honest omission).
+   * An interval without its n is unfalsifiable — alpha/nCalibration always persist with it. */
+  conformal: z.object({
+    low: z.number(),
+    high: z.number(),
+    alpha: z.number(),
+    nCalibration: z.number().int().positive(),
+    guarantee: z.string().min(1),
+  }).optional(),
 });
 export type ResultCell = z.infer<typeof ResultCell>;
 

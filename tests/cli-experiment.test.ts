@@ -173,4 +173,40 @@ describe('far experiment CLI surface', { timeout: 300_000 }, () => {
       w.cleanup();
     }
   });
+
+  it.runIf(uvAvailable())('simulate: CRN simspec -> direct execution -> verdicts + feedback (10-03 surface)', async () => {
+    const w = makeWorld();
+    try {
+      const { runId, hypId } = seedRun(w.store);
+      const simSpec = {
+        id: newId('xsp'), runId, planId: newId('pln'), planStepId: newId('task'), version: 1,
+        question: 'cli simulate CRN paired mean shift',
+        configs: [
+          { name: 'mu0', template: 'monte_carlo', distribution: { family: 'normal', mu: 0, sigma: 1 }, statistic: 'mean', replicates: 2000, seed: 99 },
+          { name: 'mu1', template: 'monte_carlo', distribution: { family: 'normal', mu: 1, sigma: 1 }, statistic: 'mean', replicates: 2000, seed: 99 },
+        ],
+        comparisons: [{
+          id: 'cmp-crn', statistic: 'mean', kind: 'paired_diff', configAIdx: 1, configBIdx: 0, direction: 'above', threshold: 0.5,
+          thresholdProvenance: 'model-stipulated', hypothesisId: hypId, primary: true, mde: 0.2,
+        }],
+        statistics: { test: 'paired_bootstrap_ci', alpha: 0.05, nBoot: 500, analysisSeed: 11, ciLevel: 0.95 },
+        compute: { device: 'local', maxParallel: 1, timeoutMs: 120_000 },
+        approvals: [{ hypothesisId: hypId, comparisonIds: ['cmp-crn'], decisionRuleSnapshot: 'diff > 0.5', approvedBy: 'cli-test', approvedAt: new Date().toISOString() }],
+        createdAt: new Date().toISOString(),
+      };
+      const specPath = join(w.dataDir, 'sim.json');
+      writeFileSync(specPath, JSON.stringify(simSpec), 'utf8');
+      const res = await experimentCommand('simulate', argv(w.dataDir, specPath));
+      expect(res.code, res.text).toBe(0);
+      const payload = res.json as { status: string; statReports: Array<{ comparison: string; verdict: string | null }>; feedbackSignals: string[] };
+      expect(payload.status).toBe('completed');
+      expect(payload.statReports).toHaveLength(1);
+      expect(payload.statReports[0]!.comparison).toBe('cmp-crn');
+      // CRN affine pair: per-replicate diff is exactly 1.0 > 0.5 threshold — mechanical verdict
+      expect(payload.statReports[0]!.verdict).toBe('supports');
+      expect(payload.feedbackSignals).toHaveLength(1);
+    } finally {
+      w.cleanup();
+    }
+  });
 });

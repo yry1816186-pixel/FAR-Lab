@@ -3,9 +3,9 @@ import { z } from 'zod';
 import { canonicalSha256 } from '../src/shared/crypto.js';
 import type { StructuredCallRequest } from '../src/shared/ports.js';
 import { zodToStrictJsonSchema, strictSchemaOrUndefined, extractJsonText, repairUnescapedQuotes, backoffDelayMs, parseRetryAfterMs, redactSecrets, RETRY_MAX_BACKOFF_MS } from '../src/providers/http.js';
-import { createDeepSeekProvider } from '../src/providers/deepseek.js';
 import { createZaiProvider } from '../src/providers/zai.js';
 import { createDashScopeProvider } from '../src/providers/dashscope.js';
+import { runOpenAICompatStructuredCall } from '../src/providers/http.js';
 import { createTestStubProvider } from '../src/providers/test-stub.js';
 import { defaultLiveProvider, getProvider, listProviders, LIVE_PROVIDER_NAMES } from '../src/providers/index.js';
 
@@ -62,7 +62,7 @@ const recorderFetch = (impls: Array<(call: RecordedCall, index: number) => Promi
   return { fetchImpl, calls };
 };
 
-const chatOk = (content: string, model = 'deepseek-v4-flash') =>
+const chatOk = (content: string, model = 'qwen-plus') =>
   new Response(
     JSON.stringify({
       id: 'chatcmpl-test-fixture',
@@ -118,7 +118,7 @@ afterEach(() => {
 });
 
 // ---------------------------------------------------------------------------
-// deepseek adapter — success path, receipt integrity, request shaping
+// dashscope transport shell — success path, receipt integrity, request shaping
 // ---------------------------------------------------------------------------
 
 describe('zodToStrictJsonSchema (strict-FC subset projection, D-026)', () => {
@@ -210,18 +210,22 @@ describe('extractJsonText repair layer (live strict-FC failure class 2026-08-22)
   });
 });
 
-describe('deepseek adapter (mock fetch)', () => {
+describe('dashscope transport shell (mock fetch) — the OpenAI-compat core suite', () => {
+  // 2026-08-26: src/providers/deepseek.ts DELETED per the project-wide DeepSeek ban
+  // (user directive 2026-08-22; lane-14 red-team F-3). The transport-mechanics suite
+  // below (receipts/re-asks/truncation/classification/auth/deadline) exercises the
+  // shared http.ts core through the dashscope shell — the production OpenAI-compat route.
   it('succeeds with a complete, correctly hashed receipt', async () => {
     const { fetchImpl, calls } = recorderFetch([() => Promise.resolve(chatOk(RAW_OK))]);
-    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl });
+    const provider = createDashScopeProvider({ apiKey: 'test-fixture-key-dashscope', fetchImpl });
     const res = await provider.structuredCall(REQ, parseHypothesis);
 
     expect(res.ok).toBe(true);
     expect(res.data).toEqual({ hypothesis: 'Chunk-level retrieval grounding reduces hallucinated entity spans' });
     expect(res.receipt).toMatchObject({
-      provider: 'deepseek',
-      modelId: 'deepseek-chat', // requested alias...
-      modelVersion: 'deepseek-v4-flash', // ...actual served model from response body
+      provider: 'dashscope',
+      modelId: 'qwen-plus',
+      modelVersion: 'qwen-plus', // actual served model from response body
       finishReason: 'stop',
       executionMode: 'live',
       usage: { promptTokens: 11, completionTokens: 7, totalTokens: 18 },
@@ -238,20 +242,22 @@ describe('deepseek adapter (mock fetch)', () => {
     );
     expect(res.receipt.outputHash).toBe(canonicalSha256(RAW_OK));
 
-    // Request shaping: OpenAI-compat endpoint, bearer auth. Default is the strict-FC beta
-    // base URL (D-026); without jsonSchema on the request the body stays json_object mode.
+    // Request shaping: OpenAI-compat endpoint, bearer auth; json_object mode when the
+    // request carries no jsonSchema (dashscope strips schemas to its negotiated wire).
     expect(calls.length).toBe(1);
-    expect(calls[0]?.url).toBe('https://api.deepseek.com/beta/chat/completions');
+    expect(calls[0]?.url).toBe('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions');
     const auth = calls[0]?.init.headers as Record<string, string>;
-    expect(auth.authorization).toBe('Bearer test-fixture-key-ds');
+    expect(auth.authorization).toBe('Bearer test-fixture-key-dashscope');
     expect(bodyOf(calls[0]!).response_format).toEqual({ type: 'json_object' });
     // No key material anywhere in the result envelope.
-    expect(JSON.stringify(res)).not.toContain('test-fixture-key-ds');
+    expect(JSON.stringify(res)).not.toContain('test-fixture-key-dashscope');
   });
 
-  it('strict mode: requests carrying jsonSchema use tools+strict+tool_choice and parse tool_calls arguments', async () => {
+  it('http core strict-FC: jsonSchema requests ride tools+strict+tool_choice and parse tool_calls arguments (direct core call)', async () => {
+    // The deepseek shell was the only jsonSchema pass-through; the machinery lives in
+    // http.ts (mode 'strict_tools') and stays locked here against the bare core.
     const toolCallBody = JSON.stringify({
-      model: 'deepseek-v4-flash',
+      model: 'qwen-plus',
       choices: [{
         index: 0,
         message: {
@@ -269,39 +275,30 @@ describe('deepseek adapter (mock fetch)', () => {
       usage: { prompt_tokens: 11, completion_tokens: 7, total_tokens: 18 },
     });
     const { fetchImpl, calls } = recorderFetch([() => Promise.resolve(chatOkRaw(toolCallBody))]);
-    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl });
-    const schema = { type: 'object', properties: { hypothesis: { type: 'string' } }, required: ['hypothesis'], additionalProperties: false };
-    const res = await provider.structuredCall({ ...REQ, jsonSchema: schema }, parseHypothesis);
+    const res = await runOpenAICompatStructuredCall(
+      { providerName: 'core-test', baseUrl: 'https://unit.test/v1', apiKey: 'test-fixture-key-core', modelId: 'm', executionMode: 'test' },
+      { ...REQ, jsonSchema: { type: 'object', properties: { hypothesis: { type: 'string' } }, required: ['hypothesis'], additionalProperties: false } },
+      parseHypothesis,
+      { fetchImpl },
+    );
     expect(res.ok).toBe(true);
     expect(res.data).toEqual({ hypothesis: 'Chunk-level retrieval grounding reduces hallucinated entity spans' });
     expect(res.receipt.finishReason).toBe('tool_calls');
     const body = bodyOf(calls[0]!);
     expect(body.response_format).toBeUndefined();
     expect(body.tools).toEqual([
-      { type: 'function', function: { name: 'respond', strict: true, description: 'Respond with the structured output for this task.', parameters: schema } },
+      { type: 'function', function: { name: 'respond', strict: true, description: 'Respond with the structured output for this task.', parameters: { type: 'object', properties: { hypothesis: { type: 'string' } }, required: ['hypothesis'], additionalProperties: false } } },
     ]);
     expect(body.tool_choice).toEqual({ type: 'function', function: { name: 'respond' } });
   });
 
-  it('strictTools=false keeps the stable base URL and strips jsonSchema (mode fixed at construction, no mid-flight switch)', async () => {
+  it('passes through temperature and demands JSON-only in the system message', async () => {
     const { fetchImpl, calls } = recorderFetch([() => Promise.resolve(chatOk(RAW_OK))]);
-    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl, strictTools: false });
-    expect(provider.strictTools).toBe(false);
-    expect(provider.baseUrl).toBe('https://api.deepseek.com');
-    const schema = { type: 'object', properties: {}, required: [], additionalProperties: false };
-    await provider.structuredCall({ ...REQ, jsonSchema: schema }, parseHypothesis);
-    const body = bodyOf(calls[0]!);
-    expect(body.tools).toBeUndefined();
-    expect(body.response_format).toEqual({ type: 'json_object' });
-  });
-
-  it('passes through temperature/maxTokens and demands JSON-only in the system message', async () => {
-    const { fetchImpl, calls } = recorderFetch([() => Promise.resolve(chatOk(RAW_OK))]);
-    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl });
-    await provider.structuredCall({ ...REQ, temperature: 0.2, maxTokens: 800 }, parseHypothesis);
+    const provider = createDashScopeProvider({ apiKey: 'test-fixture-key-dashscope', fetchImpl });
+    await provider.structuredCall({ ...REQ, temperature: 0.2 }, parseHypothesis);
     const body = bodyOf(calls[0]!);
     expect(body.temperature).toBe(0.2);
-    expect(body.max_tokens).toBe(800);
+    // max_tokens: dashscope strips it on the structured route (W7-F3, asserted in its adapter suite); no provider asserts passthrough anymore since the deepseek shell was removed.
     const messages = body.messages as Array<{ role: string; content: string }>;
     expect(messages[0]?.role).toBe('system');
     expect(messages[0]?.content).toContain('ONLY a single valid JSON object');
@@ -311,7 +308,7 @@ describe('deepseek adapter (mock fetch)', () => {
   it('strips a ```json fence and succeeds on the first attempt', async () => {
     const fenced = '```json\n' + RAW_OK + '\n```';
     const { fetchImpl, calls } = recorderFetch([() => Promise.resolve(chatOk(fenced))]);
-    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl });
+    const provider = createDashScopeProvider({ apiKey: 'test-fixture-key-dashscope', fetchImpl });
     const res = await provider.structuredCall(REQ, parseHypothesis);
     expect(res.ok).toBe(true); // fence stripping is NOT an invalid_output event
     expect(calls.length).toBe(1);
@@ -329,7 +326,7 @@ describe('invalid_output retry discipline', () => {
       () => Promise.resolve(chatOk('Sorry, I cannot produce JSON.')), // not JSON at all
       () => Promise.resolve(chatOk(RAW_OK)),
     ]);
-    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl });
+    const provider = createDashScopeProvider({ apiKey: 'test-fixture-key-dashscope', fetchImpl });
     const res = await provider.structuredCall(REQ, parseHypothesis);
     expect(res.ok).toBe(true);
     expect(calls.length).toBe(2);
@@ -342,7 +339,7 @@ describe('invalid_output retry discipline', () => {
       () => Promise.resolve(chatOk('{"hypothesis": ""}')), // schema violation: empty string
       () => Promise.resolve(chatOk(RAW_OK)),
     ]);
-    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl });
+    const provider = createDashScopeProvider({ apiKey: 'test-fixture-key-dashscope', fetchImpl });
     const res = await provider.structuredCall(REQ, parseHypothesis);
     expect(res.ok).toBe(true);
     expect(calls.length).toBe(2);
@@ -355,7 +352,7 @@ describe('invalid_output retry discipline', () => {
       () => Promise.resolve(chatOk('still not json')),
       () => Promise.resolve(chatOk('again not json')),
     ]);
-    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl, sleep });
+    const provider = createDashScopeProvider({ apiKey: 'test-fixture-key-dashscope', fetchImpl, sleep });
     const res = await provider.structuredCall(REQ, parseHypothesis);
     expect(res.ok).toBe(false);
     expect(res.error?.kind).toBe('invalid_output');
@@ -372,7 +369,7 @@ describe('invalid_output retry discipline', () => {
       () => Promise.resolve(chatOk('corrupted second sample')),
       () => Promise.resolve(chatOk(RAW_OK)),
     ]);
-    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl });
+    const provider = createDashScopeProvider({ apiKey: 'test-fixture-key-dashscope', fetchImpl });
     const res = await provider.structuredCall(REQ, parseHypothesis);
     expect(res.ok).toBe(true);
     expect(calls.length).toBe(3); // succeeded on the 2nd re-ask within the 3-re-ask budget
@@ -384,7 +381,7 @@ describe('invalid_output retry discipline', () => {
 // and a concise-completion re-ask; completed truncation never passes silently
 // ---------------------------------------------------------------------------
 
-const chatOkFinish = (content: string, finishReason: string, model = 'deepseek-v4-flash') =>
+const chatOkFinish = (content: string, finishReason: string, model = 'qwen-plus') =>
   chatOkRaw(JSON.stringify({
     model,
     choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: finishReason }],
@@ -398,7 +395,7 @@ describe('truncation discipline (W7-F2, finish_reason=length)', () => {
       () => Promise.resolve(chatOkFinish(truncated, 'length')),
       () => Promise.resolve(chatOk(RAW_OK)),
     ]);
-    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl });
+    const provider = createDashScopeProvider({ apiKey: 'test-fixture-key-dashscope', fetchImpl });
     const res = await provider.structuredCall(REQ, parseHypothesis);
     expect(res.ok).toBe(true);
     expect(calls.length).toBe(2); // the truncated completion was never accepted as-is
@@ -409,7 +406,7 @@ describe('truncation discipline (W7-F2, finish_reason=length)', () => {
   it('truncated output that is nevertheless complete valid JSON is accepted without a re-ask', async () => {
     // trailing whitespace hit the token limit after the document closed — the doc is whole
     const { fetchImpl, calls } = recorderFetch([() => Promise.resolve(chatOkFinish(RAW_OK, 'length'))]);
-    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl });
+    const provider = createDashScopeProvider({ apiKey: 'test-fixture-key-dashscope', fetchImpl });
     const res = await provider.structuredCall(REQ, parseHypothesis);
     expect(res.ok).toBe(true);
     expect(calls.length).toBe(1);
@@ -419,7 +416,7 @@ describe('truncation discipline (W7-F2, finish_reason=length)', () => {
   it('same corrupted shape WITHOUT truncation confirmation IS engine-repaired (gate is truncation-specific)', async () => {
     const truncatedShape = '{"hypothesis": "partial text that looks truncated but was not flagged'; // finish_reason=stop
     const { fetchImpl, calls } = recorderFetch([() => Promise.resolve(chatOkFinish(truncatedShape, 'stop'))]);
-    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl });
+    const provider = createDashScopeProvider({ apiKey: 'test-fixture-key-dashscope', fetchImpl });
     const res = await provider.structuredCall(REQ, parseHypothesis);
     expect(res.ok).toBe(true); // engine completed the un-flagged structural omission
     expect(calls.length).toBe(1);
@@ -432,12 +429,12 @@ describe('truncation discipline (W7-F2, finish_reason=length)', () => {
     // (W7 audit P2-2 disclosure: an actually-truncated doc could be engine-completed
     // here; all FAR-Lab registered providers report finish_reason — D-030 41/41).
     const raw = JSON.stringify({
-      model: 'deepseek-v4-flash',
+      model: 'qwen-plus',
       choices: [{ index: 0, message: { role: 'assistant', content: '{"hypothesis": "unflagged structural omission' }, finish_reason: undefined }],
       usage: { prompt_tokens: 11, completion_tokens: 7, total_tokens: 18 },
     });
     const { fetchImpl, calls } = recorderFetch([() => Promise.resolve(chatOkRaw(raw))]);
-    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl });
+    const provider = createDashScopeProvider({ apiKey: 'test-fixture-key-dashscope', fetchImpl });
     const res = await provider.structuredCall(REQ, parseHypothesis);
     expect(res.ok).toBe(true);
     expect(calls.length).toBe(1);
@@ -448,7 +445,7 @@ describe('truncation discipline (W7-F2, finish_reason=length)', () => {
     const { fetchImpl, calls } = recorderFetch([
       () => Promise.resolve(chatOkFinish('{"hypothesis": "cut short', 'length')),
     ]);
-    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl });
+    const provider = createDashScopeProvider({ apiKey: 'test-fixture-key-dashscope', fetchImpl });
     const res = await provider.structuredCall(REQ, parseHypothesis);
     expect(res.ok).toBe(false);
     expect(res.error?.kind).toBe('invalid_output');
@@ -467,7 +464,7 @@ describe('transport failure classification and retry budget', () => {
     const rateLimited = () =>
       Promise.resolve(httpError(429, { error: { message: 'Too many requests', type: 'rate_limit_error', code: 'rate_limit_exceeded' } }));
     const { fetchImpl, calls } = recorderFetch([rateLimited, rateLimited, rateLimited, rateLimited]);
-    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl, sleep, random: () => 0.5 });
+    const provider = createDashScopeProvider({ apiKey: 'test-fixture-key-dashscope', fetchImpl, sleep, random: () => 0.5 });
     const res = await provider.structuredCall(REQ, parseHypothesis);
 
     expect(res.ok).toBe(false);
@@ -493,7 +490,7 @@ describe('transport failure classification and retry budget', () => {
         ),
       );
     const { fetchImpl, calls } = recorderFetch([withRetryAfter, withRetryAfter, withRetryAfter]);
-    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl, sleep, random: () => 0.5 });
+    const provider = createDashScopeProvider({ apiKey: 'test-fixture-key-dashscope', fetchImpl, sleep, random: () => 0.5 });
     const res = await provider.structuredCall(REQ, parseHypothesis);
     expect(res.ok).toBe(false);
     expect(calls.length).toBe(3);
@@ -510,7 +507,7 @@ describe('transport failure classification and retry budget', () => {
         ),
       );
     const { fetchImpl } = recorderFetch([withRetryAfter, withRetryAfter, withRetryAfter]);
-    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl, sleep, random: () => 0.5 });
+    const provider = createDashScopeProvider({ apiKey: 'test-fixture-key-dashscope', fetchImpl, sleep, random: () => 0.5 });
     const res = await provider.structuredCall(REQ, parseHypothesis);
     expect(res.ok).toBe(false);
     expect(sleeps).toEqual([30_000, 30_000]);
@@ -523,7 +520,7 @@ describe('transport failure classification and retry budget', () => {
         httpError(429, { error: { message: 'rejected for key sk-abc123def456ghi789jklmn and api_key = "z9y8x7w6v5u4t3s2r1q0"', code: 'rate_limit' } }),
       );
     const { fetchImpl, calls } = recorderFetch([leaking, leaking, leaking]);
-    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl, sleep, random: () => 0.5 });
+    const provider = createDashScopeProvider({ apiKey: 'test-fixture-key-dashscope', fetchImpl, sleep, random: () => 0.5 });
     const res = await provider.structuredCall(REQ, parseHypothesis);
     expect(res.ok).toBe(false);
     expect(calls.length).toBe(3);
@@ -538,7 +535,7 @@ describe('transport failure classification and retry budget', () => {
       () => Promise.resolve(httpError(429, { error: { message: 'slow down', code: 'rate_limit' } })),
       () => Promise.resolve(chatOk(RAW_OK)),
     ]);
-    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl, sleep, random: () => 0.5 });
+    const provider = createDashScopeProvider({ apiKey: 'test-fixture-key-dashscope', fetchImpl, sleep, random: () => 0.5 });
     const res = await provider.structuredCall(REQ, parseHypothesis);
     expect(res.ok).toBe(true);
     expect(calls.length).toBe(2);
@@ -584,7 +581,7 @@ describe('transport failure classification and retry budget', () => {
           httpError(400, { error: { message: 'The supported API model names are …', type: 'invalid_request_error', code: 'invalid_request_error' } }),
         ),
     ]);
-    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl });
+    const provider = createDashScopeProvider({ apiKey: 'test-fixture-key-dashscope', fetchImpl });
     const res = await provider.structuredCall(REQ, parseHypothesis);
     expect(res.ok).toBe(false);
     expect(res.error?.kind).toBe('provider_error');
@@ -596,7 +593,7 @@ describe('transport failure classification and retry budget', () => {
   it('does NOT retry network-level transport failures (DNS/TCP)', async () => {
     const networkError = Object.assign(new Error('fetch failed'), { name: 'TypeError' });
     const { fetchImpl, calls } = recorderFetch([() => Promise.reject(networkError)]);
-    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl });
+    const provider = createDashScopeProvider({ apiKey: 'test-fixture-key-dashscope', fetchImpl });
     const res = await provider.structuredCall(REQ, parseHypothesis);
     expect(res.ok).toBe(false);
     expect(res.error?.kind).toBe('provider_error');
@@ -607,7 +604,7 @@ describe('transport failure classification and retry budget', () => {
   it('classifies a malformed HTTP 200 (no content) as provider_error, no retry', async () => {
     const malformed = new Response(JSON.stringify({ id: 'x', choices: [] }), { status: 200 });
     const { fetchImpl, calls } = recorderFetch([() => Promise.resolve(malformed)]);
-    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl });
+    const provider = createDashScopeProvider({ apiKey: 'test-fixture-key-dashscope', fetchImpl });
     const res = await provider.structuredCall(REQ, parseHypothesis);
     expect(res.ok).toBe(false);
     expect(res.error?.kind).toBe('provider_error');
@@ -622,13 +619,13 @@ describe('transport failure classification and retry budget', () => {
 describe('auth fail-closed', () => {
   it('returns auth_error without any network call when the key is absent', async () => {
     const { fetchImpl, calls } = recorderFetch([neverResolveFetch]);
-    const provider = createDeepSeekProvider({ apiKey: '', fetchImpl }); // explicit empty -> liveReady false
+    const provider = createDashScopeProvider({ apiKey: '', fetchImpl }); // explicit empty -> liveReady false
     expect(provider.liveReady).toBe(false);
     const res = await provider.structuredCall(REQ, parseHypothesis);
     expect(res.ok).toBe(false);
     expect(res.error?.kind).toBe('auth_error');
     expect(res.error?.retryable).toBe(false);
-    expect(res.error?.message).toContain('DEEPSEEK_API_KEY');
+    expect(res.error?.message).toContain('DASHSCOPE_API_KEY');
     expect(calls.length).toBe(0); // zero fetch calls: fail closed means fail BEFORE the wire
     expect(res.receipt.requestHash).toBe(
       canonicalSha256({ task: REQ.task, systemPrompt: REQ.systemPrompt, userPayload: REQ.userPayload, purpose: REQ.purpose }),
@@ -666,8 +663,8 @@ describe('total-deadline timeout', () => {
           reject(e);
         });
       });
-    const provider = createDeepSeekProvider({
-      apiKey: 'test-fixture-key-ds',
+    const provider = createDashScopeProvider({
+      apiKey: 'test-fixture-key-dashscope',
       fetchImpl: hangingFetch,
       sleep: async () => {}, // no real waiting
       totalTimeoutMs: 80,
@@ -739,7 +736,7 @@ describe('dashscope adapter (mock fetch)', () => {
     await provider.structuredCall({ ...REQ, maxTokens: 8192 }, parseHypothesis);
     const body = bodyOf(calls[0]!);
     expect(body.max_tokens).toBeUndefined();
-    // other providers keep the budget (deepseek request shaping asserted elsewhere carries it)
+    // (max_tokens passthrough no longer has a shell; the core keeps the field when present)
   });
 
   it('targets the compatible-mode/v1 endpoint with the qwen-plus default model', async () => {
@@ -950,7 +947,7 @@ describe('W4-F3 credential redaction (source-fused: openai/codex secrets sanitiz
     const straddling = () =>
       Promise.resolve(httpError(429, { error: { message: `${padding} sk-abc123def456ghi789jklmn`, code: 'rate_limit' } }));
     const { fetchImpl } = recorderFetch([straddling, straddling, straddling]);
-    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl, sleep, random: () => 0.5 });
+    const provider = createDashScopeProvider({ apiKey: 'test-fixture-key-dashscope', fetchImpl, sleep, random: () => 0.5 });
     const res = await provider.structuredCall(REQ, parseHypothesis);
     expect(res.ok).toBe(false);
     expect(res.error?.message).not.toMatch(/sk-[A-Za-z0-9-]{8,}/); // no key fragment of any size

@@ -184,6 +184,19 @@ describe('R2-10 regression executor end-to-end (real uv sidecar)', () => {
       );
       expect(linear.metrics['r2']).toBeGreaterThan(0.99);
       expect(baseline.metrics['mean_squared_error']).toBeGreaterThan(linear.metrics['mean_squared_error']);
+      // 06→10 §1 wiring: split-conformal band on every cell (alpha + nCalibration persist
+      // with the interval — an interval without its n is unfalsifiable).
+      const perRowBaseline = JSON.parse((await w.artifacts.get(baseline.perRowRef))!) as number[];
+      for (const [cell, rows] of [[linear, perRowLinear], [baseline, perRowBaseline]] as const) {
+        expect(cell.conformal, cell.modelName).toBeDefined();
+        expect(cell.conformal!.alpha).toBe(0.05);
+        expect(cell.conformal!.nCalibration).toBe(rows.length);
+        expect(cell.conformal!.low).toBeLessThanOrEqual(rows.reduce((a, b) => a + b, 0) / rows.length);
+        expect(cell.conformal!.high).toBeGreaterThanOrEqual(rows.reduce((a, b) => a + b, 0) / rows.length);
+        expect(cell.conformal!.guarantee).toContain('coverage');
+        expect(cell.conformal!.guarantee).toContain('0.95');
+        expect(cell.conformal!.guarantee).toContain('exchangeability');
+      }
       // paired MSE diff (linear - baseline) far below -10 -> supports
       const report = out.statReports.find((r) => r.comparisonId === 'cmp-primary')!;
       expect(report.verdict).toBe('supports');
@@ -243,4 +256,39 @@ it('uv gate is honest: suites skip with a reason when uv is absent', () => {
   // Documents the gate contract; the assertion itself is environment-neutral.
   expect(uvAvailable() ? 'runs' : 'skips').toBe(uvAvailable() ? 'runs' : 'skips');
   expect(UV_SKIP_REASON).toContain('uv toolchain not available');
+});
+
+describe('ablation expansion (14-10 wiring)', () => {
+  it.runIf(uvAvailable())('ablationAppend-cells: factor cells appended after base, tags carried, base indices untouched', async () => {
+    const w = makeStore();
+    try {
+      const runId = makeRun(w.store);
+      const hypId = makeHypothesis(w.store, runId).id;
+      const csvPath = join(w.dir, 'abl.csv');
+      writeFileSync(csvPath, regressionCsv(), 'utf8');
+      const spec = makeRegressionSpec(runId, csvPath, hypId);
+      // ablation on a hyperparam-bearing builder: RF with one factor, two levels; the
+      // base-equivalent level is filtered (the declaring base cell already runs).
+      spec.models = spec.models.map((m) => m.name === 'linear'
+        ? { ...m, builderId: 'random_forest_regressor' as never, hyperparams: { n_estimators: 50 }, ablationFactors: [{ name: 'n-est', levels: [
+            { label: 'n50', hyperparams: { n_estimators: 50 } },
+            { label: 'n200', hyperparams: { n_estimators: 200 } },
+          ] }] }
+        : m);
+
+      const out = await executeExperiment(w.store, w.artifacts, spec, { allowLocalDatasets: true });
+
+      expect(out.run.status).toBe('completed');
+      const names = out.resultSet.cells.map((c) => c.modelName);
+      // base cells keep indices 0..1 (comparisons reference them); expanded cells append
+      expect(names.slice(0, 2).sort()).toEqual(['linear', 'mean-baseline']);
+      expect(names.filter((n) => n.startsWith('linear|'))).toEqual(['linear|n-est=n200']);
+      expect(out.resultSet.cells).toHaveLength(3);
+      expect(out.resultSet.cells.find((c) => c.modelName === 'linear|n-est=n200')!.tags).toEqual(['n-est=n200']);
+      // base cell (comparison target, index 0) still runs and carries the conformal band
+      expect(out.resultSet.cells[0]!.conformal).toBeDefined();
+    } finally {
+      w.cleanup();
+    }
+  }, 180_000);
 });
