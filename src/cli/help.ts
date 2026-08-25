@@ -25,6 +25,10 @@ Usage:
                                                   reproduction_failure); consumed causally by the revise stage
   far research lineage <run-id> [--json]         Trajectory graph: revision family, hypotheses, evidence, causal revisions
   far research supervise <run-id> [--json]       Live supervisor analysis: stall/repeat-failure/cycle signals with action hints
+  far research counter-search <run-id> --query "<text>"
+                                                  Execute ONE researcher-directed counter-evidence search
+                                                  against the live sources; grows the corpus (append-only
+                                                  snapshot versioning; receipts + events; unverified sources)
   far research fork <run-id> [--reason <text>] [--json]
                                                   Branch a settled run (alternative direction; question referenced, never copied)
   far runs [--json]                              List runs

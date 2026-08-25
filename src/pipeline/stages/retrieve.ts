@@ -399,9 +399,11 @@ export const applyWindowedRerank = async (
  * content-addressed; the artifact is stored over canonicalJson, the same basis
  * as snapshotHash, so the artifact hash equals contentHash. fullTextRef is only
  * set for full_text-depth records (the deepest content the record carries).
+ * Narrow ctx contract: only run identity + artifact store are consumed, so
+ * non-stage callers (server counter-search) can supply exactly that.
  */
 export const toDocument = async (
-  ctx: StageContext,
+  ctx: Pick<StageContext, 'run' | 'artifacts'>,
   family: SourceFamily,
   rec: RawSourceRecord,
   rwTable?: RetractionWatchTable,
