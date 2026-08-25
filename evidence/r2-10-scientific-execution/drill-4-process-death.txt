@@ -1,0 +1,32 @@
+{
+ "expected": "worker B reclaims stale job and completes (attempts=2)",
+ "workerB": {
+  "executed": 1,
+  "failed": 0
+ },
+ "job": {
+  "jobId": "job_7eaf0cc149a35d78328a0c06",
+  "experimentRunId": "xrun_z12we2bt0x77kxsz4vz8qec8y4",
+  "runId": "run_xfjq6hwx49kksxy9sjcz27fkw0",
+  "specId": "xsp_y3j62bvn18cdqdnn3f547eqk8y",
+  "priority": 0,
+  "status": "completed",
+  "fenceToken": 2,
+  "worker": "drill-worker-B",
+  "heartbeatAt": "2026-08-24T18:41:23.738Z",
+  "attempts": 2,
+  "cancelRequested": false,
+  "device": "local",
+  "createdAt": "2026-08-24T18:40:51.601Z",
+  "startedAt": "2026-08-24T18:40:51.680Z",
+  "endedAt": "2026-08-24T18:41:24.036Z",
+  "error": null
+ },
+ "run": {
+  "status": "completed",
+  "attempts": 2,
+  "cancelRequested": false
+ },
+ "experimentRunId": "xrun_z12we2bt0x77kxsz4vz8qec8y4",
+ "workerALog": "(node:18136) ExperimentalWarning: SQLite is an experimental feature and might change at any time\n(Use `node --trace-warnings ...` to show where the warning was created)\n"
+}

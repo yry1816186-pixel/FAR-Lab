@@ -1,0 +1,10 @@
+{
+ "expected": "canceled mid-training",
+ "thrown": "experiment xrun_vxe2y3vp0frkgnr45s2se5mfq3 canceled",
+ "run": {
+  "status": "canceled",
+  "error": "canceled by operator",
+  "attempts": 1,
+  "cancelRequested": true
+ }
+}

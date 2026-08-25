@@ -1,0 +1,6 @@
+(node:34228) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+[remote experiment xrun_36892fygnyrcj04b4vjm2ydd7w @ ssh-sandbox-2242]
+device=ssh-sandbox-2242 python=3.11.2 numpy=true
+model=mean-baseline exit=0 
+model=linear exit=0 

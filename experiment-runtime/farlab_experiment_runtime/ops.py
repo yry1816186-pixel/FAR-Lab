@@ -18,6 +18,8 @@ REGRESSION_METRICS = ("mean_squared_error", "r2")
 
 
 def op_env_info(_payload: dict[str, Any]) -> dict[str, Any]:
+    import os
+
     import sklearn
     import scipy
 
@@ -28,11 +30,22 @@ def op_env_info(_payload: dict[str, Any]) -> dict[str, Any]:
             "scipy": scipy.__version__,
             "numpy": np.__version__,
         },
+        # R2-10 hardware capture: reproducibility context recorded into the run's
+        # environment (cross-device bit-identity is NOT claimed — D-086-3 same-device only).
+        "hardware": {
+            "system": platform.system(),
+            "machine": platform.machine(),
+            "pythonImplementation": platform.python_implementation(),
+            "cpuCount": str(os.cpu_count()),
+        },
     }
 
 
-def _load_tabular(payload: dict[str, Any]) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
-    """Read the CSV the TS side points at (path()-based access — binary-safe, D-085 note)."""
+def _load_tabular(payload: dict[str, Any], task: str = "classification") -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, dict[str, Any]]:
+    """Read the CSV the TS side points at (path()-based access — binary-safe, D-085 note).
+
+    task='regression' (R2-10): the target is parsed as float (visible failure on
+    non-numeric targets) and stays float — class-index encoding never applies."""
     import csv as _csv
 
     path = payload["csvPath"]
@@ -56,9 +69,6 @@ def _load_tabular(payload: dict[str, Any]) -> tuple[np.ndarray, np.ndarray, dict
 
     x_train_raw, y_train = matrix(train_idx)
     x_test_raw, y_test = matrix(test_idx)
-    classes = sorted(set(y_train))
-    if not set(y_test).issubset(set(classes)):
-        raise ValueError("test split contains classes unseen in train (leak-safe encoding impossible)")
 
     # One-hot for categorical features, numeric for numeric — deterministic, fitted on TRAIN only (D-086-10).
     column_values: list[list[str]] = [[] for _ in feature_is]
@@ -91,29 +101,58 @@ def _load_tabular(payload: dict[str, Any]) -> tuple[np.ndarray, np.ndarray, dict
             cols.append(np.array([index.get(r[ci], -1) for r in rows_raw], dtype=np.float64))
         return np.column_stack(cols) if cols else np.zeros((len(rows_raw), 0))
 
-    y_index = {c: k for k, c in enumerate(classes)}
+    X_train = encode(x_train_raw)
+    X_test = encode(x_test_raw)
     meta = {
         "nTrain": len(x_train_raw),
         "nTest": len(x_test_raw),
-        "classes": classes,
     }
-    X_train = encode(x_train_raw)
-    X_test = encode(x_test_raw)
+    if task == "regression":
+        def _float_target(labels: list[str]) -> np.ndarray:
+            try:
+                return np.array([float(v) for v in labels], dtype=np.float64)
+            except ValueError as exc:
+                raise ValueError(
+                    f"regression target column {target_column!r} contains non-numeric values ({exc}); regressor builders need a numeric target"
+                ) from exc
+        y_train_enc = _float_target(y_train)
+        y_test_enc = _float_target(y_test)
+        meta["classes"] = []
+        return X_train, X_test, y_train_enc, y_test_enc, meta
+    classes = sorted(set(y_train))
+    if not set(y_test).issubset(set(classes)):
+        raise ValueError("test split contains classes unseen in train (leak-safe encoding impossible)")
+    y_index = {c: k for k, c in enumerate(classes)}
+    meta["classes"] = classes
     y_train_enc = np.array([y_index[c] for c in y_train], dtype=np.int64)
     y_test_enc = np.array([y_index[c] for c in y_test], dtype=np.int64)
     return X_train, X_test, y_train_enc, y_test_enc, meta
 
 
 def op_train_eval(payload: dict[str, Any]) -> dict[str, Any]:
-    X_train, X_test, y_train, y_test, meta = _load_tabular(payload)
-    model = builders.build(payload["model"]["builderId"], payload["model"].get("hyperparams", {}), int(payload["model"]["seed"]))
+    builder_id = str(payload["model"]["builderId"])
+    regression = builders.is_regressor(builder_id)
+    X_train, X_test, y_train, y_test, meta = _load_tabular(payload, task="regression" if regression else "classification")
+    model = builders.build(builder_id, payload["model"].get("hyperparams", {}), int(payload["model"]["seed"]))
     model.fit(X_train, y_train)
 
     prediction = model.predict(X_test)
-    per_row_correct = (prediction == y_test).astype(np.int64).tolist()
+    if regression:
+        # Per-row SQUARED error: mean(per-row) == MSE exactly — the per-row statistic
+        # the confirmatory statistics chain bootstraps (comparison metricKey mean_squared_error).
+        residuals = prediction.astype(np.float64) - y_test
+        per_row_correct = np.square(residuals).tolist()
+    else:
+        per_row_correct = (prediction == y_test).astype(np.int64).tolist()
 
     metrics: dict[str, float] = {}
     for key in payload.get("metrics", []):
+        # Task/metric coherence is enforced upstream (checkExperimentSpec); this is the
+        # defense-in-depth mirror — a mismatch raises visibly, never silently mislabels.
+        if regression and key in CLASSIFICATION_METRICS:
+            raise ValueError(f"metric {key!r} is classification-only; builder {builder_id!r} is a regressor")
+        if not regression and key in REGRESSION_METRICS:
+            raise ValueError(f"metric {key!r} is regression-only; builder {builder_id!r} is a classifier")
         if key == "accuracy":
             metrics["accuracy"] = float(accuracy_score(y_test, prediction))
         elif key == "balanced_accuracy":
@@ -136,7 +175,7 @@ def op_train_eval(payload: dict[str, Any]) -> dict[str, Any]:
         elif key == "r2":
             metrics["r2"] = float(r2_score(y_test, prediction))
         elif key == "mean_squared_error":
-            metrics["mean_squared_error"] = float(np.mean((prediction.astype(np.float64) - y_test.astype(np.float64)) ** 2))
+            metrics["mean_squared_error"] = float(np.mean(np.square(residuals)))
         else:
             raise ValueError(f"unknown metric {key!r}")
 
@@ -280,6 +319,59 @@ def op_dataset_audit(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def op_simulate(payload: dict[str, Any]) -> dict[str, Any]:
+    """R2-10 Monte-Carlo simulation template: per-REPLICATE outcomes that ride the
+    confirmatory statistics chain (abs_stats/paired_stats) exactly like ML per-row
+    outcomes. JSON params only — never code (D-086-5 discipline).
+
+    CRN discipline: the raw RNG stream depends ONLY on (family, seed, replicates,
+    blockSize) — distribution parameters transform the stream AFTER drawing, so two
+    configs sharing those four consume identical randomness and pair honestly
+    (common random numbers variance reduction). The TS validator enforces CRN
+    compatibility for paired comparisons; this op just executes the template.
+    """
+    template = payload.get("template")
+    if template != "monte_carlo":
+        raise ValueError(f"unknown simulation template {template!r} (known: ['monte_carlo'])")
+    d = payload["distribution"]
+    stat = payload["statistic"]
+    n = int(payload["replicates"])
+    seed = int(payload["seed"])
+    family = d["family"]
+    block = int(payload.get("blockSize", 1))
+    if stat == "variance":
+        if block < 2:
+            raise ValueError("variance statistic requires blockSize >= 2 (one block per replicate)")
+        count = n * block
+    else:
+        count = n
+
+    rng = np.random.default_rng(seed)
+    if family == "normal":
+        x = float(d["mu"]) + float(d["sigma"]) * rng.standard_normal(count)
+    elif family == "uniform":
+        x = float(d["low"]) + (float(d["high"]) - float(d["low"])) * rng.random(count)
+    elif family == "bernoulli":
+        x = (rng.random(count) < float(d["p"])).astype(np.float64)
+    else:
+        raise ValueError(f"unknown distribution family {family!r}")
+
+    if stat == "mean":
+        per = x.astype(np.float64)
+    elif stat == "threshold_prob":
+        per = (x > float(payload["threshold"])).astype(np.float64)
+    elif stat == "variance":
+        per = x.reshape(n, block).var(axis=1, ddof=1)
+    else:
+        raise ValueError(f"unknown statistic {stat!r}")
+    return {
+        "perReplicate": per.tolist(),
+        "pointEstimate": float(np.mean(per)),
+        "n": n,
+        "blockSize": block,
+    }
+
+
 OPS = {
     "env_info": op_env_info,
     "dataset_audit": op_dataset_audit,
@@ -289,4 +381,6 @@ OPS = {
     # AVO fusion G4: exploratory CodeAct (restricted namespace; TS static gate
     # runs first; outputs are CANDIDATE findings, never confirmatory facts).
     "run_exploration": op_run_exploration,
+    # R2-10: reviewed simulation template (per-replicate outcomes -> shared stats chain).
+    "simulate": op_simulate,
 }

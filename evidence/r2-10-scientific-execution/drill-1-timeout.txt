@@ -1,0 +1,10 @@
+{
+ "expected": "failed / timed out",
+ "thrown": "experiment xrun_g6yppkqwx08n6ym5h9xcjxqbvv failed: sidecar call train_eval timed out after 8000ms",
+ "run": {
+  "status": "failed",
+  "error": "sidecar call train_eval timed out after 8000ms",
+  "attempts": 1,
+  "cancelRequested": false
+ }
+}
