@@ -353,9 +353,10 @@ export class Store {
     ).all(...params);
     if (rows.length === 0) return [];
     // Fetch each matched event's payload, preserving (run_id, seq) order.
+    const fetchEvent = this.db.prepare('SELECT seq, payload FROM events WHERE run_id=? AND seq=?');
     const out: RunEvent[] = [];
     for (const r of rows) {
-      const row = this.db.prepare('SELECT seq, payload FROM events WHERE run_id=? AND seq=?').get(String(r.run_id), Number(r.seq));
+      const row = fetchEvent.get(String(r.run_id), Number(r.seq));
       if (!row) continue; // deleted-event hole: skip honestly
       const p = JSON.parse(String(row.payload)) as Record<string, unknown>;
       out.push(RunEvent.parse({ ...p, seq: Number(row.seq) }));
@@ -615,13 +616,14 @@ export class Store {
       return rows.map(parse);
     };
     // ResearchQuestion carries no runId in its payload, so its objects row is
-    // stored under '__none__'; the question->run association lives in the run
-    // doc (questionId). Resolve it so search results are navigable to a run.
+    // stored under '__none__'; the question->run association lives in the run doc
+    // (questionId). Resolve it so search results are navigable to a run. The
+    // runs.question_id COLUMN is the projection of that doc field (written at
+    // INSERT) — reading it avoids JSON-parsing every run doc per search.
     const questionOwner = new Map<string, string>();
     if (limits.questions > 0) {
-      for (const row of this.db.prepare('SELECT id, doc FROM runs').all() as { id: string; doc: string }[]) {
-        const run = JSON.parse(row.doc) as { questionId?: string };
-        if (typeof run.questionId === 'string') questionOwner.set(run.questionId, row.id);
+      for (const row of this.db.prepare('SELECT id, question_id FROM runs').all() as { id: string; question_id: string }[]) {
+        questionOwner.set(row.question_id, row.id);
       }
     }
     const questions = fetch('question', limits.questions)
@@ -677,25 +679,7 @@ export class Store {
     });
   }
 
-  // ---- RU-10 GO4: persistent researcher library (corpus_items) ----
-
-  private corpusItemsReady = false;
-  private ensureCorpusItems(): void {
-    if (this.corpusItemsReady) return;
-    this.db.exec(`CREATE TABLE IF NOT EXISTS corpus_items (
-      id TEXT PRIMARY KEY,
-      family TEXT NOT NULL,
-      title TEXT NOT NULL,
-      identifiers_json TEXT NOT NULL,
-      text TEXT,
-      year INTEGER,
-      authors_json TEXT,
-      first_seen_run TEXT NOT NULL,
-      created_at TEXT NOT NULL
-    )`);
-    this.db.exec('CREATE INDEX IF NOT EXISTS idx_corpus_items_family ON corpus_items(family)');
-    this.corpusItemsReady = true;
-  }
+  // ---- RU-10 GO4: persistent researcher library (corpus_items, migration v9) ----
 
   /**
    * Persist one researcher-supplied corpus item (seed). Idempotent by a
@@ -712,7 +696,6 @@ export class Store {
     firstSeenRun: string;
     at?: string;
   }): boolean {
-    this.ensureCorpusItems();
     const id = 'ci_' + createHash('sha256').update(
       JSON.stringify({ title: item.title, identifiers: item.identifiers, year: item.year }),
     ).digest('hex').slice(0, 24);
@@ -730,7 +713,6 @@ export class Store {
     id: string; family: string; title: string; identifiers: Array<{ kind: string; value: string }>;
     text: string | null; year: number | null; authors: string[]; firstSeenRun: string; createdAt: string;
   }> {
-    this.ensureCorpusItems();
     const limit = Math.min(filter.limit ?? 100, 500);
     return (this.db.prepare('SELECT * FROM corpus_items ORDER BY created_at DESC LIMIT ?').all(limit) as Record<string, unknown>[]).map((r) => ({
       id: String(r.id), family: String(r.family), title: String(r.title),

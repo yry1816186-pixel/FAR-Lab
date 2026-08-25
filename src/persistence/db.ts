@@ -227,6 +227,28 @@ export const MIGRATIONS: readonly { version: number; sql: string }[] = [
       CREATE INDEX IF NOT EXISTS idx_outbox_pending ON outbox(drained_at) WHERE drained_at IS NULL;
     `,
   },
+  {
+    // R2-12 schema consolidation: corpus_items moves from lazy runtime DDL into
+    // the migration chain (the chain is the ONE schema authority; the lazy
+    // CREATE was a second owner). Partial index keeps the every-open unchained-
+    // events repair check O(empty-index) instead of a full events scan.
+    version: 9,
+    sql: `
+      CREATE TABLE IF NOT EXISTS corpus_items (
+        id TEXT PRIMARY KEY,
+        family TEXT NOT NULL,
+        title TEXT NOT NULL,
+        identifiers_json TEXT NOT NULL,
+        text TEXT,
+        year INTEGER,
+        authors_json TEXT,
+        first_seen_run TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_corpus_items_family ON corpus_items(family);
+      CREATE INDEX IF NOT EXISTS idx_events_unchained ON events(run_id, seq) WHERE prev_hash IS NULL;
+    `,
+  },
 ];
 
 export const openDb = (dbPath: string): Db => {
