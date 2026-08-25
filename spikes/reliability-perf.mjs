@@ -104,6 +104,59 @@ const runId = globalThis.__perfRunId;
   db.close();
 }
 
+// ---- 5. agent-kernel loop overhead (real loop, instant provider) ----
+// The stub provider answers without latency, so the measured wall time is the
+// kernel machinery per turn: prompt assembly, permission decide, exfil scans
+// (secret/canary/size on args + outbound), transcript growth, receipts,
+// telemetry, event emit. NOT model latency — that belongs to the provider.
+{
+  const { z } = await import('zod'); // bare specifier resolves via the repo's node_modules
+  const { runAgentLoop } = await imp('dist/agent/loop.js');
+  const { ToolRegistry } = await imp('dist/agent/tool.js');
+  const { PermissionEngine } = await imp('dist/agent/permissions.js');
+  const { SessionTelemetry } = await imp('dist/agent/telemetry.js');
+  const { createTestStubProvider } = await imp('dist/providers/test-stub.js');
+
+  const tools = new ToolRegistry().register({
+    name: 'echo', description: 'echo', riskClass: 'read',
+    inputSchema: z.object({ text: z.string() }),
+    async execute(args) { return { ok: true, data: { echo: args } }; },
+  });
+  const mkDeps = (steps) => ({
+    provider: createTestStubProvider(steps),
+    tools,
+    permissions: new PermissionEngine({ rules: [{ effect: 'allow' }], defaultEffect: 'deny' }),
+    sessionId: 'ags_perfsession0000000000aaaa',
+    purpose: 'test:perf',
+    emit: () => {}, recordReceipt: () => {}, telemetry: new SessionTelemetry(),
+  });
+  const useTool = JSON.stringify({ action: 'use_tool', tool: 'echo', args: { text: 'perf turn payload '.repeat(8) }, reason: 'progress' });
+  const finish = JSON.stringify({ action: 'finish', reason: 'done', result: { answer: 'ok' } });
+  const cfgFor = (maxTurns) => ({
+    capability: 'perf', systemPrompt: 'perf system prompt '.repeat(20),
+    task: 'perf task', maxTurns, resultSchema: z.object({ answer: z.string().min(2) }),
+  });
+  const stepsFor = (n) => Array.from({ length: n }, (_, i) => ({ rawOutput: i === n - 1 ? finish : useTool }));
+
+  // Short sessions: 20 sessions x 6 turns (5 tool calls + finish).
+  const t = Date.now();
+  const sessions = 20, turnsPer = 6;
+  for (let s = 0; s < sessions; s++) {
+    const res = await runAgentLoop(cfgFor(turnsPer), mkDeps(stepsFor(turnsPer)));
+    if (res.status !== 'completed') throw new Error(`perf loop session ${s} did not complete: ${res.status}`);
+  }
+  const shortMs = Date.now() - t;
+  log('agent-loop 20 sessions x 6 turns (kernel-only)', shortMs, { detail: `${(shortMs / (sessions * turnsPer)).toFixed(1)}ms per turn machinery (instant provider)` });
+
+  // One long session: 60 turns — per-turn scaling under transcript growth.
+  const longN = 60;
+  const t2 = Date.now();
+  const res2 = await runAgentLoop(cfgFor(longN), mkDeps(stepsFor(longN)));
+  if (res2.status !== 'completed') throw new Error(`perf long session did not complete: ${res2.status}`);
+  const longMs = Date.now() - t2;
+  log('agent-loop single 60-turn session (transcript growth)', longMs, { detail: `${(longMs / longN).toFixed(1)}ms per turn with full transcript in context` });
+}
+
 fs.writeFileSync(path.join(EVIDENCE, 'perf.json'), JSON.stringify(out, null, 2));
 app.close();
 try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch { /* tmp */ }

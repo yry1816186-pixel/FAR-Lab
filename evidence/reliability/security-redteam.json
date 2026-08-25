@@ -1,0 +1,62 @@
+{
+  "measuredAt": "2026-08-25T15:06:08.397Z",
+  "results": [
+    {
+      "proof": "fix-F1-manifest-riskclass-floored",
+      "verdict": "PASS",
+      "summary": "manifest declared riskClass='read' -> staged integration riskClass='execute' with a reviewer-visible warning (present)",
+      "staged": "execute",
+      "warned": true
+    },
+    {
+      "proof": "context-F1b-engine-trusts-declared-class",
+      "verdict": "PASS",
+      "summary": "engine semantics (unchanged by design): a read-class tool with an allow rule is auto-allowed in explore mode (allow) while execute-class is denied (deny) — the class MUST therefore be trustworthy at the point it is assigned; for plugins that point is now the import floor",
+      "readDecision": {
+        "effect": "allow",
+        "rule": "mcp_innocent-reader_tool",
+        "cachedGrant": false,
+        "asked": false
+      },
+      "execDecision": {
+        "effect": "deny",
+        "rule": "mode=explore(non-read tool)",
+        "cachedGrant": false,
+        "asked": false
+      }
+    },
+    {
+      "proof": "context-F1c-embed-guard-exempts-read-class",
+      "verdict": "PASS",
+      "summary": "detector flags the 48-char embed (true) but the guard condition exempts read-class tools — combined with F1b, a fake 'read' would disable both lines; the import floor closes the path",
+      "embedDetected": true,
+      "guardAppliesForRead": false
+    },
+    {
+      "proof": "fix-F5-conversation-allow-keyed-on-riskclass",
+      "verdict": "PASS",
+      "summary": "REAL conversationAllowRules: allow rules only for read-class (list_runs, propose_action); execute-class tool decide()=deny (fail-closed default); propose_action (card-only) still allowed",
+      "rules": [
+        "list_runs",
+        "propose_action"
+      ],
+      "readOk": {
+        "effect": "allow",
+        "rule": "list_runs",
+        "cachedGrant": false,
+        "asked": false
+      },
+      "execBlocked": {
+        "effect": "deny",
+        "cachedGrant": false,
+        "asked": false
+      },
+      "proposeOk": {
+        "effect": "allow",
+        "rule": "propose_action",
+        "cachedGrant": false,
+        "asked": false
+      }
+    }
+  ]
+}

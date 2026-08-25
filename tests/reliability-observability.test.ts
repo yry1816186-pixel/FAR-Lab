@@ -65,6 +65,45 @@ describe('classifyError (unified taxonomy)', () => {
     expect(classifyError(new Error('mystery'))).toMatchObject({ category: 'provider_error', retryable: true });
     expect(classifyError('raw string')).toMatchObject({ category: 'provider_error' });
   });
+
+  it('unwraps undici cause-carried errnos: real DNS failures classify as network_error', () => {
+    // Node fetch wraps transport failures in `TypeError: fetch failed` with the
+    // errno on `.cause` — the taxonomy must see through exactly one guarded hop.
+    const dnsAgain = new TypeError('fetch failed');
+    (dnsAgain as { cause?: unknown }).cause = Object.assign(new Error('getaddrinfo EAI_AGAIN offline.invalid'), { code: 'EAI_AGAIN' });
+    expect(classifyError(dnsAgain)).toMatchObject({ category: 'network_error', retryable: true, needsHuman: false });
+    const notFound = new TypeError('fetch failed');
+    (notFound as { cause?: unknown }).cause = Object.assign(new Error('getaddrinfo ENOTFOUND no.such.host'), { code: 'ENOTFOUND' });
+    expect(classifyError(notFound)).toMatchObject({ category: 'network_error', retryable: true });
+    // A direct errno still wins over the cause hop (top level is authoritative).
+    const both = Object.assign(new TypeError('fetch failed'), { code: 'ENOSPC' });
+    (both as { cause?: unknown }).cause = Object.assign(new Error('dns'), { code: 'EAI_AGAIN' });
+    expect(classifyError(both)).toMatchObject({ category: 'disk_full', needsHuman: true });
+    // Non-error cause is ignored, not crashed on.
+    const badCause = new TypeError('fetch failed');
+    (badCause as { cause?: unknown }).cause = 'not-an-error';
+    expect(classifyError(badCause)).toMatchObject({ category: 'provider_error', retryable: true });
+  });
+
+  it('maps SourceAdapterError kind=network to network_error (errno already lost there)', () => {
+    // src/sources normalize every transport failure into this shape; without the
+    // mapping retrieval outages mislabel as provider_error in the obs console.
+    const srcErr = Object.assign(new Error('[arxiv] network httpStatus=0 query="x": fetch failed'), {
+      name: 'SourceAdapterError',
+      kind: 'network',
+      family: 'arxiv',
+      httpStatus: 0,
+    });
+    expect(classifyError(srcErr)).toMatchObject({ category: 'network_error', retryable: true, needsHuman: false });
+    // Non-network adapter failures (http_status/parse) keep the generic fallback.
+    const parseErr = Object.assign(new Error('[arxiv] parse httpStatus=200 query="x": bad body'), {
+      name: 'SourceAdapterError',
+      kind: 'parse',
+      family: 'arxiv',
+      httpStatus: 200,
+    });
+    expect(classifyError(parseErr)).toMatchObject({ category: 'provider_error', retryable: true });
+  });
 });
 
 describe('resource + storage sampling', () => {

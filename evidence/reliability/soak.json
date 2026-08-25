@@ -1,11 +1,11 @@
 {
-  "measuredAt": "2026-08-24T05:32:40.584Z",
+  "measuredAt": "2026-08-25T14:53:52.534Z",
   "config": {
     "rounds": 40,
     "concurrency": 6,
     "heavySubtasks": 14,
     "sampleMs": 1000,
-    "elapsedMs": 178567
+    "elapsedMs": 17839
   },
   "totals": {
     "runs": 45,
@@ -13,18 +13,18 @@
     "objects": 7379,
     "receipts": 7294,
     "artifactBlobs": 7294,
-    "dbBytes": 25681920,
-    "walBytes": 4226960
+    "dbBytes": 25669632,
+    "walBytes": 4243440
   },
   "growth": {
-    "rssFirstMb": 64.3,
-    "rssLastMb": 101.1,
-    "rssGrowthMb": 36.8,
+    "rssFirstMb": 65.1,
+    "rssLastMb": 107.9,
+    "rssGrowthMb": 42.8,
     "rssAllowanceMb": 120,
     "handleFirst": 0,
     "handleLast": 0,
     "handleGrowth": 0,
-    "dbGrowthBytes": 25677824,
+    "dbGrowthBytes": 25665536,
     "artifactBytesGrowth": 3491265
   },
   "verdicts": {
@@ -35,190 +35,190 @@
   },
   "storageDetail": {
     "bytesPerRow": 831,
-    "walBytes": 4226960,
+    "walBytes": 4243440,
     "walBounded": true,
-    "dbBytes": 25681920
+    "dbBytes": 25669632
   },
   "leaseRaces": 0,
   "chainResults": [
     {
-      "id": "run_mxzc20cg8ktjxm0jekg4shw8fk",
+      "id": "run_2x7chcpwgmsrpdrg972m27p38k",
       "ok": true
     },
     {
-      "id": "run_mj38nemh6nwngz12wjh17zzeb9",
+      "id": "run_td5cr9pswc17fxz7nj7pkggx8q",
       "ok": true
     },
     {
-      "id": "run_23z9t69xbpmp2m83eqeh4v2ryx",
+      "id": "run_fafb3n9w7wgtgrmbb3fapab8p3",
       "ok": true
     },
     {
-      "id": "run_8nvdantthrd4npm690a5j6shdq",
+      "id": "run_94g0jgw39zty6vqb07csw9qfbb",
       "ok": true
     },
     {
-      "id": "run_3tg1edpwpsj2bp8hfebjf5ma29",
+      "id": "run_gq9zz8ym721aygh82vn4nq42b6",
       "ok": true
     },
     {
-      "id": "run_stxsfe7by3dwvx2y8c9bqhng5r",
+      "id": "run_s8z8952xc6x2bcmhcpbqb4g0t3",
       "ok": true
     },
     {
-      "id": "run_vekp1rd25rt1pjc3qfx4tcmqm3",
+      "id": "run_48sh8nb65fazrbg2kk61g1bgwa",
       "ok": true
     },
     {
-      "id": "run_fnhmc1ssryfwwfv9r6g3kkkq52",
+      "id": "run_422vdcf06zmyhxksecy2x7hdax",
       "ok": true
     },
     {
-      "id": "run_4bcbfnyvwg2nys27syhmcafcrj",
+      "id": "run_9nrvr3gc68azp073nbj8r67wga",
       "ok": true
     },
     {
-      "id": "run_e34vew3zy1yh9zwvfhgv6vr4h5",
+      "id": "run_m0wsqt169vjc85egpk57g3py5b",
       "ok": true
     },
     {
-      "id": "run_8tvrv57j0eg3bmaaxa175gn0xx",
+      "id": "run_j0kbnagcreydzwx7agcqxmtmtt",
       "ok": true
     },
     {
-      "id": "run_1med5fcy14695f32gr3xn0mfr8",
+      "id": "run_b5tg0fsebsvcqxcen6sbv6ve5f",
       "ok": true
     },
     {
-      "id": "run_2xkmwxsq1pnqsh5pk451pmbnbt",
+      "id": "run_y7cd138z367hcx2z3vykxncx7h",
       "ok": true
     },
     {
-      "id": "run_exzxfzgeyqaqbgag0kkvatfted",
+      "id": "run_jaampnbbjxqm161apkn8h6nsfp",
       "ok": true
     },
     {
-      "id": "run_mtebxxc4eae2an8tgprqsmt30j",
+      "id": "run_cc87b3nvr3bkx3cnh8dv980smy",
       "ok": true
     },
     {
-      "id": "run_mvdttyge9qgqcsdpnzabc1hx9s",
+      "id": "run_b9mhce34nswd28rkssa9xks9xx",
       "ok": true
     },
     {
-      "id": "run_ka06gzkf8xax1d3tv551f4eckv",
+      "id": "run_gs7k8v22zxmj33heqdsmv4gjzt",
       "ok": true
     },
     {
-      "id": "run_nevwardnmcd56jrk7j5rnj0qfb",
+      "id": "run_s158n0farwpegwfpab2rfn27wm",
       "ok": true
     },
     {
-      "id": "run_dbtdgcz9g5daevz17chn2heg71",
+      "id": "run_ekjk2n45wkq948zdw6as7j38n4",
       "ok": true
     },
     {
-      "id": "run_318zc81rcxw0ezkrgdq5z75qak",
+      "id": "run_330yp111szr2m923ygrg9a307y",
       "ok": true
     },
     {
-      "id": "run_qxb8gkdqjq51zd65bwb4adt2ds",
+      "id": "run_wb3grkh50ya0gygvqrv6zksy6k",
       "ok": true
     },
     {
-      "id": "run_egnqwd9ekhm2h7kvzw51gm95mb",
+      "id": "run_ha9p9bgzrg6kanfnfd64qnvryp",
       "ok": true
     },
     {
-      "id": "run_rqhmqycecqq1msb3qmep032ns3",
+      "id": "run_kksk2xcpvhf7nvqzcngzf00pwy",
       "ok": true
     },
     {
-      "id": "run_dcny9qcamwvjn7n4krfhg0aw4f",
+      "id": "run_dxhqx1zpxs4a6b5b2retc2z0d6",
       "ok": true
     },
     {
-      "id": "run_2fv5bm51jnxa5k3y2q10txpxvt",
+      "id": "run_ra29ezzqdnth2gk7m395zxb37j",
       "ok": true
     },
     {
-      "id": "run_qr35xnjrxq4wx08h5tys8brzrj",
+      "id": "run_02tqae1qyc4ybzv8mx949sthqz",
       "ok": true
     },
     {
-      "id": "run_mrqax5w2f1k4ggrt9ywwfyjdmr",
+      "id": "run_js9y1mg1jzq45c43mpmwmezkes",
       "ok": true
     },
     {
-      "id": "run_jwmb4k7gqm9dqb951ycx4arcfp",
+      "id": "run_sjm8n0tagar74hnkee9d11x5ff",
       "ok": true
     },
     {
-      "id": "run_dgx47car9x2w0svb2zk34627ge",
+      "id": "run_jtwqj55ny4hcmr2xesfamnb3bw",
       "ok": true
     },
     {
-      "id": "run_34rt263dbn5d891a5y0qh1fsh1",
+      "id": "run_vry2hjvdd0ws67qry95gyq6g21",
       "ok": true
     },
     {
-      "id": "run_wpy31nmx9r9ejj15trv5a9cqe0",
+      "id": "run_be79pb6dxxkfqxkt2760azjctq",
       "ok": true
     },
     {
-      "id": "run_ewznemcdbmh0vbfy9hhst9gycr",
+      "id": "run_p2kktx4v8kebmnraec49b83pw7",
       "ok": true
     },
     {
-      "id": "run_s2jedaew3zqt2h0jy2bzjs6g3f",
+      "id": "run_prhgehq2q62b2t2ekyxt0gv2cw",
       "ok": true
     },
     {
-      "id": "run_g5v4babcc3y5r5g58gmvaa5by1",
+      "id": "run_fz07adkc5sz3syn73kbv0djh51",
       "ok": true
     },
     {
-      "id": "run_jw5k2tcznk1mmagwxbrcfy6yzk",
+      "id": "run_p66n3268b32dx355ng9ra1bgv2",
       "ok": true
     },
     {
-      "id": "run_cqnhn8t741kajzrnrj56863x02",
+      "id": "run_ed64s14xg2gsbwk3tnb34md1v6",
       "ok": true
     },
     {
-      "id": "run_h53ypfzb5wpmff7c4hg0ph2mcd",
+      "id": "run_tabr7n626dyq95e3x2yrkpbzpa",
       "ok": true
     },
     {
-      "id": "run_ea15t2rb08pbq2ggyaej9hjjgc",
+      "id": "run_rs8p9ee3ftah168hcd24n8pt4n",
       "ok": true
     },
     {
-      "id": "run_n26svffxxryc8ptk61qmd0tyzm",
+      "id": "run_h6nkvypwev1jra7xa43wq0s1pq",
       "ok": true
     },
     {
-      "id": "run_791k5nsx634xy31pjxzs66jps5",
+      "id": "run_yryrppkybg1ddtf6zf8nmnsa2a",
       "ok": true
     },
     {
-      "id": "run_y3g4z065et90am3mj02z3e1f5g",
+      "id": "run_zkt3jhectpfc6zth9q7acbrp0r",
       "ok": true
     },
     {
-      "id": "run_zr09fp2vq19tpyyzchmfb0mgnd",
+      "id": "run_txdv7tvvttx3dkvb506pcmgc6w",
       "ok": true
     },
     {
-      "id": "run_y943fx83gry46res9ahbrrtzw0",
+      "id": "run_nr0hb8xvef37x5qg46cc4bvh2h",
       "ok": true
     },
     {
-      "id": "run_44ar8qwcbj7vytp5p4mgxctwh9",
+      "id": "run_ft8esgjq78x0k0172s3qgm0q83",
       "ok": true
     },
     {
-      "id": "run_kaab4td7fawcet5tr0ryew8c8n",
+      "id": "run_qec5ykamrfv1m7bp070efd1v8m",
       "ok": true
     }
   ],
