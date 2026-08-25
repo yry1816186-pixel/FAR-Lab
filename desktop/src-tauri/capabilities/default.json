@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Minimal capability: the shell only shows the workbench webview; no native APIs are exposed to page code.",
+  "description": "Minimal capability: the shell shows the workbench webview and fires run-completion notifications from RUST side; no native APIs are exposed to page code (notification permission is process-level, not page-invocable).",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "notification:default"]
 }

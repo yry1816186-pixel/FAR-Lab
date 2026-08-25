@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FAR_COMMANDS, bashCompletion, completionScript, pwshCompletion, zshCompletion } from '../src/cli/completion.js';
+import { HELP } from '../src/cli/help.js';
 import { formatElapsed, isActiveStatus, truncateLine, watchLines } from '../src/cli/watch.js';
 import { ResearchRun } from '../src/domain/index.js';
 
@@ -69,10 +70,10 @@ describe('far completion: generators cover the real command tree', () => {
 
   it('tree mirrors the router dispatch surface (guards completion drift)', () => {
     expect(FAR_COMMANDS.map((c) => c.name)).toEqual(
-      ['research', 'runs', 'experiment', 'agent', 'probe', 'data', 'verify', 'new', 'completion'],
+      ['research', 'runs', 'experiment', 'agent', 'probe', 'serve', 'probe-custom', 'memory', 'backup', 'gc', 'data', 'verify', 'new', 'completion'],
     );
     expect(FAR_COMMANDS[0]!.subs.map((s) => s.name)).toEqual(
-      ['start', 'status', 'inspect', 'cancel', 'resume', 'export', 'feedback'],
+      ['start', 'status', 'inspect', 'cancel', 'resume', 'export', 'feedback', 'lineage', 'supervise', 'fork'],
     );
     expect(FAR_COMMANDS.find((c) => c.name === 'experiment')!.subs.map((s) => s.name)).toEqual(
       ['run', 'enqueue', 'worker', 'status', 'cancel', 'logs'],
@@ -80,6 +81,22 @@ describe('far completion: generators cover the real command tree', () => {
     expect(FAR_COMMANDS.find((c) => c.name === 'agent')!.subs.map((s) => s.name)).toEqual(['refine']);
     expect(FAR_COMMANDS.find((c) => c.name === 'data')!.subs.map((s) => s.name)).toEqual(['info']);
     expect(FAR_COMMANDS.find((c) => c.name === 'completion')!.subs.map((s) => s.name)).toEqual(['bash', 'zsh', 'pwsh']);
+  });
+
+  it('HELP and the completion tree agree in both directions (drift found 2026-08-24)', () => {
+    // Every dispatchable command must have a HELP usage line…
+    for (const cmd of FAR_COMMANDS) {
+      expect(HELP, `HELP mentions "far ${cmd.name}"`).toMatch(new RegExp(`^  far ${cmd.name} `, 'm'));
+    }
+    // …and every top-level `far <cmd>` usage line in HELP must be dispatchable.
+    const helpCommands = [...HELP.matchAll(/^ {2}far ([a-z-]+) /gm)].map((m) => m[1]!);
+    const treeNames = new Set(FAR_COMMANDS.map((c) => c.name));
+    for (const name of helpCommands) {
+      expect(treeNames.has(name), `HELP command "${name}" exists in FAR_COMMANDS`).toBe(true);
+    }
+    // Exit-code contract documented in full (3 = stale dist, 130 = SIGINT).
+    expect(HELP).toContain('0 ok, 1 runtime failure, 2 usage error, 3 stale dist');
+    expect(HELP).toContain('130 interrupted');
   });
 });
 

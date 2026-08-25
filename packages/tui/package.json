@@ -1,10 +1,10 @@
 {
   "name": "@far-lab/tui",
-  "version": "0.1.0",
-  "description": "FAR-Lab interactive terminal research browser (read-only v1; Ink full-screen + readline line-mode fallback)",
+  "version": "0.3.0",
+  "description": "FAR-Lab terminal research workbench (live run attach via SSE + resident-agent chat with approval cards; Ink full-screen + readline line-mode fallback)",
   "scripts": {
     "start": "node --experimental-strip-types src/main.ts",
-    "test": "node --experimental-strip-types --test test/core.test.ts test/render.test.ts"
+    "test": "node --experimental-strip-types --test test/core.test.ts test/render.test.ts test/liveCore.test.ts test/chatCore.test.ts test/render-v3.test.ts test/seedAttach.test.ts test/e2e.test.ts"
   },
   "license": "MIT",
   "type": "module",
