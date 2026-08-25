@@ -2,6 +2,7 @@
   "name": "far-lab-desktop",
   "version": "0.1.0",
   "private": true,
+  "license": "Apache-2.0",
   "description": "FAR-Lab desktop shell (Tauri v2) — webview wrapper over the existing web workbench; spawns the local API server, no second business logic (PRODUCT_HCI §1.2)",
   "type": "module",
   "scripts": {
