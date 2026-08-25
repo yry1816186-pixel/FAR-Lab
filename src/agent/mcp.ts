@@ -1,5 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { z } from 'zod';
+import { canonicalSha256 } from '../shared/crypto.js';
 import type { AgentTool, ToolContext, ToolResult } from './tool.js';
 
 /**
@@ -21,10 +22,31 @@ type JsonRpcMessage =
   | { jsonrpc: '2.0'; method: string; params?: unknown } // notification
   | { jsonrpc: '2.0'; id: number; result?: unknown; error?: { code: number; message: string; data?: unknown } };
 
+/**
+ * MCP tool annotations (spec 2025-06-18 tools/list): UNTRUSTED server
+ * self-declarations (readOnlyHint etc.). Parsed and surfaced as capability
+ * METADATA only — they never override the researcher-declared risk class on
+ * the integration (a lying "readOnlyHint: true" must not widen admission).
+ */
+export const McpToolAnnotations = z.object({
+  title: z.string().max(200).optional(),
+  readOnlyHint: z.boolean().optional(),
+  destructiveHint: z.boolean().optional(),
+  idempotentHint: z.boolean().optional(),
+  openWorldHint: z.boolean().optional(),
+});
+export type McpToolAnnotations = z.infer<typeof McpToolAnnotations>;
+
+/** Loose initialize-result serverInfo (spec: { name, version } — both optional in practice). */
+const ServerInfoSchema = z.object({
+  serverInfo: z.object({ name: z.string().optional(), version: z.string().optional() }).optional(),
+});
+
 export interface McpToolInfo {
   name: string;
   description?: string;
   inputSchema?: unknown;
+  annotations?: McpToolAnnotations;
 }
 
 export interface McpStdioOptions {
@@ -43,6 +65,7 @@ export class McpStdioClient {
   private readonly pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void; timer: NodeJS.Timeout }>();
   private buffer = '';
   private closed = false;
+  private serverIdentity: { name?: string; version?: string } = {};
   constructor(private readonly opts: McpStdioOptions) {}
 
   async connect(): Promise<void> {
@@ -58,16 +81,28 @@ export class McpStdioClient {
     child.stdout.on('data', (chunk: string) => this.onStdout(chunk));
     this.child = child;
     try {
-      await this.request('initialize', {
+      const initResult = await this.request('initialize', {
         protocolVersion: this.opts.protocolVersion ?? '2025-06-18',
         capabilities: {},
         clientInfo: { name: this.opts.clientName ?? 'far-lab-agent', version: '0.1.0' },
       });
+      const parsed = ServerInfoSchema.safeParse(initResult);
+      if (parsed.success && parsed.data.serverInfo !== undefined) {
+        this.serverIdentity = {
+          ...(parsed.data.serverInfo.name !== undefined ? { name: parsed.data.serverInfo.name } : {}),
+          ...(parsed.data.serverInfo.version !== undefined ? { version: parsed.data.serverInfo.version } : {}),
+        };
+      }
     } catch (e) {
       await this.close();
       throw e;
     }
     this.notify('notifications/initialized');
+  }
+
+  /** Server identity from the initialize handshake (capability provenance; empty when the server declared none). */
+  serverInfo(): { name?: string; version?: string } {
+    return this.serverIdentity;
   }
 
   async listTools(): Promise<McpToolInfo[]> {
@@ -78,6 +113,7 @@ export class McpStdioClient {
         name: z.string().min(1),
         description: z.string().optional(),
         inputSchema: z.unknown().optional(),
+        annotations: McpToolAnnotations.optional(),
       })),
       nextCursor: z.string().min(1).optional(),
     });
@@ -216,25 +252,61 @@ export interface McpToolCaller {
 /**
  * Adapt one remote MCP tool into the kernel AgentTool contract. Args are passed through
  * (the remote server validates); results carry the raw content payload back to the model.
+ * Every call records a tool_exec provenance receipt through the tool context
+ * (input/output canonical hashes + duration — payloads hashed, never archived
+ * verbatim, same discipline as source retrieval).
  */
 export const mcpToolAdapter = (client: McpToolCaller, info: McpToolInfo, serverLabel: string): AgentTool => ({
   name: info.name,
   description: info.description ?? `remote MCP tool '${info.name}' from ${serverLabel}`,
   inputSchema: MCP_ARGS_SCHEMA,
-  async execute(args: unknown, _ctx: ToolContext): Promise<ToolResult> {
+  ...(info.annotations !== undefined ? { annotations: info.annotations } : {}),
+  async execute(args: unknown, ctx: ToolContext): Promise<ToolResult> {
     const checked = MCP_ARGS_SCHEMA.safeParse(args ?? {});
     if (!checked.success) {
       return { ok: false, error: { kind: 'validation', message: `MCP tool args must be an object: ${checked.error.issues[0]?.message}` } };
     }
+    const startedMs = Date.now();
+    let res: Awaited<ReturnType<McpToolCaller['callTool']>>;
     try {
-      const res = await client.callTool(info.name, checked.data);
-      return {
-        ok: res.ok,
-        ...(res.ok ? { data: res.content } : { error: { kind: 'execution', message: `remote tool reported error: ${JSON.stringify(res.content).slice(0, 500)}` } }),
-        summary: `mcp:${serverLabel}:${info.name}`,
-      };
+      res = await client.callTool(info.name, checked.data);
     } catch (e) {
+      recordMcpReceipt(ctx, serverLabel, info.name, checked.data, { transportError: e instanceof Error ? e.message : String(e) }, Date.now() - startedMs);
       return { ok: false, error: { kind: 'execution', message: e instanceof Error ? e.message : String(e) } };
     }
+    recordMcpReceipt(ctx, serverLabel, info.name, checked.data, res.content ?? null, Date.now() - startedMs);
+    return {
+      ok: res.ok,
+      ...(res.ok ? { data: res.content } : { error: { kind: 'execution', message: `remote tool reported error: ${JSON.stringify(res.content).slice(0, 500)}` } }),
+      summary: `mcp:${serverLabel}:${info.name}`,
+    };
   },
 });
+
+/** Best-effort tool_exec receipt for one MCP call (success or transport failure). */
+const recordMcpReceipt = (
+  ctx: ToolContext,
+  serverLabel: string,
+  toolName: string,
+  args: Record<string, unknown>,
+  output: unknown,
+  durationMs: number,
+): void => {
+  try {
+    ctx.recordReceipt({
+      kind: 'tool_exec',
+      executionMode: 'live',
+      stage: `mcp:${serverLabel}:${toolName}`,
+      toolExec: {
+        tool: toolName,
+        inputHash: canonicalSha256(JSON.stringify(args)),
+        outputHash: canonicalSha256(JSON.stringify(output)),
+        durationMs,
+      },
+      redactionNote: 'MCP call args/results hashed only; payloads not archived',
+    });
+  } catch {
+    // Receipt-sink failure must not corrupt the tool result; the loop's own
+    // receipt path surfaces its errors separately (best-effort observability).
+  }
+};
