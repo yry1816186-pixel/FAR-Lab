@@ -414,6 +414,57 @@ const caseConcurrentAppend = async () => {
   });
 };
 
+// ---- CASE: DNS resolution failure through the REAL http core + taxonomy ----
+// Closes the residue handoff's honest boundary #1 (offline DNS-fault proof).
+// Two layers, honestly distinct:
+//   transport policy (providers/http): DNS failure -> provider_error, NOT
+//     blind-retried (W1 discipline — never retry a black-holed connection),
+//     bounded and fail-visible;
+//   observability taxonomy: errno (direct or undici cause-carried) and
+//     SourceAdapterError(kind='network') -> network_error + retryable (the
+//     operator-facing verdict for the obs console).
+
+const caseDnsFailure = async () => {
+  const driver = childDriver('dnsfault', `
+    const { runOpenAICompatStructuredCall } = await import(pathToFileURL(path.join(ROOT, 'dist/providers/http.js')).href);
+    const { classifyError } = await import(pathToFileURL(path.join(ROOT, 'dist/app/observability.js')).href);
+    const sleeps = [];
+    const mkDeps = (impl) => ({ fetchImpl: impl, sleep: async (ms) => { sleeps.push(ms); }, random: () => 0.5, totalTimeoutMs: 8000 });
+    const cfg = { providerName: 'dns-fault', modelId: 'm1', baseUrl: 'http://offline.invalid', apiKey: 'k', executionMode: 'test' };
+    const parse = (x) => x;
+    // Real undici failure shape: TypeError('fetch failed') with the errno on cause.
+    const dnsFetch = async () => {
+      const cause = new Error('getaddrinfo EAI_AGAIN offline.invalid');
+      cause.code = 'EAI_AGAIN';
+      const e = new TypeError('fetch failed');
+      e.cause = cause;
+      throw e;
+    };
+    const r1 = await runOpenAICompatStructuredCall(cfg, { purpose: 'dns-fault', messages: [], responseFormat: { type: 'json_object' } }, parse, mkDeps(dnsFetch));
+    const attempt1 = r1.ok === true ? 'ok' : r1.error.kind;
+    const goodFetch = async () => ({ ok: true, status: 200, headers: { get: () => null }, text: async () => JSON.stringify({ choices: [{ message: { content: JSON.stringify({ answer: 1 }) } }], usage: { prompt_tokens: 2, completion_tokens: 1, total_tokens: 3 } }) });
+    const r2 = await runOpenAICompatStructuredCall(cfg, { purpose: 'dns-recovered', messages: [], responseFormat: { type: 'json_object' } }, parse, mkDeps(goodFetch));
+    const attempt2 = r2.ok === true ? 'ok' : r2.error.kind;
+    const direct = new Error('getaddrinfo EAI_AGAIN offline.invalid'); direct.code = 'EAI_AGAIN';
+    const wrapped = new TypeError('fetch failed'); const c2 = new Error('getaddrinfo ENOTFOUND no.such.host'); c2.code = 'ENOTFOUND'; wrapped.cause = c2;
+    const srcShape = new Error('[arxiv] network httpStatus=0 query="q": down');
+    srcShape.name = 'SourceAdapterError'; srcShape.kind = 'network';
+    const tax = { direct: classifyError(direct), wrapped: classifyError(wrapped), source: classifyError(srcShape) };
+    console.log(JSON.stringify({ attempt1, attempt2, sleeps, tax }));
+  `);
+  const r = await runChild(driver);
+  if (r.code !== 0) { record('dns-resolution-failure', false, { summary: `driver failed: ${r.err.slice(0, 400)}` }); return; }
+  const out = JSON.parse(r.out.trim().split('\n').pop());
+  const transportOk = out.attempt1 === 'provider_error' && out.sleeps.length === 0;
+  const recoveryOk = out.attempt2 === 'ok';
+  const taxonomyOk = out.tax.direct.category === 'network_error' && out.tax.direct.retryable === true
+    && out.tax.wrapped.category === 'network_error' && out.tax.source.category === 'network_error';
+  record('dns-resolution-failure', transportOk && recoveryOk && taxonomyOk, {
+    summary: `EAI_AGAIN in the real undici cause shape: transport=${out.attempt1} (fail-visible), blindRetries=${out.sleeps.length} (W1: no blind network retry), cleanRecovery=${out.attempt2}; taxonomy direct/wrapped/source-adapter all network_error+retryable`,
+    transport: out.attempt1, blindRetries: out.sleeps.length, recovery: out.attempt2, taxonomy: out.tax,
+  });
+};
+
 // ---- main ----
 
 const CASES = {
@@ -426,6 +477,7 @@ const CASES = {
   'model-fault-sequence': caseModelFaults,
   'outbox-drain-idempotent': caseOutboxCrashWindow,
   'concurrent-append-two-processes': caseConcurrentAppend,
+  'dns-resolution-failure': caseDnsFailure,
 };
 
 const selected = process.argv.slice(2).length > 0 ? process.argv.slice(2) : Object.keys(CASES);

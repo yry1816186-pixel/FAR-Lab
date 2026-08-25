@@ -1,5 +1,5 @@
 {
-  "measuredAt": "2026-08-24T13:38:53.588Z",
+  "measuredAt": "2026-08-25T14:50:15.713Z",
   "results": [
     {
       "case": "sigint-mid-run",
@@ -13,9 +13,9 @@
     {
       "case": "db-busy-concurrent-writer",
       "verdict": "PASS",
-      "summary": "append succeeded under 2.5s exclusive writer (waited 1964ms; busy_timeout 10s), chain intact",
+      "summary": "append succeeded under 2.5s exclusive writer (waited 2051ms; busy_timeout 10s), chain intact",
       "appendOk": true,
-      "waitedMs": 1964,
+      "waitedMs": 2051,
       "chainOk": true
     },
     {
@@ -49,12 +49,12 @@
       "summary": "cross-process concurrent execute: completed=1, RunLeaseHeldError=1, chain=true, maxStageAttempt=2 (quality-gate reopen, audited) — single-writer enforced",
       "outcomes": [
         {
-          "pid": 39844,
+          "pid": 18932,
           "outcome": "fulfilled",
           "status": "completed"
         },
         {
-          "pid": 44224,
+          "pid": 8400,
           "outcome": "rejected",
           "errorName": "RunLeaseHeldError"
         }
@@ -98,6 +98,34 @@
       "raceNotes": 80,
       "raceUnique": 80,
       "monotonic": true
+    },
+    {
+      "case": "dns-resolution-failure",
+      "verdict": "PASS",
+      "summary": "EAI_AGAIN in the real undici cause shape: transport=provider_error (fail-visible), blindRetries=0 (W1: no blind network retry), cleanRecovery=ok; taxonomy direct/wrapped/source-adapter all network_error+retryable",
+      "transport": "provider_error",
+      "blindRetries": 0,
+      "recovery": "ok",
+      "taxonomy": {
+        "direct": {
+          "category": "network_error",
+          "retryable": true,
+          "needsHuman": false,
+          "message": "getaddrinfo EAI_AGAIN offline.invalid"
+        },
+        "wrapped": {
+          "category": "network_error",
+          "retryable": true,
+          "needsHuman": false,
+          "message": "fetch failed"
+        },
+        "source": {
+          "category": "network_error",
+          "retryable": true,
+          "needsHuman": false,
+          "message": "[arxiv] network httpStatus=0 query=\"q\": down"
+        }
+      }
     }
   ]
 }
