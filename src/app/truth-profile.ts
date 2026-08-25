@@ -67,7 +67,10 @@ const countRetrieval = (receipts: readonly ProvenanceReceipt[]): { live: number;
 export const classifyTruth = (modelCalls: { live: number; test: number }, retrieval: { live: number; hit: number; stale: number; replay: number }): RunTruthClass => {
   const evidence = modelCalls.live + modelCalls.test + retrieval.live + retrieval.hit + retrieval.stale + retrieval.replay;
   if (evidence === 0) return 'empty';
-  if (modelCalls.test > 0 && modelCalls.live > 0) return 'mixed';
+  // A run that touched the external world (live model OR live retrieval) while
+  // ALSO running deterministic test calls is mixed — never synthetic (audit P2-2:
+  // the class must not contradict the counts rendered beside it).
+  if (modelCalls.test > 0 && (modelCalls.live > 0 || retrieval.live > 0)) return 'mixed';
   if (modelCalls.test > 0) return 'synthetic';
   if (modelCalls.live > 0 && retrieval.replay > 0) return 'mixed';
   if (modelCalls.live > 0 || retrieval.live > 0) return 'live';

@@ -240,18 +240,20 @@ export class Orchestrator {
 
     // §5.2 evidence-debt reopen: a COMPLETED run whose corpus grew afterwards
     // (counter-search / seeded docs) has unprocessed evidence — resume reopens
-    // verify_sources + build_evidence so the new sources are verified and their
-    // claims extracted. Both stages are naturally idempotent (they only process
-    // unverified / not-yet-claimed documents), so existing work is never redone
-    // and hypotheses are NOT auto-invalidated (their evidence-binding surfaces
-    // can link the new claims; causal revision stays a human/feedback act).
+    // verify_sources + build_evidence (+ export: the stale report/bundle must be
+    // regenerated with the new evidence, mirroring the feedback reopen) so the
+    // new sources are verified and their claims extracted. Both stages are
+    // naturally idempotent (they only process unverified / not-yet-claimed
+    // documents), so existing work is never redone and hypotheses are NOT
+    // auto-invalidated (their evidence-binding surfaces can link the new claims;
+    // causal revision stays a human/feedback act).
     if (wasCompleted) {
       const unverified = this.deps.store
         .listObjects('source_document', runId)
         .some((d) => d.verification === undefined);
       if (unverified) {
         run = await this.transition(runId, (r) => {
-          for (const stage of ['verify_sources', 'build_evidence'] as RunStageName[]) {
+          for (const stage of ['verify_sources', 'build_evidence', 'export'] as RunStageName[]) {
             const rec = r.stages.find((x) => x.stage === stage);
             if (rec && (rec.state === 'done' || rec.state === 'skipped')) {
               rec.state = 'pending';

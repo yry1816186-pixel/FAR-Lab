@@ -601,15 +601,20 @@ const resolveCodeRevision = (): string => {
 export const exportStage: StageHandler = {
   stage: 'export',
   applicable: async (ctx) => {
-    // Re-export when no bundle exists OR when a revision landed after the newest bundle,
-    // so the report/bundle always reflect the latest causal revision state.
+    // Re-export when no bundle exists, when a revision landed after the newest
+    // bundle, OR when the corpus grew beyond the sources the bundle covers
+    // (§5.2 evidence debt: counter-search added sources post-completion; the
+    // report/bundle must reflect them). Count-based, not timestamp-based —
+    // fixture/clock skew cannot spuriously re-trigger.
     const bundles = ctx.store.listObjects('bundle', ctx.run.id);
     if (bundles.length === 0) return true;
     const latestBundle = bundles[bundles.length - 1]!;
     const newerRevision = ctx.store
       .listObjects('revision', ctx.run.id)
       .find((r) => r.createdAt > latestBundle.createdAt);
-    return newerRevision !== undefined;
+    if (newerRevision !== undefined) return true;
+    const sourceCount = ctx.store.listObjects('source_document', ctx.run.id).length;
+    return sourceCount > latestBundle.sourceArtifactHashes.length;
   },
 
   execute: async (ctx) => {

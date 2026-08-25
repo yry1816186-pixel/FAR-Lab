@@ -605,6 +605,10 @@ describe('GET /api/v1/runs and /api/v1/runs/:id', () => {
   });
 
   it('executes a researcher-directed counter-search (§5.2) through the route with fake adapters', async () => {
+    // counter-search grows the corpus of an ALREADY-started run (created runs are refused)
+    const run2doc = app.store.getRun(run2)!;
+    run2doc.status = 'completed';
+    app.store.updateRun(run2doc);
     const res = await postJson(`${base}/api/v1/runs/${run2}/counter-search`, { query: 'studies failing to replicate the effect' });
     expect(res.status).toBe(201);
     expect(res.body.runId).toBe(run2);

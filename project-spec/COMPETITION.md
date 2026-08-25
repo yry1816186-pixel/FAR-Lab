@@ -2,7 +2,7 @@
 
 **Verified:** 2026-08-26 against the official pages (URLs below; previous rechecks 2026-08-25, 2026-08-24, 2026-08-22, 2026-08-21). Re-check before any consequential compliance/submission claim; this file is not allowed to override a newer official rule.
 
-**Official sources (recorded 2026-08-22, re-fetched 2026-08-25):**
+**Official sources (recorded 2026-08-22, re-fetched 2026-08-25 and 2026-08-26):**
 
 - Aliyun official topic page: https://university.aliyun.com/action/tzbjbgs2026
 - NADC (国家天文科学数据中心) topic release, published 2026-06-25: https://nadc.china-vo.org/article/20260624094452

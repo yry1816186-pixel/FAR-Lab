@@ -69,7 +69,8 @@ describe('orchestrator: evidence-debt reopen on completed runs', () => {
     const calls: string[] = [];
     const out = await build(store, calls).execute(runId);
 
-    expect(calls.sort()).toEqual(['build_evidence', 'verify_sources']);
+    // export reopens too (audit P1-1): the stale report/bundle must be regenerated
+    expect(calls.sort()).toEqual(['build_evidence', 'export', 'verify_sources']);
     expect(out.status).toBe('completed');
     const resumed = store.listEvents(runId).filter((e) => e.type === 'run_resumed');
     expect(resumed.some((e) => (e.detail as { reopened?: string })?.reopened === 'evidence_debt')).toBe(true);

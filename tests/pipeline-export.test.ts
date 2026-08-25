@@ -528,6 +528,23 @@ describe('export stage', () => {
     expect(await exportStage.applicable(exportCtx)).toBe(false);
   });
 
+  it('re-exports when the corpus grew beyond the bundle\'s covered sources (§5.2 evidence debt, audit P1-1)', async () => {
+    const g = seedRun();
+    const { exportCtx } = await runPlanThenExport(g);
+    expect(await exportStage.applicable(exportCtx)).toBe(false);
+    // counter-search-style growth: one more source doc than the bundle covers
+    const before = store.listObjects('source_document', g.run.id).length;
+    store.putObject('source_document', SourceDocument.parse({
+      id: newId('src'), runId: g.run.id, family: 'openalex',
+      identifiers: [{ kind: 'doi', value: '10.1/counter-new' }],
+      title: 'Post-bundle counter evidence', authors: [],
+      contentDepth: 'abstract', accessState: 'open',
+      contentHash: 'b'.repeat(64), retrievedAt: new Date().toISOString(), parseStatus: 'ok',
+    }));
+    expect(store.listObjects('source_document', g.run.id).length).toBe(before + 1);
+    expect(await exportStage.applicable(exportCtx)).toBe(true);
+  });
+
   it('renders all 9 report sections strictly from stored objects', async () => {
     const g = seedRun();
     const { outcome } = await runPlanThenExport(g);

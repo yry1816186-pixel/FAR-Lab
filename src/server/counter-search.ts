@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { App } from '../app/composition.js';
-import { CorpusSnapshot, ProvenanceReceipt, SourceDocument, newId } from '../domain/index.js';
+import { leaseHolderId, LEASE_TTL_MS } from '../app/orchestrator.js';
+import { CorpusSnapshot, ProvenanceReceipt, ResearchRun, SourceDocument, newId } from '../domain/index.js';
 import type { SourceFamily } from '../domain/source.js';
 import type { RawRetrievalResult, RawSourceRecord, SourceAdapter } from '../shared/ports.js';
 import { snapshotHash } from '../sources/snapshot.js';
@@ -40,7 +41,7 @@ const PER_FAMILY_LIMIT = 5;
 /** Total docs a single counter-search may add (bounded by contract). */
 export const COUNTER_SEARCH_MAX_ADD = 8;
 
-export type CounterSearchErrorCode = 'invalid_counter_search' | 'not_found' | 'run_active';
+export type CounterSearchErrorCode = 'invalid_counter_search' | 'not_found' | 'run_active' | 'not_started';
 
 export class CounterSearchError extends Error {
   constructor(readonly status: number, readonly code: CounterSearchErrorCode, message: string) {
@@ -78,15 +79,42 @@ export async function runCounterSearch(
   const { query } = parsed.data;
   const run = app.store.getRun(runId);
   if (run === null) throw new CounterSearchError(404, 'not_found', `run ${runId} not found`);
-
-  const lease = app.store.getRunLease(runId);
-  if (lease.holder !== null && (lease.expiresAt ?? '') > new Date().toISOString()) {
-    throw new CounterSearchError(409, 'run_active', `run ${runId} has a live executor (${lease.holder}) — cancel or wait before growing the corpus`);
+  // A counter-search grows the corpus of a run that ALREADY did discovery retrieval;
+  // on a not-yet-started run the snapshot would make retrieveStage.applicable false
+  // and silently replace the whole discovery corpus with the counter docs (audit P1-2).
+  if (run.status === 'created') {
+    throw new CounterSearchError(409, 'not_started', `run ${runId} has not started yet — counter-search grows an existing corpus; start the research first`);
   }
 
-  const latest = app.store.listObjects('corpus_snapshot', runId).at(-1) ?? null;
+  // Single-writer across the WHOLE operation (audit P1-3): the entry lease check
+  // alone left a multi-second window where an executor could interleave corpus
+  // snapshots. We hold the run lease from before the first search until after the
+  // last write, so pipeline execution and corpus mutation can never race.
+  const holder = leaseHolderId();
+  const leaseUntil = new Date(Date.now() + LEASE_TTL_MS).toISOString();
+  if (!app.store.acquireLease(runId, holder, leaseUntil)) {
+    throw new CounterSearchError(409, 'run_active', `run ${runId} has a live executor — cancel or wait before growing the corpus`);
+  }
+  try {
+    return await runCounterSearchLocked(app, run, query, sourceFor, holder);
+  } finally {
+    app.store.releaseLease(runId, holder);
+  }
+}
+
+async function runCounterSearchLocked(
+  app: Pick<App, 'store' | 'artifacts'>,
+  run: ResearchRun,
+  query: string,
+  sourceFor: (family: SourceFamily) => SourceAdapter,
+  leaseHolder: string,
+): Promise<CounterSearchOutcome> {
+  const runId = run.id;
+  const store = app.store;
+
+  const latest = store.listObjects('corpus_snapshot', runId).at(-1) ?? null;
   const existingKeys = new Set(
-    (app.store.listObjects('source_document', runId) as SourceDocument[])
+    (store.listObjects('source_document', runId) as SourceDocument[])
       .flatMap((d) => d.identifiers.filter((i) => i.kind === 'doi' || i.kind === 'arxiv').map((i) => identifierKey([i])))
       .filter((k) => k !== ''),
   );
@@ -102,13 +130,28 @@ export async function runCounterSearch(
     try {
       result = await sourceFor(family).search(query, { limit: PER_FAMILY_LIMIT });
     } catch (e) {
-      familyFailures.push({ family, reason: e instanceof Error ? e.message : String(e) });
+      const reason = e instanceof Error ? e.message : String(e);
+      familyFailures.push({ family, reason });
+      // Audit P2-4: a thrown external contact is still a contact — record the
+      // failed attempt as a receipt (httpStatus 0 = no response) so the truth
+      // plane sees it; mirrors verify_sources' error-receipt discipline.
+      receipts.push(ProvenanceReceipt.parse({
+        id: newId('rcp'), runId, kind: 'source_retrieval', executionMode: 'live', at: new Date().toISOString(),
+        stage: 'counter-search',
+        redactionNote: `counter-evidence search failed before a response: ${reason.slice(0, 300)}`,
+        sourceRetrieval: { family, query, httpStatus: 0, resultCount: 0, contentHashes: [] },
+      }));
+      receiptsRecorded += 1;
       continue;
     }
     const hashes: string[] = [];
     for (const record of result.records) {
       hashes.push(snapshotHash(family, record));
-      const key = identifierKey(record.identifiers);
+      // Audit P2-3: dedup keys are doi/arxiv-only on BOTH sides (existing corpus
+      // and incoming records) — a pubmed-first incoming record must not bypass
+      // a doi-indexed corpus doc via the ids[0] fallback.
+      const ida = record.identifiers.find((i) => i.kind === 'doi') ?? record.identifiers.find((i) => i.kind === 'arxiv');
+      const key = ida !== undefined ? identifierKey([ida]) : '';
       if (key !== '' && existingKeys.has(key)) { duplicatesSkipped += 1; continue; }
       if (key !== '' && candidates.has(key)) continue;
       if (candidates.size >= COUNTER_SEARCH_MAX_ADD) continue;
@@ -128,8 +171,8 @@ export async function runCounterSearch(
     docs.push(await toDocument({ run, artifacts: app.artifacts }, family, record));
   }
 
-  for (const doc of docs) app.store.putObject('source_document', doc);
-  for (const receipt of receipts) app.store.putObject('receipt', receipt);
+  for (const doc of docs) store.putObject('source_document', doc);
+  for (const receipt of receipts) store.putObject('receipt', receipt);
 
   const corpus = CorpusSnapshot.parse({
     id: newId('corp'),
@@ -140,9 +183,12 @@ export async function runCounterSearch(
     familyFailures: [...(latest?.familyFailures ?? []), ...familyFailures],
     ...(latest?.fusion !== undefined ? { fusion: latest.fusion } : {}),
   });
-  app.store.putObject('corpus_snapshot', corpus);
+  store.putObject('corpus_snapshot', corpus);
+  // Lease heartbeat: every persisted write renews, matching the orchestrator's
+  // discipline (a long search window must not let the lease expire mid-write).
+  store.renewLease(runId, leaseHolder, new Date(Date.now() + LEASE_TTL_MS).toISOString());
 
-  app.store.appendEvent(runId, {
+  store.appendEvent(runId, {
     type: 'note',
     detail: {
       reason: 'counter_search_added',
