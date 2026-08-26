@@ -109,7 +109,7 @@ export function SkeletonMap(): JSX.Element {
             <option key={r.id} value={r.id}>{r.questionText?.slice(0, 60) ?? r.id}</option>
           ))}
         </select>
-        <a href="#/">← 返回工作台</a>
+        <a href="#lab/home">← 研究工作区</a>
       </header>
 
       {run === null ? (

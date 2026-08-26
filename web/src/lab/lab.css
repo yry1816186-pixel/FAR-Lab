@@ -173,3 +173,39 @@
 }
 
 .queue-empty { font-size: 12.5px; color: var(--v2-text-3); padding: 10px 2px; }
+
+/* ---------- shared queue rows (workspace layer + judgment items) ---------- */
+.queue-canvas { max-width: 880px; margin: 0 auto; padding: 26px 28px 120px; }
+.queue-section { margin-bottom: 34px; }
+.queue-section-title { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+.queue-section-sub { font-size: 12px; color: var(--v2-text-3); margin-bottom: 12px; }
+.queue-item {
+  display: grid;
+  grid-template-columns: 8px 1fr auto;
+  gap: 14px;
+  align-items: center;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-border);
+  border-radius: 10px;
+  padding: 13px 16px;
+  margin-bottom: 8px;
+}
+.queue-item .q-dot { width: 8px; height: 8px; border-radius: 50%; justify-self: center; }
+.queue-item.sev-attention .q-dot { background: var(--v2-refuted); }
+.queue-item.sev-live .q-dot { background: var(--v2-verified); animation: labPulse 1.6s ease-in-out infinite; }
+.queue-item.sev-info .q-dot { background: var(--v2-info); }
+@keyframes labPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .queue-item.sev-live .q-dot { animation: none; } }
+.queue-item .q-main { min-width: 0; }
+.queue-item .q-title { font-size: 13.5px; line-height: 1.5; font-weight: 600; overflow-wrap: anywhere; display: block; }
+.queue-item .q-why { font-size: 12px; color: var(--v2-text-2); line-height: 1.55; margin-top: 3px; display: block; }
+.queue-item .q-act {
+  font-size: 12.5px;
+  color: var(--v2-info);
+  border: 1px solid color-mix(in oklab, var(--v2-info) 45%, transparent);
+  border-radius: 7px;
+  padding: 6px 13px;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.queue-item .q-act:hover { background: var(--v2-info-tint); }

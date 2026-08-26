@@ -2,6 +2,7 @@ import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Toaster } from 'sonner';
 import { App } from './App';
+import { SkeletonHome } from './lab/SkeletonHome';
 import { SkeletonMap } from './lab/SkeletonMap';
 import { LanguageProvider } from './i18n/LanguageContext';
 import { ConnectionProvider } from './state/connection';
@@ -16,6 +17,7 @@ function Root(): JSX.Element {
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
+  if (hash === '#lab' || hash.startsWith('#lab/home')) return <SkeletonHome />;
   if (hash.startsWith('#lab/map')) return <SkeletonMap />;
   return <App />;
 }

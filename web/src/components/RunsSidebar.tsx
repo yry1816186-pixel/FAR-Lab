@@ -133,12 +133,12 @@ const LIBRARY_PREVIEW = 12;
  * one study — the researcher's mental object, not a status bucket. Normalized
  * question text is the key (id fallback keeps unlabelled runs singletons).
  */
-function studyKey(run: RunSummary): string {
+export function studyKey(run: RunSummary): string {
   const q = run.questionText?.trim().toLowerCase().replace(/\s+/g, ' ');
   return q !== undefined && q.length > 0 ? q : run.id;
 }
 
-interface StudyGroup {
+export interface StudyGroup {
   key: string;
   question: string;
   runs: RunSummary[]; // newest first
@@ -147,7 +147,7 @@ interface StudyGroup {
   failedCount: number;
 }
 
-function groupStudies(filtered: RunSummary[]): StudyGroup[] {
+export function groupStudies(filtered: RunSummary[]): StudyGroup[] {
   const byStudy = new Map<string, StudyGroup>();
   for (const run of filtered) {
     const key = studyKey(run);
