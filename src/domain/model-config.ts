@@ -10,13 +10,20 @@ import { ModelConfigId } from './ids.js';
  */
 
 /**
- * Transport wire the custom endpoint speaks — exactly the three the transport core
- * implements. 'gemini' is the Google generativelanguage generateContent REST shape
- * (the native path for Gemini models worldwide; OpenAI-compat also exists but the
- * native wire carries thinkingConfig/usageMetadata faithfully).
+ * Transport wire the custom endpoint speaks — the three the transport core
+ * implements plus the deterministic in-process development wire. 'gemini' is
+ * the Google generativelanguage generateContent REST shape (the native path for
+ * Gemini models worldwide; OpenAI-compat also exists but the native wire
+ * carries thinkingConfig/usageMetadata faithfully). 'offline' is the
+ * OFFLINE_DEVELOPMENT route (providers/offline.ts): no network, no key,
+ * purpose-keyed deterministic outputs, every receipt stamped
+ * executionMode 'test' — it can never masquerade as a live model call.
  */
-export const ProviderWireProtocol = z.enum(['openai', 'anthropic', 'gemini']);
+export const ProviderWireProtocol = z.enum(['openai', 'anthropic', 'gemini', 'offline']);
 export type ProviderWireProtocol = z.infer<typeof ProviderWireProtocol>;
+
+/** Offline dev routes: no real endpoint is contacted, so the URL is a fixed sentinel. */
+export const OFFLINE_WIRE_BASE_URL = 'https://offline.farlab.invalid/v1';
 
 /**
  * Per-config REASONING CAPABILITY declaration (product configuration layer):
@@ -101,6 +108,12 @@ const assertReasoningWireCompat = (
     thinking_budget: 'anthropic',
     thinking_config: 'gemini',
   };
+  if (cfg.wire === 'offline') {
+    // The offline wire never emits thinking fields: declaring a dialect on a
+    // deterministic in-process route would be a config lie.
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['reasoning'], message: 'offline wire is deterministic in-process development — it speaks no thinking dialect; remove the reasoning declaration' });
+    return;
+  }
   if (cfg.wire !== requiredWire[style]) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['reasoning'], message: `reasoning style "${style}" requires wire "${requiredWire[style]}"` });
   }

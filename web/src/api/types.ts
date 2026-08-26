@@ -719,7 +719,7 @@ export interface ResearchActionResponse {
 
 // ---- user-defined model configurations (custom model routes) ----
 
-export type ProviderWireProtocol = 'openai' | 'anthropic' | 'gemini';
+export type ProviderWireProtocol = 'openai' | 'anthropic' | 'gemini' | 'offline';
 
 /** Preset provider template (server catalog.ts) — one-click prefill, not a whitelist. */
 export interface ProviderTemplate {

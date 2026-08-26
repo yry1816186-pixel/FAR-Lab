@@ -31,7 +31,17 @@ export const ENV_BASE_URL = 'FARLAB_UNIVERSAL_BASE_URL';
 export const ENV_MODEL = 'FARLAB_UNIVERSAL_MODEL';
 export const ENV_API_KEY = 'FARLAB_UNIVERSAL_API_KEY';
 
-const WIRES: readonly ProviderWireProtocol[] = ['openai', 'anthropic', 'gemini'];
+/** Live transport wires the universal env route accepts ('offline' is a custom-config-only wire). */
+const parseLiveWire = (raw: string): import('./http.js').WireName | null => {
+  switch (raw) {
+    case 'openai':
+    case 'anthropic':
+    case 'gemini':
+      return raw;
+    default:
+      return null;
+  }
+};
 
 export interface UniversalProviderOptions {
   /** Overrides the env chain (tests inject fakes; builtin-route UI override sits here). */
@@ -55,9 +65,7 @@ export interface UniversalProvider extends ModelProvider {
 
 export function createUniversalProvider(opts: UniversalProviderOptions = {}): UniversalProvider {
   const wireRaw = opts.wire ?? process.env[ENV_WIRE] ?? 'openai';
-  const wire = (WIRES as readonly string[]).includes(wireRaw.trim().toLowerCase())
-    ? (wireRaw.trim().toLowerCase() as ProviderWireProtocol)
-    : null;
+  const wire = parseLiveWire(wireRaw.trim().toLowerCase());
   const baseUrl = opts.baseUrl ?? process.env[ENV_BASE_URL] ?? '';
   const modelId = opts.model ?? process.env[ENV_MODEL] ?? '';
   const apiKey = opts.apiKey ?? process.env[ENV_API_KEY] ?? '';

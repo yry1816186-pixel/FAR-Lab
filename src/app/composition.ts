@@ -13,7 +13,7 @@ import { withSpendGate } from './spend-limit.js';
 import { Orchestrator } from './orchestrator.js';
 import type { StageHandler } from '../pipeline/types.js';
 import type { RunStageName } from '../domain/run.js';
-import type { ModelProvider, StructuredCallRequest, StructuredCallResult } from '../shared/ports.js';
+import type { ModelProvider, SourceAdapter, StructuredCallRequest, StructuredCallResult } from '../shared/ports.js';
 
 export interface AppOptions {
   /** Root for db + artifacts. Default: .far-run (gitignored local research state). */
@@ -24,6 +24,8 @@ export interface AppOptions {
   providerName?: string;
   /** Test-only provider injection (tests must never hit live routes). */
   providerOverride?: ModelProvider;
+  /** Test-only source-adapter injection (same rule: zero network in tests). */
+  adaptersOverride?: Partial<Record<string, SourceAdapter>>;
 }
 
 export interface App {
@@ -117,7 +119,7 @@ export const createApp = async (opts: AppOptions = {}): Promise<App> => {
       const p = resolveRunProvider(store, run);
       return p === null ? null : gated(p);
     },
-    sourceFor: (family) => sourceAdapterFor(family),
+    sourceFor: (family) => opts.adaptersOverride?.[family] ?? sourceAdapterFor(family),
     stages: stageMap,
     signals: new Map(),
     responseCache,

@@ -92,7 +92,12 @@ export function ModelRoutesSection(): JSX.Element {
   }, []);
 
   const wireLabel = (wire: ProviderWireProtocol): string =>
-    t(wire === 'openai' ? 'settings.wireOpenai' : wire === 'anthropic' ? 'settings.wireAnthropic' : 'settings.wireGemini');
+    t(
+      wire === 'openai' ? 'settings.wireOpenai'
+        : wire === 'anthropic' ? 'settings.wireAnthropic'
+          : wire === 'gemini' ? 'settings.wireGemini'
+            : 'settings.wireOffline',
+    );
 
   const startEdit = (cfg: ModelConfigSummary): void => {
     setFormError(null);
@@ -525,6 +530,7 @@ export function ModelRoutesSection(): JSX.Element {
             <option value="openai">{t('settings.wireOpenai')}</option>
             <option value="anthropic">{t('settings.wireAnthropic')}</option>
             <option value="gemini">{t('settings.wireGemini')}</option>
+            <option value="offline">{t('settings.wireOffline')}</option>
           </select>
 
           <label className="field-label" htmlFor="mcfg-baseurl">{t('settings.baseUrl')}</label>
