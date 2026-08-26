@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """S-1 技术方案文档 PDF generator (Report route, ReportLab).
-Content source of truth: submission/技术方案文档.md (v2, 2026-08-26).
+Content mirrors submission/技术方案文档.md (v2, 2026-08-26) — the case table and
+body text are embedded here for typesetting control, so edits must be applied to
+BOTH files (known mirroring cost; audit P2 accepted for a submission artifact).
 Cover: template 01 via cover_render.py, merged as page 1 via pypdf.
 Fonts: DengXian (Deng.ttf / Dengb.ttf) — host CJK TTFs, no download.
 """
@@ -157,7 +159,7 @@ CASES = [
     ('D', '与强基线同裁判对比（MLR-Bench，N=5）', 'idea 7.00 / proposal 6.20，对比 o4-mini 7.80/7.40、deepseek-r1 7.60/7.00；可行性维度 7.40 超过两个锚点；差距诚实归因，不回避。', '评测证据文件'),
     ('E', '质量门再生成（回归测试驱动真实阶段）', '真实 Orchestrator 驱动真实 generate_hypotheses 阶段，断言第二轮假设确实持久化——此前对抗审计发现再生成标志位死代码（P0），修复并用该真实阶段回归测试锁定。', '测试套件'),
     ('F', '故障注入与恢复（offline 20/20 + live）', '进程击杀→租约收养 5033–5060ms；相同 (spec, seed, env) 双跑逐字节一致；损坏检查点 fail-closed；跨进程取消→恢复续跑。', 'evidence/'),
-    ('G', '离线全程浏览器实证 + 产品结构重构（2026-08-26）', '离线路线在真实浏览器完成“预设→发起→实时观看 12 阶段（约 20 秒）→简报/比较表渲染”闭环；同日六个重构批次（简报 answer-first/假设比较表/证据绑定/研究分组/路线预警/离线旅程修复）全部经真实浏览器验收；旅程本身发现并修复三个真实缺陷。', '提交 3df63f5..c38e1f5'),
+    ('G', '离线全程浏览器实证 + 产品结构重构（2026-08-26）', '离线路线在真实浏览器完成“预设→发起→实时观看 12 阶段（约 20 秒）→简报/比较表渲染”闭环；工作区留有存活记录（run_p0xjnnyvdak1sc1v656wgh6tna，completed）；同日六个重构批次（简报 answer-first/假设比较表/证据绑定/研究分组/路线预警/离线旅程修复）全部经真实浏览器验收；旅程本身发现并修复三个真实缺陷。', '提交 3df63f5..c38e1f5'),
 ]
 case_rows = [[Paragraph('<b>案例</b>', S_TCELL_B), Paragraph('<b>验证内容</b>', S_TCELL_B), Paragraph('<b>结果</b>', S_TCELL_B), Paragraph('<b>证据</b>', S_TCELL_B)]]
 for cid, name, res, ev in CASES:
@@ -186,7 +188,7 @@ case_tbl.setStyle(TableStyle(tstyle))
 case_tbl.hAlign = 'CENTER'
 story.append(case_tbl)
 story.append(Spacer(1, 5))
-story.append(callout([Paragraph('<b>工作区累计真值（2026-08-26 读数）</b>：85 个研究运行（52 个完整完成）· 模型调用收据 2951 张 · 累计 931 万 token（三路由真实账本）· 全量确定性测试 2000+ 通过 / 195+ 测试文件 / CI 在真实 GitHub runner 上绿。', S_CARD)]))
+story.append(callout([Paragraph('<b>工作区累计真值（2026-08-26 读数）</b>：85+ 个研究运行（52 个完整完成）· 模型调用收据 2951 张 · 累计 931 万 token（三路由真实账本）· 全量确定性测试 2000+ 通过 / 195+ 测试文件 · CI 于真实 GitHub runner 验证绿（run 32983787357），其后提交本地同套门禁全绿（远端重跑受平台 runner 配给故障延迟）。', S_CARD)]))
 
 # ============ 4 ============
 story.append(KeepTogether([H1('4. 源代码'),

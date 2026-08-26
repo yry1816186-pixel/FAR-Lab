@@ -16,35 +16,43 @@ import type { RunSummary } from '../api/types';
  * key is PRESENT, not that the route is callable — a quota-exhausted default
  * still reads "引擎就绪" and the next submission dies at scope. Project the
  * honest state from recent failed runs whose lastError names the default
- * route. (Deleted failures are invisible to this pass — receipts-level
- * projection is a server-side follow-up.)
+ * route. Resolution follows the server's effective-default chain
+ * (run override > active custom config > env chain): with an ACTIVE custom
+ * config the env route is not the effective default, so a stale builtin
+ * failure must NOT fire this alert (audit P1) — custom-default failures
+ * surface through the run's own banner/resume path. (Deleted failures are
+ * invisible to this pass — receipts-level projection is a server-side
+ * follow-up.)
  */
 function useDefaultRouteDegradation(runs: RunSummary[]): { route: string; kind: 'rate_limited' | 'provider_error'; at: string } | null {
-  const [defaultRoute, setDefaultRoute] = useState<string | null>(null);
+  const [envRoute, setEnvRoute] = useState<{ name: string | null; activeCustom: boolean }>({ name: null, activeCustom: false });
   useEffect(() => {
     const controller = new AbortController();
     listModelConfigs(controller.signal)
-      .then((d) => { setDefaultRoute(d.envDefault?.name ?? null); })
+      .then((d) => { setEnvRoute({ name: d.envDefault?.name ?? null, activeCustom: d.activeModelConfigId !== null && d.activeModelConfigId !== undefined }); })
       .catch(() => { /* projection degrades to "no data" — the strip keeps its base state */ });
     return () => controller.abort();
   }, []);
   return useMemo(() => {
-    if (defaultRoute === null || defaultRoute.length === 0) return null;
+    if (envRoute.name === null || envRoute.name.length === 0) return null;
+    if (envRoute.activeCustom) return null; // effective default is the custom config, not this env route
     const cutoff = Date.now() - 24 * 3600 * 1000;
     for (const r of runs) {
       if (r.status !== 'failed' && r.status !== 'partial') continue;
       if (Date.parse(r.createdAt) < cutoff) continue;
       const err = r.lastError ?? '';
-      if (err.includes('model call failed') && err.includes(`${defaultRoute}:`)) {
+      if (err.includes('model call failed') && err.includes(`${envRoute.name}:`)) {
         return {
-          route: defaultRoute,
-          kind: err.includes('rate_limited') ? 'rate_limited' : 'provider_error',
+          route: envRoute.name,
+          // quota_exceeded (HTTP 402 class, e.g. DeepSeek insufficient balance)
+          // reads the same as rate limiting: the route is spent, not flaky.
+          kind: err.includes('rate_limited') || err.includes('quota_exceeded') ? 'rate_limited' : 'provider_error',
           at: r.createdAt,
         };
       }
     }
     return null;
-  }, [runs, defaultRoute]);
+  }, [runs, envRoute]);
 }
 
 /**

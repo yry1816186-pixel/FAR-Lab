@@ -40,6 +40,15 @@ interface FormState {
 
 const EMPTY_FORM: FormState = { id: null, label: '', wire: 'openai', baseUrl: '', modelId: '', apiKey: '', fallbackConfigIds: [], pricingIn: '', pricingOut: '', reasoningStyle: '', reasoningDefaultGear: 'medium' };
 
+/**
+ * Keyless-by-design routes: the offline dev wire, and local self-hosted
+ * endpoints (Ollama/vLLM/LM Studio presets — the catalog itself documents
+ * their keys as optional). Audit P2: the create gate once demanded a key for
+ * these too, blocking the same one-click journey class as the offline bug.
+ */
+const keylessRoute = (wire: ProviderWireProtocol, baseUrl: string): boolean =>
+  wire === 'offline' || /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(:\d+)?(\/|$)/i.test(baseUrl.trim());
+
 /** Built-in route edit form: modelId '' = follow env; pricing '' both = clear. */
 interface BuiltinFormState {
   modelId: string;
@@ -124,8 +133,9 @@ export function ModelRoutesSection(): JSX.Element {
       setFormError(t('settings.formInvalid'));
       return;
     }
-    // The offline dev wire is keyless by design — never gated on apiKey.
-    if (form.id === null && form.apiKey.length === 0 && form.wire !== 'offline') {
+    // Keyless routes (offline wire, local self-hosted endpoints) are never
+    // gated on apiKey.
+    if (form.id === null && form.apiKey.length === 0 && !keylessRoute(form.wire, form.baseUrl)) {
       setFormError(t('settings.formInvalid'));
       return;
     }
@@ -682,7 +692,7 @@ export function ModelRoutesSection(): JSX.Element {
             <button
               type="button"
               className="btn btn--small"
-                disabled={testing || form.baseUrl.trim().length === 0 || form.modelId.trim().length === 0 || (form.id === null && form.apiKey.length === 0 && form.wire !== 'offline')}
+                disabled={testing || form.baseUrl.trim().length === 0 || form.modelId.trim().length === 0 || (form.id === null && form.apiKey.length === 0 && !keylessRoute(form.wire, form.baseUrl))}
               onClick={() => {
                 void runTest({
                   ...(form.id !== null ? { configId: form.id } : {}),
