@@ -86,18 +86,17 @@ node_modules not installed in this workspace — 1 declared dependency UNAUDITED
 
 | license | packages |
 | --- | --- |
-| MIT | 424 |
+| MIT | 415 |
 | Apache-2.0 | 34 |
 | ISC | 23 |
 | BSD-3-Clause | 19 |
 | BSD-2-Clause | 11 |
-| MPL-2.0 | 3 |
 | OFL-1.1 | 3 |
 | (MIT OR CC0-1.0) | 2 |
+| MPL-2.0 | 2 |
 | (MIT AND Zlib) | 1 |
 | (MIT OR GPL-3.0-or-later) | 1 |
 | 0BSD | 1 |
-| Apache-2.0 AND LGPL-3.0-or-later | 1 |
 | BlueOak-1.0.0 | 1 |
 | BSD | 1 |
 | CC-BY-4.0 | 1 |
@@ -106,5 +105,6 @@ node_modules not installed in this workspace — 1 declared dependency UNAUDITED
 
 | package | license | disposition |
 | --- | --- | --- |
-| @img/sharp-win32-x64 | Apache-2.0 AND LGPL-3.0-or-later | ALLOWED — Apache-2.0 AND LGPL-3.0-or-later — optional platform binary of sharp (web devDependency, build-time only). Never distributed: public-release manifest prunes node_modules; end users install sharp directly from npm. No LGPL obligation attaches to FAR-Lab distributions. |
+| @img/sharp-libvips-linux-x64 | LGPL-3.0-or-later | ALLOWED — Apache-2.0 AND LGPL-3.0-or-later — Linux twin of the allowed win32 sharp binary; same build-time-only, never-distributed disposition (npm lockfiles carry ALL platforms' optionals, so CI on Linux installs this variant). |
+| @img/sharp-libvips-linuxmusl-x64 | LGPL-3.0-or-later | ALLOWED — Apache-2.0 AND LGPL-3.0-or-later — musl twin of the allowed win32 sharp binary; same build-time-only, never-distributed disposition. |
 | jszip | (MIT OR GPL-3.0-or-later) | ALLOWED — (MIT OR GPL-3.0-or-later) — dual-licensed; FAR-Lab elects the MIT alternative at install/build time. No copyleft obligation is triggered. |

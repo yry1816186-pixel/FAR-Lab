@@ -31,6 +31,14 @@ const ALLOWED_EXCEPTIONS = new Map([
     'Apache-2.0 AND LGPL-3.0-or-later — optional platform binary of sharp (web devDependency, build-time only). Never distributed: public-release manifest prunes node_modules; end users install sharp directly from npm. No LGPL obligation attaches to FAR-Lab distributions.',
   ],
   [
+    '@img/sharp-libvips-linux-x64',
+    'Apache-2.0 AND LGPL-3.0-or-later — Linux twin of the allowed win32 sharp binary; same build-time-only, never-distributed disposition (npm lockfiles carry ALL platforms\' optionals, so CI on Linux installs this variant).',
+  ],
+  [
+    '@img/sharp-libvips-linuxmusl-x64',
+    'Apache-2.0 AND LGPL-3.0-or-later — musl twin of the allowed win32 sharp binary; same build-time-only, never-distributed disposition.',
+  ],
+  [
     'jszip',
     '(MIT OR GPL-3.0-or-later) — dual-licensed; FAR-Lab elects the MIT alternative at install/build time. No copyleft obligation is triggered.',
   ],
@@ -66,6 +74,13 @@ function collect(pkgDir, name, out) {
     out.set(name, {
       version: j.version ?? '?',
       license: normalizeLicense(j.license, j.licenses),
+      // Platform-specific optional binaries (sharp/@img, @rollup/rollup-<os>,
+      // lightningcss-*, esbuild installs...) declare os/cpu constraints. They are
+      // environment artifacts of `npm ci`, not product dependencies — excluded
+      // from the distribution COUNT (which must be identical on every OS, or the
+      // committed ledger can never pass --check cross-platform). The copyleft
+      // gate still sees them.
+      platform: j.os !== undefined || j.cpu !== undefined,
     });
   } catch {
     out.set(name, { version: '?', license: 'UNREADABLE' });
@@ -120,6 +135,7 @@ function render(wsResults, copyleftHits) {
   for (const { installed } of wsResults) {
     if (!installed) continue;
     for (const info of installed.values()) {
+      if (info.platform === true) continue; // os/cpu-constrained binaries: count would differ per install platform
       dist.set(info.license, (dist.get(info.license) ?? 0) + 1);
     }
   }
