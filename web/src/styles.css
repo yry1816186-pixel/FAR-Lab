@@ -1773,6 +1773,13 @@ select option { color: var(--text); background: var(--surface); }
 }
 .summary-uncertainty .ev-glyph { flex: none; transform: translateY(2px); }
 .summary-uncertainty strong { color: var(--v2-text-1); font-weight: 600; }
+.summary-why-top {
+  margin: 0;
+  max-width: 72ch;
+  color: var(--v2-text-2);
+  overflow-wrap: anywhere;
+}
+.summary-why-top strong { color: var(--v2-text-1); font-weight: 600; }
 .brief-top3 { display: flex; flex-direction: column; gap: 4px; margin-top: var(--sp-1); }
 .brief-row {
   display: grid;

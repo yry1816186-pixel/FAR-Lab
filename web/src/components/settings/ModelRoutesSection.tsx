@@ -124,7 +124,8 @@ export function ModelRoutesSection(): JSX.Element {
       setFormError(t('settings.formInvalid'));
       return;
     }
-    if (form.id === null && form.apiKey.length === 0) {
+    // The offline dev wire is keyless by design — never gated on apiKey.
+    if (form.id === null && form.apiKey.length === 0 && form.wire !== 'offline') {
       setFormError(t('settings.formInvalid'));
       return;
     }
@@ -652,7 +653,16 @@ export function ModelRoutesSection(): JSX.Element {
                 type="button"
                 className="btn btn--small settings-preset"
                 title={[p.note, p.keyUrl].filter(Boolean).join(' · ')}
-                onClick={() => setForm({ ...form, wire: p.wire, baseUrl: p.baseUrl })}
+                onClick={() => setForm({
+                  ...form,
+                  // One-click presets are meant to BE one click: prefilled label
+                  // and (offline) model id, not a half-filled form the user must
+                  // archaeologize (2026-08-26 journey finding).
+                  label: form.label.trim().length > 0 ? form.label : p.label.replace(/\s*\(.*\)$/, '').slice(0, 60),
+                  wire: p.wire,
+                  baseUrl: p.baseUrl,
+                  ...(p.wire === 'offline' && form.modelId.trim().length === 0 ? { modelId: 'farlab-offline-deterministic' } : {}),
+                })}
               >
                 {p.label}
               </button>
@@ -672,7 +682,7 @@ export function ModelRoutesSection(): JSX.Element {
             <button
               type="button"
               className="btn btn--small"
-              disabled={testing || form.baseUrl.trim().length === 0 || form.modelId.trim().length === 0 || (form.id === null && form.apiKey.length === 0)}
+                disabled={testing || form.baseUrl.trim().length === 0 || form.modelId.trim().length === 0 || (form.id === null && form.apiKey.length === 0 && form.wire !== 'offline')}
               onClick={() => {
                 void runTest({
                   ...(form.id !== null ? { configId: form.id } : {}),

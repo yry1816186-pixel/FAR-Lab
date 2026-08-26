@@ -73,6 +73,10 @@ export function ResearchBrief({
   const topStanding = top !== undefined
     ? data.tournament?.standings.find((s) => s.hypothesisId === top.id)
     : undefined;
+  // Why #1 is #1 (revalidation P2): the scorecard's own rationale, not a
+  // re-derivation — the ranking story lives with the ranking artifact.
+  const topScorecard = top !== undefined ? data.scorecards.find((s) => s.hypothesisId === top.id) : undefined;
+  const whyTop = topScorecard?.comparisonNote?.trim() || topScorecard?.overallRationale?.trim() || undefined;
   const evidence = evidenceRes.data;
   // Same relation-based counts as the hypotheses tab cards — one computation,
   // two surfaces, zero divergence.
@@ -123,6 +127,12 @@ export function ResearchBrief({
             <p className="muted small summary-top-note">
               {top.mechanism.length > 0 && top.mechanism.length > 220 ? `${top.mechanism.slice(0, 220)}…` : top.mechanism}
             </p>
+            {whyTop !== undefined && (
+              <p className="summary-why-top" title={whyTop}>
+                <strong>{t('summary.whyTopLabel')}：</strong>
+                {whyTop.length > 200 ? `${whyTop.slice(0, 200)}…` : whyTop}
+              </p>
+            )}
             {mainUncertainty !== undefined && (
               <p className="summary-uncertainty" title={mainUncertainty}>
                 <span className="ev-glyph ev-glyph--unknown" aria-hidden="true">?</span>{' '}

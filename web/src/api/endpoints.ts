@@ -324,7 +324,11 @@ export const postFeedback = async (runId: string, input: FeedbackInput, signal?:
 const modelConfigOf = (data: unknown): ModelConfigSummary => {
   if (typeof data === 'object' && data !== null) {
     const c = data as Record<string, unknown>;
-    if (typeof c.id === 'string' && typeof c.label === 'string' && (c.wire === 'openai' || c.wire === 'anthropic')
+    // Full server wire enum (2026-08-26 drift fix): the guard once accepted only
+    // openai/anthropic, so a legitimately created gemini/offline config parsed
+    // as a schema error AFTER a successful server save.
+    if (typeof c.id === 'string' && typeof c.label === 'string'
+      && (c.wire === 'openai' || c.wire === 'anthropic' || c.wire === 'gemini' || c.wire === 'offline')
       && typeof c.baseUrl === 'string' && typeof c.modelId === 'string') {
       return {
         id: c.id,
