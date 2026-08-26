@@ -32,12 +32,32 @@ interface StageRow {
   status: 'done' | 'failed' | 'skipped' | 'running';
   at: string;
   summary?: string;
-  milestones: { key: string; detail: RunEvent['detail'] }[];
+  milestones: AggMilestone[];
 }
 
-/** Latest transition per stage wins; milestones attach to their own stage. */
+/**
+ * Milestones aggregate per stage (M1): ten "批判完成（支持 0 · 反证 0）" lines
+ * are storage truth, not reading truth — one line with the sums is. Event
+ * detail is untrusted; numbers fall back to 0 on wrong shapes.
+ */
+interface AggMilestone {
+  key: string;
+  count: number;
+  supporting: number;
+  counter: number;
+  claims: number;
+  plannedQueries: number;
+  counterQueries: number;
+}
+
+function emptyAgg(key: string): AggMilestone {
+  return { key, count: 0, supporting: 0, counter: 0, claims: 0, plannedQueries: 0, counterQueries: 0 };
+}
+
+/** Latest transition per stage wins; milestones aggregate onto their own stage. */
 function deriveTimeline(events: RunEvent[], run: ResearchRun): { stages: StageRow[]; telemetry: RunEvent[]; iterations: RunEvent[] } {
   const byStage = new Map<string, StageRow>();
+  const aggByStage = new Map<string, Map<string, AggMilestone>>();
   const milestones: RunEvent[] = [];
   const telemetry: RunEvent[] = [];
   const iterations: RunEvent[] = [];
@@ -61,12 +81,26 @@ function deriveTimeline(events: RunEvent[], run: ResearchRun): { stages: StageRo
       telemetry.push(e);
     }
   }
-  // Attach milestones to their stage by event order: the stage they arrived in.
+  // Aggregate milestones onto their stage by event order.
   for (const m of milestones) {
     const stage = m.stage;
-    const row = stage !== undefined ? byStage.get(stage) : undefined;
-    if (row !== undefined && stage !== undefined) row.milestones.push({ key: String(m.detail?.reason ?? ''), detail: m.detail });
-    else telemetry.push(m); // no owning stage yet → stay visible in trace
+    if (stage === undefined) { telemetry.push(m); continue; } // no owning stage yet → stay visible in trace
+    const reason = String(m.detail?.reason ?? '');
+    const stageAgg = aggByStage.get(stage) ?? new Map<string, AggMilestone>();
+    aggByStage.set(stage, stageAgg);
+    const agg = stageAgg.get(reason) ?? emptyAgg(reason);
+    const d = m.detail ?? {};
+    agg.count += 1;
+    if (typeof d.supportingLinks === 'number') agg.supporting += d.supportingLinks;
+    if (typeof d.counterLinks === 'number') agg.counter += d.counterLinks;
+    if (typeof d.claims === 'number') agg.claims += d.claims;
+    if (typeof d.plannedQueries === 'number') agg.plannedQueries += d.plannedQueries;
+    if (typeof d.counterQueries === 'number') agg.counterQueries += d.counterQueries;
+    stageAgg.set(reason, agg);
+  }
+  for (const [stage, agg] of aggByStage) {
+    const row = byStage.get(stage);
+    if (row !== undefined) row.milestones = [...agg.values()];
   }
   const active = run.status === 'running' || run.status === 'queued';
   if (active) {
@@ -113,20 +147,14 @@ export function ActivityFeed({ run, events }: { run: ResearchRun; events: RunEve
     return t('iter.stopped', { label });
   };
 
-  const milestoneText = (key: string, detail: RunEvent['detail']): { text: string; extra?: string } => {
-    const d = detail ?? {};
-    if (key === 'hypothesis_critiqued') {
-      const sup = typeof d.supportingLinks === 'number' ? d.supportingLinks : 0;
-      const ctr = typeof d.counterLinks === 'number' ? d.counterLinks : 0;
-      return { text: t('activity.mHypothesis', { supporting: sup, counter: ctr }) };
+  const milestoneText = (m: AggMilestone): string => {
+    if (m.key === 'hypothesis_critiqued') {
+      return t('activity.mHypothesesAgg', { n: m.count, supporting: m.supporting, counter: m.counter });
     }
-    if (key === 'document_extracted') {
-      const claims = typeof d.claims === 'number' ? d.claims : 0;
-      return { text: t('activity.mDocument', { n: claims }), extra: typeof d.sourceTitle === 'string' ? d.sourceTitle : undefined };
+    if (m.key === 'document_extracted') {
+      return t('activity.mDocumentsAgg', { sources: m.count, claims: m.claims });
     }
-    const planned = typeof d.plannedQueries === 'number' ? d.plannedQueries : 0;
-    const counter = typeof d.counterQueries === 'number' ? d.counterQueries : 0;
-    return { text: t('activity.mQueryPlan', { n: planned, c: counter }) };
+    return t('activity.mQueryPlan', { n: m.plannedQueries, c: m.counterQueries });
   };
 
   return (
@@ -156,17 +184,14 @@ export function ActivityFeed({ run, events }: { run: ResearchRun; events: RunEve
                 <p className="tl-stage-desc muted small">{t(`activity.stageDesc.${row.stage}` as DictKey)}</p>
                 {row.summary !== undefined && row.summary.length > 0 && (
                   <p className="tl-stage-summary small" title={row.summary}>
-                    {row.summary.length > 140 ? `${row.summary.slice(0, 140)}…` : row.summary}
+                    {row.summary.length > 90 ? `${row.summary.slice(0, 90)}…` : row.summary}
                   </p>
                 )}
-                {row.milestones.map((m, i) => {
-                  const { text } = milestoneText(m.key, m.detail);
-                  return (
-                    <p key={i} className="tl-milestone small">
-                      <ChevronRight size={12} aria-hidden="true" /> {text}
-                    </p>
-                  );
-                })}
+                {row.milestones.map((m, i) => (
+                  <p key={i} className="tl-milestone small">
+                    <ChevronRight size={12} aria-hidden="true" /> {milestoneText(m)}
+                  </p>
+                ))}
               </div>
             </li>
           ))}

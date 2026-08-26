@@ -12,12 +12,19 @@ import { StageTimeline } from './StageTimeline';
 import { RunControls } from './RunControls';
 import { RunStatusBanner } from './RunStatusBanner';
 import { ActivityFeed } from './ActivityFeed';
-import { ResearchSummary } from './ResearchSummary';
+import { ResearchBrief } from './ResearchBrief';
 import type { FeedbackTarget } from './FeedbackForm';
 import { stageKey, goalTypeKey } from '../../i18n/keys';
 import type { EventsState } from '../RunDetail';
 import type { TabId } from '../RunDetail';
 
+/**
+ * Research tab (M1 reconstruction): answer-first for settled studies — the
+ * brief leads, process (stage narrative + timing) folds away behind one
+ * disclosure, scope and controls follow. While the study runs the live
+ * activity feed stays the main character (watching is the task then), with
+ * the timing detail one disclosure deeper.
+ */
 export function OverviewTab({
   run,
   events,
@@ -29,11 +36,12 @@ export function OverviewTab({
   events: EventsState;
   onMutated: () => void;
   onFeedback: (target?: FeedbackTarget) => void;
-  /** Section navigation for the landing summary's deep links. */
+  /** Section navigation for the brief's deep links. */
   onNavigate: (tab: TabId) => void;
 }): JSX.Element {
   const { t } = useI18n();
   const refreshKey = `${run.updatedAt}:${run.status}`;
+  const running = run.status === 'running' || run.status === 'queued';
 
   const questionFetcher = useCallback((signal: AbortSignal) => getQuestion(run.id, signal), [run.id]);
   const questionRes = useResource(questionFetcher, [run.id], refreshKey);
@@ -48,16 +56,12 @@ export function OverviewTab({
   return (
     <>
       <RunStatusBanner run={run} onMutated={onMutated} />
-      {/* Landing answer: for a settled study, "what came of it" leads —
-          leading hypothesis, standing with uncertainty, corpus counts. */}
-      <ResearchSummary
-        run={run}
-        onOpenHypotheses={() => onNavigate('hypotheses')}
-        onOpenEvidence={() => onNavigate('evidence')}
-      />
-      <Section title={t('activity.title')} count={<span className="muted small">{t('activity.liveHint')}</span>}>
-        <ActivityFeed run={run} events={events.events} />
-      </Section>
+      <ResearchBrief run={run} onNavigate={onNavigate} onFeedback={onFeedback} />
+      {running && (
+        <Section title={t('activity.title')} count={<span className="muted small">{t('activity.liveHint')}</span>}>
+          <ActivityFeed run={run} events={events.events} />
+        </Section>
+      )}
       {/* Operational alerts stay visible; the raw metadata block (ids,
           timestamps, tags, lease internals) is a collapsed disclosure (B1
           F-09: stage/progress already live in the banner + timeline). */}
@@ -79,6 +83,38 @@ export function OverviewTab({
           )}
         </div>
       )}
+
+      <Section title={t('overview.question')}>
+        {questionRes.loading ? (
+          <Skeleton lines={4} />
+        ) : questionRes.error !== null && isNotFound(questionRes.error) ? (
+          <EmptyState titleKey="overview.noQuestion" hint={t('overview.noQuestionHint', { stage: t(stageKey(run.currentStage)) })} />
+        ) : questionRes.error !== null ? (
+          <ErrorBox error={questionRes.error} onRetry={questionRes.retry} />
+        ) : questionRes.data !== null ? (
+          <QuestionScope question={questionRes.data} />
+        ) : null}
+      </Section>
+
+      {/* Process demotion (M1): the stage narrative and timing are audit-grade
+          record, not the researcher's reading surface. One disclosure keeps
+          them reachable; the count in the summary sets expectations. */}
+      {!running && (
+        <details className="tech-details process-disclosure">
+          <summary>{t('overview.processDisclosure', { n: run.stages.length })}</summary>
+          <div className="process-disclosure-body">
+            <ActivityFeed run={run} events={events.events} />
+            <StageTimeline run={run} />
+          </div>
+        </details>
+      )}
+      {running && (
+        <details className="tech-details process-disclosure">
+          <summary>{t('overview.timingDisclosure')}</summary>
+          <StageTimeline run={run} />
+        </details>
+      )}
+
       <details className="tech-details">
         <summary>{t('overview.techTitle')}</summary>
         <FieldList
@@ -107,21 +143,6 @@ export function OverviewTab({
         />
       </details>
 
-      <Section title={t('overview.question')}>
-        {questionRes.loading ? (
-          <Skeleton lines={4} />
-        ) : questionRes.error !== null && isNotFound(questionRes.error) ? (
-          <EmptyState titleKey="overview.noQuestion" hint={t('overview.noQuestionHint', { stage: t(stageKey(run.currentStage)) })} />
-        ) : questionRes.error !== null ? (
-          <ErrorBox error={questionRes.error} onRetry={questionRes.retry} />
-        ) : questionRes.data !== null ? (
-          <QuestionScope question={questionRes.data} />
-        ) : null}
-      </Section>
-
-      <Section title={t('overview.timeline')}>
-        <StageTimeline run={run} />
-      </Section>
       <Section title={t('overview.controls')}>
         <RunControls run={run} hasFeedback={hasFeedback} hasEvidenceDebt={run.hasEvidenceDebt} onMutated={onMutated} />
         <div className="feedback-block">

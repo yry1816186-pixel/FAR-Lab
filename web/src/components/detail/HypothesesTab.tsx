@@ -9,6 +9,7 @@ import { EmptyState, ErrorBox, Section, Skeleton } from '../common';
 import { buildHypothesisBalances } from '../../viz/compare-viz';
 import { HypothesisCard } from './HypothesisCard';
 import type { HypothesisCardOps } from './HypothesisCard';
+import { HypothesesTable } from './HypothesesTable';
 import { ScorecardsTable } from './ScorecardsTable';
 import { CompareView } from './CompareView';
 import { ResearchActions } from './ResearchActions';
@@ -173,6 +174,21 @@ export function HypothesesTab({
               />
             </Section>
           )}
+
+          {/* M1: the comparison table is the scan surface — one screen answers
+              "which hypothesis stands where" before any card is read. Cards
+              below remain the deep-reading surface; counts share one
+              computation (buildHypothesisBalances) with the cards. */}
+          <Section title={t('hypTable.title')} count={<span className="muted small">{t('hypTable.hint')}</span>}>
+            <HypothesesTable
+              hypotheses={data.hypotheses}
+              scorecards={data.scorecards}
+              tournament={data.tournament}
+              balances={buildHypothesisBalances(data.evidenceBodies, evidenceRes.data?.relations)}
+              compareIds={compareIds}
+              onToggleCompare={toggleCompare}
+            />
+          </Section>
 
           {/* HX4: hypotheses ARE the page — the card flow leads, one count line
               reconciles 生成 vs 排名 (cluster representatives), and every ranking
