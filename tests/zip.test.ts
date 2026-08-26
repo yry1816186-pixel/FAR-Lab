@@ -1,19 +1,20 @@
 import { describe, it, expect } from 'vitest';
-import { inflateRawSync } from 'node:zlib';
+import { crc32 as zlibCrc32, inflateRawSync } from 'node:zlib';
 import { buildZip, readZipEntries, type ZipEntry } from '../src/server/zip.js';
-import { crc32 } from '../src/server/zip.js';
 
 /**
- * CPS-7 minimal ZIP writer: verification is INDEPENDENT of the writer's own
- * logic path — every entry is re-inflated through node:zlib (the compression
- * authority) and re-CRC'd from scratch; multi-byte UTF-8 names and mixed
- * compressibility are exercised.
+ * CPS-7 minimal ZIP writer. Verification is INDEPENDENT of the writer's own
+ * logic on BOTH axes (audit P1-2 hardening): bytes are re-inflated through
+ * node:zlib, and every header CRC-32 is asserted against zlib.crc32 — Node's
+ * C++ implementation, not this module's table. (The earlier revision compared
+ * the header CRC against the writer's own crc32() — a circular assertion that
+ * hid a real index-masking bug rejected by bsdtar.)
  */
 
 const entry = (name: string, content: string | Buffer): ZipEntry => ({ name, content: typeof content === 'string' ? Buffer.from(content, 'utf8') : content });
 
 describe('buildZip — minimal deterministic ZIP writer', () => {
-  it('round-trips entries through zlib.inflateRawSync with matching CRC-32 (independent path)', () => {
+  it('round-trips entries with zlib-verified bytes AND zlib.crc32-verified headers (independent paths)', () => {
     const long = 'FAR-Lab reproducibility package\n'.repeat(500); // compressible
     const random = Buffer.from(Array.from({ length: 2048 }, (_, i) => (i * 31 + 7) % 256)); // poorly compressible
     const entries = [
@@ -33,12 +34,19 @@ describe('buildZip — minimal deterministic ZIP writer', () => {
       const p = parsed[i]!;
       const original = entries[i]!.content;
       const restored = p.method === 8 ? inflateRawSync(p.raw) : p.raw;
-      // independent verification: bytes identical AND CRC recomputed from the
-      // restored content equals the header's CRC
+      // independent verification #1: bytes identical after zlib re-inflate
       expect(restored.equals(original), `entry ${p.name}`).toBe(true);
       expect(p.size).toBe(original.length);
-      expect(p.crc).toBe(crc32(original));
+      // independent verification #2: header CRC equals Node's own crc32
+      expect(p.crc, `entry ${p.name}`).toBe(zlibCrc32(original));
     }
+  });
+
+  it('known-answer CRC vector (protocol-standard test string)', () => {
+    // canonical CRC-32 test vector: "123456789" -> 0xCBF43926
+    const zip = buildZip([entry('vec.txt', '123456789')]);
+    const [parsed] = readZipEntries(zip);
+    expect(parsed!.crc).toBe(0xcbf43926);
   });
 
   it('is deterministic: identical inputs produce byte-identical archives', () => {

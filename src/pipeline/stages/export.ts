@@ -672,8 +672,10 @@ export const exportStage: StageHandler = {
         .listEvents(run.id)
         .filter((e) => (e.detail as { reason?: string })?.reason === 'memory_conditioning')
         .map((e) => {
-          const d = e.detail as { stage?: string; items?: Array<{ id: string; kind: string; trustClass: string }> };
-          return { stage: d.stage ?? 'unknown', items: Array.isArray(d.items) ? d.items : [] };
+          // stage lives on the event ENVELOPE (appendEvent puts it there); detail
+          // carries {ids, items} — reading detail.stage would render "unknown".
+          const d = e.detail as { items?: Array<{ id: string; kind: string; trustClass: string }> };
+          return { stage: e.stage ?? 'unknown', items: Array.isArray(d.items) ? d.items : [] };
         })
         .filter((m) => m.items.length > 0),
       experimentRuns: ctx.store.listObjects('experiment_run', run.id),

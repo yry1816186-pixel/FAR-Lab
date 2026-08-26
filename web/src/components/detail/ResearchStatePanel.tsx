@@ -111,9 +111,17 @@ export function useResearchState(runId: string | undefined): {
 }
 
 const severityKey = (s: SupervisorSignal['severity']): DictKey => `rsp.severity.${s}` as DictKey;
-const evalKey = (id: string): DictKey => `rsp.eval.${id}` as DictKey;
 const signalKindKey = (k: string): DictKey => `rsp.sig.${k}` as DictKey;
 const actionKey = (a: string): DictKey => `rsp.action.${a}` as DictKey;
+/** Known evaluator-family ids -> dict keys; an UNKNOWN id renders the raw id
+ *  (a new backend evaluator must never leak a raw key string to users). */
+const EVAL_KEYS = new Map<string, DictKey>([
+  ['evidence_balance', 'rsp.eval.evidence_balance'],
+  ['falsifiability', 'rsp.eval.falsifiability'],
+  ['hypothesis_diversity', 'rsp.eval.hypothesis_diversity'],
+  ['provenance_completeness', 'rsp.eval.provenance_completeness'],
+  ['uncertainty_transparency', 'rsp.eval.uncertainty_transparency'],
+]);
 
 const STATUS_MARK: Record<EvaluationItem['status'], string> = { pass: '✓', warn: '!', fail: '✗' };
 
@@ -224,7 +232,7 @@ export function ResearchStatePanel({ runId, runStatus }: { runId: string; runSta
             {evaluations.evaluations.map((e) => (
               <li key={e.id} title={e.detail}>
                 <span className={`rs-mark rs-${e.status}`}>{STATUS_MARK[e.status]}</span>
-                {' '}{t(evalKey(e.id))}
+                {' '}{EVAL_KEYS.get(e.id) !== undefined ? t(EVAL_KEYS.get(e.id)!) : e.id}
                 <span className="muted"> {e.detail}</span>
               </li>
             ))}

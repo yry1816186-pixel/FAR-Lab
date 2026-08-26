@@ -1376,7 +1376,7 @@ describe('GET /api/v1/runs/:id/package (CPS-7 full-package download)', () => {
     expect(zip.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 0x03, 0x04]))).toBe(true);
 
     const { readZipEntries } = await import('../src/server/zip.js');
-    const { inflateRawSync } = await import('node:zlib');
+    const { crc32: zlibCrc32, inflateRawSync } = await import('node:zlib');
     const entries = readZipEntries(zip);
     const names = entries.map((e) => e.name);
     expect(names).toContain('report.md');
@@ -1385,6 +1385,8 @@ describe('GET /api/v1/runs/:id/package (CPS-7 full-package download)', () => {
     const report = entries.find((e) => e.name === 'report.md')!;
     const restored = report.method === 8 ? inflateRawSync(report.raw) : report.raw;
     expect(restored.toString('utf8')).toBe(REPORT_MD);
+    // header CRC verified against Node's own crc32 (independent of the writer)
+    expect(report.crc).toBe(zlibCrc32(Buffer.from(REPORT_MD, 'utf8')));
   });
 
   it('404s honestly for runs without a bundle and unknown runs', async () => {
