@@ -9,7 +9,7 @@ is updated by lane 15 at governance milestones.
 | ID | Blocker | Owner | Needed action | State |
 | --- | --- | --- | --- | --- |
 | B-QWEN-LIVE-ROUTE | ACC-02 (target live_verified, at tested): competition-mandated Qwen-via-Bailian live route with receipts does not exist; original DeepSeek live evidence superseded (DeepSeek banned in project) | user (credential) + lane 11 (route) | user provides Bailian/DashScope credential; one real-route run with provider/model/request receipts captured (调用凭证/截图) | OPEN — external; no fabrication allowed; live-API policy forbids spending any key "to feel sure" |
-| S-1 | 技术方案文档 PDF (≤20 pages, adjudicated 2026-08-25) not yet written | lane 15 drafts, user approves | author from COMPLIANCE_MAP §C/§D; user final review + print | OPEN — writing starts only against real capability evidence; no future-tense capability claims |
+| S-1 | 技术方案文档 PDF (≤20 pages, adjudicated 2026-08-25) | lane 15 drafts, user approves | user final review + print | DRAFTED — v2 (2026-08-26) rendered to submission/技术方案文档.pdf (5 pages, fonts clean, all claims evidence-backed incl. 2026-08-26 restructure + offline journey); awaiting user review; content frozen until B-QWEN lands (one line to update) |
 | ACC-40 | Lineage storage evidence below target (implemented < tested) | sibling lane (lineage projection rebase) | land the lineage projection rebase and raise evidence to `tested` | OPEN — outside lane 15 write ownership; tracked here for release gating |
 
 ## User-owned submission actions (not engineering blockers; deadline 2026-09-05)
