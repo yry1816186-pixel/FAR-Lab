@@ -117,8 +117,18 @@ export function App(): JSX.Element {
 
   // Keep the selection honest: if the selected run vanished from a FRESH list
   // (deleted via the run-lifecycle DELETE /runs/:id), fall back to the home.
+  // Grace window (B1 P0, direct-launch variant): a run just created via
+  // #lab/new exists server-side (createRun returned its id) but is absent
+  // from the LAST poll snapshot — the guard must not kill that selection
+  // before the next list refresh confirms it. Two poll cycles is enough;
+  // after that a genuinely vanished run deselects as before.
+  const selectedAtRef = useRef(0);
+  useEffect(() => { if (selectedRunId !== null) selectedAtRef.current = Date.now(); }, [selectedRunId]);
   useEffect(() => {
-    if (selectedRunId !== null && !runsLoading && runs.length > 0 && !runs.some((r) => r.id === selectedRunId)) {
+    if (
+      selectedRunId !== null && !runsLoading && runs.length > 0 && !runs.some((r) => r.id === selectedRunId)
+      && Date.now() - selectedAtRef.current > 2 * RUNS_POLL_MS
+    ) {
       setSelectedRunId(null);
       setStudyView(false);
     }

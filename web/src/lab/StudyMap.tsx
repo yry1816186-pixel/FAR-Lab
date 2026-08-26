@@ -68,7 +68,11 @@ export function StudyMap({
       .catch(() => { setHyps([]); setRanks(new Map()); });
   }, []);
 
-  useEffect(() => { setInsp(null); setLoadError(null); loadScience(run.id); }, [run.id, loadScience]);
+  // Reload science objects on run switch AND on lifecycle transitions
+  // (running -> completed/partial): the live band disappears exactly when the
+  // final evidence/hypotheses land — without this the map keeps the last
+  // (possibly empty) snapshot from mid-run.
+  useEffect(() => { setInsp(null); setLoadError(null); loadScience(run.id); }, [run.id, run.status, loadScience]);
 
   // Palette claim-hit deep focus: once this run's claims arrive, open the
   // inspector on the targeted claim (consumed once).
