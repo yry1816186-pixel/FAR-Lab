@@ -1687,6 +1687,39 @@ select option { color: var(--text); background: var(--surface); }
 .runs-more { display: block; text-align: center; padding: var(--sp-1) 0; }
 .run-item .mono { font-size: var(--fs-data); }
 
+/* ---------- study groups (M2 workspace model: one question = one study) ---------- */
+.study-group { display: flex; flex-direction: column; gap: var(--sp-1); }
+.study-toggle { width: 100%; }
+.study-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+.study-question {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  text-align: left;
+  line-height: 1.35;
+}
+.study-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.study-chip {
+  font-size: var(--fs-aux);
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: var(--radius-s);
+}
+.study-chip--warn {
+  color: var(--v2-caution-on-tint);
+  background: var(--v2-caution-tint);
+}
+.run-item--in-study { padding-left: var(--sp-3); }
+
 /* ---------- research summary (landing answer for settled studies) ---------- */
 .research-summary .section-body { display: flex; flex-direction: column; gap: var(--sp-2); }
 .summary-top-statement {

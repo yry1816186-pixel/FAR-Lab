@@ -34,6 +34,7 @@ export function RunListItem({
   selected,
   onSelect,
   sourceConv,
+  hideQuestion = false,
 }: {
   run: RunSummary;
   selected: boolean;
@@ -41,6 +42,9 @@ export function RunListItem({
   /** Where this study came from (the conversation that launched it) — the
    *  unified-timeline link: records are findable from BOTH sides. */
   sourceConv?: { title: string; open: () => void };
+  /** Study groups (M2): the group header already carries the question — the
+   *  row then reads as a run OF that study (status/stage/time), not a repeat. */
+  hideQuestion?: boolean;
 }): JSX.Element {
   const { t } = useI18n();
   const active = run.status === 'running' || run.status === 'queued';
@@ -48,17 +52,19 @@ export function RunListItem({
     <li>
       <button
         type="button"
-        className={`run-item${selected ? ' run-item--selected' : ''}${active ? ' run-item--active' : ''}`}
+        className={`run-item${selected ? ' run-item--selected' : ''}${active ? ' run-item--active' : ''}${hideQuestion ? ' run-item--in-study' : ''}`}
         onClick={() => onSelect(run.id)}
         aria-current={selected ? 'true' : undefined}
         // Machine id is metadata (B1 F-09): available on hover and in the
         // detail page, never a primary identity line in the list.
         title={`${runLabel(run)} · ${run.id}`}
       >
-        <span className="run-item-top">
-          <span className="run-item-question" title={runLabel(run)}>{runLabel(run)}</span>
-          <Badge tone={runStatusTone(run.status)}>{t(runStatusKey(run.status))}</Badge>
-        </span>
+        {!hideQuestion && (
+          <span className="run-item-top">
+            <span className="run-item-question" title={runLabel(run)}>{runLabel(run)}</span>
+            <Badge tone={runStatusTone(run.status)}>{t(runStatusKey(run.status))}</Badge>
+          </span>
+        )}
         {/* Two-line rhythm (product rebuild): what a researcher needs at a glance.
             Active studies pulse with their live stage; settled studies show
             domain + time; failures carry their category forward. */}
@@ -73,6 +79,7 @@ export function RunListItem({
             </>
           ) : (
             <>
+              {hideQuestion && <Badge tone={runStatusTone(run.status)}>{t(runStatusKey(run.status))}</Badge>}
               {run.domain !== undefined && run.domain.length > 0 && (
                 <span className="run-item-domain" title={t('runs.domain')}>{run.domain}</span>
               )}
@@ -80,7 +87,7 @@ export function RunListItem({
             </>
           )}
         </span>
-        {sourceConv !== undefined && (
+        {sourceConv !== undefined && !hideQuestion && (
           <span className="run-item-source">
             {/* span, not button: the parent entry is a <button>; nested buttons are invalid HTML. */}
             <span
@@ -105,18 +112,6 @@ export function RunListItem({
   );
 }
 
-/** Status groups (P-IA: the sidebar reads as tasks-at-a-glance, not a flat feed).
- *  The last entry is a true fallback: it only receives statuses no named group claimed. */
-const NAMED_GROUPS: { key: 'runs.groupActive' | 'runs.groupAttention' | 'runs.groupDone'; match: (s: string) => boolean }[] = [
-  { key: 'runs.groupActive', match: (s) => s === 'running' || s === 'queued' },
-  { key: 'runs.groupAttention', match: (s) => s === 'partial' || s === 'failed' || s === 'cancelled' },
-  { key: 'runs.groupDone', match: (s) => s === 'completed' },
-];
-const GROUP_ORDER: { key: 'runs.groupActive' | 'runs.groupAttention' | 'runs.groupDone' | 'runs.groupOther'; match: (s: string) => boolean }[] = [
-  ...NAMED_GROUPS,
-  { key: 'runs.groupOther', match: (s) => !NAMED_GROUPS.some((g) => g.match(s)) },
-];
-
 /** Sidebar task filter (P-PRO): match on question text first, then id/status/stage labels. */
 function matchesQuery(run: RunSummary, q: string, t: (k: DictKey) => string): boolean {
   if (q.length === 0) return true;
@@ -132,6 +127,57 @@ function matchesQuery(run: RunSummary, q: string, t: (k: DictKey) => string): bo
 
 /** Library section: show the most recent studies by default, expand on demand. */
 const LIBRARY_PREVIEW = 12;
+
+/**
+ * Study identity (M2 workspace model): runs that asked the same question are
+ * one study — the researcher's mental object, not a status bucket. Normalized
+ * question text is the key (id fallback keeps unlabelled runs singletons).
+ */
+function studyKey(run: RunSummary): string {
+  const q = run.questionText?.trim().toLowerCase().replace(/\s+/g, ' ');
+  return q !== undefined && q.length > 0 ? q : run.id;
+}
+
+interface StudyGroup {
+  key: string;
+  question: string;
+  runs: RunSummary[]; // newest first
+  latest: RunSummary;
+  activeCount: number;
+  failedCount: number;
+}
+
+function groupStudies(filtered: RunSummary[]): StudyGroup[] {
+  const byStudy = new Map<string, StudyGroup>();
+  for (const run of filtered) {
+    const key = studyKey(run);
+    const group = byStudy.get(key);
+    if (group === undefined) {
+      byStudy.set(key, {
+        key,
+        question: runLabel(run),
+        runs: [run],
+        latest: run,
+        activeCount: run.status === 'running' || run.status === 'queued' ? 1 : 0,
+        failedCount: run.status === 'partial' || run.status === 'failed' || run.status === 'cancelled' ? 1 : 0,
+      });
+    } else {
+      group.runs.push(run);
+      if (run.status === 'running' || run.status === 'queued') group.activeCount += 1;
+      if (run.status === 'partial' || run.status === 'failed' || run.status === 'cancelled') group.failedCount += 1;
+      if (Date.parse(run.createdAt) > Date.parse(group.latest.createdAt)) group.latest = run;
+    }
+  }
+  const groups = [...byStudy.values()];
+  for (const g of groups) g.runs.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+  groups.sort((a, b) => {
+    // Live studies float to the top regardless of recency — the researcher's
+    // running work outranks everything else in the library.
+    if (a.activeCount !== b.activeCount) return b.activeCount - a.activeCount;
+    return Date.parse(b.latest.createdAt) - Date.parse(a.latest.createdAt);
+  });
+  return groups;
+}
 
 export function RunsList({
   runs,
@@ -161,11 +207,10 @@ export function RunsList({
     if (onQueryChange !== undefined) onQueryChange(q);
     else setInnerQuery(q);
   };
-  // B1 F-09: the "needs attention" wall (historical ops/probe runs) is collapsed
-  // by default — it stays reachable and countable, but no longer shouts over
-  // the researcher's active work. Selection or filtering re-expands a group.
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({ 'runs.groupAttention': true });
-  const [libraryExpanded, setLibraryExpanded] = useState(false);
+  // Studies collapse by default (the library is a question-first index, M2):
+  // a selection, a live run, or an active filter expands the relevant study.
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [showAll, setShowAll] = useState(false);
   const filtered = useMemo(
     () => runs.filter((r) => matchesQuery(r, effectiveQuery, t)),
     [runs, effectiveQuery, t],
@@ -187,16 +232,22 @@ export function RunsList({
       </p>
     );
   }
-  const grouped = GROUP_ORDER.map((g) => ({ ...g, items: filtered.filter((r) => g.match(r.status)) })).filter(
-    (g) => g.items.length > 0,
-  );
-  const isCollapsed = (key: string, items: RunSummary[]): boolean => {
-    if (effectiveQuery.length > 0) return false; // filtering: show everything that matches
-    if (selectedId !== null && items.some((r) => r.id === selectedId)) return false; // never hide the selection
-    return collapsed[key] === true;
+  const groups = groupStudies(filtered);
+  const isExpanded = (g: StudyGroup): boolean => {
+    if (effectiveQuery.length > 0) return true; // filtering: show everything that matched
+    if (selectedId !== null && g.runs.some((r) => r.id === selectedId)) return true; // never hide the selection
+    if (g.activeCount > 0) return true; // live work stays visible
+    return expanded[g.key] === true;
   };
+  // Library preview applies to collapsed studies: the newest LIBRARY_PREVIEW
+  // studies show; the rest wait behind the show-all toggle (a selection deep
+  // inside the library widens it, mirroring the old group guard).
+  const selGroupIdx = selectedId !== null ? groups.findIndex((g) => g.runs.some((r) => r.id === selectedId)) : -1;
+  const widened = selGroupIdx >= LIBRARY_PREVIEW;
+  const visibleGroups = showAll || widened ? groups : groups.slice(0, LIBRARY_PREVIEW);
+  const hiddenStudies = groups.length - visibleGroups.length;
   return (
-    <nav className="runs-groups" aria-label={t('runs.title')}>
+    <nav className="runs-groups study-groups" aria-label={t('runs.title')}>
       <input
         ref={filterRef}
         type="text"
@@ -209,56 +260,58 @@ export function RunsList({
       {effectiveQuery.length > 0 && filtered.length === 0 && (
         <p className="sidebar-empty">{t('runs.filterEmpty')}</p>
       )}
-      {grouped.map((g) => {
-        const open = !isCollapsed(g.key, g.items);
-        const isLibrary = g.key === 'runs.groupDone';
-        // A selection beyond the preview window must stay visible (deep link,
-        // palette navigation, or 12+ newer studies landing while one is open) —
-        // widen to the full library in that case, mirroring the group guard.
-        const selIdx = selectedId !== null ? g.items.findIndex((r) => r.id === selectedId) : -1;
-        const previewing = isLibrary && !libraryExpanded && effectiveQuery.length === 0 && selIdx >= LIBRARY_PREVIEW;
-        const visible = isLibrary && !libraryExpanded && effectiveQuery.length === 0 && !previewing
-          ? g.items.slice(0, LIBRARY_PREVIEW)
-          : g.items;
-        const hiddenCount = g.items.length - visible.length;
+      {visibleGroups.map((g) => {
+        const open = isExpanded(g);
         return (
-        <section key={g.key} className="runs-group">
+        <section key={g.key} className="study-group">
           {/* Valid heading pattern (B2-critique F-01): the button lives INSIDE
               the h3 — interactive content must not contain flow content. */}
           <h3 className="runs-group-title">
             <button
               type="button"
-              className="runs-group-toggle"
+              className="runs-group-toggle study-toggle"
               aria-expanded={open}
-              onClick={() => setCollapsed((prev) => ({ ...prev, [g.key]: open }))}
+              onClick={() => setExpanded((prev) => ({ ...prev, [g.key]: !open }))}
+              title={g.question}
             >
-              {/* The attention group says what it IS in one human phrase with the
-                  count (plan §2: no bare counters); other groups stay label + count. */}
-              <span>
-                {g.key === 'runs.groupAttention'
-                  ? t(g.key, { n: g.items.length })
-                  : <>{t(g.key)} <span className="muted small">{g.items.length}</span></>}
+              <span className="study-head">
+                <span className="study-question">{g.question}</span>
+                <span className="study-meta">
+                  <Badge tone={runStatusTone(g.latest.status)}>{t(runStatusKey(g.latest.status))}</Badge>
+                  {g.runs.length > 1 && <span className="muted small">{t('runs.studyRuns', { n: g.runs.length })}</span>}
+                  {g.activeCount > 0 && <span className="run-item-live" aria-hidden="true" />}
+                  {g.failedCount > 0 && (
+                    <span className="study-chip study-chip--warn" title={t('runs.studyFailedHint', { n: g.failedCount })}>
+                      {t('runs.studyFailedChip', { n: g.failedCount })}
+                    </span>
+                  )}
+                </span>
               </span>
               <span className="runs-group-caret muted" aria-hidden="true">{open ? '▾' : '▸'}</span>
             </button>
           </h3>
           {open && (
-            <>
             <ul className="runs-list">
-              {visible.map((run) => (
-                <RunListItem key={run.id} run={run} selected={run.id === selectedId} onSelect={onSelect} sourceConv={sourceByRunId?.get(run.id)} />
+              {g.runs.map((run) => (
+                <RunListItem
+                  key={run.id}
+                  run={run}
+                  selected={run.id === selectedId}
+                  onSelect={onSelect}
+                  sourceConv={sourceByRunId?.get(run.id)}
+                  hideQuestion
+                />
               ))}
             </ul>
-            {hiddenCount > 0 && (
-              <button type="button" className="runs-more link-button small" onClick={() => setLibraryExpanded(true)}>
-                {t('runs.showAll', { n: hiddenCount })}
-              </button>
-            )}
-            </>
           )}
         </section>
         );
       })}
+      {hiddenStudies > 0 && (
+        <button type="button" className="runs-more link-button small" onClick={() => setShowAll(true)}>
+          {t('runs.showAllStudies', { n: hiddenStudies })}
+        </button>
+      )}
     </nav>
   );
 }
