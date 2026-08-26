@@ -4,6 +4,7 @@ import { isNotFound } from '../../api/client';
 import { counterSearch, getCorpus, getEvidence, getHypotheses, getReceipts, getSources } from '../../api/endpoints';
 import type { CounterSearchOutcome } from '../../api/endpoints';
 import type { CorpusQueryInfo, CorpusSnapshotInfo, EvidenceRelation, EvidenceRelationType, ProvenanceReceipt, ResearchRun, ScientificClaim, SourceDocument } from '../../api/types';
+import { RELATION_POLARITY } from '../../api/types';
 import { useResource } from '../../hooks/useResource';
 import { useI18n } from '../../i18n/LanguageContext';
 import { Badge, EmptyState, ErrorBox, IdText, Section, Skeleton } from '../common';
@@ -32,8 +33,9 @@ export function EvidenceTab({
 }: {
   run: ResearchRun;
   onFeedback: (target?: { kind: string; id: string; label?: string; content?: string }) => void;
-  /** B7 graph navigation: jump to the hypotheses tab. */
-  onOpenHypotheses?: () => void;
+  /** B7/R3 graph + binding-chip navigation: jump to the hypotheses tab,
+   *  optionally revealing one specific hypothesis card. */
+  onOpenHypotheses?: (hypId?: string) => void;
 }): JSX.Element {
   const { t } = useI18n();
   const refreshKey = `${run.updatedAt}:${run.status}`;
@@ -366,7 +368,7 @@ function ClaimsList({ claims, relations, runId, onFeedback, onOpenHypotheses }: 
   relations: EvidenceRelation[];
   runId: string;
   onFeedback: (target?: { kind: string; id: string; label?: string; content?: string }) => void;
-  onOpenHypotheses?: () => void;
+  onOpenHypotheses?: (hypId?: string) => void;
 }): JSX.Element {
   const { t } = useI18n();
   const [filter, setFilter] = useState('');
@@ -382,7 +384,7 @@ function ClaimsList({ claims, relations, runId, onFeedback, onOpenHypotheses }: 
   for (const r of relations) {
     if (r.claimId === undefined || r.targetHypothesisId === undefined) continue;
     const list = hypBindings.get(r.claimId) ?? [];
-    list.push({ polarity: polarityOf(r.relation), hypId: r.targetHypothesisId });
+    list.push({ polarity: RELATION_POLARITY[r.relation], hypId: r.targetHypothesisId });
     hypBindings.set(r.claimId, list);
   }
   // Hypothesis statements for the binding chips (one request, already cached
@@ -496,7 +498,7 @@ function ClaimsList({ claims, relations, runId, onFeedback, onOpenHypotheses }: 
                   type="button"
                   className={`claim-bind-chip claim-bind-chip--${b.polarity}`}
                   title={hypStatement.get(b.hypId) ?? b.hypId}
-                  onClick={() => onOpenHypotheses?.()}
+                  onClick={() => onOpenHypotheses?.(b.hypId)}
                 >
                   <span className="ev-glyph" aria-hidden="true">{b.polarity === 'supporting' ? '✓' : b.polarity === 'counter' ? '✗' : '–'}</span>
                   {t(b.polarity === 'supporting' ? 'evidence.bindSupports' : b.polarity === 'counter' ? 'evidence.bindCounters' : 'evidence.bindNeutral')}
@@ -563,11 +565,11 @@ function RelationsSummary({
       <p className="muted">{t('relation.total', { n: relations.length })}</p>
       <ul className="relation-counts">
         {[...byType.entries()].map(([type, n]) => (
-          <li key={type} className={`relation-chip relation-chip--${polarityOf(type)}`}>
-            <span className={`ev-glyph ev-glyph--${polarityOf(type) === 'supporting' ? 'verified' : polarityOf(type) === 'counter' ? 'refuted' : 'unknown'}`} aria-hidden="true">
-              {polarityOf(type) === 'supporting' ? '✓' : polarityOf(type) === 'counter' ? '✗' : '–'}
+          <li key={type} className={`relation-chip relation-chip--${RELATION_POLARITY[type]}`}>
+            <span className={`ev-glyph ev-glyph--${RELATION_POLARITY[type] === 'supporting' ? 'verified' : RELATION_POLARITY[type] === 'counter' ? 'refuted' : 'unknown'}`} aria-hidden="true">
+              {RELATION_POLARITY[type] === 'supporting' ? '✓' : RELATION_POLARITY[type] === 'counter' ? '✗' : '–'}
             </span>
-            <Badge tone={polarityTone(polarityOf(type))}>{t(relationKey(type))}</Badge>
+            <Badge tone={polarityTone(RELATION_POLARITY[type])}>{t(relationKey(type))}</Badge>
             <span className="mono count">{n}</span>
           </li>
         ))}
@@ -624,13 +626,9 @@ function RelationsSummary({
   );
 }
 
-function polarityOf(relationType: string): 'supporting' | 'counter' | 'neutral' {
-  switch (relationType) {
-    case 'supports': case 'replicates': return 'supporting';
-    case 'contradicts': case 'weakens': case 'fails_to_replicate': case 'alternative_explanation': return 'counter';
-    default: return 'neutral';
-  }
-}
+/** Polarity mapping lives in one place: api/types.RELATION_POLARITY (the same
+ *  table the hypotheses balance bars count from — the two surfaces cannot
+ *  disagree). */
 
 /**
  * Retrieval transparency (D-060 phase-1): every planned query with its purpose

@@ -30,8 +30,18 @@ export function WelcomeView({
   const { t } = useI18n();
   const { health, healthError, checking } = useHealth();
   const hp = healthProjection(health, healthError, checking);
+  // Study-deduped recents (M2 parity): the sidebar groups runs by question, so
+  // the home list must too — otherwise the same study occupies two of three
+  // cards while other recent work is pushed out of sight.
+  const seenStudies = new Set<string>();
   const recent = [...runs]
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+    .filter((r) => {
+      const key = r.questionText?.trim().toLowerCase().replace(/\s+/g, ' ') || r.id;
+      if (seenStudies.has(key)) return false;
+      seenStudies.add(key);
+      return true;
+    })
     .slice(0, 3);
   const hows = [
     { key: 'welcome.step1', icon: SearchCheck, tone: 'verified' },

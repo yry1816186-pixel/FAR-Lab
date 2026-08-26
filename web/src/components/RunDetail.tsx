@@ -132,12 +132,15 @@ export function RunDetail({
   // tab and pre-targetable by inline object actions. null = open untargeted.
   const [feedbackTarget, setFeedbackTarget] = useState<FeedbackTarget | null | undefined>(undefined);
   const openFeedback = (target?: FeedbackTarget): void => setFeedbackTarget(target ?? null);
+  // R3: pending hypothesis reveal (evidence-tab binding chips).
+  const [focusHypId, setFocusHypId] = useState<string | null>(null);
 
   // Run switch resets to the research tab and closes the drawer. A route-named
   // tab wins over the default on the next render (controlled tab effect below).
   useEffect(() => {
     setTabIdState(tab ?? 'research');
     setFeedbackTarget(undefined);
+    setFocusHypId(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run-switch only; later `tab` values flow through the controlled effect
   }, [run.id]);
 
@@ -187,6 +190,35 @@ export function RunDetail({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run on pending claim only
   }, [focusClaimId]);
 
+  // R3: hypothesis reveal for evidence-tab binding chips — same mount-then-
+  // scroll pattern as the claim focus below (the tab mounts its cards fresh).
+  useEffect(() => {
+    if (focusHypId === null) return;
+    setTabId('hypotheses');
+    const hypId = focusHypId;
+    let attempt = 0;
+    let timer = 0;
+    const finish = (): void => {
+      window.clearInterval(timer);
+      setFocusHypId(null); // cleared only after the reveal — clearing earlier
+      // would re-run this effect (deps change) and cancel the poller mid-flight
+    };
+    timer = window.setInterval(() => {
+      attempt += 1;
+      const el = document.getElementById(`hyp-${hypId}`);
+      if (el !== null) {
+        el.scrollIntoView({ block: 'center' });
+        el.classList.add('claim-flash');
+        window.setTimeout(() => el.classList.remove('claim-flash'), 1600);
+        finish();
+      } else if (attempt >= 12) {
+        finish(); // honest give-up — the tab switch still landed
+      }
+    }, 250);
+    return () => { window.clearInterval(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run on pending hypothesis only
+  }, [focusHypId]);
+
   const focusTab = (index: number): void => {
     const clamped = Math.max(0, Math.min(TABS.length - 1, index));
     setTabId(TABS[clamped]!.id);
@@ -221,7 +253,7 @@ export function RunDetail({
             </details>
           </>
         );
-      case 'evidence': return <EvidenceTab run={run} onFeedback={openFeedback} onOpenHypotheses={() => setTabId('hypotheses')} />;
+      case 'evidence': return <EvidenceTab run={run} onFeedback={openFeedback} onOpenHypotheses={(hypId) => { setTabId('hypotheses'); if (hypId !== undefined) setFocusHypId(hypId); }} />;
       case 'hypotheses': return (
         <HypothesisTabWithNav run={run} onFeedback={openFeedback} setTabId={setTabId} />
       );
