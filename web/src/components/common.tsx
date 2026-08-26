@@ -213,3 +213,13 @@ export function FieldList({ items }: { items: { key: ReactNode; value: ReactNode
     </dl>
   );
 }
+
+/** In-page reveal that NEVER touches location.hash (2026-08-27 baseline finding:
+ *  href="#src-..." overwrote the SPA route and bounced the user back home). */
+export const revealElement = (id: string): void => {
+  const el = document.getElementById(id);
+  if (el === null) return;
+  el.scrollIntoView({ block: 'center' });
+  el.classList.add('claim-flash');
+  window.setTimeout(() => el.classList.remove('claim-flash'), 1600);
+};

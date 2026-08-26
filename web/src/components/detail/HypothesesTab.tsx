@@ -19,6 +19,7 @@ import { TournamentCrosstab } from './viz/TournamentCrosstab';
 import { buildClaimLabels } from './InlineIdRefs';
 import type { FeedbackTarget } from './FeedbackForm';
 import { stageKey } from '../../i18n/keys';
+import { revealElement } from '../common';
 
 const COMPARE_LIMIT = 3;
 
@@ -308,9 +309,9 @@ function TournamentView({ tournament, hypotheses }: { tournament: HypothesisTour
             <tr key={s.hypothesisId}>
               <td className="mono">{s.rank}</td>
               <td>
-                <a className="hyp-anchor-link" href={`#hyp-${s.hypothesisId}`} title={statementOf(s.hypothesisId)}>
+                <button type="button" className="hyp-anchor-link link-button" title={statementOf(s.hypothesisId)} onClick={() => revealElement(`hyp-${s.hypothesisId}`)}>
                   {statementOf(s.hypothesisId)}
-                </a>
+                </button>
               </td>
               <td className="mono">{s.wins}-{s.losses}-{s.ties}</td>
               <td>

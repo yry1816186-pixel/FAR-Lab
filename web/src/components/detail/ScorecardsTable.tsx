@@ -2,6 +2,7 @@ import { Fragment, useState } from 'react';
 import type { HypothesisCandidate, HypothesisScorecard } from '../../api/types';
 import { useI18n } from '../../i18n/LanguageContext';
 import { Badge, IdText } from '../common';
+import { revealElement } from '../common';
 
 /**
  * Score comparison table with the FIXED disclaimer: scores are inspectable
@@ -57,9 +58,9 @@ export function ScorecardsTable({
                     <th scope="row" className="mono">{t('scorecards.ofN', { rank: card.rank, total: card.rankedOutOf })}</th>
                     <td>
                       {statement !== undefined ? (
-                        <a className="hyp-anchor-link" href={`#hyp-${card.hypothesisId}`} title={`${card.hypothesisId} — ${statement}`}>
+                        <button type="button" className="hyp-anchor-link link-button" title={`${card.hypothesisId} — ${statement}`} onClick={() => revealElement(`hyp-${card.hypothesisId}`)}>
                           {statement.length > 110 ? `${statement.slice(0, 110)}…` : statement}
-                        </a>
+                        </button>
                       ) : (
                         <IdText value={card.hypothesisId} />
                       )}

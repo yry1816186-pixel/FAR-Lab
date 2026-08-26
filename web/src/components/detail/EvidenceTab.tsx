@@ -13,6 +13,7 @@ import { EvidenceGraph } from './EvidenceGraph';
 import { bindingKey, bindingTone } from '../../tones';
 import { stageKey, contentDepthKey, accessStateKey, bindingZhKey, relationKey, retrievalPurposeKey } from '../../i18n/keys';
 import type { DictKey } from '../../i18n/dict';
+import { revealElement } from '../common';
 
 /** GRADE-lite certainty (deterministic ladder, W-G F-B) — label key per level. */
 function gradeKey(level: NonNullable<ScientificClaim['gradeCertainty']>): DictKey {
@@ -511,9 +512,9 @@ function ClaimsList({ claims, relations, runId, onFeedback, onOpenHypotheses }: 
             <blockquote key={i} className="claim-quote">
               <p>{loc.quote}</p>
               <cite>
-                <a href={`#src-${loc.sourceDocumentId}`} className="source-link" title={loc.sourceDocumentId}>
+                <button type="button" className="source-link link-button" title={loc.sourceDocumentId} onClick={() => revealElement(`src-${loc.sourceDocumentId}`)}>
                   {t('evidence.jumpToSource', { n: i + 1 })}
-                </a>
+                </button>
                 {loc.section !== undefined && <span className="muted"> · {loc.section}</span>}
               </cite>
             </blockquote>
@@ -615,7 +616,7 @@ function RelationsSummary({
                 )}
                 <p className="muted small">
                   {t('evidence.rationale')}: {r.rationale}
-                  {source !== undefined && <span> · <a className="source-link" href={`#src-${source.id}`}>{source.title.length > 48 ? `${source.title.slice(0, 48)}…` : source.title}</a></span>}
+                  {source !== undefined && <span> · <button type="button" className="source-link link-button" onClick={() => revealElement(`src-${source.id}`)}>{source.title.length > 48 ? `${source.title.slice(0, 48)}…` : source.title}</button></span>}
                 </p>
               </li>
             );
