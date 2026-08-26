@@ -182,18 +182,23 @@ describe('W8 S2: step checkpoints (OAOO)', () => {
     const db = openDb(path.join(dir, 'far.db'));
     const store = new Store(db);
     const run = seedRun(store);
-    const seen: string[] = [];
     let leaseAtFirstWrite = '';
     let leaseAtLastWrite = '';
     const stage: StageHandler = {
       stage: 'retrieve',
       applicable: async () => true,
       execute: async (ctx) => {
-        await ctx.checkpointed('retrieve', 'fam', 'k1', 'fp', async () => { leaseAtFirstWrite = store.getRunLease(run.id).expiresAt ?? ''; return 1; });
+        // Measurement points are read AFTER each checkpointed write completes (i.e.
+        // after its renewLease), never inside the fn callback — inside, the first
+        // read could race the acquire-time lease on a fast host (same millisecond),
+        // which made this test flaky on CI. Discriminating power is unchanged:
+        // without renewLease both reads return the acquire-time expiry => equal.
+        await ctx.checkpointed('retrieve', 'fam', 'k1', 'fp', async () => 1);
+        leaseAtFirstWrite = store.getRunLease(run.id).expiresAt ?? '';
         // simulate a long gap between writes; the lease must have been extended past the first write's expiry
         await new Promise((r) => setTimeout(r, 30));
-        await ctx.checkpointed('retrieve', 'fam', 'k2', 'fp', async () => { leaseAtLastWrite = store.getRunLease(run.id).expiresAt ?? ''; return 2; });
-        seen.push(leaseAtFirstWrite, leaseAtLastWrite);
+        await ctx.checkpointed('retrieve', 'fam', 'k2', 'fp', async () => 2);
+        leaseAtLastWrite = store.getRunLease(run.id).expiresAt ?? '';
         return { kind: 'done', summary: 'done' };
       },
     };
@@ -203,7 +208,6 @@ describe('W8 S2: step checkpoints (OAOO)', () => {
     // DISCRIMINATING (removing renewLease makes these equal/stale): the second write's lease expiry is strictly later
     expect(leaseAtLastWrite).not.toBe('');
     expect(leaseAtLastWrite > leaseAtFirstWrite).toBe(true);
-    void seen;
     db.close();
   });
 
