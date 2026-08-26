@@ -231,3 +231,34 @@ export const memoryNegativeConditioning = (
   });
   return hits.map((h) => ({ id: h.id, kind: h.kind, title: h.title, body: h.body, trustClass: h.trustClass }));
 };
+
+/**
+ * RU-1 disclosure: memory conditioning is an auditable fact of the generation.
+ * Appends ONE note event per (stage, item-id-set) — a regeneration/resume with
+ * an unchanged conditioning set never duplicates; a changed set appends anew
+ * (append-only audit, the change itself is the story). Zero items = no-op.
+ */
+export const recordMemoryConditioning = (
+  store: Store,
+  runId: string,
+  stage: 'generate_hypotheses' | 'plan',
+  items: ReadonlyArray<{ id: string; kind: string; trustClass: string }>,
+): void => {
+  if (items.length === 0) return;
+  const ids = items.map((m) => m.id).sort().join(',');
+  const already = store.listEvents(runId).some((e) => {
+    const d = e.detail as { reason?: string; ids?: unknown } | undefined;
+    return e.stage === stage && d?.reason === 'memory_conditioning' && d.ids === ids;
+  });
+  if (!already) {
+    store.appendEvent(runId, {
+      type: 'note',
+      stage,
+      detail: {
+        reason: 'memory_conditioning',
+        ids,
+        items: items.map((m) => ({ id: m.id, kind: m.kind, trustClass: m.trustClass })),
+      },
+    });
+  }
+};

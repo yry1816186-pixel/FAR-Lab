@@ -96,6 +96,8 @@ interface ExportInputs {
   versionDiffs: VersionDiff[];
   /** L4 self-calibration ledger (§9 disclosure: settled/open counts + skill honesty). */
   predictions: import('../../domain/prediction.js').LedgerEntry[];
+  /** RU-1 memory-conditioning disclosure events (stage, items with trust labels). */
+  memoryConditioning: Array<{ stage: string; items: Array<{ id: string; kind: string; trustClass: string }> }>;
   /** EEL (D-081): executed experiment objects for §7a + bundle experimentEvidence. */
   experimentRuns: ExperimentRun[];
   resultSets: ResultSet[];
@@ -560,6 +562,12 @@ const buildReport = (d: ExportInputs, missingItems: string[], truth: RunTruthPro
       d.predictions.length > 0 ? '；结算采用 RPS/Brier 对无知基线打分，样本不足的分层如实标注"证据不足"' : ''
     }`,
   );
+  // RU-1 cross-run memory disclosure: what conditioned generation, with labels.
+  if (d.memoryConditioning.length > 0) {
+    const memTotal = d.memoryConditioning.reduce((a, m) => a + m.items.length, 0);
+    const stages = [...new Set(d.memoryConditioning.map((m) => m.stage))].join('、');
+    push(`- 工作区记忆调节：${memTotal} 条既往实验结果（信任标签随行）作为数据注入 ${stages} 生成——非本轮证据（RU-1）`);
+  }
   push(`- 缺失项：${missingItems.length === 0 ? '无已知缺失项' : missingItems.join('；')}`);
   push('');
 
@@ -660,6 +668,14 @@ export const exportStage: StageHandler = {
     const inputs: ExportInputs = {
       run, question, corpus, sources, claims, relations, hypotheses, scorecards, plan, receipts, feedbacks, revisions, versionDiffs,
       predictions: ctx.store.listObjects('prediction', run.id),
+      memoryConditioning: ctx.store
+        .listEvents(run.id)
+        .filter((e) => (e.detail as { reason?: string })?.reason === 'memory_conditioning')
+        .map((e) => {
+          const d = e.detail as { stage?: string; items?: Array<{ id: string; kind: string; trustClass: string }> };
+          return { stage: d.stage ?? 'unknown', items: Array.isArray(d.items) ? d.items : [] };
+        })
+        .filter((m) => m.items.length > 0),
       experimentRuns: ctx.store.listObjects('experiment_run', run.id),
       resultSets: ctx.store.listObjects('result_set', run.id),
       statReports: ctx.store.listObjects('stat_report', run.id),
