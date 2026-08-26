@@ -1,26 +1,9 @@
-import { StrictMode, useEffect, useState } from 'react';
+import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Toaster } from 'sonner';
 import { App } from './App';
-import { SkeletonHome } from './lab/SkeletonHome';
-import { SkeletonMap } from './lab/SkeletonMap';
 import { LanguageProvider } from './i18n/LanguageContext';
 import { ConnectionProvider } from './state/connection';
-
-/** HX skeleton prototypes (mission §6.3): #lab/* renders the prototype shell
- *  INSTEAD of the workbench. Gated here (outside App) so hook order in the
- *  workbench tree is untouched; both routes are deletable with the loser. */
-function Root(): JSX.Element {
-  const [hash, setHash] = useState(window.location.hash);
-  useEffect(() => {
-    const onHash = (): void => setHash(window.location.hash);
-    window.addEventListener('hashchange', onHash);
-    return () => window.removeEventListener('hashchange', onHash);
-  }, []);
-  if (hash === '#lab' || hash.startsWith('#lab/home')) return <SkeletonHome />;
-  if (hash.startsWith('#lab/map')) return <SkeletonMap />;
-  return <App />;
-}
 
 /* Three-voice type system (§8.3): UI voice = IBM Plex Sans, data voice = IBM Plex Mono,
    statement voice = Source Serif 4. Self-hosted via @fontsource (OFL) — no CDN, offline-capable.
@@ -43,7 +26,7 @@ createRoot(rootEl).render(
   <StrictMode>
     <ConnectionProvider>
       <LanguageProvider>
-        <Root />
+        <App />
         <Toaster position="top-right" closeButton={false} />
       </LanguageProvider>
     </ConnectionProvider>

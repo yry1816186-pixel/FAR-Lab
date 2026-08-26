@@ -3,7 +3,7 @@ import { ArrowUp, BookMarked, Brain, Check, Clock, Link2, Loader2, Paperclip, Ro
 import { useI18n } from '../i18n/LanguageContext';
 import type { DictKey } from '../i18n/dict';
 import { AttachIcon, DISPLAY_KIND, type AttachKind } from './common';
-import { formatBytes } from './ResearchComposer';
+import { formatBytes } from '../lab/SeedTray';
 import { MarkdownDoc } from './detail/MarkdownDoc';
 import { ZoteroPanel } from './ZoteroPanel';
 import { DictationButton } from './DictationButton';
