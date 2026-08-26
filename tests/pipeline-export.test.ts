@@ -705,7 +705,7 @@ describe('plan + export — RU-1 memory conditioning', () => {
 
   it('plan receives prior failed outcomes with trust labels; event + summary disclose; export renders the §9 line', async () => {
     const g = seedRun();
-    const { outcome, ctx, reqs } = await runPlanWithCapture(g, true);
+    const { outcome, reqs } = await runPlanWithCapture(g, true);
     expect(outcome.kind).toBe('done');
 
     const planReq = reqs.find((r) => r.task === 'research-plan-design');

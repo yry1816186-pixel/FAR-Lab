@@ -56,7 +56,7 @@ Authoritative policy: `DEPENDENCY_POLICY.md` (runtime dependency set is exactly 
 | katex | 0.16.47 | 0.16.47 | MIT | runtime |
 | lucide-react | ^1.33.0 | 1.33.0 | ISC | runtime |
 | mammoth | ^1.12.1 | 1.12.1 | BSD-2-Clause | runtime |
-| pdfjs-dist | 5.6.205 | 5.6.205 | Apache-2.0 | runtime |
+| pdfjs-dist | 6.2.108 | 6.2.108 | Apache-2.0 | runtime |
 | react | ^18.3.1 | 18.3.1 | MIT | runtime |
 | react-dom | ^18.3.1 | 18.3.1 | MIT | runtime |
 | react-katex | 3.1.0 | 3.1.0 | MIT | runtime |
@@ -86,7 +86,7 @@ node_modules not installed in this workspace — 1 declared dependency UNAUDITED
 
 | license | packages |
 | --- | --- |
-| MIT | 425 |
+| MIT | 424 |
 | Apache-2.0 | 34 |
 | ISC | 23 |
 | BSD-3-Clause | 19 |
