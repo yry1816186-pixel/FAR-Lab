@@ -143,3 +143,78 @@ describe('offline dev provider: generic fallback and fail-visible', () => {
     expect(res.receipt.executionMode).toBe('test');
   });
 });
+
+describe('offline dev provider: conversation turn and claim->hypothesis edges (2026-08-27 takeover)', () => {
+  // Sibling-lane gap A: the resident-agent loop asks with purpose
+  // 'conversation:turn:turn' and its validator is the kernel's AgentAction
+  // schema — a finish action with the conversation reply contract must parse.
+  it('answers the resident-agent conversation turn with a valid finish action + launchable candidate', async () => {
+    const p = createOfflineDevProvider(offlineCfg());
+    const AgentActionLike = z.object({
+      action: z.literal('finish'),
+      reason: z.string().min(1),
+      result: z.object({
+        reply: z.string().min(1),
+        clarifyingQuestions: z.array(z.string()).max(3),
+        candidates: z.array(z.object({ text: z.string().min(1).max(2000), rationale: z.string().min(1).max(2000) })).max(5),
+        readyToConverge: z.boolean(),
+      }),
+    });
+    const res = await p.structuredCall(
+      req('conversation:turn:turn', { userPayload: { task: '研究者发来新消息：「What mechanisms drive CRISPR off-target editing?」\n回应它' } }),
+      (raw) => {
+        const r = AgentActionLike.safeParse(raw);
+        return r.success ? r.data : new Error(r.error.message);
+      },
+    );
+    expect(res.ok).toBe(true);
+    if (!res.ok) throw new Error('unreachable');
+    expect(res.data.result.candidates.length).toBe(1);
+    expect(res.data.result.candidates[0]!.text).toContain('CRISPR off-target editing');
+  });
+
+  it('conversation turn without an extractable question still finishes honestly (no candidate)', async () => {
+    const p = createOfflineDevProvider(offlineCfg());
+    const res = await p.structuredCall(
+      req('conversation:turn:turn', { userPayload: { task: 'no quoted question here' } }),
+      (raw) => {
+        const r = z.object({ action: z.string(), result: z.unknown() }).safeParse(raw);
+        return r.success ? r.data : new Error(r.error.message);
+      },
+    );
+    expect(res.ok).toBe(true);
+  });
+
+  // Sibling-lane gap B: the falsify stage builds EvidenceRelations from the
+  // critique links — the offline spec must propose supporting (and, with
+  // enough claims, one weakening) link so offline runs carry claim->hypothesis
+  // edges for the web binding chips.
+  it('falsification-spec proposes supporting links and a counter link when claims allow', async () => {
+    const p = createOfflineDevProvider(offlineCfg());
+    const LinkReason = z.object({ claimId: z.string().min(1), linkReason: z.string().min(20) });
+    const Out = z.object({
+      supportingLinks: z.array(LinkReason).min(1),
+      counterLinks: z.array(LinkReason.extend({ relation: z.enum(['contradicts', 'weakens', 'qualifies']) })),
+      supportingClaimIds: z.array(z.string()),
+    });
+    const res = await p.structuredCall(
+      req('falsification-spec:hyp_test1', {
+        userPayload: {
+          hypothesis: { id: 'hyp_test1', statement: 'X improves Y in Z' },
+          availableClaims: [
+            { id: 'clm_a', text: 'claim a' }, { id: 'clm_b', text: 'claim b' }, { id: 'clm_c', text: 'claim c' }, { id: 'clm_d', text: 'claim d' },
+          ],
+        },
+      }),
+      (raw) => {
+        const r = Out.safeParse(raw);
+        return r.success ? r.data : new Error(r.error.message);
+      },
+    );
+    expect(res.ok).toBe(true);
+    if (!res.ok) throw new Error('unreachable');
+    expect(res.data.supportingLinks.length).toBe(2);
+    expect(res.data.counterLinks.length).toBe(1);
+    expect(res.data.counterLinks[0]!.relation).toBe('weakens');
+  });
+});

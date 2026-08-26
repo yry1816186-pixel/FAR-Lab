@@ -935,6 +935,18 @@ describe('POST /api/v1/runs', () => {
     expect(brokenJson.body.error.message).toContain('not valid JSON');
   });
 
+  it('accepts an EMPTY seeds array (seedless conversation launches travel this path)', async () => {
+    // 2026-08-27 regression: the conversation launch bridge always passes
+    // collectConversationSeeds(conv); rejecting [] broke every seedless launch.
+    const { status, body } = await postJson(`${base}/api/v1/runs`, { text: 'Seedless launch regression probe?', seeds: [] });
+    expect(status).toBe(202);
+    expect(typeof body.runId).toBe('string');
+    // non-array seeds stays invalid
+    const bad = await postJson(`${base}/api/v1/runs`, { text: 'q', seeds: 'nope' });
+    expect(bad.status).toBe(400);
+    expect(bad.body.error.message).toContain('seeds');
+  });
+
   it('400s when the body exceeds the 1MB cap', async () => {
     const { status, body } = await postJson(`${base}/api/v1/runs`, { text: 'x'.repeat(1_100_000) });
     expect(status).toBe(400);

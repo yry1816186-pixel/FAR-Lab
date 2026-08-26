@@ -484,8 +484,12 @@ function parseSeedSources(raw: unknown): string | {
   authors: string[];
 }[] {
   if (raw === undefined) return [];
-  if (!Array.isArray(raw) || raw.length === 0 || raw.length > 50) {
-    return 'field "seeds" must be an array of 1-50 seed sources';
+  // An EMPTY array is legitimate: the conversation launch bridge always passes
+  // collectConversationSeeds(conv), and a seedless conversation must be able to
+  // launch a run (2026-08-27 journey: rejecting [] broke every seedless launch
+  // since the bridge landed). Only a non-array or >50 shape is invalid.
+  if (!Array.isArray(raw) || raw.length > 50) {
+    return 'field "seeds" must be an array of at most 50 seed sources';
   }
   const out: {
     title: string; identifiers: { kind: 'doi' | 'arxiv' | 'url' | 'other'; value: string }[];

@@ -194,7 +194,7 @@ story.append(callout([Paragraph('<b>工作区累计真值（2026-08-26 读数）
 story.append(KeepTogether([H1('4. 源代码'),
   P('开源仓库：github.com/yry1816186-pixel/FAR-Lab（Apache-2.0）；npm install 与 npm run build 后执行 far research start “问题” 一分钟内可复现主流程；npm test 全量确定性验证。')]))
 story.append(P('工程不变量：Node 产品<b>运行时依赖仅 zod</b>（其余全部 devDependencies）；实验运行时为 uv 锁定的独立 Python sidecar（sklearn/scipy/numpy 版本锁定 + 锁文件哈希入运行记录）；桌面壳为 Tauri v2。'))
-story.append(P('<b>诚实边界（如实披露）</b>：官方规定的千问/百炼调用路线的真实凭证验证仍缺 DASHSCOPE_API_KEY（结构已就绪、探针脚本已备，B-QWEN-LIVE-ROUTE）；离线确定性路线当前覆盖管线全程，对话式创建入口在离线路线上暂不可用（已知边界，在修）；演示视频与交互前端按官方要求随提交包附上。'))
+story.append(P('<b>诚实边界（如实披露）</b>：官方规定的千问/百炼调用路线的真实凭证验证仍缺 DASHSCOPE_API_KEY（结构已就绪、探针脚本已备，B-QWEN-LIVE-ROUTE）；离线确定性路线覆盖管线全程与对话式创建入口（2026-08-27 修复并经浏览器全程验证）；演示视频与交互前端按官方要求随提交包附上。'))
 
 # ============ 5 ============
 story.append(H1('5. 项目工作流程（研究者视角）'))

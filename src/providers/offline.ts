@@ -170,7 +170,27 @@ const claimCrossRelations: Handler = (p) => {
 
 const hypothesisSearch = (variant: 'evidence' | 'contradiction' | 'mechanism'): Handler => (p) => {
   const question = questionTextOf(p);
-  const claimIds = idListOf(p.claims).slice(0, 2);
+  // The generate payload carries claims as supportingClaims / counterDirectionClaims
+  // ({id, text} projections — shared.ts cappedClaimsForPrompt); the ORIGINAL
+  // handler read `p.claims` (always empty), so evidenceClaimIds were dead and
+  // statements shared no vocabulary with the corpus — the falsify topical gate
+  // then dropped every critique link. Ground the template in REAL claim text.
+  const promptClaims = (asArray(p.supportingClaims) ?? asArray(p.counterDirectionClaims) ?? asArray(p.claims) ?? [])
+    .map((c) => asRecord(c))
+    .filter((c): c is Record<string, unknown> => c !== null);
+  const claimIds = promptClaims.map((c) => asString(c.id)).filter((id): id is string => id !== null).slice(0, 2);
+  const claimTexts = promptClaims
+    .map((c) => asString(c.text) ?? '')
+    .filter((t) => t.length > 0);
+  const claimSnippet = claimTexts
+    .slice(0, 2)
+    .map((t) => (t.length > 90 ? `${t.slice(0, 90)}…` : t))
+    .join(' / ');
+  // The counter link names the LAST claim; embedding its vocabulary in the
+  // mechanism keeps the falsify topical gate from dropping the counter edge.
+  const counterSnippet = claimTexts.length > 3
+    ? (claimTexts[claimTexts.length - 1]!.length > 90 ? `${claimTexts[claimTexts.length - 1]!.slice(0, 90)}…` : claimTexts[claimTexts.length - 1]!)
+    : '';
   const kw = keywordsOf(question, 4);
   const flavour =
     variant === 'evidence'
@@ -179,8 +199,8 @@ const hypothesisSearch = (variant: 'evidence' | 'contradiction' | 'mechanism'): 
         ? 'resolving the tensions in the current evidence'
         : 'through an explicit causal mechanism';
   const mk = (i: number): Record<string, unknown> => ({
-    statement: `Offline hypothesis ${i} (${variant}-driven): ${question} holds ${flavour}, variant ${i}.`,
-    mechanism: `A deterministic offline mechanism chain ${i}: upstream cause -> mediating process -> observable outcome for ${kw}.`,
+    statement: `Offline hypothesis ${i} (${variant}-driven): ${question} holds ${flavour}, variant ${i}${claimSnippet.length > 0 ? `, grounded in the evidence that: ${claimSnippet}` : ''}.`,
+    mechanism: `A deterministic offline mechanism chain ${i}: upstream cause -> mediating process -> observable outcome for ${kw}${counterSnippet.length > 0 ? `, bounded by the observation that: ${counterSnippet}` : ''}.`,
     assumptions: [
       `assumption ${i}.a: the offline route's premise about ${kw} applies`,
       `assumption ${i}.b: the mediating process is measurable in available data`,
@@ -348,24 +368,49 @@ const researchPlanDesign: Handler = (p) => {
 const falsificationSpec: Handler = (p) => {
   const hyp = asRecord(p.hypothesis);
   const statement = hyp === null ? 'the hypothesis' : (asString(hyp.statement) ?? 'the hypothesis');
+  // Claim->hypothesis edges (sibling-lane gap B, taken over 2026-08-27): the
+  // falsify stage builds EvidenceRelations from these links — the ORIGINAL
+  // handler read `p.claims`, but the real payload field is `availableClaims`
+  // (falsify.ts), so the whole link chain was silently dead offline. Also the
+  // decision rule must carry decidable comparison semantics or the
+  // deterministic completeness gate rejects the spec (zeroing all links).
+  const claimIds = (() => {
+    const fromAvailable = idListOf(p.availableClaims);
+    return fromAvailable.length > 0 ? fromAvailable : idListOf(p.claims);
+  })();
+  const supportingLinks = claimIds.slice(0, 2).map((claimId) => ({
+    claimId,
+    linkReason: `offline deterministic link: the claim states the association this hypothesis predicts, taken as supporting on the development route`,
+  }));
+  const counterLinks = claimIds.length > 3
+    ? [{
+        claimId: claimIds[claimIds.length - 1]!,
+        relation: 'weakens' as const,
+        linkReason: 'offline deterministic counter link: the claim bounds the association to a subgroup, weakening the hypothesis in its general form (development route)',
+      }]
+    : [];
   return {
     observable: `the outcome quantity named by: ${statement.slice(0, 120)}`,
     measurement: 'systematic measurement of the observable across the comparison conditions',
     expectedRelation: 'the direction predicted by the hypothesis statement',
-    decisionRule: 'support if the measured comparison exceeds 0 in the predicted direction; weaken if it does not; falsify if significantly opposite',
+    // Decidable-comparison semantics are MANDATORY: the deterministic
+    // completeness gate rejects specs without >=/</ratio/threshold/if-then
+    // criteria (2026-08-27 journey: the template's prose rule was rejected,
+    // which zeroed critique links and thus claim->hypothesis relations).
+    decisionRule: 'if the measured association ratio between compared conditions is >= 1.2, support; if < 1.0, weaken; if the interval around the ratio excludes the predicted direction, falsify',
     decisionRuleProvenance: 'model-stipulated',
-    supportCondition: 'the predicted direction is observed',
-    weakeningCondition: 'the effect appears only in a subgroup or under added assumptions',
-    falsificationCondition: 'the measured relation is absent or significantly reversed',
+    supportCondition: 'the measured ratio is >= 1.2 in the predicted direction',
+    weakeningCondition: 'the ratio is < 1.0 or appears only in a subgroup under added assumptions',
+    falsificationCondition: 'the measured relation is absent (ratio not > 1.0) or significantly reversed',
     confounders: ['population heterogeneity', 'measurement timing'],
     alternativeExplanations: ['a confounder explains the observed pattern'],
     dataRequirements: ['comparative observations of the observable'],
     method: 'offline deterministic falsification template',
     failureInterpretation: 'absence of the predicted relation weakens the hypothesis; reversal falsifies it',
     assumptionCritiques: [],
-    counterLinks: [],
-    supportingClaimIds: idListOf(p.claims).slice(0, 2),
-    supportingLinks: [],
+    counterLinks,
+    supportingClaimIds: claimIds.slice(0, 2),
+    supportingLinks,
     consideredClaimIds: [],
     uncertainties: ['offline template: thresholds are stipulated, not evidence-derived'],
     testability: 'testable_with_data',
@@ -459,6 +504,36 @@ const causalRevisionAnalysis: Handler = (p) => {
 const modelConfigTest: Handler = () => ({ ok: true });
 
 /**
+ * Resident-agent conversation turn (sibling-lane gap A, taken over 2026-08-27):
+ * the kernel calls with purpose 'conversation:turn' + ':turn' appended by the
+ * loop. The generic schema-walker built use_tool instances the kernel rejected
+ * three times, killing the offline conversation-first creation path. Answer
+ * with a deterministic FINISH action instead: an honest offline reply plus the
+ * researcher's own message offered back as a launchable candidate question
+ * (result contract: server ConversationAgentReplySchema).
+ */
+const conversationTurn: Handler = (payload) => {
+  const task = asString(payload.task) ?? '';
+  const m = /「([^」]{6,2000})」/.exec(task);
+  const question = m !== null ? m[1]! : '';
+  const reply = question.length > 0
+    ? `（离线路线确定性回复）已收到你的消息：「${question}」。\n\n这条路线不联网、不调用真实模型——它用于演示与界面验收：对话式创建、研究运行与结果阅读的全流程可以走通，所有回执均标记为 test 模式。下面已把你的原话列为候选研究问题，可直接发起一次完整研究。`
+    : '（离线路线确定性回复）已收到你的消息。这条路线不联网、不调用真实模型——用于演示与界面验收；如需真实文献检索与模型推理，请在设置中切换到已配置密钥的路线。';
+  return {
+    action: 'finish',
+    reason: 'offline deterministic reply: the development route exercises the conversation flow without tools or network',
+    result: {
+      reply,
+      clarifyingQuestions: [],
+      candidates: question.length > 0
+        ? [{ text: question, rationale: 'offline template: the researcher\'s own message, offered verbatim as a launchable research question' }]
+        : [],
+      readyToConverge: false,
+    },
+  };
+};
+
+/**
  * Experiment-leg drafts: the offline route declares both experiment forms
  * infeasible — a synthetic plan must not fabricate a dataset execution (the EEL
  * lane stays separately exercisable with real specs).
@@ -499,6 +574,7 @@ const HANDLERS: Readonly<Record<string, Handler>> = {
   'experiment-spec-draft': experimentSpecDraft,
   'meta-spec-draft': metaSpecDraft,
   'model-config-test': modelConfigTest,
+  'conversation:turn:turn': conversationTurn,
 };
 
 /** Prefix purposes (per-object id suffix): falsification-spec:<hypId> etc. */
