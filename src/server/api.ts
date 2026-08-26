@@ -1,5 +1,6 @@
 import http from 'node:http';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { App } from '../app/composition.js';
@@ -14,6 +15,7 @@ import { createCustomProvider } from '../providers/custom.js';
 import { analyzeTrajectory } from '../app/supervisor.js';
 import { runTruthProfile } from '../app/truth-profile.js';
 import { runCounterSearch, CounterSearchError } from './counter-search.js';
+import { buildZip, type ZipEntry } from './zip.js';
 import { buildLineageGraph } from '../app/lineage.js';
 import { runEvaluators } from '../app/evaluators.js';
 import { runResearchAction, ActionError } from './actions.js';
@@ -826,6 +828,46 @@ function parseSeedSources(raw: unknown): string | {
       throw notFound(`paper artifact missing in artifact store (${paperRef.slice(0, 16)}…)`, runId);
     }
     sendText(res, 200, 'text/markdown; charset=utf-8', content);
+  };
+
+  /**
+   * CPS-7 full-package download: builds the lane-07 reproducibility package into a
+   * temp dir (same engine as `far research export --format package`) and streams it
+   * as a single ZIP. One-request convenience for reviewers; the CLI/dir path stays
+   * authoritative (nothing is re-derived — the package is the deterministic
+   * projection of stored export artifacts).
+   */
+  const runPackageZip = async (res: http.ServerResponse, runId: string): Promise<void> => {
+    mustGetRun(runId);
+    const latestBundle = app.store.listObjects('bundle', runId).at(-1);
+    if (!latestBundle) {
+      throw notFound(`no bundle stored for run ${runId} — the export stage has not produced one yet`, runId);
+    }
+    const { buildReproducibilityPackage } = await import('../report/package.js');
+    const tmp = await import('node:fs/promises').then((fsp) => fsp.mkdtemp(path.join(os.tmpdir(), 'farlab-pkg-')));
+    try {
+      const result = await buildReproducibilityPackage({ store: app.store, artifacts: app.artifacts }, runId, { outDir: tmp });
+      const fsp = await import('node:fs/promises');
+      const walk = async (dir: string, prefix: string): Promise<ZipEntry[]> => {
+        const out: ZipEntry[] = [];
+        for (const ent of await fsp.readdir(dir, { withFileTypes: true })) {
+          const rel = prefix === '' ? ent.name : `${prefix}/${ent.name}`;
+          if (ent.isDirectory()) out.push(...await walk(path.join(dir, ent.name), rel));
+          else out.push({ name: rel, content: await fsp.readFile(path.join(dir, ent.name)) });
+        }
+        return out;
+      };
+      const zip = buildZip(await walk(tmp, ''));
+      res.writeHead(200, {
+        'Content-Type': 'application/zip',
+        'Content-Length': String(zip.length),
+        'Content-Disposition': `attachment; filename="${runId}-farlab-package.zip"`,
+        'X-Bundle-Id': result.bundleId,
+      });
+      res.end(zip);
+    } finally {
+      await import('node:fs/promises').then((fsp) => fsp.rm(tmp, { recursive: true, force: true }));
+    }
   };
 
   const cancelRun = (res: http.ServerResponse, runId: string): void => {
@@ -1820,6 +1862,7 @@ function parseSeedSources(raw: unknown): string | {
         if (leaf === 'question' && method === 'GET') return runQuestion(res, runId);
         if (leaf === 'report' && method === 'GET') return runReport(res, runId);
         if (leaf === 'paper' && method === 'GET') return runPaper(res, runId);
+        if (leaf === 'package' && method === 'GET') return runPackageZip(res, runId);
         if (leaf === 'sources' && method === 'GET') {
           mustGetRun(runId);
           return sendJson(res, 200, { sources: app.store.listObjects('source_document', runId) });

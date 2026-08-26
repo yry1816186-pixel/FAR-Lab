@@ -1365,3 +1365,35 @@ describe('GET/PUT /api/v1/competition-route', () => {
     expect(p3.body.competitionRouteMode).toBe('off');
   });
 });
+
+describe('GET /api/v1/runs/:id/package (CPS-7 full-package download)', () => {
+  it('streams a valid ZIP of the reproducibility package with the report inside (independent zlib verification)', async () => {
+    const res = await fetch(`${base}/api/v1/runs/${run1}/package`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('application/zip');
+    expect(res.headers.get('content-disposition')).toContain(`${run1}-farlab-package.zip`);
+    const zip = Buffer.from(await res.arrayBuffer());
+    expect(zip.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 0x03, 0x04]))).toBe(true);
+
+    const { readZipEntries } = await import('../src/server/zip.js');
+    const { inflateRawSync } = await import('node:zlib');
+    const entries = readZipEntries(zip);
+    const names = entries.map((e) => e.name);
+    expect(names).toContain('report.md');
+    expect(names).toContain('MANIFEST.json');
+    expect(names).toContain('README.md');
+    const report = entries.find((e) => e.name === 'report.md')!;
+    const restored = report.method === 8 ? inflateRawSync(report.raw) : report.raw;
+    expect(restored.toString('utf8')).toBe(REPORT_MD);
+  });
+
+  it('404s honestly for runs without a bundle and unknown runs', async () => {
+    // run4 is created but never exported
+    const noBundle = await fetch(`${base}/api/v1/runs/${run4}/package`);
+    expect(noBundle.status).toBe(404);
+    expect((await noBundle.json() as { error: { code: string } }).error.code).toBe('not_found');
+
+    const ghost = await fetch(`${base}/api/v1/runs/${'run_' + 'b'.repeat(24)}/package`);
+    expect(ghost.status).toBe(404);
+  });
+});
