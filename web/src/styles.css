@@ -932,6 +932,32 @@ select option { color: var(--text); background: var(--surface); }
 /* ---------- evidence ---------- */
 .claims-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
 .claim-item { border: 1px solid var(--border); border-radius: 4px; padding: 8px 10px; }
+/* R3: claims participating in counter relations lead and carry a refuted
+   left rail — the wavering point is findable before anything else. */
+.claim-item--counter { border-left: 3px solid var(--v2-refuted); }
+.claim-hyp-binds { margin: 2px 0 0; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.claim-bind-chip {
+  font: inherit;
+  font-size: var(--fs-aux);
+  line-height: 1.35;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--v2-border);
+  background: var(--v2-surface);
+  color: var(--v2-text-1);
+  cursor: pointer;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+.claim-bind-chip .ev-glyph { flex: none; }
+.claim-bind-chip--supporting .ev-glyph { color: var(--v2-verified-on-tint); }
+.claim-bind-chip--counter { border-color: var(--v2-refuted); background: var(--v2-refuted-tint); }
+.claim-bind-chip--counter .ev-glyph { color: var(--v2-refuted-on-tint); }
+.claim-bind-chip:hover { border-color: var(--v2-info); }
 .claim-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .claim-text { margin: 8px 0; font-size: 12.5px; }
 .claim-quote {

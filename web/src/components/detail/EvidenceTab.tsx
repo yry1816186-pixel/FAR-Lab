@@ -1,7 +1,7 @@
 import { ScreeningWorkbench } from '../ScreeningWorkbench.js';
 import { useCallback, useState } from 'react';
 import { isNotFound } from '../../api/client';
-import { counterSearch, getCorpus, getEvidence, getReceipts, getSources } from '../../api/endpoints';
+import { counterSearch, getCorpus, getEvidence, getHypotheses, getReceipts, getSources } from '../../api/endpoints';
 import type { CounterSearchOutcome } from '../../api/endpoints';
 import type { CorpusQueryInfo, CorpusSnapshotInfo, EvidenceRelation, EvidenceRelationType, ProvenanceReceipt, ResearchRun, ScientificClaim, SourceDocument } from '../../api/types';
 import { useResource } from '../../hooks/useResource';
@@ -189,7 +189,7 @@ export function EvidenceTab({
         ) : evidenceRes.error !== null ? (
           <ErrorBox error={evidenceRes.error} onRetry={evidenceRes.retry} />
         ) : claims !== null ? (
-          <ClaimsList claims={claims} runId={run.id} onFeedback={onFeedback} />
+          <ClaimsList claims={claims} relations={relations ?? []} runId={run.id} onFeedback={onFeedback} onOpenHypotheses={onOpenHypotheses} />
         ) : null}
         {evidenceRes.data !== null && evidenceRes.data.unclassified > 0 && (
           <p className="callout callout--warn" role="status">
@@ -359,10 +359,14 @@ function SourcesTable({ sources }: { sources: SourceDocument[] }): JSX.Element {
   );
 }
 
-function ClaimsList({ claims, runId, onFeedback }: {
+function ClaimsList({ claims, relations, runId, onFeedback, onOpenHypotheses }: {
   claims: ScientificClaim[];
+  /** Claim→hypothesis bindings (R3): the reading question "which hypotheses
+   *  does this claim move" is answered inline, not via the graph detour. */
+  relations: EvidenceRelation[];
   runId: string;
   onFeedback: (target?: { kind: string; id: string; label?: string; content?: string }) => void;
+  onOpenHypotheses?: () => void;
 }): JSX.Element {
   const { t } = useI18n();
   const [filter, setFilter] = useState('');
@@ -371,10 +375,34 @@ function ClaimsList({ claims, runId, onFeedback }: {
     return `${t('grade.titlePrefix')}（${level}）— ${reasons}`;
   };
   if (claims.length === 0) return <EmptyState titleKey="evidence.noClaims" />;
+
+  // Hypothesis bindings per claim, from the same relation set the overview
+  // strip and the hypotheses table count from — one source of truth.
+  const hypBindings = new Map<string, { polarity: 'supporting' | 'counter' | 'neutral'; hypId: string }[]>();
+  for (const r of relations) {
+    if (r.claimId === undefined || r.targetHypothesisId === undefined) continue;
+    const list = hypBindings.get(r.claimId) ?? [];
+    list.push({ polarity: polarityOf(r.relation), hypId: r.targetHypothesisId });
+    hypBindings.set(r.claimId, list);
+  }
+  // Hypothesis statements for the binding chips (one request, already cached
+  // per run by the resource layer when the researcher crossed the other tabs).
+  const hypFetcher = useCallback((signal: AbortSignal) => getHypotheses(runId, signal), [runId]);
+  const hypRes = useResource(hypFetcher, [runId], 'settled-only');
+  const hypStatement = new Map((hypRes.data?.hypotheses ?? []).map((h) => [h.id, h.statement] as const));
+
+  // Reading order (R3): claims that participate in COUNTER relations lead —
+  // the wavering points decide the study, then the most-connected claims.
+  const order = claims.map((c, i) => {
+    const binds = hypBindings.get(c.id) ?? [];
+    return { claim: c, i, counters: binds.filter((b) => b.polarity === 'counter').length, binds: binds.length };
+  });
+  order.sort((a, b) => (b.counters - a.counters) || (b.binds - a.binds) || (a.i - b.i));
+
   const needle = filter.trim().toLowerCase();
   const visible = needle.length === 0
-    ? claims
-    : claims.filter((c) => c.text.toLowerCase().includes(needle) || c.id.toLowerCase().includes(needle));
+    ? order
+    : order.filter(({ claim }) => claim.text.toLowerCase().includes(needle) || claim.id.toLowerCase().includes(needle));
   return (
     <div>
       <input
@@ -387,8 +415,13 @@ function ClaimsList({ claims, runId, onFeedback }: {
       />
       {visible.length === 0 && <p className="muted small">{t('evidence.claimFilterEmpty')}</p>}
     <ul className="claims-list">
-      {visible.map((claim) => (
-        <li key={claim.id} id={`claim-${claim.id}`} className="claim-item" title={claim.id}>
+      {visible.map(({ claim, counters, binds }) => (
+        <li
+          key={claim.id}
+          id={`claim-${claim.id}`}
+          className={`claim-item${counters > 0 ? ' claim-item--counter' : ''}`}
+          title={claim.id}
+        >
           {/* B1 F-09: the claim's statement is the label; provenance metadata
               follows it — the machine id trails the meta line, never leads. */}
           <p className="claim-text">{claim.text}</p>
@@ -410,6 +443,11 @@ function ClaimsList({ claims, runId, onFeedback }: {
                 title={gradeTitle(claim.gradeCertainty, claim.downgraded ?? [])}
               >
                 {t(gradeKey(claim.gradeCertainty))}
+              </Badge>
+            )}
+            {counters > 0 && (
+              <Badge tone="err" title={t('evidence.counterInvolvedHint', { n: counters })}>
+                {t('evidence.counterInvolved')}
               </Badge>
             )}
             {claim.alignmentChecked === true ? (
@@ -447,6 +485,26 @@ function ClaimsList({ claims, runId, onFeedback }: {
               />
             </span>
           </div>
+          {/* R3: hypothesis bindings inline — supports/weakens chips that carry
+              the claim's effect on the hypothesis set to the reading path. */}
+          {binds > 0 && (
+            <p className="claim-hyp-binds">
+              <span className="muted small">{t('evidence.bindsHypotheses')}：</span>
+              {(hypBindings.get(claim.id) ?? []).map((b, i) => (
+                <button
+                  key={`${b.hypId}-${i}`}
+                  type="button"
+                  className={`claim-bind-chip claim-bind-chip--${b.polarity}`}
+                  title={hypStatement.get(b.hypId) ?? b.hypId}
+                  onClick={() => onOpenHypotheses?.()}
+                >
+                  <span className="ev-glyph" aria-hidden="true">{b.polarity === 'supporting' ? '✓' : b.polarity === 'counter' ? '✗' : '–'}</span>
+                  {t(b.polarity === 'supporting' ? 'evidence.bindSupports' : b.polarity === 'counter' ? 'evidence.bindCounters' : 'evidence.bindNeutral')}
+                  {(() => { const s = hypStatement.get(b.hypId); return s !== undefined ? `：${s.length > 56 ? `${s.slice(0, 56)}…` : s}` : ''; })()}
+                </button>
+              ))}
+            </p>
+          )}
           {claim.locators.slice(0, 3).map((loc, i) => (
             <blockquote key={i} className="claim-quote">
               <p>{loc.quote}</p>
