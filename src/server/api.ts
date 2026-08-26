@@ -836,6 +836,12 @@ function parseSeedSources(raw: unknown): string | {
    * as a single ZIP. One-request convenience for reviewers; the CLI/dir path stays
    * authoritative (nothing is re-derived — the package is the deterministic
    * projection of stored export artifacts).
+   *
+   * Known limitation (audit P2-3, accepted for the single-user local product):
+   * pandoc renders run spawnSync (up to 60s/format) and the zip is assembled
+   * in-memory — a package request can block this single-threaded server for
+   * seconds-to-minutes. MB-scale packages are fine; revisit (worker/queue) if a
+   * multi-user/remote deployment mode ever lands.
    */
   const runPackageZip = async (res: http.ServerResponse, runId: string): Promise<void> => {
     mustGetRun(runId);

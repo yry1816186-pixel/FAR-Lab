@@ -25,6 +25,11 @@ const BINDINGS = ['verified', 'resolved_unaligned', 'unresolved', 'missing'] as 
 const RELATIONS = ['supports', 'contradicts', 'weakens', 'qualifies', 'depends_on', 'derived_from', 'replicates', 'fails_to_replicate', 'alternative_explanation', 'methodological_limitation', 'unknown'] as const;
 const PURPOSES = ['discovery', 'supporting', 'counter_evidence', 'methodological', 'identifier_resolution', 'gap_followup'] as const;
 const TRUTH_CLASSES = ['live', 'mixed', 'recorded_replay', 'synthetic', 'empty'] as const;
+// ResearchStatePanel families (severity / signal kinds / actions / evaluator ids)
+const RSP_SEVERITIES = ['high', 'medium', 'low'] as const;
+const RSP_SIG_KINDS = ['stalled_horizon', 'repeated_failure', 'unproductive_cycle'] as const;
+const RSP_ACTIONS = ['resume_or_replan', 'change_strategy', 'branch_or_deepen'] as const;
+const RSP_EVALS = ['evidence_balance', 'falsifiability', 'hypothesis_diversity', 'provenance_completeness', 'uncertainty_transparency'] as const;
 
 describe('i18n key builders — domain-union to dictionary exhaustiveness', () => {
   it('every stage/goalType/quality value has zh+en entries', () => {
@@ -53,5 +58,12 @@ describe('i18n key builders — domain-union to dictionary exhaustiveness', () =
     for (const k of TRUTH_CLASSES.map(truthClassKey)) { expect(zh).toHaveProperty(k); expect(en).toHaveProperty(k); }
     expect(zh).toHaveProperty('truth.title');
     expect(en).toHaveProperty('truth.title');
+  });
+
+  it('every ResearchStatePanel family value has zh+en entries (rsp.*)', () => {
+    for (const s of RSP_SEVERITIES) { expect(zh).toHaveProperty(`rsp.severity.${s}`); expect(en).toHaveProperty(`rsp.severity.${s}`); }
+    for (const k of RSP_SIG_KINDS) { expect(zh).toHaveProperty(`rsp.sig.${k}`); expect(en).toHaveProperty(`rsp.sig.${k}`); }
+    for (const a of RSP_ACTIONS) { expect(zh).toHaveProperty(`rsp.action.${a}`); expect(en).toHaveProperty(`rsp.action.${a}`); }
+    for (const e of RSP_EVALS) { expect(zh).toHaveProperty(`rsp.eval.${e}`); expect(en).toHaveProperty(`rsp.eval.${e}`); }
   });
 });

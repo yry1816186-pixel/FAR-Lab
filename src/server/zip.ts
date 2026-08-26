@@ -21,7 +21,7 @@ const CRC_TABLE = (() => {
 
 export const crc32 = (buf: Buffer): number => {
   let c = 0xffffffff;
-  for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]!)!]! ^ (c >>> 8);
+  for (let i = 0; i < buf.length; i++) c = CRC_TABLE[((c ^ buf[i]!) & 0xff)!]! ^ (c >>> 8);
   return (c ^ 0xffffffff) >>> 0;
 };
 
