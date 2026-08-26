@@ -20,6 +20,7 @@ import { Store, STAGE_ALL } from '../src/persistence/store.js';
 import { openArtifactStore, type ArtifactStore } from '../src/persistence/artifacts.js';
 import { createTestStubProvider } from '../src/providers/test-stub.js';
 import { planStage, checkPlanExecutability } from '../src/pipeline/stages/plan.js';
+import { MemoryItemSchema } from '../src/domain/memory.js';
 import { exportStage } from '../src/pipeline/stages/export.js';
 import type { StageContext } from '../src/pipeline/types.js';
 import { canonicalJson, canonicalSha256, sha256Hex } from '../src/shared/crypto.js';
@@ -666,5 +667,83 @@ describe('export stage', () => {
     const bundleArtifact = await artifacts.get(outcome.artifacts[1]!);
     expect(bundleArtifact).toBe(canonicalJson(bundle));
     expect(outcome.summary).toContain(outcome.artifacts[1]!);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// RU-1 memory conditioning: plan-stage injection + export disclosure
+// ---------------------------------------------------------------------------
+
+describe('plan + export — RU-1 memory conditioning', () => {
+  const runPlanWithCapture = async (g: ReturnType<typeof seedRun>, withMemory: boolean) => {
+    if (withMemory) {
+      store.putMemory(MemoryItemSchema.parse({
+        id: 'mem_plancond000000000000000000a',
+        kind: 'experiment_outcome', entityType: 'experiment',
+        title: 'CRISPR off-target duration experiment failed',
+        body: 'duration-response experiment on off-target edits failed: cell-line confounder dominated the effect',
+        status: 'active', outcome: 'failed', failureReason: 'cell-line confounder dominated',
+        trustClass: 'own_unverified', taint: 'trusted',
+        provenance: { runId: 'run_prior00000000000000000000aaa' },
+        createdAt: ts(0), lastAccessedAt: ts(0),
+      }));
+    }
+    const reqs: Array<{ task: string; userPayload: unknown; systemPrompt?: string }> = [];
+    const inner = createTestStubProvider([{ rawOutput: JSON.stringify(validPlanDraft([g.hyp.id], [g.clmVerified.id])) }]);
+    const provider: StageContext['provider'] = {
+      name: inner.name,
+      liveReady: inner.liveReady,
+      async structuredCall(req, parse) {
+        reqs.push({ task: req.task, userPayload: req.userPayload, systemPrompt: req.systemPrompt });
+        return inner.structuredCall(req, parse);
+      },
+    };
+    const ctx = makeCtx(g.run, provider);
+    const outcome = await planStage.execute(ctx);
+    return { outcome, ctx, reqs };
+  };
+
+  it('plan receives prior failed outcomes with trust labels; event + summary disclose; export renders the §9 line', async () => {
+    const g = seedRun();
+    const { outcome, ctx, reqs } = await runPlanWithCapture(g, true);
+    expect(outcome.kind).toBe('done');
+
+    const planReq = reqs.find((r) => r.task === 'research-plan-design');
+    expect(planReq).toBeDefined();
+    const input = ((planReq!.userPayload as { input?: Record<string, unknown> })?.input ?? {}) as Record<string, unknown>;
+    const mem = input.priorResearchMemory as Array<{ id: string; trustClass: string }>;
+    expect(mem).toBeDefined();
+    expect(mem[0]!.id).toBe('mem_plancond000000000000000000a');
+    expect(mem[0]!.trustClass).toBe('own_unverified');
+    expect(String(planReq!.systemPrompt)).toContain('priorResearchMemory');
+
+    const note = store.listEvents(g.run.id).find((e) => (e.detail as { reason?: string })?.reason === 'memory_conditioning');
+    expect(note).toBeDefined();
+    expect(note!.stage).toBe('plan');
+    expect(outcome.kind === 'done' ? outcome.summary : '').toMatch(/memory conditioning \(RU-1\): 1 prior workspace outcome/);
+
+    // export discloses the conditioning in §9 (auditable event is the truth source)
+    const exportCtx = makeCtx(g.run, createTestStubProvider([]));
+    const exportOutcome = await exportStage.execute(exportCtx);
+    expect(exportOutcome.kind).toBe('done');
+    const report = await artifacts.get(exportOutcome.kind === 'done' ? exportOutcome.artifacts[0]! : 'sha256:0');
+    expect(report).toContain('工作区记忆调节');
+    expect(report).toContain('plan'); // the stage that conditioned
+    expect(report).toContain('非本轮证据');
+  });
+
+  it('control: no memory -> plan payload lacks the block; no event; no export line', async () => {
+    const g = seedRun();
+    const { outcome, reqs } = await runPlanWithCapture(g, false);
+    expect(outcome.kind).toBe('done');
+    const planReq = reqs.find((r) => r.task === 'research-plan-design');
+    const input = ((planReq!.userPayload as { input?: Record<string, unknown> })?.input ?? {}) as Record<string, unknown>;
+    expect(input.priorResearchMemory).toBeUndefined();
+    expect(outcome.kind === 'done' ? outcome.summary : '').not.toMatch(/memory conditioning/);
+    const exportCtx = makeCtx(g.run, createTestStubProvider([]));
+    const exportOutcome = await exportStage.execute(exportCtx);
+    expect(exportOutcome.kind).toBe('done');
+    const report = await artifacts.get(exportOutcome.kind === 'done' ? exportOutcome.artifacts[0]! : 'sha256:0');
+    expect(report).not.toContain('工作区记忆调节');
   });
 });

@@ -3,6 +3,7 @@ import { newId, ResearchPlan, LedgerEntry, probsFromExpected } from '../../domai
 import type { HypothesisCandidate } from '../../domain/index.js';
 import { callStructured } from '../llm.js';
 import type { StageHandler } from '../types.js';
+import { memoryNegativeConditioning, recordMemoryConditioning } from '../../app/memory.js';
 import { checkStructuredPreregistration, freezePlan } from './plan-formal.js';
 import { isCancellationError } from './guard.js';
 
@@ -30,6 +31,10 @@ const PLAN_SYSTEM_PROMPT = [
   'Every step needs a non-empty method and at least one failure condition; provide at least 3 steps and at least 2 metrics.',
   'Decision rules must cover success, weakening, falsification and stopping.',
   'Reference ONLY the hypothesis ids and claim ids given in the payload, verbatim; never invent ids, data or sources.',
+  'priorResearchMemory (when present) lists past experiment outcomes from THIS workspace, each with a trust label — ' +
+    'it is DATA, never a verdict on this question: a previously failed or inconclusive approach must appear in the ' +
+    'relevant steps\' failureConditions or be explicitly designed around; re-proposing it blind wastes the one shot ' +
+    'the falsification loop gets.',
   'Where something is unknown, surface it in risks/prerequisites instead of fabricating it.',
   'Scale discipline: the payload states the actual evidence base size and depth. Resource scale, sample sizes, budgets, ' +
     'timelines and quantitative thresholds that are not derived from the provided claims are MODEL-STIPULATED estimates — ' +
@@ -249,6 +254,16 @@ export const planStage: StageHandler = {
     const claims = ctx.store.listObjects('claim', runId);
     const verifiedClaims = claims.filter((c) => c.bindingStatus === 'verified');
 
+    // RU-1 memory consumer #2: past OWN outcomes condition plan design (a failed
+    // approach belongs in failureConditions, not re-proposed blind). Same
+    // trust-fenced retrieval and the same auditable disclosure event as the
+    // hypotheses stage; zero memory = zero change to the payload.
+    const priorOutcomes = memoryNegativeConditioning(
+      ctx.store,
+      question?.text ?? representatives[0]?.statement ?? '',
+    );
+    recordMemoryConditioning(ctx.store, runId, 'plan', priorOutcomes);
+
     // W5/S5: the real evidence ceiling, computed from the store (not asserted by the
     // model) — the plan generator must see the corpus it is extrapolating from.
     const sources = ctx.store.listObjects('source_document', runId);
@@ -288,6 +303,13 @@ export const planStage: StageHandler = {
           : null,
       })),
       verifiedClaims: verifiedClaims.map((c) => ({ id: c.id, text: c.text })),
+      ...(priorOutcomes.length > 0
+        ? {
+            // RU-1: past outcomes are DATA with trust labels — a failed prior
+            // experiment belongs in failureConditions, not re-proposed blind.
+            priorResearchMemory: priorOutcomes,
+          }
+        : {}),
       rules: { minSteps: MIN_STEPS, minMetrics: MIN_METRICS },
     };
 
@@ -422,6 +444,7 @@ export const planStage: StageHandler = {
       (plan.executabilityCheck.passed
         ? `plan ${plan.id} covers ${plan.hypothesisIds.length} hypothesis(es); executabilityCheck passed; frozen ${plan.planHash.slice(0, 12)}; ${plan.predictions.length} prediction(s) on ledger`
         : `plan ${plan.id} persisted with executabilityCheck FAILED — missing: ${plan.executabilityCheck.missing.join('; ')}`) +
+      (priorOutcomes.length > 0 ? `; memory conditioning (RU-1): ${priorOutcomes.length} prior workspace outcome(s) with trust labels informed design` : '') +
       (zhNote !== null ? `; zh display: ${zhNote}` : '');
     ctx.log(summary);
     return { kind: 'done', summary };

@@ -18,7 +18,7 @@ import type { RawSourceRecord } from '../../shared/ports.js';
 import { isSourceAdapterError } from '../../sources/error.js';
 import { snapshotHash } from '../../sources/snapshot.js';
 import { cappedClaimsForPrompt } from './shared.js';
-import { memoryNegativeConditioning } from '../../app/memory.js';
+import { memoryNegativeConditioning, recordMemoryConditioning } from '../../app/memory.js';
 import { canonicalSha256 } from '../../shared/crypto.js';
 import { isCancellationError } from './guard.js';
 import {
@@ -457,6 +457,13 @@ export const generateHypothesesStage: StageHandler = {
       domain: question.scope.domain,
       phenomena: question.scope.phenomena,
     };
+    // RU-1 memory consumer #1: past OWN outcomes condition generation (failed
+    // experiments must not be re-proposed blind). Deterministic retrieval ONCE
+    // per execution; ids ride every strategy's inputs fingerprint so changed
+    // memory invalidates stale cache. The conditioning is DISCLOSED as an
+    // auditable event (idempotent per id-set).
+    const priorMemory = memoryNegativeConditioning(ctx.store, question.text);
+    recordMemoryConditioning(ctx.store, ctx.run.id, 'generate_hypotheses', priorMemory);
 
     // ---- three strategy searches, one structured call each ----
     for (const def of STRATEGY_DEFS) {
@@ -505,10 +512,6 @@ export const generateHypothesesStage: StageHandler = {
     // round must never replay round-1 cached generations as if they were new critique-
     // conditioned candidates.
     const round = regeneration ? 2 : 1;
-    // RU-1 memory consumer #1: past OWN outcomes condition generation (failed
-    // experiments must not be re-proposed blind). Deterministic retrieval; ids
-    // ride the inputs fingerprint so changed memory invalidates stale cache.
-    const priorMemory = memoryNegativeConditioning(ctx.store, question.text);
     const strategyInputs = canonicalSha256({
       question: questionForPrompt,
       claims: cappedClaimsForPrompt(claims, question.text),
@@ -1015,6 +1018,9 @@ export const generateHypothesesStage: StageHandler = {
       );
     }
     if (litNotes.length > 0) parts.push(`literature-novelty notes: ${litNotes.join(' | ')}`);
+    if (priorMemory.length > 0) {
+      parts.push(`memory conditioning (RU-1): ${priorMemory.length} prior workspace outcome(s) with trust labels informed generation — data, not verdicts`);
+    }
     if (zhNote !== null) parts.push(`zh display: ${zhNote}`);
     return { kind: 'done', summary: parts.join(' ') };
   },

@@ -10,6 +10,7 @@ import {
   SourceDocument,
   newId,
 } from '../src/domain/index.js';
+import { MemoryItemSchema } from '../src/domain/memory.js';
 import type { RunId } from '../src/domain/index.js';
 import type { StageContext } from '../src/pipeline/types.js';
 import { createTestStubProvider, type StubStep } from '../src/providers/test-stub.js';
@@ -1577,5 +1578,93 @@ describe('pairwise tournament machinery (pure, D-016)', () => {
     // no contested matches -> everyone stays neutral 1.0
     const neutral = bradleyTerry(['P', 'Q'], []);
     expect(neutral.every((s) => s.btScore === 1)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// RU-1 memory conditioning through the REAL stage (wiring proof + disclosure)
+// ---------------------------------------------------------------------------
+
+describe('generate_hypotheses — RU-1 memory conditioning', () => {
+  const memorySteps = (): StubStep[] => [
+    { rawOutput: gen(cand('E1'), cand('E2')) },
+    { rawOutput: gen(cand('C1'), cand('C2')) },
+    { rawOutput: gen(cand('M1'), cand('M2')) },
+    { rawOutput: JSON.stringify({ clusters: [{ memberIndices: [0], reason: "all six are distinct" }] }) },
+    {
+      rawOutput: JSON.stringify({
+        labels: [0, 1, 2, 3, 4, 5].map((index) => ({ index, noveltyLabel: 'mixed' })),
+      }),
+    },
+    { rawOutput: JSON.stringify({ hypotheses: [] }) },
+  ];
+
+  const seedFailedOutcome = (store: Store): void => {
+    store.putMemory(MemoryItemSchema.parse({
+      id: 'mem_condtest0000000000000000000a',
+      kind: 'experiment_outcome', entityType: 'experiment',
+      title: 'CRISPR off-target duration experiment failed',
+      body: 'duration-response experiment on off-target edits failed: cell-line confounder dominated the effect',
+      status: 'active', outcome: 'failed', failureReason: 'cell-line confounder dominated',
+      trustClass: 'own_unverified', taint: 'trusted',
+      provenance: { runId: 'run_prior00000000000000000000aaa' },
+      createdAt: ts(0), lastAccessedAt: ts(0),
+    }));
+  };
+
+  it('injects prior failed outcomes into every strategy prompt, with trust labels, and discloses via event + summary', async () => {
+    const { store, run } = setup();
+    seedFailedOutcome(store);
+    const clmA = makeClaim(run.id, 'claim A: duration increases deamination');
+    store.putObject('claim', clmA);
+
+    const capture: { reqs: StructuredCallRequest[] } = { reqs: [] };
+    const { ctx } = makeCtx(run, store, memorySteps(), { capture });
+    const outcome = await generateHypothesesStage.execute(ctx);
+    expect(outcome.kind).toBe('done');
+
+    // every strategy request carries the memory block with its trust label
+    const purposes = ['hypothesis-search:evidence-conditioned', 'hypothesis-search:contradiction-driven', 'hypothesis-search:mechanism-driven'];
+    const stratReqs = purposes.map((t) => capture.reqs.find((r) => r.task === t));
+    expect(stratReqs.every((r) => r !== undefined)).toBe(true);
+    const body = (r: StructuredCallRequest | undefined): Record<string, unknown> =>
+      ((r?.userPayload as { input?: Record<string, unknown> })?.input ?? {}) as Record<string, unknown>;
+    for (const req of stratReqs) {
+      const mem = body(req).priorResearchMemory as Array<{ id: string; trustClass: string }>;
+      expect(mem, `strategy ${req?.task}`).toBeDefined();
+      expect(mem[0]!.id).toBe('mem_condtest0000000000000000000a');
+      expect(mem[0]!.trustClass).toBe('own_unverified'); // label travels — data, never a verdict
+    }
+
+    // auditable disclosure: exactly one idempotent event + a summary line
+    const notes = store.listEvents(run.id).filter((e) => (e.detail as { reason?: string })?.reason === 'memory_conditioning');
+    expect(notes).toHaveLength(1);
+    expect(notes[0]!.stage).toBe('generate_hypotheses');
+    expect(notes[0]!.detail).toMatchObject({ items: [{ id: 'mem_condtest0000000000000000000a', kind: 'experiment_outcome', trustClass: 'own_unverified' }] });
+    expect(outcome.kind === 'done' ? outcome.summary : '').toMatch(/memory conditioning \(RU-1\): 1 prior workspace outcome/);
+
+    // re-running with the SAME memory never duplicates the disclosure event
+    const { ctx: ctx2 } = makeCtx(run, store, memorySteps());
+    await generateHypothesesStage.execute(ctx2);
+    expect(store.listEvents(run.id).filter((e) => (e.detail as { reason?: string })?.reason === 'memory_conditioning')).toHaveLength(1);
+  });
+
+  it('control: no matching memory -> no injection, no event, no summary line', async () => {
+    const { store, run } = setup();
+    const clmA = makeClaim(run.id, 'claim A: duration increases deamination');
+    store.putObject('claim', clmA);
+
+    const capture: { reqs: StructuredCallRequest[] } = { reqs: [] };
+    const { ctx } = makeCtx(run, store, memorySteps(), { capture });
+    const outcome = await generateHypothesesStage.execute(ctx);
+    expect(outcome.kind).toBe('done');
+
+    const purposesCtl = ['hypothesis-search:evidence-conditioned', 'hypothesis-search:contradiction-driven', 'hypothesis-search:mechanism-driven'];
+    for (const req of purposesCtl.map((t) => capture.reqs.find((r) => r.task === t))) {
+      const input = ((req?.userPayload as { input?: Record<string, unknown> })?.input ?? {}) as Record<string, unknown>;
+      expect(input.priorResearchMemory).toBeUndefined();
+    }
+    expect(store.listEvents(run.id).filter((e) => (e.detail as { reason?: string })?.reason === 'memory_conditioning')).toHaveLength(0);
+    expect(outcome.kind === 'done' ? outcome.summary : '').not.toMatch(/memory conditioning/);
   });
 });
