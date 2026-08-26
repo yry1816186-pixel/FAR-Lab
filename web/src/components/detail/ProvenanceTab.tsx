@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
-import { Download, FileText, RefreshCw, ScrollText } from 'lucide-react';
+import { Download, FileText, PackageOpen, RefreshCw, ScrollText } from 'lucide-react';
 import { ApiError, isNotFound, withTimeout } from '../../api/client';
 import { getBundles, getEvidence, getHypotheses, getPaper, getReceipts, getReport, reexportRun, verifyBundle } from '../../api/endpoints';
 import type { ProvenanceReceipt, ResearchRun, VerificationReport } from '../../api/types';
@@ -97,6 +97,7 @@ export function ProvenanceTab({ run, events, onMutated }: { run: ResearchRun; ev
             runId={run.id}
             markdown={reportRes.data}
             paperMarkdown={paperRes.data}
+            hasBundle={bundles.length > 0}
             hypLabels={hypLabels}
             claimLabels={claimLabels}
           />
@@ -433,10 +434,12 @@ function BundleVerify({
   );
 }
 
-function ReportBlock({ runId, markdown, paperMarkdown, hypLabels, claimLabels }: {
+function ReportBlock({ runId, markdown, paperMarkdown, hasBundle, hypLabels, claimLabels }: {
   runId: string;
   markdown: string;
   paperMarkdown: string | null;
+  /** CPS-7: a stored bundle exists -> the full-package download is offered. */
+  hasBundle: boolean;
   hypLabels?: Map<string, string>;
   claimLabels?: Map<string, string>;
 }): JSX.Element {
@@ -493,6 +496,16 @@ function ReportBlock({ runId, markdown, paperMarkdown, hypLabels, claimLabels }:
           <Download size={13} aria-hidden="true" />
           {doc === 'paper' && hasPaper ? t('report.downloadPaper') : t('report.download')}
         </button>
+        {hasBundle && (
+          <a
+            className="btn"
+            href={`/api/v1/runs/${encodeURIComponent(runId)}/package`}
+            title={t('report.packageHint')}
+          >
+            <PackageOpen size={13} aria-hidden="true" />
+            {t('report.downloadPackage')}
+          </a>
+        )}
         <span className="muted small">{t('report.chars', { n: active.length })}</span>
       </div>
       {/* Rendered preview (HX5): downloaded files keep raw ids; the preview

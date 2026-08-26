@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { RunTruthProfile } from '../../api/types';
+import { useI18n } from '../../i18n/LanguageContext';
+import type { DictKey } from '../../i18n/dict';
 
 /**
  * AVO fusion G2/G3/G8 web projection — the "Living Research Workspace" data
@@ -7,7 +9,9 @@ import type { RunTruthProfile } from '../../api/types';
  * family. Progressive disclosure by design: the component renders the
  * researcher-level summary (health + counts + next-action hints) and folds
  * raw node/edge tables into <details>; nothing is invented — every field
- * maps 1:1 onto GET /runs/:id/{lineage,supervision,evaluations}.
+ * maps 1:1 onto GET /runs/:id/{lineage,supervision,evaluations,calibration}.
+ * Fully i18n'd (zh/en): supervisor signal projections derive from the signal's
+ * STRUCTURED evidence; the raw English rationale stays on hover (audit trail).
  */
 
 // ---- API types mirroring src/app/{lineage,supervisor,evaluators}.ts ----
@@ -106,17 +110,10 @@ export function useResearchState(runId: string | undefined): {
   return { lineage, supervision, evaluations, calibration, error, loading };
 }
 
-const SEVERITY_LABEL: Record<SupervisorSignal['severity'], string> = {
-  high: '高', medium: '中', low: '低',
-};
-
-const EVAL_ID_LABEL: Record<string, string> = {
-  evidence_balance: '证据平衡（反证在列）',
-  falsifiability: '可证伪性',
-  hypothesis_diversity: '假设多样性',
-  provenance_completeness: '溯源完整性',
-  uncertainty_transparency: '不确定性披露',
-};
+const severityKey = (s: SupervisorSignal['severity']): DictKey => `rsp.severity.${s}` as DictKey;
+const evalKey = (id: string): DictKey => `rsp.eval.${id}` as DictKey;
+const signalKindKey = (k: string): DictKey => `rsp.sig.${k}` as DictKey;
+const actionKey = (a: string): DictKey => `rsp.action.${a}` as DictKey;
 
 const STATUS_MARK: Record<EvaluationItem['status'], string> = { pass: '✓', warn: '!', fail: '✗' };
 
@@ -126,16 +123,17 @@ const STATUS_MARK: Record<EvaluationItem['status'], string> = { pass: '✓', war
  * fold into details for audit-grade drill-down.
  */
 export function ResearchStatePanel({ runId, runStatus }: { runId: string; runStatus?: string }): JSX.Element {
+  const { t } = useI18n();
   const { lineage, supervision, evaluations, calibration, error, loading } = useResearchState(runId);
 
   if (loading && lineage === null && supervision === null) {
-    return <div className="research-state" data-state="loading"><p>研究状态加载中…</p></div>;
+    return <div className="research-state" data-state="loading"><p>{t('rsp.loading')}</p></div>;
   }
   if (error !== null) {
     return (
       <div className="research-state" data-state="error">
-        <p>研究状态不可用：{error}</p>
-        <p className="muted">后端未升级或该投影被禁用时会出现此提示——不会伪造数据。</p>
+        <p>{t('rsp.unavailable', { error })}</p>
+        <p className="muted">{t('rsp.unavailableHint')}</p>
       </div>
     );
   }
@@ -145,80 +143,75 @@ export function ResearchStatePanel({ runId, runStatus }: { runId: string; runSta
   const highSignals = supervision?.signals.filter((s) => s.severity === 'high') ?? [];
   const counterEdges = lineage?.edges.filter((e) => COUNTER_EDGE_KINDS.has(e.kind)).length ?? 0;
 
-  /** Deterministic zh projection from the signal's STRUCTURED evidence — the
-   *  raw English rationale stays on hover (audit trail, never parsed). */
+  /** Localized humanization of a silence/quiet window in seconds. */
   const humanizeSec = (sec: number): string => {
-    if (sec < 60) return `${sec} 秒`;
-    if (sec < 3600) return `${Math.round(sec / 60)} 分钟`;
+    if (sec < 60) return t('rsp.dur.seconds', { n: Math.round(sec) });
+    if (sec < 3600) return t('rsp.dur.minutes', { n: Math.round(sec / 60) });
     const h = Math.floor(sec / 3600);
     const m = Math.round((sec % 3600) / 60);
-    return m > 0 ? `${h} 小时 ${m} 分钟` : `${h} 小时`;
+    return m > 0 ? t('rsp.dur.hoursMinutes', { h, m }) : t('rsp.dur.hours', { h });
   };
+  /** Deterministic projection from the signal's STRUCTURED evidence — the
+   *  raw English rationale stays on hover (audit trail, never parsed). */
   const signalText = (s: SupervisorSignal): string => {
     const ev = s.evidence as Record<string, unknown>;
     if (s.kind === 'stalled_horizon') {
       const ms = typeof ev.msSinceLastEvent === 'number' ? ev.msSinceLastEvent : null;
       const quiet = typeof ev.quietWindowMs === 'number' ? ev.quietWindowMs / 1000 : 0;
       return ms === null
-        ? `研究没有任何已记录的活动（静默阈值 ${humanizeSec(quiet)}）`
-        : `距最后一次活动已 ${humanizeSec(ms / 1000)}，超过静默阈值 ${humanizeSec(quiet)}`;
+        ? t('rsp.sigStalled.never', { quiet: humanizeSec(quiet) })
+        : t('rsp.sigStalled.quiet', { since: humanizeSec(ms / 1000), quiet: humanizeSec(quiet) });
     }
     if (s.kind === 'repeated_failure') {
       const count = typeof ev.count === 'number' ? ev.count : 0;
       const sig = typeof ev.signature === 'string' ? ev.signature : '';
-      return `同一失败签名（${sig}）已重复 ${count} 次——原样重试是循环，不是进展`;
+      return t('rsp.sigRepeated', { n: count, sig });
     }
     if (s.kind === 'unproductive_cycle') {
       const iters = typeof ev.iterations === 'number' ? ev.iterations : 0;
-      return `${iters} 轮迭代未产生实质变化——建议改变方向或加深挖掘后再投入`;
+      return t('rsp.sigUnproductive', { n: iters });
     }
     return s.recommendation.rationale;
   };
-  const ACTION_LABEL: Record<string, string> = {
-    resume_or_replan: '恢复执行或重新规划',
-    change_strategy: '更换策略',
-    branch_or_deepen: '分叉新方向或加深现有方向',
-  };
+  const signalKindLabel = (k: string): string =>
+    k === 'stalled_horizon' || k === 'repeated_failure' || k === 'unproductive_cycle' ? t(signalKindKey(k)) : k;
+  const actionLabel = (a: string): string =>
+    a === 'resume_or_replan' || a === 'change_strategy' || a === 'branch_or_deepen' ? t(actionKey(a)) : a;
+
+  const signalList = (signals: SupervisorSignal[]): JSX.Element => (
+    <ul>
+      {signals.map((s) => (
+        <li key={s.kind} title={s.recommendation.rationale}>
+          [{t(severityKey(s.severity))}] {signalKindLabel(s.kind)}：{signalText(s)}
+          <span className="muted"> {t('rsp.suggestedAction')}：{actionLabel(s.recommendation.action)}</span>
+        </li>
+      ))}
+    </ul>
+  );
 
   return (
-    <section className="research-state" aria-label="研究状态（AVO 融合投影）">
+    <section className="research-state" aria-label={t('rsp.aria')}>
       {/* --- supervisor health --- */}
       <div
         className={`rs-supervision ${highSignals.length > 0 && !isTerminal ? 'rs-alert' : 'rs-ok'}`}
         data-testid="supervision"
       >
         {supervision === null ? (
-          <p>监督分析不可用。</p>
+          <p>{t('rsp.supervisionUnavailable')}</p>
         ) : supervision.signals.length === 0 ? (
-          <p><strong>轨迹健康</strong>：无监督信号（事件 {supervision.observation.eventCount} 条）。</p>
+          <p><strong>{t('rsp.healthy')}</strong>{t('rsp.healthyDetail', { n: supervision.observation.eventCount })}</p>
         ) : isTerminal ? (
           <>
-            <p><strong>监督</strong>：研究已结束（{runStatus}）——运行期监督记录归档如下，停滞类信号对已结束的研究不再适用。</p>
+            <p><strong>{t('rsp.supervision')}</strong>{t('rsp.archivedIntro', { status: runStatus ?? '' })}</p>
             <details>
-              <summary>归档的监督信号（{supervision.signals.length} 条）</summary>
-              <ul>
-                {supervision.signals.map((s) => (
-                  <li key={s.kind} title={s.recommendation.rationale}>
-                    [{SEVERITY_LABEL[s.severity]}] {s.kind === 'stalled_horizon' ? '探索停滞' : s.kind === 'repeated_failure' ? '重复失败' : '无产出循环'}
-                    ：{signalText(s)}
-                    <span className="muted"> 建议动作：{ACTION_LABEL[s.recommendation.action] ?? s.recommendation.action}</span>
-                  </li>
-                ))}
-              </ul>
+              <summary>{t('rsp.archivedSummary', { n: supervision.signals.length })}</summary>
+              {signalList(supervision.signals)}
             </details>
           </>
         ) : (
           <>
-            <p><strong>监督信号 {supervision.signals.length} 条</strong>{highSignals.length > 0 ? `（其中高危 ${highSignals.length}）` : ''}</p>
-            <ul>
-              {supervision.signals.map((s) => (
-                <li key={s.kind} title={s.recommendation.rationale}>
-                  [{SEVERITY_LABEL[s.severity]}] {s.kind === 'stalled_horizon' ? '探索停滞' : s.kind === 'repeated_failure' ? '重复失败' : '无产出循环'}
-                  ：{signalText(s)}
-                  <span className="muted"> 建议动作：{ACTION_LABEL[s.recommendation.action] ?? s.recommendation.action}</span>
-                </li>
-              ))}
-            </ul>
+            <p><strong>{t('rsp.signalsCount', { n: supervision.signals.length })}</strong>{highSignals.length > 0 ? t('rsp.highCount', { n: highSignals.length }) : ''}</p>
+            {signalList(supervision.signals)}
           </>
         )}
       </div>
@@ -226,12 +219,12 @@ export function ResearchStatePanel({ runId, runStatus }: { runId: string; runSta
       {/* --- evaluator family (multi-dimensional; no invented single score) --- */}
       {evaluations !== null && (
         <div className="rs-evaluations" data-testid="evaluations">
-          <h4>科学评价族</h4>
+          <h4>{t('rsp.evaluationsTitle')}</h4>
           <ul>
             {evaluations.evaluations.map((e) => (
               <li key={e.id} title={e.detail}>
                 <span className={`rs-mark rs-${e.status}`}>{STATUS_MARK[e.status]}</span>
-                {' '}{EVAL_ID_LABEL[e.id] ?? e.id}
+                {' '}{t(evalKey(e.id))}
                 <span className="muted"> {e.detail}</span>
               </li>
             ))}
@@ -242,10 +235,14 @@ export function ResearchStatePanel({ runId, runStatus }: { runId: string; runSta
       {/* --- L4 self-calibration ledger (forward predictions, settled by experiment verdicts) --- */}
       {calibration !== null && calibration.entries.length > 0 && (
         <div className="rs-calibration" data-testid="calibration">
-          <h4>前向预测账本（自校准）</h4>
+          <h4>{t('rsp.calibrationTitle')}</h4>
           <p>
-            {calibration.entries.length} 条前向预测 · 已结算 {calibration.report.settledTotal} · 未结算 {calibration.report.openTotal}
-            <span className="muted"> 结算以 RPS/Brier 对无知基线打分（实验判定驱动，确定性）</span>
+            {t('rsp.calibrationLine', {
+              total: calibration.entries.length,
+              settled: calibration.report.settledTotal,
+              open: calibration.report.openTotal,
+            })}
+            <span className="muted"> {t('rsp.calibrationHint')}</span>
           </p>
           {calibration.report.stratified.length > 0 && (
             <ul>
@@ -253,8 +250,11 @@ export function ResearchStatePanel({ runId, runStatus }: { runId: string; runSta
                 <li key={s.kind}>
                   [{s.kind}] n={s.n}
                   {s.insufficientEvidence
-                    ? <span className="muted"> 样本 &lt;30——分层结论"证据不足"，不给出校准数字</span>
-                    : <> 平均技能 vs 无知基线 {s.meanSkillVsUniform >= 0 ? '+' : ''}{s.meanSkillVsUniform.toFixed(3)}（RPS {s.meanRps.toFixed(3)}）</>}
+                    ? <span className="muted"> {t('rsp.calibrationInsufficient')}</span>
+                    : <> {t('rsp.calibrationSkill', {
+                        skill: `${s.meanSkillVsUniform >= 0 ? '+' : ''}${s.meanSkillVsUniform.toFixed(3)}`,
+                        rps: s.meanRps.toFixed(3),
+                      })}</>}
                 </li>
               ))}
             </ul>
@@ -265,13 +265,10 @@ export function ResearchStatePanel({ runId, runStatus }: { runId: string; runSta
       {/* --- lineage summary --- */}
       {lineage !== null && (
         <div className="rs-lineage" data-testid="lineage">
-          <h4>研究谱系</h4>
-          <p>
-            {lineage.nodes.length} 个节点 · {lineage.edges.length} 条边
-            （其中反证/因果修订边 {counterEdges}）
-          </p>
+          <h4>{t('rsp.lineageTitle')}</h4>
+          <p>{t('rsp.lineageLine', { nodes: lineage.nodes.length, edges: lineage.edges.length, counter: counterEdges })}</p>
           <details>
-            <summary>节点明细</summary>
+            <summary>{t('rsp.lineageDetails')}</summary>
             <ul>
               {lineage.nodes.slice(0, 50).map((n) => (
                 <li key={`${n.kind}:${n.id}`}>
