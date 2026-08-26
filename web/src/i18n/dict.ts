@@ -587,6 +587,9 @@ export const zh = {
   'conv.automationPause': '暂停',
   'conv.automationResume': '启用',
   'health.readyPlain': '研究引擎就绪 · {ready}/{total} 个模型可用',
+  'health.routeQuotaDead': '默认模型路线 {route} 近 24 小时内因配额/限流调用失败——现在提交研究会在起步阶段停止',
+  'health.routeFailing': '默认模型路线 {route} 近 24 小时内调用失败——研究可能无法启动',
+  'health.routeSwitchAction': '到设置切换默认路线',
   // ---- Home v2 + Composer v2 + Timeline (HX redo) ----
   'home.greeting': '今天研究什么？',
   'home.greetingSub': '提出一个问题，或拖入论文与数据 —— FAR-Lab 会检索真实文献证据，生成可证伪的假设、排位与研究计划',
@@ -1944,6 +1947,9 @@ export const en: Record<DictKey, string> = {
   'conv.automationPause': 'Pause',
   'conv.automationResume': 'Enable',
   'health.readyPlain': 'Research engine ready · {ready}/{total} models available',
+  'health.routeQuotaDead': 'Default model route {route} failed with quota/rate-limit errors in the last 24h — submitting now will stall at the first stage',
+  'health.routeFailing': 'Default model route {route} failed calls in the last 24h — research may not start',
+  'health.routeSwitchAction': 'Switch the default route in settings',
   // ---- Home v2 + Composer v2 + Timeline (HX redo) ----
   'home.greeting': 'What shall we research today?',
   'home.greetingSub': 'Ask a question, or drop in papers and data — FAR-Lab retrieves real literature evidence and produces falsifiable hypotheses, rankings and a research plan',

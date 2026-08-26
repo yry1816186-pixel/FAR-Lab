@@ -1,13 +1,51 @@
-import { ArrowRight, BookOpenCheck, Scale, SearchCheck } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { ArrowRight, BookOpenCheck, Scale, SearchCheck, TriangleAlert } from 'lucide-react';
 import { useI18n } from '../i18n/LanguageContext';
 import { ResearchComposer } from './ResearchComposer';
 import { healthProjection, useHealth } from '../hooks/useHealth';
+import { listModelConfigs } from '../api/endpoints';
 import { runStatusTone } from '../tones';
 import { runStatusKey } from '../tones';
 import { stageKey } from '../i18n/keys';
 import { TimeAgo } from './common';
 import { runLabel } from './RunsSidebar';
 import type { RunSummary } from '../api/types';
+
+/**
+ * Default-route degradation (2026-08-26 live incident): liveReady means the
+ * key is PRESENT, not that the route is callable — a quota-exhausted default
+ * still reads "引擎就绪" and the next submission dies at scope. Project the
+ * honest state from recent failed runs whose lastError names the default
+ * route. (Deleted failures are invisible to this pass — receipts-level
+ * projection is a server-side follow-up.)
+ */
+function useDefaultRouteDegradation(runs: RunSummary[]): { route: string; kind: 'rate_limited' | 'provider_error'; at: string } | null {
+  const [defaultRoute, setDefaultRoute] = useState<string | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    listModelConfigs(controller.signal)
+      .then((d) => { setDefaultRoute(d.envDefault?.name ?? null); })
+      .catch(() => { /* projection degrades to "no data" — the strip keeps its base state */ });
+    return () => controller.abort();
+  }, []);
+  return useMemo(() => {
+    if (defaultRoute === null || defaultRoute.length === 0) return null;
+    const cutoff = Date.now() - 24 * 3600 * 1000;
+    for (const r of runs) {
+      if (r.status !== 'failed' && r.status !== 'partial') continue;
+      if (Date.parse(r.createdAt) < cutoff) continue;
+      const err = r.lastError ?? '';
+      if (err.includes('model call failed') && err.includes(`${defaultRoute}:`)) {
+        return {
+          route: defaultRoute,
+          kind: err.includes('rate_limited') ? 'rate_limited' : 'provider_error',
+          at: r.createdAt,
+        };
+      }
+    }
+    return null;
+  }, [runs, defaultRoute]);
+}
 
 /**
  * Home (HX v2) — a conversation-first landing in the ChatGPT/LibreChat form
@@ -30,6 +68,7 @@ export function WelcomeView({
   const { t } = useI18n();
   const { health, healthError, checking } = useHealth();
   const hp = healthProjection(health, healthError, checking);
+  const degraded = useDefaultRouteDegradation(runs);
   // Study-deduped recents (M2 parity): the sidebar groups runs by question, so
   // the home list must too — otherwise the same study occupies two of three
   // cards while other recent work is pushed out of sight.
@@ -62,6 +101,15 @@ export function WelcomeView({
               ? t('health.checking')
               : t('health.readyPlain', { ready: hp.liveReady, total: hp.liveTotal })}
         </p>
+        {degraded !== null && (
+          <p className="home-health home-health--degraded" role="alert">
+            <TriangleAlert size={13} aria-hidden="true" />{' '}
+            {t(degraded.kind === 'rate_limited' ? 'health.routeQuotaDead' : 'health.routeFailing', { route: degraded.route })}
+            <button type="button" className="link-button small" onClick={onOpenSettings}>
+              {t('health.routeSwitchAction')}
+            </button>
+          </p>
+        )}
 
         <div className="home-composer">
           <ResearchComposer onCreated={onCreated} onOpenSettings={onOpenSettings} />

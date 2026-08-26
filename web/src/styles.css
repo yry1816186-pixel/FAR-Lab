@@ -2001,6 +2001,22 @@ select option { color: var(--text); background: var(--surface); }
 }
 .home-sub { max-width: 580px; margin: 0; }
 .home-health { display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-aux); color: var(--v2-text-2); }
+/* Default-route degradation alert (2026-08-26 incident): reads as a blocker,
+   not a status color — quota-dead default means the next submission dies. */
+.home-health--degraded {
+  display: flex;
+  color: var(--v2-caution-on-tint);
+  background: var(--v2-caution-tint);
+  border: 1px solid var(--warn-border);
+  border-radius: var(--radius-s);
+  padding: 4px 10px;
+  max-width: 64ch;
+  text-align: left;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.home-health--degraded svg { flex: none; transform: translateY(2px); }
 .home-composer { width: 100%; margin-top: var(--sp-3); text-align: left; }
 .home .example-questions { margin-top: var(--sp-3); display: flex; flex-direction: column; gap: 8px; align-items: center; }
 .home .example-chips { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; }
