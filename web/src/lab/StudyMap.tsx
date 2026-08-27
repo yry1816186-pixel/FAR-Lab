@@ -14,6 +14,7 @@ import { runProgress } from '../api/types';
 import { RELATION_POLARITY } from '../api/types';
 import { runStatusKey } from '../tones';
 import { ClaimInspector } from './ClaimInspector';
+import { useRunTruth } from '../components/detail/ResearchStatePanel';
 import { ScopeReview } from './ScopeReview';
 import { runLabel, type StudyGroup } from '../studies';
 import './lab.css';
@@ -51,6 +52,7 @@ export function StudyMap({
   onMutated: () => void;
 }): JSX.Element {
   const { t } = useI18n();
+  const truth = useRunTruth(run.id);
   const [question, setQuestion] = useState<ResearchQuestion | null>(null);
   const [claims, setClaims] = useState<ScientificClaim[]>([]);
   // First-fetch gates: "empty" is only honest AFTER the fetch settled (the
@@ -173,6 +175,11 @@ export function StudyMap({
         <a className="lab-crumb" href="#/">{t('map.backHome')}</a>
         <span className="lab-title">{t('map.title')}</span>
         <span className={`lab-status lab-status--${run.status}`}>{t(runStatusKey(run.status))}</span>
+        {truth !== null && truth.klass !== 'live' && truth.klass !== 'empty' && (
+          <span className={`lab-status lab-truth--${truth.klass}`} title={t('map.truthHint', { n: truth.totalReceipts })}>
+            {t('map.truthBadge')}
+          </span>
+        )}
         <span className="lab-spacer" />
         <label className="sr-only" htmlFor="map-study-select">{t('map.selectStudy')}</label>
         <select
@@ -336,7 +343,16 @@ export function StudyMap({
                   {t('map.nextSteps')} · <a href={`#run/${run.id}/hypotheses`}>{t('map.linkCompare')}</a> · <a href={`#run/${run.id}/revisions`}>{t('map.linkFeedback')}</a> · <a href={`#run/${run.id}/verify`}>{t('map.linkExport')}</a>
                 </p>
               </div>
-            ) : <p className="queue-empty">{t('map.noActiveHyps')}</p>}
+            ) : (
+              <div className="map-verdict map-verdict--empty">
+                <p className="v-line">{t('map.noActiveHyps')}</p>
+                {run.status === 'partial' && (
+                  <p className="v-line">
+                    {t('map.partialExportPath')} · <a href={`#run/${run.id}/verify`}>{t('map.verifyPanel')}</a>
+                  </p>
+                )}
+              </div>
+            )}
           </section>
         )}
           </>
