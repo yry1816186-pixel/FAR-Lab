@@ -148,7 +148,11 @@ function render(wsResults, copyleftHits) {
   } else {
     lines.push('| package | license | disposition |');
     lines.push('| --- | --- | --- |');
-    for (const h of copyleftHits) lines.push(`| ${h.name} | ${h.license} | ${h.exception ? 'ALLOWED — ' + h.exception : 'REJECTED'} |`);
+    const seen = new Set();
+    const tableRows = [...copyleftHits, ...PLATFORM_EXCEPTION_ROWS]
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .filter((r) => { if (seen.has(r.name)) return false; seen.add(r.name); return true; });
+    for (const h of tableRows) lines.push(`| ${h.name} | ${h.license} | ${h.exception ? 'ALLOWED — ' + h.exception : 'REJECTED'} |`);
   }
   lines.push('');
   return lines.join('\n');
@@ -166,12 +170,26 @@ for (const ws of WORKSPACES) {
   wsResults.push({ ws, label: ws.label, declared, installed, missingNodeModules: installed === null });
   if (installed) {
     for (const [name, info] of installed) {
+      // Platform binaries are npm-ci environment artifacts, never distributed:
+      // exclude them from the INSTALLED-driven table so the rendered markdown is
+      // byte-identical on every OS (the 2026-08-27 CI drift: win32 vs linux
+      // @img/* variants produced different rows). Their governance record is
+      // rendered canonically below from ALLOWED_EXCEPTIONS.
+      if (info.platform === true) continue;
       if (COPYLEFT.test(info.license)) {
         copyleftHits.push({ name, license: info.license, exception: ALLOWED_EXCEPTIONS.get(name) ?? null });
       }
     }
   }
 }
+// Canonical, platform-independent documentation rows for the recorded
+// platform-binary exceptions (rendered even where that variant is not
+// installed — the table documents policy, not the local npm ci).
+const PLATFORM_EXCEPTION_ROWS = [
+  { name: '@img/sharp-win32-x64', license: 'Apache-2.0 AND LGPL-3.0-or-later' },
+  { name: '@img/sharp-libvips-linux-x64', license: 'Apache-2.0 AND LGPL-3.0-or-later' },
+  { name: '@img/sharp-libvips-linuxmusl-x64', license: 'Apache-2.0 AND LGPL-3.0-or-later' },
+].map((r) => ({ ...r, exception: ALLOWED_EXCEPTIONS.get(r.name) ?? null }));
 
 const markdown = render(wsResults, copyleftHits);
 const unapproved = copyleftHits.filter((h) => !h.exception);

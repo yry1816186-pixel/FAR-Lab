@@ -109,5 +109,7 @@ Authoritative policy: `DEPENDENCY_POLICY.md` (runtime dependency set is exactly 
 
 | package | license | disposition |
 | --- | --- | --- |
+| @img/sharp-libvips-linux-x64 | Apache-2.0 AND LGPL-3.0-or-later | ALLOWED — Apache-2.0 AND LGPL-3.0-or-later — Linux twin of the allowed win32 sharp binary; same build-time-only, never-distributed disposition (npm lockfiles carry ALL platforms' optionals, so CI on Linux installs this variant). |
+| @img/sharp-libvips-linuxmusl-x64 | Apache-2.0 AND LGPL-3.0-or-later | ALLOWED — Apache-2.0 AND LGPL-3.0-or-later — musl twin of the allowed win32 sharp binary; same build-time-only, never-distributed disposition. |
 | @img/sharp-win32-x64 | Apache-2.0 AND LGPL-3.0-or-later | ALLOWED — Apache-2.0 AND LGPL-3.0-or-later — optional platform binary of sharp (web devDependency, build-time only). Never distributed: public-release manifest prunes node_modules; end users install sharp directly from npm. No LGPL obligation attaches to FAR-Lab distributions. |
 | jszip | (MIT OR GPL-3.0-or-later) | ALLOWED — (MIT OR GPL-3.0-or-later) — dual-licensed; FAR-Lab elects the MIT alternative at install/build time. No copyleft obligation is triggered. |
