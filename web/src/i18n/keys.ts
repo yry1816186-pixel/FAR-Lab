@@ -43,3 +43,12 @@ export const bindingKey = (b: CitationBindingStatus): DictKey => key('binding', 
 export const bindingZhKey = (b: CitationBindingStatus): DictKey => `binding.${b}.zh` as DictKey;
 export const relationKey = (r: EvidenceRelationType): DictKey => key('relation', r);
 export const retrievalPurposeKey = (p: RetrievalPurpose): DictKey => key('retrieval.purpose', p);
+
+export type RevHypStatus = 'active' | 'promoted' | 'rejected';
+export type RevDecisionReason =
+  | 'hypothesis_status_changed' | 'hypothesis_forked'
+  | 'claim_linked_human' | 'claim_annotated_human'
+  | 'claim_pinned_human' | 'claim_unpinned_human'
+  | 'claim_excluded_human' | 'claim_reclassified_human';
+export const revDecisionKey = (r: RevDecisionReason): DictKey => key('rev.decision', r);
+export const revHypStatusKey = (s: RevHypStatus): DictKey => key('rev.hypStatus', s);

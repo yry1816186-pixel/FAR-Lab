@@ -1,5 +1,5 @@
-import { useCallback } from 'react';
-import { getHypotheses, getRevisions } from '../../api/endpoints';
+import { useCallback, useMemo } from 'react';
+import { getEvents, getHypotheses, getRevisions } from '../../api/endpoints';
 import type { ResearchRun } from '../../api/types';
 import { useResource } from '../../hooks/useResource';
 import { useI18n } from '../../i18n/LanguageContext';
@@ -9,6 +9,8 @@ import { qualityKey } from '../../i18n/keys';
 import { DiffText } from '../../utils/diffview';
 import { qualitySequence } from '../../viz/cross-viz';
 import { InlineIdRefs, buildHypLabels, buildOrdinalLabels } from './InlineIdRefs';
+import { deriveDecisions, hypStatusLabel, STATUS_CHANGE_LABEL_KEY } from './revision-decisions';
+import type { ResearcherDecision } from './revision-decisions';
 
 /**
  * Causal revision chain (mission §33/§34, report §10): every revision MUST link
@@ -16,6 +18,7 @@ import { InlineIdRefs, buildHypLabels, buildOrdinalLabels } from './InlineIdRefs
  * version diff. Missing links render as visible "missing" — never dropped.
  * HX4c: the chain reads in human terms (反馈 N · 假设 №N); raw ids stay one
  * hover away — this is an audit surface, ids remain reachable, never dominant.
+ * Human inspector decisions are projected via revision-decisions.ts.
  */
 export function RevisionsTab({ run }: { run: ResearchRun }): JSX.Element {
   const fetcher = useCallback((signal: AbortSignal) => getRevisions(run.id, signal), [run.id]);
@@ -27,19 +30,71 @@ export function RevisionsTab({ run }: { run: ResearchRun }): JSX.Element {
   const hypLabels = hypRes.data !== null
     ? buildHypLabels(hypRes.data.scorecards, new Map(hypRes.data.hypotheses.map((h) => [h.id, h.statement] as const)))
     : undefined;
+  const evFetcher = useCallback((signal: AbortSignal) => getEvents(run.id, 0, signal), [run.id]);
+  const evRes = useResource(evFetcher, [run.id], `${run.updatedAt}:${run.status}`);
+  const decisions = useMemo(() => deriveDecisions(evRes.data ?? []), [evRes.data]);
 
+  const feedbackCount = res.data?.feedbacks.length ?? 0;
   return (
     <>
       {res.loading ? (
         <Skeleton lines={4} />
       ) : res.error !== null ? (
         <ErrorBox error={res.error} onRetry={res.retry} />
-      ) : res.data === null ? null : res.data.feedbacks.length === 0 ? (
+      ) : res.data === null ? null : feedbackCount === 0 && decisions.length === 0 ? (
         <EmptyState titleKey="rev.empty" />
       ) : (
-        <RevisionChain data={res.data} hypLabels={hypLabels} />
+        <div>
+          {decisions.length > 0 && <DecisionList decisions={decisions} hypLabels={hypLabels} />}
+          {feedbackCount > 0 && <RevisionChain data={res.data} hypLabels={hypLabels} />}
+        </div>
       )}
     </>
+  );
+}
+
+function DecisionList({ decisions, hypLabels }: { decisions: ResearcherDecision[]; hypLabels?: Map<string, string> }): JSX.Element {
+  const { t } = useI18n();
+  return (
+    <div className="revision-chain">
+      <h3 className="minor-title">{t('rev.decisionsTitle')}（{decisions.length}）</h3>
+      <p className="muted small">{t('rev.decisionsHint')}</p>
+      {decisions.map(({ event, labelKey }) => {
+        const detail = (event.detail ?? {}) as {
+          hypothesisId?: unknown; claimId?: unknown;
+          from?: unknown; to?: unknown;
+          excludedReason?: unknown;
+        };
+        const isStatusChange = labelKey === STATUS_CHANGE_LABEL_KEY;
+        return (
+          <div key={event.seq} className="chain-node chain-node--feedback">
+            <div className="chain-node-head">
+              <strong>{t(labelKey)}</strong>
+              <TimeText iso={event.at} />
+              <span className="muted small mono">#{event.seq}</span>
+            </div>
+            <p className="chain-content">
+              {typeof detail.hypothesisId === 'string' && (
+                <InlineIdRefs text={detail.hypothesisId} hypLabels={hypLabels} />
+              )}
+              {typeof detail.claimId === 'string' && <IdText value={detail.claimId} />}
+              {typeof detail.from === 'string' && typeof detail.to === 'string' && (
+                <span className="muted">
+                  {' '}
+                  {t('rev.decisionFromTo', {
+                    from: isStatusChange ? hypStatusLabel(detail.from, t) : detail.from,
+                    to: isStatusChange ? hypStatusLabel(detail.to, t) : detail.to,
+                  })}
+                </span>
+              )}
+              {typeof detail.excludedReason === 'string' && (
+                <span className="muted small"> — {detail.excludedReason}</span>
+              )}
+            </p>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
