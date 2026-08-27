@@ -254,6 +254,20 @@ export interface ScientificClaim {
   /** GRADE-lite deterministic certainty ladder (W-G F-B); downgrade reasons ride along. */
   gradeCertainty?: 'high' | 'moderate' | 'low' | 'very_low';
   downgraded?: string[];
+  /** HX §15 researcher judgement layer (annotate/pin/exclude/reclassify). */
+  researcher?: ClaimResearcherLayer;
+}
+
+/** HX §15 researcher judgement layer on claims (strictly additive; server zod-owned shape). */
+export interface ClaimResearcherLayer {
+  excluded: boolean;
+  excludedAt?: string;
+  excludedReason?: string;
+  pinned: boolean;
+  pinnedAt?: string;
+  classification?: 'core-evidence' | 'counter-evidence' | 'background' | 'methodological-concern';
+  classifiedAt?: string;
+  annotations: { text: string; at: string }[];
 }
 
 // ---- evidence relations (src/domain/evidence.ts) ----
@@ -398,6 +412,19 @@ export interface AchAnalysis {
   removalSensitivity: AchRemovalSensitivity;
   method: string;
   createdAt: string;
+}
+
+/**
+ * HX §15 researcher-adjusted ACH projection (GET /runs/:id/hypotheses): a
+ * read-time recomputation over claims the researcher excluded — the stored
+ * AchAnalysis stays untouched; both views are disclosed. Null until a claim
+ * is excluded.
+ */
+export interface AchResearcherAdjusted {
+  excludedClaimIds: string[];
+  diagnosticity: AchDiagnosticityScore[];
+  removalSensitivity: AchRemovalSensitivity;
+  method: string;
 }
 
 // ---- D-017 literature novelty + D-016 tournament (src/domain/hypothesis.ts / scorecard.ts) ----

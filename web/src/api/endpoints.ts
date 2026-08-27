@@ -865,6 +865,61 @@ export const connectClaim = (
 ): Promise<HypothesisOpResult> =>
   postHypOp(runId, hypId, 'connect', { claimId, direction }, signal);
 
+// ---- HX §15 claim researcher-judgement ops (server: claim-ops.ts) ----
+
+export type ClaimClassification = 'core-evidence' | 'counter-evidence' | 'background' | 'methodological-concern';
+
+/** Op result contract: {claimId, researcher, eventId} (eventId null on idempotent no-op). */
+export interface ClaimOpResult {
+  claimId: string;
+  researcher: import('./types').ClaimResearcherLayer;
+  eventId: number | null;
+}
+
+const claimOpResultOf = (data: unknown): ClaimOpResult => {
+  if (typeof data !== 'object' || data === null
+    || typeof (data as Record<string, unknown>).claimId !== 'string'
+    || typeof (data as Record<string, unknown>).researcher !== 'object') {
+    throw new ApiError({ code: 'unexpected_schema', message: 'claim op: malformed response', retryable: false });
+  }
+  return data as ClaimOpResult;
+};
+
+const postClaimOp = (
+  runId: string,
+  claimId: string,
+  op: 'annotate' | 'pin' | 'unpin' | 'exclude' | 'reinstate' | 'reclassify',
+  body: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<ClaimOpResult> =>
+  api
+    .post(`${BASE}/runs/${encodeURIComponent(runId)}/claims/${encodeURIComponent(claimId)}/${op}`, body, signal)
+    .then(claimOpResultOf);
+
+export const annotateClaim = (runId: string, claimId: string, text: string, signal?: AbortSignal): Promise<ClaimOpResult> =>
+  postClaimOp(runId, claimId, 'annotate', { text }, signal);
+
+export const pinClaim = (runId: string, claimId: string, signal?: AbortSignal): Promise<ClaimOpResult> =>
+  postClaimOp(runId, claimId, 'pin', {}, signal);
+
+export const unpinClaim = (runId: string, claimId: string, signal?: AbortSignal): Promise<ClaimOpResult> =>
+  postClaimOp(runId, claimId, 'unpin', {}, signal);
+
+/** Exclusion changes analysis inputs (researcher-adjusted ACH); the reason is reviewable, so it is required. */
+export const excludeClaim = (runId: string, claimId: string, reason: string, signal?: AbortSignal): Promise<ClaimOpResult> =>
+  postClaimOp(runId, claimId, 'exclude', { reason }, signal);
+
+export const reinstateClaim = (runId: string, claimId: string, signal?: AbortSignal): Promise<ClaimOpResult> =>
+  postClaimOp(runId, claimId, 'reinstate', {}, signal);
+
+export const reclassifyClaim = (
+  runId: string,
+  claimId: string,
+  classification: ClaimClassification,
+  signal?: AbortSignal,
+): Promise<ClaimOpResult> =>
+  postClaimOp(runId, claimId, 'reclassify', { classification }, signal);
+
 // ---- tool integrations (TIS: researcher-wired external tools) ----
 
 /** Defensive projection: only fields the shapes above define survive. */

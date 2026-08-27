@@ -64,10 +64,22 @@ await fetch(`http://127.0.0.1:${PORT}/api/v1/model-configs/active`, {
 
 console.log(`serve-e2e: ready at ${HEALTH} (offline route ${cfg.config.id})`);
 
+// Windows: child.kill('SIGTERM') terminates ONLY the direct child — the
+// serve.mjs process tree can survive Playwright's teardown, leaving a stale
+// listener on PORT that a later run then REUSES with a wrong cwd (API-only,
+// static 404s). taskkill /T kills the tree; POSIX keeps SIGTERM.
+const killTree = () => {
+  if (process.platform === 'win32' && child.pid !== undefined) {
+    spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+  } else {
+    child.kill('SIGTERM');
+  }
+};
 const cleanup = () => {
-  child.kill('SIGTERM');
+  killTree();
   try { rmSync(dataDir, { recursive: true, force: true }); } catch { /* windows locks; tmp survives */ }
 };
 process.on('SIGTERM', () => { cleanup(); process.exit(0); });
 process.on('SIGINT', () => { cleanup(); process.exit(0); });
+process.on('exit', () => { killTree(); });
 child.on('exit', (code) => { process.exit(code ?? 0); });

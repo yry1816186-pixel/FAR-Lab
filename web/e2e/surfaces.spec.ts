@@ -27,10 +27,12 @@ async function provisionStudy(request: APIRequestContext): Promise<string> {
   // Poll to completed: the offline route settles in ~15-30s.
   await expect
     .poll(async () => {
-      const res = await request.get(`/api/v1/runs/${created}`);
-      if (!res.ok()) return 'fetch-error';
-      const run = await res.json() as { status: string };
-      return run.status;
+      try {
+        const res = await request.get(`/api/v1/runs/${created}`);
+        if (!res.ok()) return 'fetch-error';
+        const run = await res.json() as { status: string };
+        return run.status;
+      } catch { return 'conn-error'; } // offline-run event-loop block can RST keep-alive; still must reach completed
     }, { timeout: 90_000, interval: 2_000 })
     .toBe('completed');
   return created;
@@ -115,6 +117,50 @@ test('axe: no critical or serious violations on home or study map (zh, light)', 
   await expect(page.locator('.map-verdict')).toBeVisible();
   const mapViolations = await axeScan(page);
   expect(mapViolations, mapViolations.map((v) => `${v.id}@${v.nodes}`).join(', ')).toEqual([]);
+});
+
+test('§15 claim judgement: exclude -> disclosed marks + adjusted projection -> reinstate', async ({ page, request }) => {
+  await page.goto(`/#study/${studyId}`);
+  await expect(page.locator('.map-claim-row').first()).toBeVisible({ timeout: 30_000 });
+
+  // Baseline: no adjusted band before any exclusion.
+  await expect(page.locator('.map-band--adjusted')).toHaveCount(0);
+
+  // Open the first claim's inspector, arm the exclusion, require the reason.
+  await page.locator('.map-claim-row').first().click();
+  await page.getByRole('button', { name: /排除出分析|Exclude from analysis/ }).click();
+  const reason = page.locator('#insp-exclude-reason');
+  await expect(reason).toBeVisible();
+  const confirm = page.getByRole('button', { name: /确认排除|Confirm exclusion/ });
+  await expect(confirm).toBeDisabled(); // reason required — reviewable judgement
+  await reason.fill('E2E: source methodology does not support the claim as stated');
+  await confirm.click();
+
+  // Inspector discloses the excluded state with the reason + reinstate entry.
+  await expect(page.getByText(/已被你排除|You excluded this claim/)).toBeVisible();
+  await expect(page.getByText(/E2E: source methodology/)).toBeVisible();
+  await expect(page.getByRole('button', { name: /恢复进入分析|Reinstate into analysis/ })).toBeVisible();
+
+  // Close (Esc) — the evidence band keeps the row, marked, never erased.
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.map-claim-row.is-excluded').first()).toBeVisible();
+  await expect(page.locator('.map-claim-row.is-excluded .map-claim-text').first()).toHaveCSS('text-decoration-line', 'line-through');
+
+  // The hypotheses band discloses the researcher-adjusted projection.
+  await expect(page.locator('.map-band--adjusted')).toBeVisible();
+  await expect(page.getByText(/研究者调整视图|Researcher-adjusted view/)).toBeVisible();
+
+  // Server truth: the adjusted projection exists over exactly this claim.
+  const hyp = await (await request.get(`/api/v1/runs/${studyId}/hypotheses`)).json() as { achResearcherAdjusted: { excludedClaimIds: string[] } | null };
+  expect(hyp.achResearcherAdjusted?.excludedClaimIds.length).toBeGreaterThanOrEqual(1);
+
+  // Reinstate: marks clear, the adjusted band disappears, server returns to null.
+  await page.locator('.map-claim-row.is-excluded').first().click();
+  await page.getByRole('button', { name: /恢复进入分析|Reinstate into analysis/ }).click();
+  await expect(page.locator('.map-claim-row.is-excluded')).toHaveCount(0, { timeout: 15_000 });
+  await expect(page.locator('.map-band--adjusted')).toHaveCount(0);
+  const after = await (await request.get(`/api/v1/runs/${studyId}/hypotheses`)).json() as { achResearcherAdjusted: { excludedClaimIds: string[] } | null };
+  expect(after.achResearcherAdjusted).toBeNull();
 });
 
 /** Inject axe-core and return critical/serious violations (impact-filtered, honest scope). */

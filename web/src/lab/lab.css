@@ -459,3 +459,50 @@
 /* Judgment severity split: hard failures (red) vs evidence review (amber) */
 .queue-item.sev-review .q-dot { background: var(--v2-warn, #b8860b); }
 .queue-section-title { font-size: 15px; }
+
+/* §15 researcher layer on the map */
+.map-claim-row.is-excluded .map-claim-text {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  color: var(--v2-text-3);
+}
+.map-claim-row.is-excluded { border-style: dashed; }
+.map-claim-row.is-pinned { border-color: color-mix(in oklab, var(--v2-info) 45%, var(--v2-border)); }
+.map-band--adjusted {
+  background: var(--v2-surface);
+  border: 1px dashed color-mix(in oklab, var(--v2-warn, #b8860b) 55%, var(--v2-border));
+  margin-bottom: 12px;
+}
+.insp-excluded {
+  border: 1px solid color-mix(in oklab, var(--v2-refuted) 40%, var(--v2-border));
+  border-radius: 9px; padding: 12px 14px; margin: 14px 0;
+  display: grid; gap: 6px; justify-items: start;
+}
+.insp-excluded-title { font-size: 12.5px; font-weight: 700; color: var(--v2-refuted); }
+.insp-excluded-why { font-size: 12.5px; color: var(--v2-text-2); line-height: 1.55; }
+.insp-excluded-note { font-size: 11.5px; color: var(--v2-text-3); line-height: 1.6; }
+.insp-reclassify { max-width: 190px; font-size: 12.5px; padding: 6px 8px; border: 1px solid var(--v2-border); border-radius: 7px; background: var(--v2-surface); color: var(--v2-text-1); }
+.insp-annotate { margin-top: 12px; display: grid; gap: 6px; }
+.insp-annotate label { font-size: 12px; font-weight: 600; color: var(--v2-text-2); }
+.insp-annotate textarea {
+  font: inherit; font-size: 13px; line-height: 1.6; width: 100%;
+  border: 1px solid var(--v2-border); border-radius: 8px;
+  background: var(--v2-surface); color: var(--v2-text-1); padding: 9px 11px; resize: vertical;
+}
+.insp-annotate textarea:focus-visible { outline: 2px solid var(--v2-info); outline-offset: 1px; }
+.insp-annotations { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.insp-annotations li {
+  border-left: 2px solid var(--v2-border); padding: 4px 10px;
+  display: grid; gap: 2px;
+}
+.insp-annotation-text { font-size: 12.5px; color: var(--v2-text-2); line-height: 1.55; }
+.insp-annotation-at { font-size: 11px; color: var(--v2-text-3); }
+
+/* §21 CLS fix: reserve a stable band footprint while data materializes so
+   late-arriving rows never shift content above them (measured 0.259 -> budget 0.1). */
+.map-band--reserving { min-height: 168px; }
+/* §21 CLS: the question block grows from its loading text to the full
+   statement after fetch — reserve the settled footprint up front. */
+.map-question { min-height: 92px; }
+.map-scope-row { min-height: 30px; }
+.map-band--reserving { min-height: 260px; }

@@ -4,15 +4,16 @@ import { ErrorBox } from '../components/common';
 import { useI18n } from '../i18n/LanguageContext';
 import type { DictKey } from '../i18n/dict';
 import {
-  cancelRun, connectClaim, editHypothesis, forkHypothesis, getEvidence, getHypotheses,
+  cancelRun, editHypothesis, forkHypothesis, getEvidence, getHypotheses,
   getQuestion, promoteHypothesis, rejectHypothesis, resumeRun,
 } from '../api/endpoints';
 import type {
-  EvidenceRelation, HypothesisCandidate, ResearchQuestion, ResearchRun, RunEvent, ScientificClaim,
+  AchResearcherAdjusted, EvidenceRelation, HypothesisCandidate, ResearchQuestion, ResearchRun, RunEvent, ScientificClaim,
 } from '../api/types';
 import { runProgress } from '../api/types';
 import { RELATION_POLARITY } from '../api/types';
 import { runStatusKey } from '../tones';
+import { ClaimInspector } from './ClaimInspector';
 import { runLabel, type StudyGroup } from '../studies';
 import './lab.css';
 
@@ -26,9 +27,14 @@ import './lab.css';
  * linking ride the real op contracts and enter the causal revision chain.
  */
 
+/**
+ * Inspector target by ID, resolved against the LATEST science objects at
+ * render time — ops mutate the researcher layer / hypothesis status and the
+ * inspector must reflect the post-op state, not the pre-click snapshot.
+ */
 type Insp =
-  | { kind: 'claim'; claim: ScientificClaim }
-  | { kind: 'hyp'; hyp: HypothesisCandidate; rank: number };
+  | { kind: 'claim'; claimId: string }
+  | { kind: 'hyp'; hypId: string; rank: number };
 
 const LIVE_REFETCH_MS = 4_000;
 
@@ -46,9 +52,13 @@ export function StudyMap({
   const { t } = useI18n();
   const [question, setQuestion] = useState<ResearchQuestion | null>(null);
   const [claims, setClaims] = useState<ScientificClaim[]>([]);
+  // First-fetch gates: "empty" is only honest AFTER the fetch settled (the
+  // empty->band swap measured as the map's dominant layout shift, §21).
+  const [scienceLoaded, setScienceLoaded] = useState(false);
   const [relations, setRelations] = useState<EvidenceRelation[]>([]);
   const [hyps, setHyps] = useState<HypothesisCandidate[]>([]);
   const [ranks, setRanks] = useState<Map<string, number>>(new Map());
+  const [adjusted, setAdjusted] = useState<AchResearcherAdjusted | null>(null);
   const [insp, setInsp] = useState<Insp | null>(null);
   const [loadError, setLoadError] = useState<ApiError | null>(null);
   const [lifecycleBusy, setLifecycleBusy] = useState(false);
@@ -58,14 +68,15 @@ export function StudyMap({
     const c = new AbortController();
     void getQuestion(rid, c.signal).then(setQuestion).catch(() => setQuestion(null));
     void getEvidence(rid, c.signal)
-      .then((e) => { setClaims(e.claims); setRelations(e.relations); })
-      .catch((e: unknown) => { setClaims([]); setRelations([]); if (e instanceof ApiError) setLoadError(e); });
+      .then((e) => { setClaims(e.claims); setRelations(e.relations); setScienceLoaded(true); })
+      .catch((e: unknown) => { setClaims([]); setRelations([]); setScienceLoaded(true); if (e instanceof ApiError) setLoadError(e); });
     void getHypotheses(rid, c.signal)
       .then((h) => {
         setHyps(h.hypotheses);
         setRanks(new Map(h.scorecards.map((s) => [s.hypothesisId, s.rank] as const)));
+        setAdjusted(h.achResearcherAdjusted);
       })
-      .catch(() => { setHyps([]); setRanks(new Map()); });
+      .catch(() => { setHyps([]); setRanks(new Map()); setAdjusted(null); });
   }, []);
 
   // Reload science objects on run switch AND on lifecycle transitions
@@ -80,7 +91,7 @@ export function StudyMap({
     if (focusClaimId == null || claims.length === 0) return;
     const hit = claims.find((c) => c.id === focusClaimId);
     if (hit === undefined) return;
-    setInsp({ kind: 'claim', claim: hit });
+    setInsp({ kind: 'claim', claimId: hit.id });
     onClaimFocused?.();
   }, [focusClaimId, claims, onClaimFocused]);
 
@@ -115,7 +126,15 @@ export function StudyMap({
 
   const claimOrder = useMemo(() => claims
     .map((c, i) => ({ c, i, bal: balances.get(c.id) ?? { supports: 0, counters: 0 } }))
-    .sort((a, b) => (b.bal.counters - a.bal.counters) || (b.bal.supports + b.bal.counters - a.bal.supports - a.bal.counters) || (a.i - b.i)), [claims, balances]);
+    // Researcher layer shapes the band (§15): pinned first. Excluded rows
+    // KEEP their position, weakened in place — the judgement must stay
+    // disclosed in its original context (never sunk out of reach).
+    .sort((a, b) => {
+      const pa = a.c.researcher?.pinned === true ? 0 : 1;
+      const pb = b.c.researcher?.pinned === true ? 0 : 1;
+      if (pa !== pb) return pa - pb;
+      return (b.bal.counters - a.bal.counters) || (b.bal.supports + b.bal.counters - a.bal.supports - a.bal.counters) || (a.i - b.i);
+    }), [claims, balances]);
 
   const activeHyps = useMemo(() => hyps
     .filter((h) => h.status === undefined || h.status === 'active')
@@ -215,23 +234,34 @@ export function StudyMap({
         <section className="map-node">
           <p className="map-node-label">{t('map.evidenceLabel')}</p>
           {claims.length === 0 && !running
-            ? <p className="queue-empty">{t('map.evidenceEmpty')}</p>
+            ? scienceLoaded
+              ? <p className="queue-empty">{t('map.evidenceEmpty')}</p>
+              : <div className="map-band map-band--reserving" aria-hidden="true" />
             : (
               <div className="map-band">
-                {claimOrder.slice(0, 7).map(({ c, bal }) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    className={`map-claim-row${bal.counters > 0 ? ' is-counter' : ''}`}
-                    onClick={() => setInsp({ kind: 'claim', claim: c })}
-                  >
-                    <span aria-hidden="true" style={{ fontSize: 13, color: bal.counters > 0 ? 'var(--v2-refuted-on-tint)' : 'var(--v2-verified-on-tint)' }}>
-                      {bal.counters > 0 ? '✗' : bal.supports > 0 ? '✓' : '–'}
-                    </span>
-                    <span className="map-claim-text">{c.text}</span>
-                    <span className="map-claim-meta">{bal.supports > 0 && `✓${bal.supports}`}{bal.counters > 0 && ` ✗${bal.counters}`}</span>
-                  </button>
-                ))}
+                {claimOrder.slice(0, 7).map(({ c, bal }) => {
+                  const excluded = c.researcher?.excluded === true;
+                  const pinned = c.researcher?.pinned === true;
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      className={`map-claim-row${bal.counters > 0 && !excluded ? ' is-counter' : ''}${excluded ? ' is-excluded' : ''}${pinned ? ' is-pinned' : ''}`}
+                      onClick={() => setInsp({ kind: 'claim', claimId: c.id })}
+                    >
+                      <span aria-hidden="true" style={{ fontSize: 13, color: excluded ? 'var(--v2-text-3)' : bal.counters > 0 ? 'var(--v2-refuted-on-tint)' : 'var(--v2-verified-on-tint)' }}>
+                        {excluded ? '⊘' : pinned ? '◆' : bal.counters > 0 ? '✗' : bal.supports > 0 ? '✓' : '–'}
+                      </span>
+                      <span className="map-claim-text">{c.text}</span>
+                      <span className="map-claim-meta">
+                        {excluded && t('map.claimExcluded')}
+                        {!excluded && pinned && t('map.claimPinned')}
+                        {!excluded && bal.supports > 0 && `✓${bal.supports}`}
+                        {!excluded && bal.counters > 0 && ` ✗${bal.counters}`}
+                      </span>
+                    </button>
+                  );
+                })}
                 {claimOrder.length > 7 && <p className="queue-empty">{t('map.moreClaims', { n: claimOrder.length - 7 })}</p>}
               </div>
             )}
@@ -239,8 +269,21 @@ export function StudyMap({
 
         <section className="map-node">
           <p className="map-node-label">{t('map.hypsLabel')}</p>
+          {adjusted !== null && (
+            <div className="map-band map-band--adjusted" role="status">
+              <p className="mb-title">{t('map.adjustedTitle', { n: adjusted.excludedClaimIds.length })}</p>
+              <p className="mb-line">
+                {adjusted.removalSensitivity.stable
+                  ? t('map.adjustedStable')
+                  : t('map.adjustedOrderChanged')}
+              </p>
+              <p className="mb-line">{t('map.adjustedDisclosed')}</p>
+            </div>
+          )}
           {hyps.length === 0 && !running
-            ? <p className="queue-empty">{t('map.hypsEmpty')}</p>
+            ? scienceLoaded
+              ? <p className="queue-empty">{t('map.hypsEmpty')}</p>
+              : <div className="map-hyp-row map-band--reserving" aria-hidden="true" />
             : (
               <div className="map-hyp-row">
                 {activeHyps.slice(0, 6).map((h) => {
@@ -252,7 +295,7 @@ export function StudyMap({
                       key={h.id}
                       type="button"
                       className={`map-hyp-card${rank === 1 ? ' is-top' : ''}`}
-                      onClick={() => setInsp({ kind: 'hyp', hyp: h, rank: rank ?? 99 })}
+                      onClick={() => setInsp({ kind: 'hyp', hypId: h.id, rank: rank ?? 99 })}
                     >
                       <span className="map-hyp-rank">#{rank ?? '—'}{rank === 1 && t('map.topMark')}</span>
                       <span className="map-hyp-statement">{h.statement}</span>
@@ -283,16 +326,39 @@ export function StudyMap({
         )}
       </main>
 
-      {insp !== null && (
-        <Inspector
-          insp={insp}
-          run={run}
-          hyps={hyps}
-          balances={balances}
-          onClose={() => setInsp(null)}
-          onMutated={() => { onMutated(); loadScience(run.id); }}
-        />
-      )}
+      {insp !== null && (insp.kind === 'claim'
+        ? (() => {
+            // Resolve the claim id against the LATEST list: researcher-layer
+            // ops change the object; the inspector must show post-op truth.
+            const live = claims.find((c) => c.id === insp.claimId);
+            if (live === undefined) return null; // vanished (deleted) — render nothing; next open resets
+            return (
+              <Inspector
+                insp={insp}
+                run={run}
+                liveClaim={live}
+                hyps={hyps}
+                balances={balances}
+                onClose={() => setInsp(null)}
+                onMutated={() => { onMutated(); loadScience(run.id); }}
+              />
+            );
+          })()
+        : (() => {
+            const live = hyps.find((h) => h.id === insp.hypId);
+            if (live === undefined) return null; // vanished (rejected/forked away) — render nothing
+            return (
+              <Inspector
+                insp={insp}
+                run={run}
+                liveHyp={live}
+                hyps={hyps}
+                balances={balances}
+                onClose={() => setInsp(null)}
+                onMutated={() => { onMutated(); loadScience(run.id); }}
+              />
+            );
+          })())}
     </div>
   );
 }
@@ -372,9 +438,12 @@ function PartialBand({ run, claims, hyps, onResume, busy }: {
 }
 
 /** Object inspector — where scientific decisions are made, not just viewed. */
-function Inspector({ insp, run, hyps, balances, onClose, onMutated }: {
+function Inspector({ insp, run, liveClaim, liveHyp, hyps, balances, onClose, onMutated }: {
   insp: Insp;
   run: ResearchRun;
+  /** Live (post-op) object for the inspected id; the parent guarantees presence. */
+  liveClaim?: ScientificClaim;
+  liveHyp?: HypothesisCandidate;
   hyps: HypothesisCandidate[];
   balances: Map<string, { supports: number; counters: number }>;
   onClose: () => void;
@@ -386,16 +455,11 @@ function Inspector({ insp, run, hyps, balances, onClose, onMutated }: {
   const [editing, setEditing] = useState(false);
   const [editStatement, setEditStatement] = useState('');
   const [editNote, setEditNote] = useState('');
-  // claim→hyp linking (from the claim inspector)
-  const [linkHypId, setLinkHypId] = useState('');
-  const [linkDir, setLinkDir] = useState<'supports' | 'counters'>('supports');
   const errRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setEditing(false);
     setOpError(null);
-    setLinkHypId('');
-    setLinkDir('supports');
   }, [insp]);
 
   const op = async (act: () => Promise<unknown>): Promise<void> => {
@@ -418,42 +482,18 @@ function Inspector({ insp, run, hyps, balances, onClose, onMutated }: {
       {opError !== null && <div ref={errRef} tabIndex={-1}><ErrorBox error={opError} onRetry={onClose} /></div>}
 
       {insp.kind === 'claim' ? (
-        <>
-          <h3>{t('map.inspClaim')}</h3>
-          <p className="insp-body">{insp.claim.text}</p>
-          {insp.claim.locators.slice(0, 2).map((loc, i) => (
-            <blockquote key={i} className="insp-quote">“{loc.quote}”</blockquote>
-          ))}
-          <p className="insp-meta">
-            {t('map.inspBinding', { status: insp.claim.bindingStatus })}
-            {insp.claim.gradeCertainty !== undefined && t('map.inspCertainty', { n: insp.claim.gradeCertainty })}
-            {balances.get(insp.claim.id) !== undefined && t('map.inspImpact', {
-              s: balances.get(insp.claim.id)!.supports, c: balances.get(insp.claim.id)!.counters,
-            })}
-          </p>
-          {hyps.length > 0 && (
-            <div className="insp-link">
-              <p className="insp-link-title">{t('map.linkClaimTitle')}</p>
-              <select aria-label={t('map.linkHypLabel')} value={linkHypId} onChange={(e) => setLinkHypId(e.target.value)}>
-                <option value="">{t('map.linkPickHyp')}</option>
-                {hyps.map((h) => <option key={h.id} value={h.id}>{h.statement.slice(0, 70)}</option>)}
-              </select>
-              <select aria-label={t('map.linkDirLabel')} value={linkDir} onChange={(e) => setLinkDir(e.target.value as 'supports' | 'counters')}>
-                <option value="supports">{t('map.linkDirSupports')}</option>
-                <option value="counters">{t('map.linkDirCounters')}</option>
-              </select>
-              <button
-                type="button"
-                className="mb-act mb-act--primary"
-                disabled={busy || linkHypId.length === 0}
-                onClick={() => { void op(() => connectClaim(run.id, linkHypId, insp.claim.id, linkDir)); }}
-              >
-                {t('map.linkApply')}
-              </button>
-            </div>
-          )}
-        </>
-      ) : (
+        liveClaim !== undefined && (
+          <ClaimInspector
+            claim={liveClaim}
+            run={run}
+            hyps={hyps}
+            balances={balances}
+            busy={busy}
+            op={op}
+            onError={setOpError}
+          />
+        )
+      ) : liveHyp === undefined ? null : (
         <>
           <h3>{t('map.inspHyp', { rank: insp.rank })}</h3>
           {editing ? (
@@ -479,7 +519,7 @@ function Inspector({ insp, run, hyps, balances, onClose, onMutated }: {
                   className="mb-act mb-act--primary"
                   disabled={busy || editNote.trim().length === 0 || editStatement.trim().length === 0}
                   onClick={() => {
-                    void op(() => editHypothesis(run.id, insp.hyp.id, {
+                    void op(() => editHypothesis(run.id, liveHyp.id, {
                       statement: editStatement.trim(),
                       note: editNote.trim(),
                     }).then(() => setEditing(false)));
@@ -493,23 +533,23 @@ function Inspector({ insp, run, hyps, balances, onClose, onMutated }: {
             </div>
           ) : (
             <>
-              <p className="insp-body">{insp.hyp.statement}</p>
+              <p className="insp-body">{liveHyp.statement}</p>
               <p className="insp-meta">
-                {t('map.inspMechanism', { text: insp.hyp.mechanism })}
-                {insp.hyp.falsification?.falsificationCondition !== undefined && t('map.inspFalsification', { text: insp.hyp.falsification.falsificationCondition })}
-                {(insp.hyp.uncertainties ?? []).length > 0 && t('map.inspUncertainties', { text: (insp.hyp.uncertainties ?? []).join('；') })}
+                {t('map.inspMechanism', { text: liveHyp.mechanism })}
+                {liveHyp.falsification?.falsificationCondition !== undefined && t('map.inspFalsification', { text: liveHyp.falsification.falsificationCondition })}
+                {(liveHyp.uncertainties ?? []).length > 0 && t('map.inspUncertainties', { text: (liveHyp.uncertainties ?? []).join('；') })}
               </p>
               <div className="insp-ops">
                 <p className="insp-ops-title">{t('map.opsTitle')}</p>
                 <div className="insp-ops-row">
-                  <button type="button" className="mb-act" disabled={busy} onClick={() => { void op(() => promoteHypothesis(run.id, insp.hyp.id)); }}>{t('map.opPromote')}</button>
-                  <button type="button" className="mb-act" disabled={busy} onClick={() => { void op(() => rejectHypothesis(run.id, insp.hyp.id)); }}>{t('map.opReject')}</button>
-                  <button type="button" className="mb-act" disabled={busy} onClick={() => { void op(() => forkHypothesis(run.id, insp.hyp.id)); }}>{t('map.opFork')}</button>
+                  <button type="button" className="mb-act" disabled={busy} onClick={() => { void op(() => promoteHypothesis(run.id, liveHyp.id)); }}>{t('map.opPromote')}</button>
+                  <button type="button" className="mb-act" disabled={busy} onClick={() => { void op(() => rejectHypothesis(run.id, liveHyp.id)); }}>{t('map.opReject')}</button>
+                  <button type="button" className="mb-act" disabled={busy} onClick={() => { void op(() => forkHypothesis(run.id, liveHyp.id)); }}>{t('map.opFork')}</button>
                   <button
                     type="button"
                     className="mb-act"
                     disabled={busy}
-                    onClick={() => { setEditStatement(insp.hyp.statement); setEditNote(''); setEditing(true); }}
+                    onClick={() => { setEditStatement(liveHyp.statement); setEditNote(''); setEditing(true); }}
                   >
                     {t('map.opEdit')}
                   </button>

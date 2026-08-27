@@ -11,7 +11,7 @@
  */
 import { ApiError } from './client';
 import type {
-  AchAnalysis, EvidenceBody, EvidenceRelation, FeedbackSignal, HypothesisCandidate, HypothesisScorecard, HypothesisTournament,
+  AchAnalysis, AchResearcherAdjusted, EvidenceBody, EvidenceRelation, FeedbackSignal, HypothesisCandidate, HypothesisScorecard, HypothesisTournament,
   ProvenanceReceipt, ResearchPlan, ResearchQuestion, ResearchRun, RunEvent,
   RunSummary, ScientificClaim, SearchResponse, SearchHit, SourceDocument, VersionDiff, Revision,
 } from './types';
@@ -183,6 +183,10 @@ const looksLikeEvidenceBody = (v: unknown): v is EvidenceBody =>
 const looksLikeAchAnalysis = (v: unknown): v is AchAnalysis =>
   isRecord(v) && Array.isArray(v.diagnosticity) && isRecord(v.removalSensitivity);
 
+/** HX §15 adjusted projection: same skeleton minus identity fields. */
+const looksLikeAchAdjusted = (v: unknown): v is AchResearcherAdjusted =>
+  isRecord(v) && Array.isArray(v.diagnosticity) && Array.isArray(v.excludedClaimIds) && isRecord(v.removalSensitivity);
+
 export interface HypothesesBundle {
   hypotheses: HypothesisCandidate[];
   scorecards: HypothesisScorecard[];
@@ -192,6 +196,8 @@ export interface HypothesesBundle {
   evidenceBodies: EvidenceBody[];
   /** Wave-S g9 ACH audit; null on older runs. */
   achAnalysis: AchAnalysis | null;
+  /** HX §15 researcher-adjusted projection; null until a claim is excluded. */
+  achResearcherAdjusted: AchResearcherAdjusted | null;
 }
 
 export function normalizeHypotheses(data: unknown): HypothesesBundle {
@@ -205,6 +211,7 @@ export function normalizeHypotheses(data: unknown): HypothesesBundle {
         tournament: looksLikeTournament(data.tournament) ? data.tournament : null,
         evidenceBodies: Array.isArray(data.evidenceBodies) ? data.evidenceBodies.filter(looksLikeEvidenceBody) : [],
         achAnalysis: looksLikeAchAnalysis(data.achAnalysis) ? data.achAnalysis : null,
+        achResearcherAdjusted: looksLikeAchAdjusted(data.achResearcherAdjusted) ? data.achResearcherAdjusted : null,
       };
     }
   }
@@ -218,7 +225,7 @@ export function normalizeHypotheses(data: unknown): HypothesesBundle {
     else if (looksLikeScorecard(item)) scorecards.push(item);
   }
   if (items.length > 0 && hypotheses.length + scorecards.length === 0) throw schemaError('hypotheses');
-  return { hypotheses, scorecards, tournament: null, evidenceBodies: [], achAnalysis: null };
+  return { hypotheses, scorecards, tournament: null, evidenceBodies: [], achAnalysis: null, achResearcherAdjusted: null };
 }
 
 // ---- feedbacks / revisions / version diffs ----
