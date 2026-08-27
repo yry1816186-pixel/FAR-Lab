@@ -60,10 +60,13 @@ test('six core tasks: measured AFTER walkthrough', async ({ page }) => {
   // ---- T4 找到一条证据的原文: claim row -> inspector shows the locator quote
   t0 = now(); clicks = 1;
   const firstClaim = page.locator('.map-claim-row, [class*="claim-row"]').first();
+  const claimText = (await firstClaim.innerText()).replace(/^[✓✗–⊘◆]\s*/, '').trim();
   await firstClaim.click();
   const inspector = page.locator('.lab-inspector, [role="dialog"]');
   await expect(inspector).toBeVisible({ timeout: 10_000 });
-  await expect(inspector).toContainText(/pain|mindfulness|back/i, { timeout: 10_000 });
+  // Grounded-source assertion: the clicked claim's text appears verbatim in
+  // the inspector (counter-first ordering decides WHICH claim is first).
+  await expect(inspector).toContainText(claimText.slice(0, 40), { timeout: 10_000 });
   await page.keyboard.press('Escape');
   metrics.push({ task: 'T4 找到证据原文 (claim -> inspector locator)', seconds: Number(((now() - t0) / 1000).toFixed(1)), primaryActions: clicks, note: 'keyboard Esc returns; quote grounded in the retrieved source' });
 
