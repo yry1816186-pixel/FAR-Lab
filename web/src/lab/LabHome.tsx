@@ -10,6 +10,9 @@ import { groupStudies, runLabel } from '../studies';
 import { useHealth } from '../hooks/useHealth';
 import './lab.css';
 
+/** Studies shown before the expand toggle (search overrides). */
+const STUDY_PREVIEW = 10;
+
 /**
  * Lab home — the product's front door (Research Experience Architecture A).
  * Three researcher-owned zones: what needs my judgment now (intervention
@@ -36,6 +39,7 @@ export function LabHome({
   const fresh = !runsLoading && runs.length === 0;
   const [counterStudyIds, setCounterStudyIds] = useState<string[]>([]);
   const [query, setQuery] = useState('');
+  const [showAllStudies, setShowAllStudies] = useState(false);
   const { health, healthError, checking } = useHealth();
 
   // Judgment items: counter-evidence studies (top completed studies probed).
@@ -66,6 +70,12 @@ export function LabHome({
       t(runStatusKey(r.status)).toLowerCase().includes(needle));
     return groupStudies(filtered);
   }, [runs, query, t]);
+
+  // Density (§8.6): the index previews recent studies and expands on demand —
+  // a 35-study library must not scroll the judgment queue off the first screen.
+  // Searching overrides the preview (matches are the intent).
+  const searching = query.trim().length > 0;
+  const visibleStudies = searching ? studies.slice(0, 50) : showAllStudies ? studies : studies.slice(0, STUDY_PREVIEW);
 
   const probeSet = new Set(counterStudyIds);
   const counterStudies = runs.filter((r) => probeSet.has(r.id));
@@ -117,7 +127,7 @@ export function LabHome({
                         title={runLabel(r).slice(0, 90)}
                         why={t('labhome.attentionWhy', {
                           status: t(runStatusKey(r.status)),
-                          reason: (r.lastError ?? t('labhome.seeStudyMap')).slice(0, 110),
+                          reason: failureCause(r.lastError ?? t('labhome.seeStudyMap')),
                         })}
                         action={t('labhome.handle')}
                         onClick={() => onOpenStudy(r.id)}
@@ -125,7 +135,7 @@ export function LabHome({
                     ))}
                     {counterStudies.map((r) => (
                       <QueueRow
-                        key={`ctr-${r.id}`} sev="attention"
+                        key={`ctr-${r.id}`} sev="review"
                         title={runLabel(r).slice(0, 90)}
                         why={t('labhome.counterWhy')}
                         action={t('labhome.review')}
@@ -153,7 +163,7 @@ export function LabHome({
               <p className="queue-section-sub">{t('labhome.studiesSub')}</p>
               {studies.length === 0
                 ? <p className="queue-empty">{t('labhome.studiesNoMatch')}</p>
-                : studies.map((g) => {
+                : visibleStudies.map((g) => {
                   const active = g.activeCount > 0;
                   return (
                     <button
@@ -179,6 +189,18 @@ export function LabHome({
                     </button>
                   );
                 })}
+              {!searching && studies.length > STUDY_PREVIEW && (
+                <button
+                  type="button"
+                  className="lab-studies-toggle"
+                  aria-expanded={showAllStudies}
+                  onClick={() => setShowAllStudies((v) => !v)}
+                >
+                  {showAllStudies
+                    ? t('labhome.collapseStudies')
+                    : t('labhome.showAllStudies', { n: studies.length })}
+                </button>
+              )}
             </section>
 
             {conversations.length > 0 && (
@@ -269,8 +291,18 @@ function FirstUse({ health, healthError, checking, onNewResearch, onOpenSettings
   );
 }
 
+/** Researcher-language failure causes (§14: internal jargon recedes; raw
+ * strings stay reachable via the title tooltip for diagnosis). */
+function failureCause(raw: string): string {
+  if (/rate_limited|429/.test(raw)) return '模型路线限流——稍后恢复即可续跑';
+  if (/quota_exceeded|HTTP 402/.test(raw)) return '模型配额耗尽——充值或切换路线后可续跑';
+  if (/timeout|budget \d+ms/.test(raw)) return '模型响应超时——可从断点恢复';
+  if (/network|ECONN|fetch failed/.test(raw)) return '网络错误——可从断点恢复';
+  return raw.length > 90 ? `${raw.slice(0, 90)}…` : raw;
+}
+
 function QueueRow({ sev, title, why, action, onClick }: {
-  sev: 'live' | 'attention';
+  sev: 'live' | 'attention' | 'review';
   title: string;
   why: string;
   action: string;

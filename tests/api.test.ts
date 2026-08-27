@@ -10,6 +10,7 @@ import type { ApiServer } from '../src/server/api.js';
 import { openDb } from '../src/persistence/db.js';
 import { createTestStubProvider } from '../src/providers/test-stub.js';
 import {
+  buildAchAnalysis,
   CorpusSnapshot,
   EvidenceRelation,
   FeedbackSignal,
@@ -1409,5 +1410,111 @@ describe('GET /api/v1/runs/:id/package (CPS-7 full-package download)', () => {
 
     const ghost = await fetch(`${base}/api/v1/runs/${'run_' + 'b'.repeat(24)}/package`);
     expect(ghost.status).toBe(404);
+  });
+});
+
+
+// ---- HX §15 evidence annotation/classification ops (HTTP surface; unit semantics in claim-ops.test.ts) ----
+
+describe('POST /api/v1/runs/:id/claims/:claimId/<op> (HX §15)', () => {
+  it('annotates over HTTP: 200, annotation persisted, audit event appended', async () => {
+    const { status, body } = await postJson(base + '/api/v1/runs/' + run1 + '/claims/' + run1ClaimId + '/annotate', { text: 'n=12, imprecision concern' });
+    expect(status).toBe(200);
+    expect(body.researcher.annotations).toHaveLength(1);
+    expect(app.store.getObject('claim', run1ClaimId)?.researcher.annotations[0]?.text).toContain('n=12');
+    const ev = app.store.listEvents(run1).find((e) => e.detail?.reason === 'claim_annotated_human');
+    expect(ev?.detail).toMatchObject({ claimId: run1ClaimId, actor: 'human' });
+  });
+
+  it('400s when exclude has no reason', async () => {
+    const bad = await postJson(base + '/api/v1/runs/' + run1 + '/claims/' + run1ClaimId + '/exclude', {});
+    expect(bad.status).toBe(400);
+    expect(bad.body.error.code).toBe('validation');
+    expect(bad.body.error.message).toContain('reason');
+  });
+
+  it('404s cross-run claim ops (ownership) and unknown runs', async () => {
+    const cross = await postJson(base + '/api/v1/runs/' + run2 + '/claims/' + run1ClaimId + '/exclude', { reason: 'x' });
+    expect(cross.status).toBe(404);
+    expect(cross.body.error.code).toBe('target_not_found');
+    const ghostRun = 'run_' + '9'.repeat(26);
+    const ghost = await postJson(base + '/api/v1/runs/' + ghostRun + '/claims/' + run1ClaimId + '/annotate', { text: 'x' });
+    expect(ghost.status).toBe(404);
+    expect(ghost.body.error.runId).toBe(ghostRun);
+  });
+
+  it('exclusion drives the researcher-adjusted ACH projection on /hypotheses (§15 downstream semantics)', async () => {
+    // Seed two hypotheses + relations so diagnosticity has 2 columns, plus a stored ACH.
+    const hyp2id = newId('hyp');
+    app.store.putObject('hypothesis', HypothesisCandidate.parse({
+      id: hyp2id,
+      runId: run1,
+      version: 0,
+      statement: 'Off-targeting is driven by chromatin accessibility',
+      mechanism: 'open chromatin increases bystander deamination',
+      derivation: { strategy: 'mechanism_driven', rationale: 'from accessibility evidence', inputClaimIds: [] },
+      assumptions: [],
+      predictions: ['accessible loci show higher off-target rate'],
+      supportingClaimIds: [],
+      counterClaimIds: [],
+      uncertainties: [],
+      noveltyLabel: 'evidence_grounded',
+      testability: 'testable_with_data',
+      clusterKey: 'chromatin',
+      createdAt: new Date().toISOString(),
+    }));
+    const rel = EvidenceRelation.parse({
+      id: newId('ev'),
+      runId: run1,
+      relation: 'supports',
+      claimId: run1ClaimId,
+      targetHypothesisId: hyp1,
+      rationale: 'seeded for ACH projection test',
+      uncertainties: [],
+      createdAt: new Date().toISOString(),
+    });
+    app.store.putObject('evidence_relation', rel);
+    const ach = buildAchAnalysis({
+      id: newId('ach'),
+      runId: run1,
+      hypothesisIds: [hyp1, hyp2id],
+      relations: [rel],
+      now: new Date().toISOString(),
+    });
+    app.store.putObject('ach_analysis', ach);
+
+    // Before any exclusion: no projection noise.
+    const plain = await getJson(base + '/api/v1/runs/' + run1 + '/hypotheses');
+    expect(plain.body.achResearcherAdjusted).toBeNull();
+    expect(plain.body.achAnalysis.id).toBe(ach.id);
+
+    // Exclude the claim that carries the only relation.
+    const ex = await postJson(base + '/api/v1/runs/' + run1 + '/claims/' + run1ClaimId + '/exclude', { reason: 'retracted (test)' });
+    expect(ex.status).toBe(200);
+
+    const adjusted = await getJson(base + '/api/v1/runs/' + run1 + '/hypotheses');
+    const proj = adjusted.body.achResearcherAdjusted;
+    expect(proj).not.toBeNull();
+    expect(proj.excludedClaimIds).toEqual([run1ClaimId]);
+    expect(proj.method).toBe('heuer-diagnosticity-v1-researcher-adjusted');
+    // The excluded claim's relations are gone from the projection: no diagnosticity
+    // row references it (a single-hypothesis row cannot discriminate anyway).
+    expect(proj.diagnosticity.every((d: { claimId: string }) => d.claimId !== run1ClaimId)).toBe(true);
+    // The STORED analysis is untouched — dual view, not an overwrite.
+    expect(app.store.getObject('ach_analysis', ach.id)?.diagnosticity).toEqual(ach.diagnosticity);
+
+    // Reinstate: the projection disappears again (no stale adjustment).
+    const back = await postJson(base + '/api/v1/runs/' + run1 + '/claims/' + run1ClaimId + '/reinstate', {});
+    expect(back.status).toBe(200);
+    const after = await getJson(base + '/api/v1/runs/' + run1 + '/hypotheses');
+    expect(after.body.achResearcherAdjusted).toBeNull();
+  });
+
+  it('reclassifies over HTTP with from/to audit', async () => {
+    const res = await postJson(base + '/api/v1/runs/' + run1 + '/claims/' + run1ClaimId + '/reclassify', { classification: 'background', note: 'context only' });
+    expect(res.status).toBe(200);
+    expect(res.body.researcher.classification).toBe('background');
+    const ev = app.store.listEvents(run1).find((e) => e.detail?.reason === 'claim_reclassified_human');
+    expect(ev?.detail).toMatchObject({ claimId: run1ClaimId, to: 'background', actor: 'human' });
   });
 });

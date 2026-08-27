@@ -446,3 +446,16 @@
   padding: 3px; border-radius: 5px; display: inline-flex;
 }
 .seed-card-x:hover { color: var(--v2-text-1); background: var(--v2-border); }
+
+/* Studies index density: preview + expand toggle */
+.lab-studies-toggle {
+  display: block; width: 100%; text-align: center; cursor: pointer;
+  font-size: 12.5px; color: var(--v2-info);
+  background: none; border: 1px dashed var(--v2-border);
+  border-radius: 8px; padding: 8px 12px; margin-top: 4px;
+}
+.lab-studies-toggle:hover { border-color: var(--v2-info); }
+
+/* Judgment severity split: hard failures (red) vs evidence review (amber) */
+.queue-item.sev-review .q-dot { background: var(--v2-warn, #b8860b); }
+.queue-section-title { font-size: 15px; }

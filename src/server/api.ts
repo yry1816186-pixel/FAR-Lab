@@ -20,6 +20,9 @@ import { buildLineageGraph } from '../app/lineage.js';
 import { runEvaluators } from '../app/evaluators.js';
 import { runResearchAction, ActionError } from './actions.js';
 import { connectClaim, editHypothesis, forkHypothesis, HypothesisOpError, promoteHypothesis, rejectHypothesis } from './hypothesis-ops.js';
+import {
+  annotateClaim, ClaimOpError, excludeClaim, excludedClaimIdsOf, pinClaim, reclassifyClaim, reinstateClaim,
+} from './claim-ops.js';
 import { ACTIVE_MODEL_CONFIG_META_KEY, readCompetitionRouteMode, writeCompetitionRouteMode } from '../app/provider-resolver.js';
 import { discoverModels } from '../providers/discovery.js';
 import { ingestPdfTextPayload, ingestSdm, ingestTextToSdm, ingestBytes, persistDatasetProfile, loadSdmByRef, loadDatasetProfileByRef, ingestSvgPlot, loadPlotPointsByRef, jsonRefusalReason, type IngestOutcome } from '../ingest/service.js';
@@ -65,7 +68,8 @@ import { importPlugin, PluginImportError, PluginImportInputSchema } from '../plu
 import type { FeedbackSourceKind as FeedbackSource } from '../domain/index.js';
 import { toProvJsonLd } from '../domain/prov-o.js';
 import { consolidateConversationProfile } from '../app/memory.js';
-import { EvidenceRelationType } from '../domain/evidence.js';
+import { EvidenceRelation, EvidenceRelationType } from '../domain/evidence.js';
+import { diagnosticityScores, removalSensitivity } from '../domain/ach.js';
 import { canonicalSha256 } from '../shared/crypto.js';
 
 /**
@@ -1729,6 +1733,41 @@ function parseSeedSources(raw: unknown): string | {
         }
         throw notFound(`no route: ${method} ${url.pathname}`);
       }
+
+      // HX §15 evidence annotation/classification — researcher judgement ops on
+      // claims, same ownership/audit discipline as hypothesis-ops above.
+      if (segments.length === 7 && segments[4] === 'claims') {
+        const claimId = segments[5]!;
+        const op = segments[6]!;
+        const claimOps: Record<string, (a: App, r: string, c: string, b: unknown) => unknown> = {
+          annotate: annotateClaim,
+          pin: (a, r, c, b) => pinClaim(a, r, c, true, b),
+          unpin: (a, r, c, b) => pinClaim(a, r, c, false, b),
+          exclude: excludeClaim,
+          reinstate: reinstateClaim,
+          reclassify: reclassifyClaim,
+        };
+        const handler = claimOps[op];
+        if (method === 'POST' && handler !== undefined) {
+          const body = await readJsonObject(req);
+          try {
+            const result = handler(app, runId, claimId, body);
+            sendJson(res, 200, result);
+            return;
+          } catch (e) {
+            if (e instanceof ClaimOpError) {
+              throw new HttpError(e.status, {
+                code: e.code,
+                message: e.message,
+                retryable: false,
+                ...(e.code === 'not_found' ? { runId } : {}),
+              });
+            }
+            throw e;
+          }
+        }
+        throw notFound(`no route: ${method} ${url.pathname}`);
+      }
         if (segments.length === 7 && segments[4] === 'experiments' && segments[6] === 'approve' && method === 'POST') {
           // BP-5 confirmatory binding approval (hypothesis-bound comparisons).
           const body = await readJsonObject(req);
@@ -1886,6 +1925,35 @@ function parseSeedSources(raw: unknown): string | {
         }
         if (leaf === 'hypotheses' && method === 'GET') {
           mustGetRun(runId);
+          const achAnalysis = app.store.listObjects('ach_analysis', runId).at(-1) ?? null;
+          // HX §15 downstream semantics of claim exclusion: a read-time
+          // researcher-adjusted PROJECTION recomputed with the same pure
+          // functions the pipeline used (stored AchAnalysis stays untouched;
+          // both views are disclosed — the exclusion is a judgement, not an
+          // erasure). Null when nothing is excluded.
+          let achResearcherAdjusted: {
+            excludedClaimIds: string[];
+            diagnosticity: ReturnType<typeof diagnosticityScores>;
+            removalSensitivity: ReturnType<typeof removalSensitivity>;
+            method: string;
+          } | null = null;
+          const excludedClaimIds = excludedClaimIdsOf(app.store.listObjects('claim', runId));
+          if (achAnalysis !== null && excludedClaimIds.length > 0) {
+            // Stored relations re-validated through the domain schema (honest
+            // narrowing, no blind cast), then the excluded claims' rows drop.
+            const keptRelations = app.store.listObjects('evidence_relation', runId)
+              .flatMap((r) => {
+                const parsed = EvidenceRelation.safeParse(r);
+                return parsed.success ? [parsed.data] : [];
+              })
+              .filter((r) => r.claimId === undefined || !excludedClaimIds.includes(r.claimId));
+            achResearcherAdjusted = {
+              excludedClaimIds,
+              diagnosticity: diagnosticityScores(keptRelations),
+              removalSensitivity: removalSensitivity(keptRelations, achAnalysis.hypothesisIds),
+              method: 'heuer-diagnosticity-v1-researcher-adjusted',
+            };
+          }
           return sendJson(res, 200, {
             hypotheses: app.store.listObjects('hypothesis', runId),
             scorecards: app.store.listObjects('scorecard', runId),
@@ -1894,7 +1962,8 @@ function parseSeedSources(raw: unknown): string | {
             // Wave-S g8/g9: hypothesis-level evidence bodies (floor certainty, independent
             // sources, Σlog-LR band, QBAF+Carneades, orthogonal promotion) + ACH audit
             evidenceBodies: app.store.listObjects('evidence_body', runId),
-            achAnalysis: app.store.listObjects('ach_analysis', runId).at(-1) ?? null,
+            achAnalysis,
+            achResearcherAdjusted,
           });
         }
         if (leaf === 'plan' && method === 'GET') {

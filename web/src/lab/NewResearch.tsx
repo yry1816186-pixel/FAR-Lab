@@ -41,6 +41,10 @@ export function NewResearch({ onLaunched, onOpenConversation }: {
   // Keep the shared tray and the launch machine in sync (ready seeds only).
   useEffect(() => { run.setSeeds(tray.seeds); }, [tray.seeds, run.setSeeds]);
 
+  // Keyboard path: arriving via "n" or the CTA puts the researcher straight
+  // into the question — one keystroke from anywhere to typing (§9.8).
+  useEffect(() => { textareaRef.current?.focus(); }, []);
+
   const canSubmit = !run.submitting && run.text.trim().length > 0;
   const activeLabel = configs?.configs.find((c) => c.id === (run.providerConfigId === '' ? configs.activeModelConfigId : run.providerConfigId))?.label;
 

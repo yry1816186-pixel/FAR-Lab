@@ -19,7 +19,11 @@ export default defineConfig({
   reporter: process.env.CI ? [['github'], ['list']] : 'list',
   use: {
     baseURL: process.env.FARLAB_E2E_BASE_URL ?? 'http://127.0.0.1:3198',
-    channel: process.env.PLAYWRIGHT_CHANNEL ?? 'msedge',
+    // Local: System Edge (no download). CI: default chromium (installed by the
+    // workflow); an explicitly empty PLAYWRIGHT_CHANNEL also means "default".
+    channel: process.env.CI
+      ? undefined
+      : (process.env.PLAYWRIGHT_CHANNEL === '' ? undefined : (process.env.PLAYWRIGHT_CHANNEL ?? 'msedge')),
     trace: 'retain-on-failure',
     locale: 'zh-CN',
   },

@@ -472,6 +472,10 @@ export const buildEvidenceStage: StageHandler = {
           // T2: claims are verbatim excerpts of untrusted external literature —
           // derived_untrusted by structural position, deterministic assignment.
           taint: 'derived_untrusted',
+          // HX §15: the researcher judgement layer starts empty — annotate/pin/
+          // exclude/reclassify (server claim-ops) fill it later; extraction never
+          // pre-judges on the researcher's behalf.
+          researcher: { excluded: false, pinned: false, annotations: [] },
         };
         ctx.store.putObject('claim', claim);
         claimsTotal += 1;

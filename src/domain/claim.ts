@@ -47,6 +47,28 @@ export const ScientificClaim = z.object({
    * approval justifications, verdicts, or unlabelled exports.
    */
   taint: z.enum(['trusted', 'untrusted_literal', 'derived_untrusted']).optional(),
+  /**
+   * HX §15 evidence annotation/classification — the researcher judgement layer.
+   * Strictly additive on top of the deterministic extraction fields: pipeline
+   * provenance (locators/binding/grade/taint) is never overwritten. Downstream
+   * read surfaces must DISCLOSE this layer (researcher-adjusted ACH excludes
+   * excluded claims' relations; the claim itself never vanishes from the record
+   * or unlabelled exports — exclusion is a judgement, not an erasure).
+   */
+  researcher: z.object({
+    excluded: z.boolean().default(false),
+    excludedAt: z.string().datetime().optional(),
+    excludedReason: z.string().max(2_000).optional(),
+    pinned: z.boolean().default(false),
+    pinnedAt: z.string().datetime().optional(),
+    /** Researcher role judgement on the neutral proposition (never alters gradeCertainty). */
+    classification: z.enum(['core-evidence', 'counter-evidence', 'background', 'methodological-concern']).optional(),
+    classifiedAt: z.string().datetime().optional(),
+    annotations: z.array(z.object({
+      text: z.string().min(1).max(2_000),
+      at: z.string().datetime(),
+    })).default([]),
+  }).default({ excluded: false, pinned: false, annotations: [] }),
 });
 export type ScientificClaim = z.infer<typeof ScientificClaim>;
 

@@ -450,7 +450,10 @@ a:hover { text-decoration: underline; }
 .app-brand h1 { font-size: var(--fs-h2); }
 .app-brand p { margin: 0; font-size: var(--fs-aux); }
 
-.app-header-right { display: flex; align-items: center; gap: var(--sp-3); }
+/* Narrow-viewport discipline (HX §9.5): the chrome controls wrap to a second
+   row instead of pushing the page past the viewport. */
+.app-header-right { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; justify-content: flex-end; min-width: 0; }
+@media (max-width: 480px) { .app-brand p { display: none; } }
 
 .conn {
   display: inline-flex;
@@ -1368,7 +1371,7 @@ select option { color: var(--text); background: var(--surface); }
   overflow-x: auto;
 }
 .awareness-label { flex: 0 0 auto; white-space: nowrap; }
-.awareness-list { display: flex; gap: var(--sp-3); list-style: none; margin: 0; padding: 0; }
+.awareness-list { display: flex; gap: var(--sp-3); list-style: none; margin: 0; padding: 0; min-width: 0; }
 .awareness-item {
   all: unset;
   display: inline-flex;
