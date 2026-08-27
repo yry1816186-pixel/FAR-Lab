@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createInterface } from 'node:readline/promises';
 import path from 'node:path';
-import { createApp } from '../app/composition.js';
+import { createApp, type AppOptions } from '../app/composition.js';
 import { verifyBundle } from '../app/verify.js';
 import { readFile } from 'node:fs/promises';
 import { ingestSdm, ingestTextToSdm, ingestBytes, ingestSvgPlot, persistDatasetProfile, type TextIngestResult, type BytesIngestResult } from '../ingest/service.js';
@@ -96,9 +96,30 @@ const STAGE_GLYPH: Record<string, string> = UNICODE_OK
  * Shared creation+execution path for `research start` and `far new` (B11): both must
  * behave identically after the question/domain/goal are known.
  */
-const startRun = async (question: string, goalType: string, domain: string): Promise<void> => {
+const startRun = async (question: string, goalType: string, domain: string, route?: string): Promise<void> => {
   assertDistFresh();
-  const app = await createApp();
+  // --route offline|zai|dashscope|deepseek|universal: explicit model-route
+  // control (R4-P1). 'offline' pins the deterministic offline dev wire — the
+  // demo and acceptance path that needs no keys or network; live names resolve
+  // through the registry. Absent -> product-layer default (UI route > env chain).
+  const routeOpts: AppOptions = {};
+  if (route !== undefined) {
+    if (route === 'offline') {
+      const { createOfflineDevProvider } = await import('../providers/offline.js');
+      routeOpts.providerOverride = createOfflineDevProvider({
+        id: 'mcfg_cli_offline', label: '离线开发路由 (CLI --route offline)',
+        createdAt: '2026-08-27T00:00:00.000Z', updatedAt: '2026-08-27T00:00:00.000Z',
+        wire: 'offline', baseUrl: 'https://offline.farlab.invalid/v1',
+        modelId: 'farlab-offline-deterministic', apiKey: '', fallbackConfigIds: [],
+      });
+    } else {
+      const { getProvider } = await import('../providers/index.js');
+      const prov = getProvider(route);
+      if (prov === undefined) die(`--route: unknown route "${route}" (offline | zai | dashscope | deepseek | universal)`, 2);
+      routeOpts.providerOverride = prov;
+    }
+  }
+  const app = await createApp(routeOpts);
   try {
     const q = ResearchQuestion.parse({
       id: newId('q'), text: question, background: '', goalType,
@@ -786,7 +807,7 @@ const main = async (): Promise<void> => {
   if (sub === 'start') {
     const question = positional(4);
     if (!question) die('research start requires a question text', 2);
-    await startRun(question, arg('--goal') ?? 'explanatory', arg('--domain') ?? 'unspecified');
+    await startRun(question, arg('--goal') ?? 'explanatory', arg('--domain') ?? 'unspecified', arg('--route'));
     return;
   }
 

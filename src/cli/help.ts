@@ -7,7 +7,7 @@
 export const HELP = `far — FAR-Lab research workbench (XH-202619 Track 1 Direction 1A)
 
 Usage:
-  far research start <question text> [--domain <d>] [--goal <type>] [--json]
+  far research start <question text> [--domain <d>] [--goal <type>] [--route offline|zai|dashscope|deepseek|universal] [--json]
       Create a research run from a real scientific question and execute the full pipeline.
       --goal: explanatory|predictive|interventional|methodological|exploratory (default explanatory)
   far research status <run-id> [--json] [--watch]  Show run status/stages/progress (no invented percentages)
