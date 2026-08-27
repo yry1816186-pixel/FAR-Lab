@@ -83,14 +83,14 @@ export function NewResearch({ onLaunched, onOpenConversation }: {
     ev?.preventDefault();
     setReviewError(null);
     setSavedNote(false);
-    if (draftId === null) {
-      const id = await run.submitDraft();
-      if (id === null) return; // validation/creation error already surfaced by the hook
-      setDraftId(id);
-    }
+    // Local binding: setState does not refresh the closure's draftId this
+    // frame — proposing against '' produced /runs//scope-proposal (E2E caught).
+    const id = draftId ?? (await run.submitDraft());
+    if (id === null) return; // validation/creation error already surfaced by the hook
+    setDraftId(id);
     setReviewBusy('proposing');
     try {
-      const p = await proposeScope(draftId ?? '');
+      const p = await proposeScope(id);
       enterReview(p.question);
     } catch (e) {
       setReviewError(e instanceof ApiError ? e : new ApiError({ code: 'unknown', message: String(e), retryable: true }));
