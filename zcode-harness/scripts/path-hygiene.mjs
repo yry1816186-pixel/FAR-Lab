@@ -50,11 +50,17 @@ const REQUIRED = [
   'project-spec/policies/RELIABILITY_SECURITY.md',
   'project-spec/policies/RELEASE_OPERATIONS.md',
 ];
+// Workspace-process state that the repository no longer carries (repo
+// governance 2026-08-28: source + necessary files only — these are gitignored
+// and live only in the working workspace). Missing them is still a LOCAL
+// workspace invariant; CI checkouts of the public repo degrade to a warning
+// exactly like .control/.
+const WORKSPACE_ONLY_REQUIRED = new Set(['START_HERE.md', 'FINAL_BUILD_PROMPT.md', 'research/EVIDENCE_INDEX.md']);
 for (const rel of REQUIRED) {
   if (!exists(rel)) {
     // CI checkouts have no .control/ or other gitignored workspace state by
     // design — missing-required is a workspace invariant, not a repo one.
-    if (process.env.CI !== undefined && rel.startsWith('.control/')) {
+    if (process.env.CI !== undefined && (rel.startsWith('.control/') || WORKSPACE_ONLY_REQUIRED.has(rel))) {
       warnings.push(`ci-skipped-missing-required:${rel}`);
     } else {
       errors.push(`missing-required:${rel}`);
