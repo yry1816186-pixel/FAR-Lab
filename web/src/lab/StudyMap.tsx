@@ -14,6 +14,7 @@ import { runProgress } from '../api/types';
 import { RELATION_POLARITY } from '../api/types';
 import { runStatusKey } from '../tones';
 import { ClaimInspector } from './ClaimInspector';
+import { ScopeReview } from './ScopeReview';
 import { runLabel, type StudyGroup } from '../studies';
 import './lab.css';
 
@@ -96,6 +97,9 @@ export function StudyMap({
   }, [focusClaimId, claims, onClaimFocused]);
 
   const running = run.status === 'running' || run.status === 'queued';
+  // §8.2 pre-launch states: 'created' = fresh draft, 'paused' = parked after
+  // the scope proposal. The scope-review surface owns what happens next.
+  const draftable = run.status === 'created' || run.status === 'paused';
   // Live studies accumulate findings progressively — refresh the science
   // objects on a slow cadence while executing (events drive the narrative
   // band; this keeps the evidence/hypothesis bands from going stale).
@@ -231,6 +235,17 @@ export function StudyMap({
           </div>
         </section>
 
+        {draftable && (
+          <ScopeReview
+            run={run}
+            question={question}
+            onQuestionChanged={() => { loadScience(run.id); onMutated(); }}
+            onLaunched={onMutated}
+          />
+        )}
+
+        {!draftable && (
+          <>
         <section className="map-node">
           <p className="map-node-label">{t('map.evidenceLabel')}</p>
           {claims.length === 0 && !running
@@ -323,6 +338,8 @@ export function StudyMap({
               </div>
             ) : <p className="queue-empty">{t('map.noActiveHyps')}</p>}
           </section>
+        )}
+          </>
         )}
       </main>
 

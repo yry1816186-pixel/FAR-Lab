@@ -163,6 +163,49 @@ test('§15 claim judgement: exclude -> disclosed marks + adjusted projection -> 
   expect(after.achResearcherAdjusted).toBeNull();
 });
 
+
+test('§8.2 pre-launch: draft -> scope proposal -> edit -> server truth -> launch', async ({ page, request }) => {
+  // Provision a DRAFT through the real contract (no execution; status 'created').
+  const created = await request.post('/api/v1/runs', { data: { text: 'Does resistance training preserve cognitive function in older adults?', draft: true } });
+  expect(created.ok()).toBeTruthy();
+  const { runId } = await created.json() as { runId: string };
+
+  // The map in draft state: scope-review surface, NO evidence/hypothesis bands yet.
+  await page.goto(`/#study/${runId}`);
+  await expect(page.getByText(/研究范围（启动前可编辑）|editable before launch/)).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('button', { name: /生成范围提议|Generate scope proposal/ })).toBeVisible();
+  await expect(page.locator('.map-claim-row')).toHaveCount(0);
+  await expect(page.locator('.map-hyp-card')).toHaveCount(0);
+
+  // Generate the proposal (real scope-stage execution; offline route is fast).
+  await page.getByRole('button', { name: /生成范围提议|Generate scope proposal/ }).click();
+  await expect(page.locator('#scope-domain')).toBeVisible({ timeout: 30_000 });
+  const proposedDomain = await page.locator('#scope-domain').inputValue();
+  expect(proposedDomain.length).toBeGreaterThan(0);
+
+  // Edit domain + phenomena, save.
+  await page.locator('#scope-domain').fill('cognitive aging (edited by researcher)');
+  await page.locator('#scope-phenomena').fill('executive function adaptation\ntraining-induced neuroplasticity');
+  await page.getByRole('button', { name: /保存修改|Save changes/ }).click();
+  await expect(page.getByText(/已保存：|Saved:/)).toBeVisible({ timeout: 15_000 });
+
+  // Server truth: the stored question carries the researcher's edits verbatim.
+  const runs1 = await (await request.get(`/api/v1/runs/${runId}`)).json() as { status: string };
+  expect(runs1.status).toBe('paused'); // parked — never auto-continues
+  const q = await (await request.get(`/api/v1/runs/${runId}/question`)).json() as { scope: { domain: string; phenomena: string[] } };
+  expect(q.scope.domain).toBe('cognitive aging (edited by researcher)');
+  expect(q.scope.phenomena).toContain('training-induced neuroplasticity');
+
+  // Launch: the remainder runs; the map lands on the verdict.
+  await page.getByRole('button', { name: /^启动研究$|^Launch study$/ }).click();
+  await expect(page.locator('.map-verdict')).toBeVisible({ timeout: 90_000 });
+  const done = await (await request.get(`/api/v1/runs/${runId}`)).json() as { status: string };
+  expect(done.status).toBe('completed');
+
+  // Post-launch: the scope-review surface is gone (edits belong to the revision chain now).
+  await expect(page.locator('#scope-domain')).toHaveCount(0);
+});
+
 /** Inject axe-core and return critical/serious violations (impact-filtered, honest scope). */
 async function axeScan(page: Page): Promise<{ id: string; impact: string; nodes: number }[]> {
   await page.addScriptTag({ path: AXE_PATH });
