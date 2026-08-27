@@ -42,12 +42,17 @@ export function LabHome({
   const [showAllStudies, setShowAllStudies] = useState(false);
   const { health, healthError, checking } = useHealth();
 
+  // Stable probe key: completed-run ids + their updatedAt — unchanged polls
+  // (identical arrays from the 5s list refresh) do NOT re-probe hypotheses.
+  const probeKey = useMemo(
+    () => runs.filter((r) => r.status === 'completed').slice(0, 5).map((r) => r.id).join('|'),
+    [runs],
+  );
   // Judgment items: counter-evidence studies (top completed studies probed).
   useEffect(() => {
     if (runs.length === 0) { setCounterStudyIds([]); return; }
-    const completed = runs.filter((r) => r.status === 'completed');
     // Probe at most the latest 5 completed runs; more would just slow the home.
-    const probe = completed.slice(0, 5);
+    const probe = runs.filter((r) => r.status === 'completed').slice(0, 5);
     const c = new AbortController();
     void Promise.all(probe.map(async (r) => {
       try {
@@ -56,10 +61,20 @@ export function LabHome({
       } catch { return null; }
     })).then((ids) => { setCounterStudyIds(ids.filter((x): x is string => x !== null)); });
     return () => c.abort();
-  }, [runs]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- probe keyed on the stable id set of completed runs, not the polled array reference (5s re-probe storm, §27 R2-P1-2)
+  }, [probeKey]);
 
   const live = runs.filter((r) => r.status === 'running' || r.status === 'queued');
-  const attention = runs.filter((r) => r.status === 'partial' || r.status === 'failed').slice(0, 4);
+  const attentionAll = runs.filter((r) => r.status === 'partial' || r.status === 'failed');
+  const attention = attentionAll.slice(0, 4);
+  const attentionHidden = attentionAll.length - attention.length;
+  // §8.2 drafts (created/paused): a study awaiting its launch decision IS a
+  // judgment item — it floats in the queue (most recent first), not buried in
+  // the library index. The map's ScopeReview owns the actual resume surface.
+  const drafts = runs
+    .filter((r) => r.status === 'created' || r.status === 'paused')
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+    .slice(0, 4);
 
   const studies = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -106,7 +121,7 @@ export function LabHome({
             <section className="queue-section" aria-labelledby="labq-judgment">
               <h2 className="queue-section-title" id="labq-judgment">{t('labhome.judgmentTitle')}</h2>
               <p className="queue-section-sub">{t('labhome.judgmentSub')}</p>
-              {live.length === 0 && attention.length === 0 && counterStudies.length === 0
+              {live.length === 0 && attention.length === 0 && counterStudies.length === 0 && drafts.length === 0
                 ? <p className="queue-empty">{t('labhome.judgmentEmpty')}</p>
                 : (
                   <>
@@ -121,18 +136,32 @@ export function LabHome({
                         onClick={() => onOpenStudy(r.id)}
                       />
                     ))}
+                    {drafts.map((r) => (
+                      <QueueRow
+                        key={`draft-${r.id}`} sev="review"
+                        title={runLabel(r).slice(0, 90)}
+                        why={r.status === 'paused'
+                          ? t('labhome.draftWhyProposed')
+                          : t('labhome.draftWhyNew')}
+                        action={t('labhome.draftResume')}
+                        onClick={() => onOpenStudy(r.id)}
+                      />
+                    ))}
                     {attention.map((r) => (
                       <QueueRow
                         key={r.id} sev="attention"
                         title={runLabel(r).slice(0, 90)}
                         why={t('labhome.attentionWhy', {
                           status: t(runStatusKey(r.status)),
-                          reason: failureCause(r.lastError ?? t('labhome.seeStudyMap')),
+                          reason: failureCause(r.lastError ?? t('labhome.seeStudyMap'), t),
                         })}
                         action={t('labhome.handle')}
                         onClick={() => onOpenStudy(r.id)}
                       />
                     ))}
+                    {attentionHidden > 0 && (
+                      <p className="queue-empty">{t('labhome.attentionHidden', { n: attentionHidden })}</p>
+                    )}
                     {counterStudies.map((r) => (
                       <QueueRow
                         key={`ctr-${r.id}`} sev="review"
@@ -293,11 +322,11 @@ function FirstUse({ health, healthError, checking, onNewResearch, onOpenSettings
 
 /** Researcher-language failure causes (§14: internal jargon recedes; raw
  * strings stay reachable via the title tooltip for diagnosis). */
-function failureCause(raw: string): string {
-  if (/rate_limited|429/.test(raw)) return '模型路线限流——稍后恢复即可续跑';
-  if (/quota_exceeded|HTTP 402/.test(raw)) return '模型配额耗尽——充值或切换路线后可续跑';
-  if (/timeout|budget \d+ms/.test(raw)) return '模型响应超时——可从断点恢复';
-  if (/network|ECONN|fetch failed/.test(raw)) return '网络错误——可从断点恢复';
+function failureCause(raw: string, t: ReturnType<typeof useI18n>['t']): string {
+  if (/rate_limited|429/.test(raw)) return t('labhome.causeRateLimited');
+  if (/quota_exceeded|HTTP 402/.test(raw)) return t('labhome.causeQuota');
+  if (/timeout|budget \d+ms/.test(raw)) return t('labhome.causeTimeout');
+  if (/network|ECONN|fetch failed/.test(raw)) return t('labhome.causeNetwork');
   return raw.length > 90 ? `${raw.slice(0, 90)}…` : raw;
 }
 

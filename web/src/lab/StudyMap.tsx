@@ -219,8 +219,8 @@ export function StudyMap({
             elapsedMin={elapsedMin}
           />
         )}
-        {run.status === 'partial' && (
-          <PartialBand run={run} claims={claims.length} hyps={activeHyps.length} onResume={() => { void lifecycle('resume'); }} busy={lifecycleBusy} />
+        {(run.status === 'partial' || run.status === 'cancelled') && (
+          <PartialBand run={run} claims={claims.length} hyps={activeHyps.length} cancelled={run.status === 'cancelled'} onResume={() => { void lifecycle('resume'); }} busy={lifecycleBusy} />
         )}
         {run.status === 'failed' && (
           <div className="map-band map-band--failed" role="alert">
@@ -340,7 +340,7 @@ export function StudyMap({
                   ? <p className="v-line">{t('map.openCounters', { n: counterClaims.length })}</p>
                   : <p className="v-line">{t('map.noCountersFound')}</p>}
                 <p className="v-line">
-                  {t('map.nextSteps')} · <a href={`#run/${run.id}/hypotheses`}>{t('map.linkCompare')}</a> · <a href={`#run/${run.id}/revisions`}>{t('map.linkFeedback')}</a> · <a href={`#run/${run.id}/verify`}>{t('map.linkExport')}</a>
+                  {t('map.nextSteps')} · <a href={`#run/${run.id}/plan`}>{t('map.linkPlan')}</a> · <a href={`#run/${run.id}/hypotheses`}>{t('map.linkCompare')}</a> · <a href={`#run/${run.id}/revisions`}>{t('map.linkFeedback')}</a> · <a href={`#run/${run.id}/verify`}>{t('map.linkExport')}</a>
                 </p>
               </div>
             ) : (
@@ -448,19 +448,24 @@ function LiveBand({ run, events, onCancel, cancelArmed, onArmCancel, busy, elaps
   );
 }
 
-/** Partial run: what broke, what survived, and the resume entry — failure is a main path. */
-function PartialBand({ run, claims, hyps, onResume, busy }: {
+/** Partial/cancelled run: what happened, what survived, and the resume entry —
+ * failure is a main path, and a user-cancelled run must not dead-end either
+ * (G3: the server resumes from the checkpoint; the map owns the affordance). */
+function PartialBand({ run, claims, hyps, cancelled, onResume, busy }: {
   run: ResearchRun;
   claims: number;
   hyps: number;
+  cancelled: boolean;
   onResume: () => void;
   busy: boolean;
 }): JSX.Element {
   const { t } = useI18n();
   return (
     <div className="map-band map-band--partial" role="status">
-      <p className="mb-title">{t('map.partialTitle')}</p>
-      <p className="mb-line">{t('map.partialReason', { reason: (run.lastError ?? t('map.partialNoReason')).slice(0, 140) })}</p>
+      <p className="mb-title">{cancelled ? t('map.cancelledTitle') : t('map.partialTitle')}</p>
+      <p className="mb-line">{cancelled
+        ? t('map.cancelledReason')
+        : t('map.partialReason', { reason: (run.lastError ?? t('map.partialNoReason')).slice(0, 140) })}</p>
       <p className="mb-line">{t('map.partialKept', { claims, hyps })}</p>
       <div className="mb-acts">
         <button type="button" className="mb-act mb-act--primary" disabled={busy} onClick={onResume}>{t('map.resume')}</button>
