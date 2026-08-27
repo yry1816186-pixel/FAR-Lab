@@ -35,6 +35,7 @@ Authoritative policy: `DEPENDENCY_POLICY.md` (runtime dependency set is exactly 
 | @fontsource/ibm-plex-sans | ^5.3.0 | 5.3.0 | OFL-1.1 | runtime |
 | @fontsource/source-serif-4 | ^5.3.0 | 5.3.0 | OFL-1.1 | runtime |
 | @huggingface/transformers | ^4.2.0 | 4.2.0 | Apache-2.0 | runtime |
+| @playwright/test | ^1.62.1 | 1.62.1 | Apache-2.0 | dev |
 | @radix-ui/react-collapsible | ^1.1.20 | 1.1.20 | MIT | runtime |
 | @radix-ui/react-dialog | ^1.1.23 | 1.1.23 | MIT | runtime |
 | @radix-ui/react-dropdown-menu | ^2.1.24 | 2.1.24 | MIT | runtime |
@@ -80,14 +81,16 @@ Authoritative policy: `DEPENDENCY_POLICY.md` (runtime dependency set is exactly 
 
 ## Desktop shell (Tauri scaffold)
 
-node_modules not installed in this workspace — 1 declared dependency UNAUDITED at generation time. Install and regenerate before release.
+| package | constraint | installed | license | scope |
+| --- | --- | --- | --- | --- |
+| @tauri-apps/cli | ^2.9.0 | 2.11.4 | Apache-2.0 OR MIT | dev |
 
 ## Installed-license distribution (all packages, all installed workspaces)
 
 | license | packages |
 | --- | --- |
 | MIT | 415 |
-| Apache-2.0 | 34 |
+| Apache-2.0 | 37 |
 | ISC | 23 |
 | BSD-3-Clause | 19 |
 | BSD-2-Clause | 11 |
@@ -97,6 +100,7 @@ node_modules not installed in this workspace — 1 declared dependency UNAUDITED
 | (MIT AND Zlib) | 1 |
 | (MIT OR GPL-3.0-or-later) | 1 |
 | 0BSD | 1 |
+| Apache-2.0 OR MIT | 1 |
 | BlueOak-1.0.0 | 1 |
 | BSD | 1 |
 | CC-BY-4.0 | 1 |
@@ -105,6 +109,5 @@ node_modules not installed in this workspace — 1 declared dependency UNAUDITED
 
 | package | license | disposition |
 | --- | --- | --- |
-| @img/sharp-libvips-linux-x64 | LGPL-3.0-or-later | ALLOWED — Apache-2.0 AND LGPL-3.0-or-later — Linux twin of the allowed win32 sharp binary; same build-time-only, never-distributed disposition (npm lockfiles carry ALL platforms' optionals, so CI on Linux installs this variant). |
-| @img/sharp-libvips-linuxmusl-x64 | LGPL-3.0-or-later | ALLOWED — Apache-2.0 AND LGPL-3.0-or-later — musl twin of the allowed win32 sharp binary; same build-time-only, never-distributed disposition. |
+| @img/sharp-win32-x64 | Apache-2.0 AND LGPL-3.0-or-later | ALLOWED — Apache-2.0 AND LGPL-3.0-or-later — optional platform binary of sharp (web devDependency, build-time only). Never distributed: public-release manifest prunes node_modules; end users install sharp directly from npm. No LGPL obligation attaches to FAR-Lab distributions. |
 | jszip | (MIT OR GPL-3.0-or-later) | ALLOWED — (MIT OR GPL-3.0-or-later) — dual-licensed; FAR-Lab elects the MIT alternative at install/build time. No copyleft obligation is triggered. |
