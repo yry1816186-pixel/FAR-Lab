@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """S-1 技术方案文档 PDF generator (Report route, ReportLab).
-Content mirrors submission/技术方案文档.md (v2, 2026-08-26) — the case table and
+Content mirrors submission/技术方案文档.md (v3, 2026-08-27) — the case table and
 body text are embedded here for typesetting control, so edits must be applied to
 BOTH files (known mirroring cost; audit P2 accepted for a submission artifact).
 Cover: template 01 via cover_render.py, merged as page 1 via pypdf.
@@ -77,7 +77,7 @@ def footer(canv, doc):
     canv.saveState()
     canv.setFont('Deng', 8.5)
     canv.setFillColor(TEXT_MUTED)
-    canv.drawString(ML, 12 * mm, 'FAR-Lab · XH-202619 Track 1 / Direction 1 / A · 技术方案文档 v2')
+    canv.drawString(ML, 12 * mm, 'FAR-Lab · XH-202619 Track 1 / Direction 1 / A · 技术方案文档 v3')
     canv.drawRightString(PAGE_W - MR, 12 * mm, '第 %d 页' % canv.getPageNumber())
     canv.setStrokeColor(BORDER)
     canv.setLineWidth(0.4)
@@ -198,7 +198,7 @@ story.append(P('<b>诚实边界（如实披露）</b>：官方规定的千问/�
 
 # ============ 5 ============
 story.append(H1('5. 项目工作流程（研究者视角）'))
-story.append(P('提问（Web 作曲器支持拖入论文/数据/DOI/Zotero 引入与语音听写）→ <b>以研究为中心的工作台</b>：侧栏按研究问题聚合历史运行（同一问题的多次运行归并为一个研究条目），研究页以 <b>answer-first 简报</b>开场——首选假设、胜率与证据平衡、主要不确定性、前三名假设一览与“为什么排第一”的评分理据，管线过程折叠为一处可展开的审计记录 → <b>假设比较表</b>为默认扫描面（排名/陈述/支持√/反证×/胜率一屏可比，行点击直达完整卡片，可勾选进入并排对比）→ <b>证据页主张与假设双向绑定</b>（每条主张直接标注它支持/削弱的假设并点击跳转；参与反证的主张置顶并带红色左轨）→ 信任面审阅（GRADE 证据等级徽章 / 多重检验政策 / 局限性披露 / ACH 区分性证据交叉表）→ 必要时<b>直接编辑假设</b>（编辑进入与 AI 反馈同一条因果修订链：human_expert 反馈→修订前后对比→版本号递增→陈旧性不确定性披露）→ 绑定确证性实验（声明 MDE，批准时快照当前证伪决策规则，重新校验 fail-closed）→ 观察迭代轮（时间轴逐轮显示重开阶段与触发原因）→ 导出研究产品（确定性 IMRaD 论文投影：局限性由真实计数合成、BibTeX 只来自存储元数据）+ 一键可复现包（far verify 独立校验 10/10）。全程执行模式显式标识（LIVE / OFFLINE / RECORDED / SYNTHETIC），默认路线配额耗尽时首页给出阻断式预警与切换入口，而非让研究在起步阶段静默失败。'))
+story.append(P('提问（研究形成页：问题输入 + 粘贴/拖放/显式「引文 / 标识符」入口同一条摄入管线 + Zotero 本地库引入 + 离线语音听写；启动前「会发生什么」四步说明常驻，也可经常驻对话打磨问题后一键启动）→ <b>研究地图</b>（单画布 answer-first）：研究问题 → 证据带（参与反证的主张置顶、来源逐条可追）→ 排序假设卡 → 当前判断（主要不确定性、未决反证、下一步）；任意对象点击即在右侧 inspector 展开完整卡片 → <b>研究者直接操作</b>：主张可排除/固定/连接到假设（支持/反对），排除后假设区分度按剩余证据即时重算（「研究者调整视图」与存储的原始分析两个视图并存披露）；假设可编辑陈述/推进/否决/分叉，编辑与 AI 反馈进入同一条因果修订链（human_expert 反馈→修订前后对比→版本号递增→陈旧性不确定性披露）→ <b>深层工具层</b>（研究地图「下一步」行进入，按需展开）：评分卡与维度分解（“为什么排第一”的评分理据、GRADE 证据体评级、ACH 判别性证据交叉表——全部确定性计算而非模型判分；跨单元多重检验政策单一权威）、反馈与修订历史、研究计划与确证性实验（声明 MDE，批准时快照当前证伪决策规则，重新校验 fail-closed）、观察迭代轮（时间轴逐轮显示重开阶段与触发原因）、核验与导出 → 导出研究产品（确定性 IMRaD 论文投影：局限性由真实计数合成、BibTeX 只来自存储元数据）+ 一键可复现包（far verify 独立校验）。首页为研究工作区：判断队列（进行中/失败待恢复/反证待审视）+ 研究索引（同一问题的多次运行归并为一个研究条目）。全程执行模式显式标识（LIVE / OFFLINE / RECORDED / SYNTHETIC——研究地图顶栏徽章 + 执行真实性面板）；路线失败（如配额耗尽）时研究进入失败态、首页判断队列按研究者语言显示原因，可从断点恢复，而非起步阶段静默失败或全部重来。'))
 
 # ============ 6 ============
 story.append(H1('6. 上下文工程设计'))
