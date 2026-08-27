@@ -63,6 +63,8 @@ import {
   newId,
   runProgress,
 } from '../domain/index.js';
+import { ConstraintSet } from '../domain/question.js';
+import type { RunStageName } from '../domain/run.js';
 import { McpManager } from '../agent/mcp-manager.js';
 import { importPlugin, PluginImportError, PluginImportInputSchema } from '../plugins/import.js';
 import type { FeedbackSourceKind as FeedbackSource } from '../domain/index.js';
@@ -84,7 +86,7 @@ import { canonicalSha256 } from '../shared/crypto.js';
  */
 
 export interface ApiServerError {
-  code: 'not_found' | 'validation' | 'already_running' | 'run_active' | 'not_started' | 'internal' | 'target_not_found' | 'question_required' | 'action_model_failed' | 'action_budget_exhausted' | 'invalid_action_request' | 'invalid_counter_search' | 'provider_unreachable' | 'conversation_model_failed' | 'conversation_full' | 'turn_in_flight' | 'no_corpus' | 'session_stopped' | 'src_not_in_pool' | 'run_not_found';
+  code: 'not_found' | 'validation' | 'already_running' | 'run_active' | 'not_started' | 'internal' | 'target_not_found' | 'question_required' | 'action_model_failed' | 'action_budget_exhausted' | 'invalid_action_request' | 'invalid_counter_search' | 'provider_unreachable' | 'conversation_model_failed' | 'conversation_full' | 'turn_in_flight' | 'no_corpus' | 'session_stopped' | 'src_not_in_pool' | 'run_not_found' | 'already_launched' | 'scope_proposal_failed';
   message: string;
   retryable: boolean;
   runId?: string;
@@ -96,9 +98,10 @@ export interface ApiServerOptions {
   /**
    * Test seam (NOT a product mock): injected run execution. Product default is
    * orchestrator.execute; tests inject an immediately-resolving executor so the
-   * HTTP layer is exercised without live model/source routes.
+   * HTTP layer is exercised without live model/source routes. opts carries the
+   * §8.2 draft journey's stopAfter (scope-proposal runs scope only).
    */
-  executor?: (runId: string) => Promise<unknown>;
+  executor?: (runId: string, opts?: { stopAfter?: RunStageName }) => Promise<unknown>;
   /**
    * Test seam (NOT a product mock): per-family source-adapter resolver for the
    * counter-search route. Product default is the canonical sourceAdapterFor;
@@ -229,16 +232,16 @@ const mimeFor = (file: string): string =>
   MIME_TYPES[path.extname(file).slice(1).toLowerCase()] ?? 'application/octet-stream';
 
 export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServer {
-  const executor = opts.executor ?? ((runId: string) => app.orchestrator.execute(runId));
+  const executor = opts.executor ?? ((runId: string, execOpts?: { stopAfter?: RunStageName }) => app.orchestrator.execute(runId, execOpts));
   const staticRoot = path.resolve(opts.staticRoot ?? path.join(process.cwd(), 'web', 'dist'));
 
   /** One in-flight execution per run id; a second request fails with 409 semantics. */
   const executing = new Map<string, Promise<unknown>>();
 
-  const startRun = (runId: string): boolean => {
+  const startRun = (runId: string, execOpts?: { stopAfter?: RunStageName }): boolean => {
     if (executing.has(runId)) return false;
     const run = Promise.resolve()
-      .then(() => executor(runId))
+      .then(() => executor(runId, execOpts))
       .catch((e: unknown) => {
         // Stage failures are persisted by the orchestrator into run state (visible via
         // GET /runs/:id). A throw here means the execution itself never ran — log it.
@@ -547,15 +550,20 @@ function parseSeedSources(raw: unknown): string | {
   const createRun = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
     const body = await readJsonObject(req);
     const runId = await createRunWithSeeds(body);
-    sendJson(res, 202, { runId });
+    sendJson(res, 202, { runId, ...(body.draft === true ? { draft: true } : {}) });
   };
 
   /**
    * Shared run-creation core (POST /runs and conversation launch): question
-   * validation, optional model route, seed ingestion and async start.
+   * validation, optional model route, seed ingestion and async start. With
+   * draft:true (§8.2) the run + seeds persist but execution does NOT start —
+   * scope-proposal / PATCH question / resume complete the pre-launch journey.
    */
   const createRunWithSeeds = async (body: Record<string, unknown>): Promise<string> => {
     const { text, domain, goalType } = body as { text?: unknown; domain?: unknown; goalType?: unknown };
+    if (body.draft !== undefined && typeof body.draft !== 'boolean') {
+      throw validation('field "draft" must be a boolean when given');
+    }
     if (typeof text !== 'string' || text.trim().length === 0) {
       throw validation('field "text" is required (non-empty string: the research question)');
     }
@@ -612,6 +620,15 @@ function parseSeedSources(raw: unknown): string | {
         parseStatus: 'ok',
         ...(seed.text !== undefined ? { abstractText: seed.text } : {}),
       }));
+    }
+    if (body.draft === true) {
+      // §8.2 draft: persisted, NOT started — the studies index sees status
+      // 'created' and the pre-launch journey (proposal/edit/resume) owns it.
+      app.store.appendEvent(run.id, {
+        type: 'note',
+        detail: { reason: 'run_created_draft', actor: 'human' },
+      });
+      return run.id;
     }
     startRun(run.id); // async execution — the 202 returns immediately; failures land in run state
     return run.id;
@@ -900,6 +917,148 @@ function parseSeedSources(raw: unknown): string | {
     mustGetRun(runId);
     if (!startRun(runId)) throw alreadyRunning(runId);
     sendJson(res, 202, { runId });
+  };
+
+  /**
+   * §8.2 pre-launch scope proposal: runs ONLY the scope stage (stopAfter
+   * breaks before retrieve) on a draft run, then parks it at 'paused' so the
+   * researcher sees and edits the refined scope BEFORE committing to the full
+   * journey. The refined question (with its receipt-backed provenance) is the
+   * response; POST /runs/:id/resume launches the remainder. 'paused' (not
+   * 'running') is load-bearing: the lease watchdog adopts only 'running' runs,
+   * so a parked draft can never be auto-continued behind the user's back.
+   */
+  const scopeProposal = async (res: http.ServerResponse, runId: string): Promise<void> => {
+    const run = mustGetRun(runId);
+    if (run.status !== 'created' && run.status !== 'paused') {
+      throw new HttpError(409, {
+        code: 'already_launched',
+        message: `scope proposal requires a not-yet-launched run (status 'created' or 'paused'; got '${run.status}') — POST /runs with draft:true creates one`,
+        retryable: false,
+        runId,
+      });
+    }
+    if (executing.has(runId)) throw alreadyRunning(runId);
+    const execution = Promise.resolve()
+      .then(() => executor(runId, { stopAfter: 'retrieve' }))
+      .catch((e: unknown) => {
+        const msg = e instanceof Error ? e.message : String(e);
+        process.stderr.write(`far-api: scope-proposal execution of run ${runId} failed: ${msg}\n`);
+        return undefined;
+      })
+      .finally(() => { executing.delete(runId); });
+    executing.set(runId, execution);
+    await execution;
+
+    const after = app.store.getRun(runId);
+    if (after === null) throw notFound(`run ${runId} vanished during scope proposal`, runId);
+    const scopeRec = after.stages.find((s) => s.stage === 'scope');
+    if (scopeRec?.state === 'failed') {
+      throw new HttpError(502, {
+        code: 'scope_proposal_failed',
+        message: `scope refinement failed: ${scopeRec.error ?? 'unknown error'}`,
+        retryable: true,
+        runId,
+      });
+    }
+    if (scopeRec?.state !== 'done') {
+      throw new HttpError(502, {
+        code: 'scope_proposal_failed',
+        message: `scope stage state '${scopeRec?.state ?? 'missing'}' after proposal execution — refusing to fabricate a proposal`,
+        retryable: true,
+        runId,
+      });
+    }
+    after.status = 'paused';
+    app.store.updateRun(after);
+    app.store.appendEvent(runId, {
+      type: 'note',
+      status: 'paused',
+      detail: { reason: 'scope_proposal_ready', actor: 'human' },
+    });
+    const question = app.store.getObject('question', after.questionId);
+    if (question === null) throw notFound(`question not found for run ${runId}: ${after.questionId}`, runId);
+    sendJson(res, 200, { runId, question, next: { edit: 'PATCH /runs/:id/question', launch: 'POST /runs/:id/resume' } });
+  };
+
+  /**
+   * §8.2/§15 editable ResearchQuestion/Scope/Constraint: researcher edits the
+   * draft's question BEFORE launch. Allowed only pre-launch ('created' before
+   * any proposal, 'paused' after one) — once the journey runs, corrections go
+   * through the causal revision chain, never a silent question rewrite. The
+   * merge is validated through the domain schema (single owner) and audited.
+   */
+  const editRunQuestion = async (req: http.IncomingMessage, res: http.ServerResponse, runId: string): Promise<void> => {
+    const run = mustGetRun(runId);
+    if (run.status !== 'created' && run.status !== 'paused') {
+      throw new HttpError(409, {
+        code: 'already_launched',
+        message: `the question is editable only before launch (status 'created' or 'paused'; got '${run.status}') — running/closed runs revise via the feedback chain`,
+        retryable: false,
+        runId,
+      });
+    }
+    const question = app.store.getObject('question', run.questionId);
+    if (question === null) throw notFound(`question not found for run ${runId}: ${run.questionId}`, runId);
+    const body = await readJsonObject(req);
+
+    const changedFields: string[] = [];
+    const next: Record<string, unknown> = { ...question };
+
+    if (body.text !== undefined) {
+      if (typeof body.text !== 'string' || body.text.trim().length === 0) {
+        throw validation('field "text" must be a non-empty string');
+      }
+      if (body.text !== question.text) changedFields.push('text');
+      next.text = body.text;
+    }
+    if (body.goalType !== undefined) {
+      const parsedGoal = ScientificGoalType.safeParse(body.goalType);
+      if (!parsedGoal.success) {
+        throw validation(`invalid goalType "${String(body.goalType)}" — must be one of: ${ScientificGoalType.options.join(', ')}`);
+      }
+      if (parsedGoal.data !== question.goalType) changedFields.push('goalType');
+      next.goalType = parsedGoal.data;
+    }
+    if (body.scope !== undefined) {
+      const s = body.scope as Record<string, unknown>;
+      const scopeNext = { ...question.scope };
+      for (const key of ['domain', 'phenomena', 'inScope', 'outOfScope'] as const) {
+        if (s[key] === undefined) continue;
+        if (key === 'domain') {
+          if (typeof s.domain !== 'string' || s.domain.trim().length === 0) throw validation('scope.domain must be a non-empty string');
+          scopeNext.domain = s.domain;
+        } else {
+          if (!Array.isArray(s[key]) || s[key].length === 0 || (s[key] as unknown[]).some((x) => typeof x !== 'string' || x.trim().length === 0)) {
+            throw validation(`scope.${key} must be a non-empty array of non-empty strings`);
+          }
+          scopeNext[key] = s[key];
+        }
+        if (JSON.stringify(scopeNext[key]) !== JSON.stringify((question.scope as Record<string, unknown>)[key])) {
+          const label = `scope.${key}`;
+          if (!changedFields.includes(label)) changedFields.push(label);
+        }
+      }
+      next.scope = scopeNext;
+    }
+    if (body.constraints !== undefined) {
+      const parsedConstraints = ConstraintSet.safeParse(body.constraints);
+      if (!parsedConstraints.success) {
+        throw validation(`invalid constraints: ${parsedConstraints.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`);
+      }
+      if (JSON.stringify(parsedConstraints.data) !== JSON.stringify(question.constraints)) changedFields.push('constraints');
+      next.constraints = parsedConstraints.data;
+    }
+    if (changedFields.length === 0) {
+      throw validation('nothing to edit — provide at least one of: text, goalType, scope.{domain,phenomena,inScope,outOfScope}, constraints');
+    }
+    const edited = ResearchQuestion.parse(next);
+    app.store.putObject('question', edited);
+    app.store.appendEvent(runId, {
+      type: 'note',
+      detail: { reason: 'question_edited_human', questionId: edited.id, changedFields, actor: 'human' },
+    });
+    sendJson(res, 200, { questionId: edited.id, changedFields, question: edited });
   };
 
   const receiveFeedback = async (
@@ -1909,6 +2068,8 @@ function parseSeedSources(raw: unknown): string | {
           return;
         }
         if (leaf === 'question' && method === 'GET') return runQuestion(res, runId);
+        if (leaf === 'question' && method === 'PATCH') return await editRunQuestion(req, res, runId);
+        if (leaf === 'scope-proposal' && method === 'POST') return await scopeProposal(res, runId);
         if (leaf === 'report' && method === 'GET') return runReport(res, runId);
         if (leaf === 'paper' && method === 'GET') return runPaper(res, runId);
         if (leaf === 'package' && method === 'GET') return runPackageZip(res, runId);
