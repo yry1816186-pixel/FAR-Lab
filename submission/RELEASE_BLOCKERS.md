@@ -1,4 +1,4 @@
-# RELEASE_BLOCKERS.md — release/submission blocker list (lane 15, live as of 2026-08-25)
+# RELEASE_BLOCKERS.md — release/submission blocker list (live as of 2026-08-27)
 
 Single published gap list for release readiness. Dynamic per-item acceptance detail stays in
 `.control/ACCEPTANCE_STATUS.json` (never published); this file is the release-facing view and
@@ -9,8 +9,8 @@ is updated by lane 15 at governance milestones.
 | ID | Blocker | Owner | Needed action | State |
 | --- | --- | --- | --- | --- |
 | B-QWEN-LIVE-ROUTE | ACC-02 (target live_verified, at tested): competition-mandated Qwen-via-Bailian live route with receipts does not exist; original DeepSeek live evidence superseded (DeepSeek banned in project) | user (credential) + lane 11 (route) | user provides Bailian/DashScope credential; one real-route run with provider/model/request receipts captured (调用凭证/截图) | OPEN — external; no fabrication allowed; live-API policy forbids spending any key "to feel sure" |
-| S-1 | 技术方案文档 PDF (≤20 pages, adjudicated 2026-08-25) | lane 15 drafts, user approves | user final review + print | DRAFTED — v2 (2026-08-26) rendered to submission/技术方案文档.pdf (5 pages, fonts clean, all claims evidence-backed incl. 2026-08-26 restructure + offline journey); awaiting user review; content frozen until B-QWEN lands (one line to update) |
-| ACC-40 | Lineage storage evidence below target (implemented < tested) | sibling lane (lineage projection rebase) | land the lineage projection rebase and raise evidence to `tested` | OPEN — outside lane 15 write ownership; tracked here for release gating |
+| S-1 | 技术方案文档 PDF (≤20 pages, adjudicated 2026-08-25) | drafts + agent updates, user approves | user final review + print | DRAFTED — v3 (2026-08-27, @486fe73) aligned with the Research Map architecture (§5 rewritten from the retired sidebar/brief flow; case-G evolution note; trust surfaces restated at their real locations); rendered to submission/技术方案文档.pdf, still 5 pages; awaiting user review; after B-QWEN lands only the live-route line needs updating |
+| ~~ACC-40~~ | RESOLVED 2026-08-27: lineage projection rebase landed; ACCEPTANCE_STATUS shows ACC-40 at target (`tested`) with 12/12 lineage tests green — kept here as a strikethrough record, no longer release-blocking | — | — | RESOLVED |
 
 ## User-owned submission actions (not engineering blockers; deadline 2026-09-05)
 
