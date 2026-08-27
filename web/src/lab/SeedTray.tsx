@@ -233,7 +233,7 @@ export function useSeedTray(onQuestionSeed?: (title: string) => void): SeedTrayA
       const notes = (it.annotations ?? [])
         .map((a, i) => {
           const parts = [a.text, a.comment].filter((x): x is string => x !== undefined);
-          return parts.length > 0 ? `[研究者注释 ${i + 1}] ${parts.join(' — ')}` : '';
+          return parts.length > 0 ? `${t('seed.researcherNote', { n: i + 1 })} ${parts.join(' — ')}` : '';
         })
         .filter((s) => s.length > 0)
         .join('\n');

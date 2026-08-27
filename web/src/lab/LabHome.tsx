@@ -93,7 +93,12 @@ export function LabHome({
   const visibleStudies = searching ? studies.slice(0, 50) : showAllStudies ? studies : studies.slice(0, STUDY_PREVIEW);
 
   const probeSet = new Set(counterStudyIds);
-  const counterStudies = runs.filter((r) => probeSet.has(r.id));
+  // Second-wave rows (counter probe) insert AFTER first paint — each extra
+  // row pushes the studies section down and burns CLS budget (measured 0.106
+  // with 2 rows on a loaded workspace; §21 ceiling 0.1). The queue is a
+  // PREVIEW surface: one counter decision here, the rest live in the studies
+  // index (which carries its own counter markers) — first paint stays stable.
+  const counterStudies = runs.filter((r) => probeSet.has(r.id)).slice(0, 1);
 
   return (
     <div className="lab-root">

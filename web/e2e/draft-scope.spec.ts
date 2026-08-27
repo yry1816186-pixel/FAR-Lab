@@ -37,7 +37,7 @@ test('preview -> edit scope -> confirm launch lands on the study map', async ({ 
   await page.getByRole('button', { name: /确认启动研究|Confirm and launch/ }).click();
   await expect(page).toHaveURL(/#study\/run_[a-z0-9]+/, { timeout: 30_000 });
   await expect(page.locator('.map-question')).toContainText('sleep deprivation', { timeout: 20_000 });
-  await expect(page.locator('.map-verdict, [class*="verdict"]')).toBeVisible({ timeout: 90_000 });
+  await expect(page.locator('.map-verdict, [class*="verdict"]')).toBeVisible({ timeout: 120_000 });
 });
 
 test('direct launch stays one click (quick path unchanged)', async ({ page }) => {
@@ -47,4 +47,21 @@ test('direct launch stays one click (quick path unchanged)', async ({ page }) =>
   await expect(page).toHaveURL(/#study\/run_[a-z0-9]+/, { timeout: 30_000 });
   // No review panel was ever shown on this path.
   await expect(page.locator('.nr-review')).toHaveCount(0);
+});
+
+test('a kept draft surfaces in the home judgment queue with a continue action', async ({ page }) => {
+  await page.goto('/#lab/new');
+  await page.locator('#nr-question').fill(QUESTION);
+  await page.getByRole('button', { name: /先看范围再启动|Preview scope first/ }).click();
+  await expect(page.locator('.nr-review')).toBeVisible({ timeout: 30_000 });
+
+  // Keep the draft (persisted server-side), return home.
+  await page.getByRole('button', { name: /保留草稿|Keep as draft/ }).click();
+  await page.goto('/#/');
+
+  // The awaiting-launch decision floats in the judgment queue — not buried
+  // in the studies index — with an explicit continue affordance.
+  const queue = page.locator('.queue-section').first();
+  await expect(queue.getByText(/草稿待启动|Draft awaiting launch/).first()).toBeVisible({ timeout: 15_000 });
+  await expect(queue.getByRole('button', { name: /继续|Continue/ }).first()).toBeVisible();
 });

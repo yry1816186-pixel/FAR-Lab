@@ -11,6 +11,13 @@ import { defineConfig } from '@playwright/test';
  * no keys, no network, receipts stamped test-mode. System Edge locally
  * (channel) / chromium in CI; no browser download required for local runs.
  */
+// One port per concurrent lane: a second session running the suite while
+// this one holds 3198 would otherwise (a) reuse a foreign scratch workspace
+// and (b) kill this lane's server in its teardown. FARLAB_E2E_PORT isolates
+// both (serve-e2e.mjs honors it; CI keeps the default).
+const PORT = process.env.FARLAB_E2E_PORT ?? '3198';
+const BASE = process.env.FARLAB_E2E_BASE_URL ?? `http://127.0.0.1:${PORT}`;
+
 export default defineConfig({
   testDir: './e2e',
   timeout: 120_000,
@@ -18,7 +25,7 @@ export default defineConfig({
   workers: 1,
   reporter: process.env.CI ? [['github'], ['list']] : 'list',
   use: {
-    baseURL: process.env.FARLAB_E2E_BASE_URL ?? 'http://127.0.0.1:3198',
+    baseURL: BASE,
     // Local: System Edge (no download). CI: default chromium (installed by the
     // workflow); an explicitly empty PLAYWRIGHT_CHANNEL also means "default".
     channel: process.env.CI
@@ -29,7 +36,7 @@ export default defineConfig({
   },
   webServer: {
     command: 'node ../scripts/serve-e2e.mjs',
-    url: 'http://127.0.0.1:3198/api/v1/health',
+    url: `${BASE}/api/v1/health`,
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
   },
