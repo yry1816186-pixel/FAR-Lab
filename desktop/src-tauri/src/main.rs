@@ -270,9 +270,15 @@ fn handle_deep_link(app: &tauri::AppHandle, payload: &str) {
         let end = rest.find(['"', ' ', '\\']).unwrap_or(rest.len());
         let path = &rest[..end];
         if path.is_empty() {
-            navigate_hash(app, "#new");
+            navigate_hash(app, "#lab/new");
         } else {
-            navigate_hash(app, &format!("#{path}"));
+            // far://run/<id> opens the study MAP (the primary view); other
+            // paths pass through as hashes (#study/.., #conv/.., #lab/new).
+            if let Some(run_id) = path.strip_prefix("run/") {
+                navigate_hash(app, &format!("#study/{run_id}"));
+            } else {
+                navigate_hash(app, &format!("#{path}"));
+            }
         }
     }
 }
@@ -433,7 +439,7 @@ fn main() {
                         // Global quick capture: surface the app and land on the
                         // focused question box (the web autoFocus does the rest).
                         show_main(app);
-                        navigate_hash(app, "#new");
+                        navigate_hash(app, "#lab/new");
                     }
                 })
                 .build(),
@@ -527,7 +533,7 @@ fn main() {
                         "open" => show_main(app),
                         "capture" => {
                             show_main(app);
-                            navigate_hash(app, "#new");
+                            navigate_hash(app, "#lab/new");
                         }
                         "quit" => app.exit(0),
                         _ => {}
