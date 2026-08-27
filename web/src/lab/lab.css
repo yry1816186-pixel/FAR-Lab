@@ -584,3 +584,8 @@
 }
 .nr-cite textarea:focus-visible { outline: 2px solid var(--v2-info); outline-offset: 1px; }
 .nr-cite-acts { display: flex; align-items: center; gap: 10px; }
+
+/* First-use route readiness detail (P2): which routes, per-route mark */
+.fu-routes-detail { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 4px; }
+.fu-route { font-size: 11.5px; color: var(--v2-text-3); }
+.fu-route.is-ready { color: var(--v2-text-2); }

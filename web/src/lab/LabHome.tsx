@@ -306,6 +306,18 @@ function FirstUse({ health, healthError, checking, onNewResearch, onOpenSettings
                     ? t('labhome.fuRoutesOk', { ready: ready.length, total: liveProviders.length })
                     : t('labhome.fuRoutesZero')}
             </span>
+            {/* Route detail (P2 fix): WHICH routes are ready — names are proper
+                nouns; the per-route mark is the same verified/unverified code
+                the evidence band uses. Disclosed always, not only at zero. */}
+            {!checking && !healthError && liveProviders.length > 0 && (
+              <span className="fu-routes-detail">
+                {liveProviders.map((p) => (
+                  <span key={p.name} className={`fu-route${p.liveReady ? ' is-ready' : ''}`}>
+                    <span aria-hidden="true">{p.liveReady ? '✓' : '–'}</span> {p.name}
+                  </span>
+                ))}
+              </span>
+            )}
             {!routesOk && !checking && !healthError && (
               <button type="button" className="fu-check-act" onClick={onOpenSettings}>{t('labhome.fuConfigure')}</button>
             )}
