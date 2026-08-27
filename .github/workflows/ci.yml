@@ -35,6 +35,9 @@ jobs:
       - name: Install TUI dependencies
         working-directory: packages/tui
         run: npm ci
+      - name: Install desktop dependencies
+        working-directory: desktop
+        run: npm ci
       # eval/*.mjs scripts (rediscovery-judge, retrieval-baseline tests) import
       # compiled dist/ — the suite needs a real build, not just typecheck.
       - name: Build backend dist
