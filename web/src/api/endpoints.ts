@@ -238,6 +238,8 @@ export interface CreateRunInput {
   providerConfigId?: string;
   /** R1: user-provided seed sources (PDF text / parsed citations / Zotero picks). */
   seeds?: import('../utils/ingest').SeedInput[];
+  /** HX §8.2: persist as a draft — run + seeds stored, execution NOT started. */
+  draft?: boolean;
 }
 
 export const createRun = async (input: CreateRunInput, signal?: AbortSignal): Promise<string> => {
@@ -267,6 +269,78 @@ export const deleteRun = async (runId: string, signal?: AbortSignal): Promise<vo
 
 export const resumeRun = async (runId: string, signal?: AbortSignal): Promise<void> => {
   await api.post(`${BASE}/runs/${encodeURIComponent(runId)}/resume`, {}, signal);
+};
+
+// ---- HX §8.2 pre-launch journey (server: draft + scope-proposal + PATCH question) ----
+
+/** Receipt-backed scope refinement returned for a parked draft (run paused, scope done). */
+export interface ScopeProposal {
+  runId: string;
+  question: import('./types').ResearchQuestion;
+}
+
+const isStringArray = (v: unknown): v is string[] =>
+  Array.isArray(v) && v.every((x) => typeof x === 'string');
+
+/** Defensive shape guard: only the fields the review panel renders, never trusted wholesale. */
+function scopeProposalOf(data: unknown): ScopeProposal {
+  if (typeof data === 'object' && data !== null) {
+    const runId = (data as { runId?: unknown }).runId;
+    const q = (data as { question?: unknown }).question;
+    if (typeof runId === 'string' && typeof q === 'object' && q !== null) {
+      const question = q as Record<string, unknown>;
+      const scope = typeof question.scope === 'object' && question.scope !== null ? question.scope as Record<string, unknown> : null;
+      if (scope !== null && typeof scope.domain === 'string' && isStringArray(scope.phenomena)) {
+        return { runId, question: q as import('./types').ResearchQuestion };
+      }
+    }
+  }
+  throw new ApiError({
+    code: 'unexpected_schema',
+    message: '范围提案响应结构与预期不符（缺少 runId/question.scope）',
+    retryable: false,
+    i18nKey: 'err.schema',
+    i18nVars: { what: 'scope proposal' },
+  });
+}
+
+/** Runs ONLY the scope stage on a draft run and parks it at 'paused' — the
+ *  researcher sees and edits the refined scope BEFORE launching (§8.2). */
+export const proposeScope = async (runId: string, signal?: AbortSignal): Promise<ScopeProposal> =>
+  scopeProposalOf(await api.post(`${BASE}/runs/${encodeURIComponent(runId)}/scope-proposal`, {}, signal));
+
+export interface EditQuestionInput {
+  text?: string;
+  goalType?: ScientificGoalType;
+  scope?: {
+    domain?: string;
+    phenomena?: string[];
+    inScope?: string[];
+    outOfScope?: string[];
+  };
+}
+
+export interface EditQuestionResult {
+  questionId: string;
+  changedFields: string[];
+  question: import('./types').ResearchQuestion;
+}
+
+/** Edit the draft's question pre-launch (server 409s once the run is launched). */
+export const editRunQuestion = async (runId: string, input: EditQuestionInput, signal?: AbortSignal): Promise<EditQuestionResult> => {
+  const data: unknown = await api.patch(`${BASE}/runs/${encodeURIComponent(runId)}/question`, input, signal);
+  if (typeof data === 'object' && data !== null
+    && typeof (data as { questionId?: unknown }).questionId === 'string'
+    && Array.isArray((data as { changedFields?: unknown }).changedFields)) {
+    return data as EditQuestionResult;
+  }
+  throw new ApiError({
+    code: 'unexpected_schema',
+    message: '问题编辑响应结构与预期不符（缺少 questionId/changedFields）',
+    retryable: false,
+    i18nKey: 'err.schema',
+    i18nVars: { what: 'question edit result' },
+  });
 };
 
 /** §5.2 counter-evidence search: one researcher-directed live search into the run
