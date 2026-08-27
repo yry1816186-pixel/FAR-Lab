@@ -17,9 +17,7 @@ coverage/
 tmp/
 *.log
 
-# Isolated external-source research clones/staging
-research/clones/
-research/staging/
+# Isolated external-source research clones/staging (covered by /research/ below)
 
 # OS/editor noise
 .DS_Store
@@ -54,16 +52,43 @@ experiment-runtime/.venv/
 # Control-plane runtime state (execution state, decisions, blockers — local only)
 .control/
 
-# Eval/spike run outputs (generated results, databases, temp builds)
+# Eval run outputs (generated results, databases, temp builds)
 eval/results/
-spikes/**/output/
-spikes/**/runs/
-spikes/**/results/
-spikes/**/data/
-spikes/**/tmp-*/
 *.db
 *.db-wal
 *.db-shm
+
+# ---- Repo governance (2026-08-28): GitHub carries source + necessary files only. ----
+# Workspace process artifacts stay on disk locally; never uploaded.
+/evidence/
+/artifacts/
+/research/
+/.planning/
+/spikes/
+
+# Transient runtime junk
+*.err
+/test-results/
+/playwright-report/
+web/test-results/
+/.far-hx-before/
+/.tmp-far-hx-isolated/
+/far-run/
+
+# Workspace-internal process/handoff docs (single source of truth is local)
+/START_HERE.md
+/BUNDLE_MANIFEST.json
+/ach-matrix.yml
+/ach-matrix-v2.yml
+/final_delivery.md
+/PROGRESS.md
+/HANDOFF_PROMPT.md
+/FINAL_BUILD_PROMPT.md
+/FAR-Lab_DEVELOPMENT_MISSION.md
+/FAR-Lab_HUMAN_EXPERIENCE_LAYER_FINAL_RECONSTRUCTION_PROMPT.md
+
+# External copyrighted material (third-party paper, never upload)
+/jss_metafor.pdf
 
 # Nested git worktrees (isolated lanes)
 work/
