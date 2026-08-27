@@ -206,6 +206,32 @@ test('§8.2 pre-launch: draft -> scope proposal -> edit -> server truth -> launc
   await expect(page.locator('#scope-domain')).toHaveCount(0);
 });
 
+
+test('deep-tools layer: map verdict links to every sanctioned deep panel and back', async ({ page }) => {
+  await page.goto(`/#study/${studyId}`);
+  await expect(page.locator('.map-verdict')).toBeVisible({ timeout: 60_000 });
+
+  // The four next-step links exist and target the correct deep panels.
+  const expectLink = async (label: RegExp, tab: string): Promise<void> => {
+    const link = page.locator(`.map-verdict a[href="#run/${studyId}/${tab}"]`);
+    await expect(link).toBeVisible();
+    await expect(link).toContainText(label);
+  };
+  await expectLink(/研究计划|Research plan/, 'plan');
+  await expectLink(/评分卡|Scorecards/, 'hypotheses');
+  await expectLink(/反馈与修订|Feedback & revision/, 'revisions');
+  await expectLink(/导出可复现包|Export reproducible/, 'verify');
+
+  // Navigate into one deep panel (plan) and back to the map — the deep layer
+  // and the map are one product, not separate apps.
+  await page.locator(`.map-verdict a[href="#run/${studyId}/plan"]`).click();
+  await expect(page).toHaveURL(new RegExp(`#run/${studyId}/plan`));
+  await expect(page.getByText(/判定规则|decision rule|步骤/i).first()).toBeVisible({ timeout: 15_000 });
+  await page.goBack();
+  await expect(page).toHaveURL(new RegExp(`#study/${studyId}`));
+  await expect(page.locator('.map-verdict')).toBeVisible();
+});
+
 /** Inject axe-core and return critical/serious violations (impact-filtered, honest scope). */
 async function axeScan(page: Page): Promise<{ id: string; impact: string; nodes: number }[]> {
   await page.addScriptTag({ path: AXE_PATH });

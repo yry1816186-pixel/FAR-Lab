@@ -573,3 +573,14 @@
 .lab-truth--recorded_replay, .lab-truth--synthetic { color: var(--v2-refuted-on-tint); border-color: var(--err-border); }
 
 .map-verdict--empty { border-color: var(--v2-border); }
+
+/* Citation/identifier entry (§8.2 explicit ingestion input) */
+.nr-cite { display: grid; gap: 7px; padding: 10px 12px; border: 1px dashed var(--v2-border); border-radius: 10px; }
+.nr-cite label { font-size: 12px; font-weight: 600; color: var(--v2-text-2); }
+.nr-cite textarea {
+  font: inherit; font-size: 12.5px; line-height: 1.55; width: 100%;
+  border: 1px solid var(--v2-border); border-radius: 8px;
+  background: var(--v2-page-bg); color: var(--v2-text-1); padding: 8px 10px; resize: vertical;
+}
+.nr-cite textarea:focus-visible { outline: 2px solid var(--v2-info); outline-offset: 1px; }
+.nr-cite-acts { display: flex; align-items: center; gap: 10px; }

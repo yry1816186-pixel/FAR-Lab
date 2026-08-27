@@ -41,9 +41,15 @@ export function NewResearch({ onLaunched, onOpenConversation }: {
   });
   const [configs, setConfigs] = useState<ModelConfigsResponse | null>(null);
   const [zoteroOpen, setZoteroOpen] = useState(false);
+  // Explicit citation/identifier entry (§8.2 one ingestion system): the paste
+  // path cannot be scripted or reached without clipboard access — this is the
+  // same parser (bibtex/ris entries, DOI/arXiv/URL lines) with a visible input.
+  const [citeOpen, setCiteOpen] = useState(false);
+  const [citeText, setCiteText] = useState('');
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const citeInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   // ---- §8.2 scope-review journey state (idle until the preview button) ----
   const [draftId, setDraftId] = useState<string | null>(null);
@@ -231,6 +237,14 @@ export function NewResearch({ onLaunched, onOpenConversation }: {
             <button type="button" className="nr-tool" onClick={() => fileInputRef.current?.click()}>
               <FileUp size={13} aria-hidden="true" /> {t('newresearch.addFile')}
             </button>
+            <button
+              type="button"
+              className="nr-tool"
+              aria-expanded={citeOpen}
+              onClick={() => { setCiteOpen((v) => !v); if (!citeOpen) window.setTimeout(() => citeInputRef.current?.focus(), 50); }}
+            >
+              <Link2 size={13} aria-hidden="true" /> {t('newresearch.addCitation')}
+            </button>
             <button type="button" className="nr-tool" onClick={() => setZoteroOpen(true)}>
               <BookMarked size={13} aria-hidden="true" /> {t('newresearch.addZotero')}
             </button>
@@ -247,6 +261,34 @@ export function NewResearch({ onLaunched, onOpenConversation }: {
               onChange={(e) => { tray.addFiles(Array.from(e.target.files ?? [])); e.target.value = ''; }}
             />
           </div>
+
+          {citeOpen && (
+            <div className="nr-cite">
+              <label htmlFor="nr-cite-input">{t('newresearch.citeLabel')}</label>
+              <textarea
+                id="nr-cite-input"
+                ref={citeInputRef}
+                rows={3}
+                value={citeText}
+                placeholder={t('newresearch.citePlaceholder')}
+                onChange={(e) => setCiteText(e.target.value)}
+              />
+              <div className="nr-cite-acts">
+                <button
+                  type="button"
+                  className="mb-act mb-act--primary"
+                  disabled={citeText.trim().length === 0}
+                  onClick={() => {
+                    tray.addDroppedText(citeText);
+                    setCiteText('');
+                  }}
+                >
+                  {t('newresearch.citeAdd')}
+                </button>
+                <span className="nr-tools-hint">{t('newresearch.citeHint')}</span>
+              </div>
+            </div>
+          )}
 
           {reviewing && (
             <section className="nr-review" aria-label={t('newresearch.reviewTitle')}>

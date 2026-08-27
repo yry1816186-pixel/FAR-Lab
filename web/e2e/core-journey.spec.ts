@@ -10,7 +10,11 @@ import { expect, test, type Page } from '@playwright/test';
 
 const QUESTION = 'Does resistance training improve insulin sensitivity in older adults?';
 
-test('empty workspace shows the first-use zone (G1), not fabricated lists', async ({ page }) => {
+test('empty workspace shows the first-use zone (G1), not fabricated lists', async ({ page, request }) => {
+  // The E2E server is reused between local runs, so its workspace is only
+  // empty on a fresh boot (CI runners boot fresh every time and never skip).
+  const runs = await (await request.get('/api/v1/runs')).json() as { runs: unknown[] };
+  test.skip(runs.runs.length > 0, 'workspace already has runs (reused server) — G1 asserted on clean CI runners');
   await page.goto('/#/');
   // Fresh scratch workspace: product positioning + readiness checks + ONE first
   // step — the judgment/studies sections appear only with real content (the
