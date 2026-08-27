@@ -80,10 +80,11 @@ test('keyboard-only: n opens formation, / opens the palette, Esc closes', async 
   await expect(page).toHaveURL(/#lab\/new/);
   await expect(page.getByRole('textbox', { name: /研究问题|Research question/ })).toBeFocused();
 
-  // "/" opens the command palette from anywhere.
+  // Ctrl+K opens the command palette from anywhere (the '/' filter shortcut
+  // belonged to the removed dual-list sidebar; the palette is the survivor).
   await page.keyboard.press('Escape'); // leave the textarea first
-  await page.keyboard.press('/');
-  const palette = page.locator('[role="dialog"], .palette').first();
+  await page.keyboard.press('Control+k');
+  const palette = page.locator('.palette[role="dialog"]');
   await expect(palette).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(palette).toBeHidden();
