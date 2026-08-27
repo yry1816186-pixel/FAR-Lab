@@ -66,6 +66,37 @@ jobs:
         working-directory: web
         run: npm run build
 
+  # HX §19: browser E2E over the Research Map core journey (home -> formation
+  # -> launch -> study map -> inspector -> home) on the deterministic offline
+  # route. Depends on both builds; chromium via the official action.
+  web-e2e:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install root deps
+        run: npm ci
+      - name: Build root dist
+        run: npm run build
+      - name: Install web deps
+        working-directory: web
+        run: npm ci
+      - name: Build web dist
+        working-directory: web
+        run: npm run build
+      - name: Install Playwright chromium
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+      - name: Run core-journey E2E (offline deterministic route)
+        working-directory: web
+        env:
+          PLAYWRIGHT_CHANNEL: ''
+        run: npx playwright test
+
   # Release artifact: the public-release pack is built only on explicit demand
   # (tag push or manual dispatch) because export-public.mjs re-verifies the
   # copy with a fresh install + typecheck + lint + test + build inside it.

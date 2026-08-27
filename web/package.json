@@ -3,14 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "license": "Apache-2.0",
-  "description": "FAR-Lab researcher workbench — React+Vite frontend over the /api/v1 HTTP contract",
+  "description": "FAR-Lab researcher workbench \u2014 React+Vite frontend over the /api/v1 HTTP contract",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "npm run typecheck && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "fetch:asr-model": "node scripts/fetch-asr-model.mjs"
+    "fetch:asr-model": "node scripts/fetch-asr-model.mjs",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@citation-js/core": "0.8.2",
@@ -48,6 +49,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/d3-force": "^3.0.10",
     "@types/node": "^24.13.3",
     "@types/react": "^18.3.12",
