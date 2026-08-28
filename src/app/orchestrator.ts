@@ -52,8 +52,8 @@ export class RunLeaseLostError extends Error {
   }
 }
 
-/** Lease TTL: renewed on every persisted write during execute(). Worst legit gap between writes = one callStructured chain under the provider layer's total retry budget (~120s, src/providers/http.ts); 240s gives 2x headroom above that and >4x above the measured inter-signal p99 (57.4s, evidence/W8/signal-gap.json). Operational override FARLAB_LEASE_TTL_MS (floor 5s) exists for fault-injection harnesses and tight-sla deployments. */
-export const LEASE_TTL_MS = Math.max(5_000, Number(process.env.FARLAB_LEASE_TTL_MS ?? 240_000) || 240_000);
+/** Lease TTL: renewed on every persisted write during execute(). Worst legit gap between writes = one callStructured chain under the provider layer's total retry budget (300s, src/providers/http.ts — raised 2026-08-28 from 120s after live receipts measured single zai calls at up to 121s); 660s keeps >2x headroom above that and >10x above the measured inter-signal p99 (57.4s, evidence/W8/signal-gap.json). The invariant TTL > worst inter-write gap is what stops the watchdog adopting (and re-executing, double-charging) a run whose worker is merely inside one long model call. Operational override FARLAB_LEASE_TTL_MS (floor 5s) exists for fault-injection harnesses and tight-sla deployments. */
+export const LEASE_TTL_MS = Math.max(5_000, Number(process.env.FARLAB_LEASE_TTL_MS ?? 660_000) || 660_000);
 
 /** Stable per-process holder identity (pid + random boot nonce: pid reuse must not merge identities). */
 const BOOT_NONCE = randomBytes(4).toString('hex');
