@@ -1477,6 +1477,7 @@ export const zh = {
   'map.order.sep.overlap': '重叠',
   'map.order.sep.unknown': '未知',
   'map.stateFalsifier': '若观察到「{text}」，领先解释将被削弱或证伪',
+  'map.stateUnavailable': '此服务端版本早于科学状态投影（/science）——重启 FAR-Lab 服务端后即可在这里看到「当前科学认识」与下一步行动。',
   'map.stateTemplateTitle': '本次运行的假设是离线模板产物',
   'map.stateTemplateBody': '模板内容不承载科学推理——本研究的诚实结论是「证据不足」。用真实模型路线重跑本研究才能获得真实假设。',
   'map.stateInsufficientTitle': '当前结论：证据不足（正式结论，非错误）',
@@ -3367,6 +3368,8 @@ export const en: Record<DictKey, string> = {
   'seed.remove': 'Remove',
   'seed.researcherNote': '[researcher note {n}]',
   'palette.goHome': 'Go to the research workspace',
+  'map.stateUnavailable': 'This server predates the scientific-state projection (/science) — restart the FAR-Lab server to see the current scientific state and next actions here.',
 };
 
 export const dictionaries: Record<Lang, Record<DictKey, string>> = { zh, en };
+

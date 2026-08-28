@@ -66,6 +66,10 @@ export function StudyMap({
   const [science, setScience] = useState<ScienceBundle | null>(null);
   const [insp, setInsp] = useState<Insp | null>(null);
   const [loadError, setLoadError] = useState<ApiError | null>(null);
+  // Spine projection 404 = the serving process predates the /science API
+  // (e.g. a long-lived 3196 instance). Fail visibly: without this the state
+  // band silently vanishes and the user cannot know why.
+  const [spineUnavailable, setSpineUnavailable] = useState(false);
   const [lifecycleBusy, setLifecycleBusy] = useState(false);
   const [cancelArmed, setCancelArmed] = useState(false);
   const [cancelRequested, setCancelRequested] = useState(false);
@@ -85,14 +89,20 @@ export function StudyMap({
       .catch(() => { setHyps([]); setRanks(new Map()); setAdjusted(null); });
     // Spine projection: state/next-actions/deltas. Failure is non-fatal (the
     // map still renders its bands) but leaves science null — never fake state.
-    void getScience(rid, c.signal).then(setScience).catch(() => setScience(null));
+    // A 404 is specifically the old-server case: surfaced as its own notice.
+    void getScience(rid, c.signal)
+      .then(setScience)
+      .catch((e: unknown) => {
+        setScience(null);
+        setSpineUnavailable(e instanceof ApiError && e.status === 404);
+      });
   }, []);
 
   // Reload science objects on run switch AND on lifecycle transitions
   // (running -> completed/partial): the live band disappears exactly when the
   // final evidence/hypotheses land — without this the map keeps the last
   // (possibly empty) snapshot from mid-run.
-  useEffect(() => { setInsp(null); setLoadError(null); loadScience(run.id); }, [run.id, run.status, loadScience]);
+  useEffect(() => { setInsp(null); setLoadError(null); setSpineUnavailable(false); loadScience(run.id); }, [run.id, run.status, loadScience]);
 
   // Palette claim-hit deep focus: once this run's claims arrive, open the
   // inspector on the targeted claim (consumed once).
@@ -287,6 +297,14 @@ export function StudyMap({
           <section className="map-node" aria-hidden="true">
             <p className="map-node-label">{t('map.stateLabel')}</p>
             <div className="map-band map-band--reserving map-band--state" />
+          </section>
+        )}
+        {!draftable && settled && science === null && scienceLoaded && spineUnavailable && (
+          <section className="map-node">
+            <p className="map-node-label">{t('map.stateLabel')}</p>
+            <div className="map-state map-state--insufficient" role="note">
+              <p className="ss-line">{t('map.stateUnavailable')}</p>
+            </div>
           </section>
         )}
         {!draftable && (
