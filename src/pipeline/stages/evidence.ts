@@ -620,7 +620,17 @@ export const buildEvidenceStage: StageHandler = {
       }
       return { adequate: false, first: first.data };
     };
-    const assessment = await assessSubjectCoverage();
+    // Fail-open by design: the gate is refusal-ENABLING — a failed assessment call
+    // must not kill a healthy run. The run proceeds untagged with a visible warning
+    // (the same enrichment-over-blockade discipline as the falsify link audit).
+    let assessment: { adequate: boolean; first: GapSeek };
+    try {
+      assessment = await assessSubjectCoverage();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      assessment = { adequate: true, first: { enoughEvidence: true, gapDescription: `assessment call failed — gate skipped, run proceeds: ${msg.slice(0, 120)}`, queries: [] } };
+      ctx.log(`build_evidence: subject-coverage assessment failed (${msg.slice(0, 160)}) — gate skipped this run (visible; not silently green)`);
+    }
     let subjectAdequate = assessment.adequate;
     if (!subjectAdequate) {
       gapSeekNote = `insufficient (2-of-2): ${assessment.first.gapDescription.slice(0, 160)}`;
@@ -722,9 +732,15 @@ export const buildEvidenceStage: StageHandler = {
       const verifiedNow = ctx.store.listObjects('claim', ctx.run.id).filter((c) => c.bindingStatus === 'verified').length;
       if (verifiedNow > verifiedCount) {
         ctx.log(`build_evidence: gap-seek added verified claims (${verifiedCount} -> ${verifiedNow}) — re-running subject-coverage assessment`);
-        const reassessed = await assessSubjectCoverage();
-        subjectAdequate = reassessed.adequate;
-        if (subjectAdequate) gapSeekNote += '; subject coverage recovered by gap-seek';
+        try {
+          const reassessed = await assessSubjectCoverage();
+          subjectAdequate = reassessed.adequate;
+          if (subjectAdequate) gapSeekNote += '; subject coverage recovered by gap-seek';
+        } catch (e) {
+          // re-assessment failed: keep the (insufficient) verdict from the first pass
+          // and disclose — never widen a refusal on a failed call.
+          ctx.log(`build_evidence: re-assessment after gap-seek failed (${e instanceof Error ? e.message.slice(0, 120) : String(e)}) — keeping the first 2-of-2 verdict`);
+        }
       }
     }
     // W4R subject-coverage verdict → honest run tag (visible in the UI; consumed
