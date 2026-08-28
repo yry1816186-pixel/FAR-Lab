@@ -212,19 +212,22 @@ const baselineMetrics = (record) => {
   const planResult = ResearchPlan.safeParse(planObj);
   if (!planResult.success) zodFailures.push(`plan: ${planResult.error.issues.slice(0, 3).map((i) => `${i.path.join('.')}:${i.message}`).join(' | ')}`);
 
-  // SAME deterministic checkers on raw baseline output
+  // SAME deterministic checkers on raw baseline output. Baseline models emit
+  // freeform shapes (arrays/objects where the product schema wants strings) —
+  // coerce non-strings to '' so the checker grades them as missing, never crashes.
+  const str = (v) => (typeof v === 'string' ? v : '');
   const falsifyChecks = (record.output.hypotheses ?? []).map((h) =>
     h.falsification
       ? checkFalsificationCompleteness({
-          observable: h.falsification.observable ?? '',
-          measurement: h.falsification.measurement ?? '',
-          expectedRelation: h.falsification.expectedRelation ?? '',
-          decisionRule: h.falsification.decisionRule ?? '',
-          supportCondition: h.falsification.supportCondition ?? '',
-          weakeningCondition: h.falsification.weakeningCondition ?? '',
-          falsificationCondition: h.falsification.falsificationCondition ?? '',
-          method: h.falsification.method ?? '',
-          failureInterpretation: h.falsification.failureInterpretation ?? '',
+          observable: str(h.falsification.observable),
+          measurement: str(h.falsification.measurement),
+          expectedRelation: str(h.falsification.expectedRelation),
+          decisionRule: str(h.falsification.decisionRule),
+          supportCondition: str(h.falsification.supportCondition),
+          weakeningCondition: str(h.falsification.weakeningCondition),
+          falsificationCondition: str(h.falsification.falsificationCondition),
+          method: str(h.falsification.method),
+          failureInterpretation: str(h.falsification.failureInterpretation),
         })
       : { passed: false, missing: ['falsification: absent'] },
   );

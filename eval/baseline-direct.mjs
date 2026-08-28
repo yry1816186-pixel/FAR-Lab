@@ -29,7 +29,7 @@ for (const p of problems) {
       userPayload: { question: p.text, domain: p.domain, goalType: p.goalType },
       outputKind: 'json',
       temperature: 0.4,
-      maxTokens: 8192,
+      maxTokens: 16000,
       purpose: 'w4-eval-baseline-direct',
     },
     (raw) => {
@@ -52,6 +52,6 @@ for (const p of problems) {
     at: new Date().toISOString(),
   };
   appendFileSync(OUT, JSON.stringify(record) + '\n', 'utf8');
-  console.log(`${p.id} ok=${res.ok} parse_ok=${record.parse.ok} wall=${record.wallMs}ms model=${res.receipt.modelVersion ?? res.receipt.modelId} tokens=${res.receipt.usage.totalTokens ?? 'n/a'}${res.error ? ' err=' + res.error.kind : ''}`);
+  console.log(`${p.id} ok=${res.ok} parse_ok=${record.parse.ok} wall=${record.wallMs}ms model=${res.receipt?.modelVersion ?? res.receipt?.modelId ?? '?'} tokens=${res.receipt?.usage?.totalTokens ?? 'n/a'}${res.error ? ' err=' + res.error.kind : ''}`);
 }
 console.log('DONE baseline-direct -> eval/results/baseline-direct.jsonl');

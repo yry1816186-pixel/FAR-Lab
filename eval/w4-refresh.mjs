@@ -31,7 +31,10 @@ for (const p of problems) {
       ['dist/cli/main.js', 'research', 'start', p.text, '--domain', p.domain, '--goal', p.goalType, '--route', 'zai', '--json'],
       { cwd: root, encoding: 'utf8', timeout: 45 * 60_000, maxBuffer: 64 * 1024 * 1024 },
     );
-    const created = JSON.parse(stdout.split('\n').filter(Boolean).pop());
+    // The CLI prints the {runId} JSON early, then executes the whole pipeline and
+    // prints a final human-readable status — pick the JSON line, not the last line.
+    const jsonLine = stdout.split('\n').map((l) => l.trim()).filter((l) => l.startsWith('{')).pop();
+    const created = JSON.parse(jsonLine);
     record.runId = created.runId;
     // poll to terminal state
     for (;;) {
