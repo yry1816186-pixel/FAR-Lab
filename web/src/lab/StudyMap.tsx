@@ -681,7 +681,7 @@ function StateBand({ run, science, onResume, onDispatch, dispatchError, busy }: 
   dispatchError: string | null;
   busy: boolean;
 }): JSX.Element {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const s = science.state;
   const primary = science.nextActions[0] ?? null;
   const rest = science.nextActions.slice(1, 4);
@@ -788,53 +788,58 @@ function StateBand({ run, science, onResume, onDispatch, dispatchError, busy }: 
         </div>
       )}
 
-      {primary !== null && (
-        <div className="map-action">
-          <p className="ma-title">{t('map.actionLabel')}{primary.researcherDecisionRequired && <span className="ma-decision">{t('map.actionDecisionRequired')}</span>}</p>
-          <p className="ma-objective">{primary.objective}</p>
-          <div className="ma-grid">
-            <p className="ma-line"><span className="ss-k">{t('map.actionGap')}</span>{primary.knowledgeGap}</p>
-            <p className="ma-line"><span className="ss-k">{t('map.actionWhyNow')}</span>{primary.rationale}</p>
-            <p className="ma-line"><span className="ss-k">{t('map.actionWouldChange')}</span>{primary.wouldChange}</p>
+      {primary !== null && (() => {
+        // Server composes the action text bilingually at one site (next-action.ts);
+        // the map picks by language with zh fallback for older projections.
+        const pa = primary.en !== undefined && lang === 'en' ? { ...primary, ...primary.en } : primary;
+        return (
+          <div className="map-action">
+            <p className="ma-title">{t('map.actionLabel')}{primary.researcherDecisionRequired && <span className="ma-decision">{t('map.actionDecisionRequired')}</span>}</p>
+            <p className="ma-objective">{pa.objective}</p>
+            <div className="ma-grid">
+              <p className="ma-line"><span className="ss-k">{t('map.actionGap')}</span>{pa.knowledgeGap}</p>
+              <p className="ma-line"><span className="ss-k">{t('map.actionWhyNow')}</span>{pa.rationale}</p>
+              <p className="ma-line"><span className="ss-k">{t('map.actionWouldChange')}</span>{pa.wouldChange}</p>
+            </div>
+            <p className="ma-meta">
+              {`${t('map.actionDiscrimination')} ${t(`map.qual.${primary.expectedDiscrimination}` as DictKey)} · ${t('map.actionFeasibility')} ${t(`map.qual.${primary.feasibility}` as DictKey)} · ${t('map.actionCost')} ${t(`map.qual.${primary.costClass}` as DictKey)}`}
+            </p>
+            {primary.actionable && primary.actionHint.kind === 'resume' && (
+              DISPATCHABLE_ACTIONS.includes(primary.actionType as DispatchableAction) ? (
+                <button
+                  type="button"
+                  className="mb-act mb-act--primary"
+                  disabled={busy}
+                  onClick={() => onDispatch(primary.actionType as DispatchableAction)}
+                >
+                  {t(`map.actionBtn.${primary.actionType}` as DictKey)}
+                </button>
+              ) : (
+                <button type="button" className="mb-act mb-act--primary" disabled={busy} onClick={onResume}>{t('map.actionRun')}</button>
+              )
+            )}
+            {primary.actionable && primary.actionHint.kind === 'rerun-live' && (
+              <a className="mb-act mb-act--primary" href={`#lab/new?q=${encodeURIComponent(run.questionText ?? '')}`}>{t('map.actionRerun')}</a>
+            )}
+            {dispatchError !== null && (
+              <p className="ma-error" role="alert">{dispatchError}</p>
+            )}
+            <p className="ma-leg">
+              {t('map.legLabel')}：{t(`map.leg.${science.experimentLeg.kind}` as DictKey)}
+              {science.experimentLeg.executabilityPassed && ` · ${t('map.legExecutable')}`}
+              {science.unconsumedFeedbackCount > 0 && ` · ${t('map.legFeedback', { n: science.unconsumedFeedbackCount })}`}
+            </p>
+            {rest.length > 0 && (
+              <details className="ma-rest">
+                <summary>{t('map.actionAlso')}（{rest.length}）</summary>
+                <ul>
+                  {rest.map((a) => <li key={a.id}><span className="ma-rest-type">{a.actionType}</span>{a.en !== undefined && lang === 'en' ? a.en.objective : a.objective}</li>)}
+                </ul>
+              </details>
+            )}
           </div>
-          <p className="ma-meta">
-            {`${t('map.actionDiscrimination')} ${t(`map.qual.${primary.expectedDiscrimination}` as DictKey)} · ${t('map.actionFeasibility')} ${t(`map.qual.${primary.feasibility}` as DictKey)} · ${t('map.actionCost')} ${t(`map.qual.${primary.costClass}` as DictKey)}`}
-          </p>
-          {primary.actionable && primary.actionHint.kind === 'resume' && (
-            DISPATCHABLE_ACTIONS.includes(primary.actionType as DispatchableAction) ? (
-              <button
-                type="button"
-                className="mb-act mb-act--primary"
-                disabled={busy}
-                onClick={() => onDispatch(primary.actionType as DispatchableAction)}
-              >
-                {t(`map.actionBtn.${primary.actionType}` as DictKey)}
-              </button>
-            ) : (
-              <button type="button" className="mb-act mb-act--primary" disabled={busy} onClick={onResume}>{t('map.actionRun')}</button>
-            )
-          )}
-          {primary.actionable && primary.actionHint.kind === 'rerun-live' && (
-            <a className="mb-act mb-act--primary" href={`#lab/new?q=${encodeURIComponent(run.questionText ?? '')}`}>{t('map.actionRerun')}</a>
-          )}
-          {dispatchError !== null && (
-            <p className="ma-error" role="alert">{dispatchError}</p>
-          )}
-          <p className="ma-leg">
-            {t('map.legLabel')}：{t(`map.leg.${science.experimentLeg.kind}` as DictKey)}
-            {science.experimentLeg.executabilityPassed && ` · ${t('map.legExecutable')}`}
-            {science.unconsumedFeedbackCount > 0 && ` · ${t('map.legFeedback', { n: science.unconsumedFeedbackCount })}`}
-          </p>
-          {rest.length > 0 && (
-            <details className="ma-rest">
-              <summary>{t('map.actionAlso')}（{rest.length}）</summary>
-              <ul>
-                {rest.map((a) => <li key={a.id}><span className="ma-rest-type">{a.actionType}</span>{a.objective}</li>)}
-              </ul>
-            </details>
-          )}
-        </div>
-      )}
+        );
+      })()}
 
       {science.deltas.length > 0 && (
         <div className="map-delta">

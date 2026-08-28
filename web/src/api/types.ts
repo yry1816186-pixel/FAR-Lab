@@ -1164,6 +1164,8 @@ export interface NextActionView {
   knowledgeGap: string;
   rationale: string;
   wouldChange: string;
+  /** English mirror of the four display fields (zh fallback when absent — older projections). */
+  en?: { objective: string; knowledgeGap: string; rationale: string; wouldChange: string };
   expectedDiscrimination: 'high' | 'medium' | 'low';
   feasibility: 'high' | 'medium' | 'low';
   costClass: 'high' | 'medium' | 'low';

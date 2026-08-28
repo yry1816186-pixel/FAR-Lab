@@ -381,6 +381,61 @@ describe('deriveNextActions — derived from scientific state, not pipeline orde
     }
   });
 
+  it('bilingual display fields: every derived action carries a non-empty en mirror for all four fields', () => {
+    // One derivation per state shape/leg so every reachable mk() site is covered.
+    const mkState = (kind: 'template' | 'backed' | 'insufficient') => {
+      if (kind === 'template') {
+        return projectScientificState({
+          runId: rid, runStatus: 'completed', questionDomain: 'life sciences (offline scope template)',
+          claims: [], relations: [], hypotheses: [hyp('t1', 'Offline hypothesis 1: x')], scorecards: [], counterQueriesAttempted: 0, evidenceBodies: [], tournament: null,
+        });
+      }
+      if (kind === 'insufficient') {
+        return projectScientificState({
+          runId: rid, runStatus: 'completed', questionDomain: 'cardiology',
+          claims: [], relations: [], hypotheses: [], scorecards: [], counterQueriesAttempted: 0, evidenceBodies: [], tournament: null,
+        });
+      }
+      const h1 = hyp('a', 'H1');
+      const c1 = claim('c1', 'c');
+      return projectScientificState({
+        runId: rid, runStatus: 'completed', questionDomain: 'cardiology',
+        claims: [c1], relations: [rel('r1', c1, h1, 'supports')],
+        hypotheses: [h1, hyp('b', 'H2')], scorecards: [card(h1, 1, 0.8, 0.6), card(hyp('b', 'H2'), 2, 0.7, 0.4)],
+        counterQueriesAttempted: 0, evidenceBodies: [], tournament: null,
+      });
+    };
+    const derivations = [
+      deriveNextActions({ ...baseInput, state: mkState('template') }),
+      deriveNextActions({ ...baseInput, state: mkState('insufficient') }),
+      deriveNextActions({ ...baseInput, state: mkState('backed') }),
+      deriveNextActions({ ...baseInput, state: mkState('backed'), leg: { kind: 'unexecuted', executabilityPassed: true }, unconsumedFeedbackCount: 1 }),
+      deriveNextActions({ ...baseInput, state: mkState('backed'), leg: { kind: 'unexecutable', executabilityPassed: true, unexecutableReason: 'tabular: requires wet-lab' } }),
+      deriveNextActions({ ...baseInput, state: mkState('backed'), hasEvidenceDebt: true }),
+      deriveNextActions({
+        ...baseInput, state: mkState('backed'),
+        planDatasets: [{ name: 'openml-61', availability: 'public' }],
+      }),
+    ];
+    const seen = new Set<string>();
+    for (const actions of derivations) {
+      for (const a of actions) {
+        seen.add(a.actionType);
+        expect(a.en, `${a.actionType} missing en mirror`).toBeDefined();
+        for (const [field, value] of Object.entries(a.en ?? {})) {
+          expect(value.length, `${a.actionType}.en.${field} empty`).toBeGreaterThan(0);
+        }
+        if (/[一-鿿]/.test(a.objective) === false) continue; // zh-composed module invariant; guard keeps the mirror check focused
+        expect(a.en && a.en.objective !== a.objective, `${a.actionType} en.objective should be an actual translation`).toBe(true);
+      }
+    }
+    // Every action type that derivation can reach is covered by at least one fixture above.
+    expect(seen.has('DECLARE_INSUFFICIENT_EVIDENCE')).toBe(true);
+    expect(seen.has('EXECUTE_PLANNED_EXPERIMENT')).toBe(true);
+    expect(seen.has('REDESIGN_EXPERIMENT_FOR_LOCAL_EXECUTABILITY')).toBe(true);
+    expect(seen.has('COUNTER_EVIDENCE_SEARCH')).toBe(true);
+  });
+
   it('science actions sort by expected discrimination desc then cost asc (information-gain ordering)', () => {
     const h1 = hyp('a', 'H1', {
       falsification: {

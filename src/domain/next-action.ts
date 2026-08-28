@@ -36,6 +36,21 @@ export type NextActionType = z.infer<typeof NextActionType>;
 
 export const Qualitative = z.enum(['high', 'medium', 'low']);
 
+/**
+ * English mirror of the four display fields. The zh fields stay the canonical
+ * text (CLI + export consumers are zh-primary); `en` is composed at the SAME
+ * site from the same structured inputs so the two can never drift apart. The
+ * web workbench picks per its language with zh fallback (older projections
+ * predating this field render zh only).
+ */
+const NextActionEn = z.object({
+  objective: z.string().min(1),
+  knowledgeGap: z.string().min(1),
+  rationale: z.string().min(1),
+  wouldChange: z.string().min(1),
+});
+export type NextActionEn = z.infer<typeof NextActionEn>;
+
 export const NextResearchAction = z.object({
   /** Deterministic id: stable per run+rule+seq so UI keys and tests are stable. */
   id: z.string().min(1),
@@ -49,6 +64,8 @@ export const NextResearchAction = z.object({
   rationale: z.string().min(1),
   /** What result would change the current view (from the leader's falsifier when available). */
   wouldChange: z.string().min(1),
+  /** English mirror of the four display fields (see NextActionEn above). */
+  en: NextActionEn.optional(),
   expectedDiscrimination: Qualitative,
   feasibility: Qualitative,
   costClass: Qualitative,
@@ -125,7 +142,11 @@ export function deriveNextActions(input: ActionDerivationInput): NextResearchAct
   const leaderFalsifier = leaderId !== null
     ? state.falsifiers.find((f) => f.hypothesisId === leaderId)?.condition ?? null
     : null;
-  const wouldChangeOf = (fallback: string): string => leaderFalsifier ?? fallback;
+  /** The leader's falsifier text is model data (verbatim in both languages); otherwise the bilingual fallback. */
+  const wouldChangeOf = (zhFallback: string, enFallback: string): { wouldChange: string; en: { wouldChange: string } } => ({
+    wouldChange: leaderFalsifier ?? zhFallback,
+    en: { wouldChange: leaderFalsifier ?? enFallback },
+  });
 
   // -- Truth gates first: template content and insufficient states are CONCLUSIONS, not config problems --
   if (state.kind === 'template') {
@@ -133,10 +154,16 @@ export function deriveNextActions(input: ActionDerivationInput): NextResearchAct
       objective: '用真实模型路线重新运行本研究，替换离线模板产物',
       knowledgeGap: '当前假设/范围由离线确定性模板生成，不含真实科学推理',
       rationale: `检测到模板标记：${state.templateEvidence.join('；')}。模板内容不构成科学判断，重跑是唯一获得真实假设的路径`,
-      wouldChange: wouldChangeOf('真实路线将生成基于所检索文献的可证伪假设，当前“证据不足”结论将被真实排序替换'),
+      wouldChange: wouldChangeOf('真实路线将生成基于所检索文献的可证伪假设，当前“证据不足”结论将被真实排序替换', 'A live route will generate falsifiable hypotheses grounded in the retrieved literature; the current "insufficient evidence" conclusion will be replaced by a real ranking').wouldChange,
       expectedDiscrimination: 'high', feasibility: 'high', costClass: 'medium',
       researcherDecisionRequired: true, // costs model calls — researcher approves
       actionable: true, actionHint: { kind: 'rerun-live' },
+      en: {
+        objective: 'Re-run this study on a real model route, replacing the offline template artifacts',
+        knowledgeGap: 'Current hypotheses/scope came from the offline deterministic template — no real scientific reasoning',
+        rationale: `Template markers detected: ${state.templateEvidence.join('; ')}. Template content carries no scientific judgment; re-running is the only path to real hypotheses`,
+        wouldChange: wouldChangeOf('', 'A live route will generate falsifiable hypotheses grounded in the retrieved literature; the current "insufficient evidence" conclusion will be replaced by a real ranking').en.wouldChange,
+      },
     }));
     actions.push(mk('DECLARE_INSUFFICIENT_EVIDENCE', {
       objective: '以「证据不足」作为本研究的当前正式结论',
@@ -144,6 +171,12 @@ export function deriveNextActions(input: ActionDerivationInput): NextResearchAct
       rationale: '科学上诚实的状态：模板产物不承载证据权重，任何“当前判断”都不成立',
       wouldChange: '不改变认识——它防止把模板当作结论',
       expectedDiscrimination: 'low', feasibility: 'high', costClass: 'low',
+      en: {
+        objective: 'Adopt "insufficient evidence" as the study\'s current formal conclusion',
+        knowledgeGap: 'No usable scientific hypotheses',
+        rationale: 'The scientifically honest state: template output carries no evidential weight, so no "current view" holds',
+        wouldChange: 'Changes nothing — it prevents mistaking template output for a conclusion',
+      },
     }));
     return actions;
   }
@@ -154,9 +187,15 @@ export function deriveNextActions(input: ActionDerivationInput): NextResearchAct
       objective: `吸收 ${unconsumedFeedbackCount} 条未消费反馈，形成因果修订`,
       knowledgeGap: '新信息已进入研究但尚未改变任何假设/计划',
       rationale: '反馈信号会触发 feedback→revise→export 重开：修订将解释哪些主张/假设因它改变',
-      wouldChange: wouldChangeOf('修订将按因果链更新受影响的假设与排序，并记录 before/after'),
+      wouldChange: wouldChangeOf('修订将按因果链更新受影响的假设与排序，并记录 before/after', 'The revision will update affected hypotheses and rankings along the causal chain, recording before/after').wouldChange,
       expectedDiscrimination: 'high', feasibility: 'high', costClass: 'low',
       actionable: true, actionHint: { kind: 'resume' },
+      en: {
+        objective: `Consume ${unconsumedFeedbackCount} unconsumed feedback signal(s) into a causal revision`,
+        knowledgeGap: 'New information has entered the study but changed no hypothesis/plan yet',
+        rationale: 'Feedback signals reopen feedback→revise→export: the revision will explain which claims/hypotheses changed because of it',
+        wouldChange: wouldChangeOf('', 'The revision will update affected hypotheses and rankings along the causal chain, recording before/after').en.wouldChange,
+      },
     }));
   }
   if ((leg.kind === 'unexecuted' || leg.kind === 'plan_revised_since_experiment') && leg.executabilityPassed) {
@@ -166,10 +205,18 @@ export function deriveNextActions(input: ActionDerivationInput): NextResearchAct
       rationale: leg.kind === 'plan_revised_since_experiment'
         ? '计划在上一实验后被因果修订（重新冻结）——新注册值得一次新实验'
         : '计划可执行但从未执行——证伪闭环缺最后一环',
-      wouldChange: wouldChangeOf('实验裁决（支持/削弱/证伪/不确定）将直接作用于领先假设的证伪条件'),
+      wouldChange: wouldChangeOf('实验裁决（支持/削弱/证伪/不确定）将直接作用于领先假设的证伪条件', 'The experiment verdict (support/weaken/falsify/inconclusive) acts directly on the leading hypothesis\'s falsifier').wouldChange,
       expectedDiscrimination: 'high', feasibility: 'high', costClass: 'medium',
       targets: leaderId !== null ? { hypothesisIds: [leaderId], claimIds: [] } : undefined,
       actionable: true, actionHint: { kind: 'resume' },
+      en: {
+        objective: 'Execute the plan\'s experiment that already satisfies executability (local deterministic executor)',
+        knowledgeGap: 'The plan passed the deterministic executability check, but no completed experiment has adjudicated it',
+        rationale: leg.kind === 'plan_revised_since_experiment'
+          ? 'The plan was causally revised after the last experiment (re-frozen) — the new registration deserves a fresh experiment'
+          : 'The plan is executable but never executed — the falsification loop is missing its last link',
+        wouldChange: wouldChangeOf('', 'The experiment verdict (support/weaken/falsify/inconclusive) acts directly on the leading hypothesis\'s falsifier').en.wouldChange,
+      },
     }));
   }
   if (leg.kind === 'unexecutable') {
@@ -184,11 +231,17 @@ export function deriveNextActions(input: ActionDerivationInput): NextResearchAct
       objective: '把计划实验重新设计为本地可执行形式，或接受本研究以文献证据收束',
       knowledgeGap: `实验腿的确定性判定：${leg.unexecutableReason ?? '计划实验无法由本地执行器执行'}`,
       rationale: '执行器已按实验类型逐一判定不可用——重复派发只会得到同一判定；改变结论的唯二路径是改实验设计（如换成已发表效应的模拟/合并分析）或接受文献级收束',
-      wouldChange: wouldChangeOf('可执行的重设计将恢复证伪闭环；接受收束则本研究以当前证据状态定稿'),
+      wouldChange: wouldChangeOf('可执行的重设计将恢复证伪闭环；接受收束则本研究以当前证据状态定稿', 'An executable redesign restores the falsification loop; accepting closure finalizes the study at its current evidence state').wouldChange,
       expectedDiscrimination: 'high', feasibility: 'medium', costClass: 'low',
       researcherDecisionRequired: true,
       targets: leaderId !== null ? { hypothesisIds: [leaderId], claimIds: [] } : undefined,
       actionable: false, actionHint: { kind: 'guidance' },
+      en: {
+        objective: 'Redesign the planned experiment into a locally executable form, or accept that this study concludes on literature evidence',
+        knowledgeGap: `Deterministic verdict on the experiment leg: ${leg.unexecutableReason ?? 'the planned experiment cannot be executed by the local executor'}`,
+        rationale: 'The executor already judged every experiment type unavailable — re-dispatching only repeats the verdict; the only two paths to a changed conclusion are redesign (e.g. simulation/meta-analysis of published effects) or accepting literature-level closure',
+        wouldChange: wouldChangeOf('', 'An executable redesign restores the falsification loop; accepting closure finalizes the study at its current evidence state').en.wouldChange,
+      },
     }));
   }
   if (hasEvidenceDebt) {
@@ -196,9 +249,15 @@ export function deriveNextActions(input: ActionDerivationInput): NextResearchAct
       objective: '补验未核验的来源（反证检索/种子文献在完成后到达）',
       knowledgeGap: '语料中存在未核验来源，其主张未进入证据体',
       rationale: 'resume 会重开 verify_sources+build_evidence，把未核验来源补入证据基础',
-      wouldChange: wouldChangeOf('新核验的主张可能新增支持或反证绑定'),
+      wouldChange: wouldChangeOf('新核验的主张可能新增支持或反证绑定', 'Newly verified claims may add supporting or counter bindings').wouldChange,
       expectedDiscrimination: 'medium', feasibility: 'high', costClass: 'low',
       actionable: true, actionHint: { kind: 'resume' },
+      en: {
+        objective: 'Verify the unverified sources (counter-search/seed literature that arrived after completion)',
+        knowledgeGap: 'The corpus contains unverified sources whose claims are not yet part of the evidence body',
+        rationale: 'Resume reopens verify_sources+build_evidence, folding the unverified sources into the evidence base',
+        wouldChange: wouldChangeOf('', 'Newly verified claims may add supporting or counter bindings').en.wouldChange,
+      },
     }));
   }
 
@@ -209,13 +268,25 @@ export function deriveNextActions(input: ActionDerivationInput): NextResearchAct
       rationale: '无活跃假设或无可绑定证据——继续调用的边际科学价值低于补齐证据基础',
       wouldChange: '不改变认识——它是当前的诚实结论',
       expectedDiscrimination: 'low', feasibility: 'high', costClass: 'low',
+      en: {
+        objective: 'Adopt "insufficient evidence" as the study\'s current formal conclusion',
+        knowledgeGap: `Evidence shape: ${state.evidenceShape.claims} claims / ${state.evidenceShape.verified} verified / ${state.evidenceShape.supportingRelations} supporting relations`,
+        rationale: 'No active hypotheses or no bindable evidence — the marginal scientific value of more calls is below that of repairing the evidence base',
+        wouldChange: 'Changes nothing — it is the honest current conclusion',
+      },
     }));
     actions.push(mk('EXTEND_LITERATURE', {
       objective: '扩展检索以建立可形成假设的证据基础',
       knowledgeGap: '当前证据体不足以支撑任何候选解释',
       rationale: '证据形状显示绑定稀疏；先补文献再生成假设，避免无据假设',
-      wouldChange: wouldChangeOf('新的可绑定主张将使假设生成有据可依'),
+      wouldChange: wouldChangeOf('新的可绑定主张将使假设生成有据可依', 'New bindable claims will give hypothesis generation something to stand on').wouldChange,
       expectedDiscrimination: 'medium', feasibility: 'high', costClass: 'low',
+      en: {
+        objective: 'Extend retrieval to build an evidence base that hypotheses can form from',
+        knowledgeGap: 'The current evidence body cannot support any candidate explanation',
+        rationale: 'The evidence shape shows sparse binding; replenish literature before generating hypotheses — no evidence-free hypotheses',
+        wouldChange: wouldChangeOf('', 'New bindable claims will give hypothesis generation something to stand on').en.wouldChange,
+      },
     }));
     return actions;
   }
@@ -231,9 +302,15 @@ export function deriveNextActions(input: ActionDerivationInput): NextResearchAct
       objective: '对当前领先解释执行结构性反证检索',
       knowledgeGap: '领先解释尚无任何反证绑定，且无已记录的反证检索——它未被对抗性检验过',
       rationale: '没有反证暴露的解释其稳健性未知；反证检索是区分“确实强”与“未受检验”的唯一手段',
-      wouldChange: wouldChangeOf('若检索到高质量反证，领先解释的排序与置信将下调'),
+      wouldChange: wouldChangeOf('若检索到高质量反证，领先解释的排序与置信将下调', 'If high-quality counter-evidence is found, the leading explanation\'s rank and confidence drop').wouldChange,
       expectedDiscrimination: 'high', feasibility: 'high', costClass: 'low',
       targets: leaderId !== null ? { hypothesisIds: [leaderId], claimIds: [] } : undefined,
+      en: {
+        objective: 'Run a structured counter-evidence search against the current leading explanation',
+        knowledgeGap: 'The leading explanation has no counter binding and no recorded counter-search — it has never been adversarially tested',
+        rationale: 'An explanation with no counter-evidence exposure has unknown robustness; a counter-search is the only way to tell "genuinely strong" from "untested"',
+        wouldChange: wouldChangeOf('', 'If high-quality counter-evidence is found, the leading explanation\'s rank and confidence drop').en.wouldChange,
+      },
     }));
   }
   const obs = state.discriminatingObservations[0] ?? null;
@@ -245,6 +322,12 @@ export function deriveNextActions(input: ActionDerivationInput): NextResearchAct
       wouldChange: `观察结果将落在两个假设的不同预期上（${obs.expects.filter((e) => e.length > 0).join(' / ')}），直接裁决其一`,
       expectedDiscrimination: 'high', feasibility: 'medium', costClass: 'medium',
       targets: { hypothesisIds: obs.betweenHypothesisIds, claimIds: [] },
+      en: {
+        objective: 'Measure the discriminating observation that separates the top two hypotheses',
+        knowledgeGap: 'The top two hypotheses\' falsifiers point at different observables — current evidence cannot separate them',
+        rationale: `Discriminating observation: ${obs.observable}. Obtaining data for it is the most likely way to change the current ranking`,
+        wouldChange: `The observation will land on the two hypotheses' differing expectations (${obs.expects.filter((e) => e.length > 0).join(' / ')}), directly adjudicating one of them`,
+      },
     }));
   }
   const publicDataset = planDatasets.find((d) => d.availability === 'public');
@@ -253,9 +336,15 @@ export function deriveNextActions(input: ActionDerivationInput): NextResearchAct
       objective: `引入公开数据集 ${publicDataset.name} 检验领先假设`,
       knowledgeGap: '假设可检验但缺少已到位的数据',
       rationale: '计划已声明公开可用数据——这是成本最低的真实检验路径',
-      wouldChange: wouldChangeOf('数据结果将直接对照领先假设的证伪条件'),
+      wouldChange: wouldChangeOf('数据结果将直接对照领先假设的证伪条件', 'The data results will be compared directly against the leading hypothesis\'s falsifier').wouldChange,
       expectedDiscrimination: 'medium', feasibility: 'medium', costClass: 'medium',
       targets: { hypothesisIds: [leaderId], claimIds: [] },
+      en: {
+        objective: `Bring in the public dataset ${publicDataset.name} to test the leading hypothesis`,
+        knowledgeGap: 'The hypothesis is testable but the data is not yet in place',
+        rationale: 'The plan already declared publicly available data — the lowest-cost path to a real test',
+        wouldChange: wouldChangeOf('', 'The data results will be compared directly against the leading hypothesis\'s falsifier').en.wouldChange,
+      },
     }));
   }
   if (state.strongestCounter !== null) {
@@ -265,10 +354,17 @@ export function deriveNextActions(input: ActionDerivationInput): NextResearchAct
       knowledgeGap: '领先解释存在未消解的反证绑定',
       rationale: `最强反证（${state.strongestCounter.text.slice(0, 120)}…）需要研究者判断：适用范围、可比性或排除理由` +
         (rank >= 0 ? `；ACH 判别力排名第 ${rank + 1}——它本身就是区分竞争假设的关键证据` : ''),
-      wouldChange: wouldChangeOf('反证的接受/排除将直接改变领先解释的排序依据'),
+      wouldChange: wouldChangeOf('反证的接受/排除将直接改变领先解释的排序依据', 'Accepting/excluding the counter directly changes the basis of the leading explanation\'s ranking').wouldChange,
       expectedDiscrimination: rank >= 0 ? 'high' : 'medium', feasibility: 'high', costClass: 'low',
       researcherDecisionRequired: true,
       targets: { hypothesisIds: [], claimIds: [state.strongestCounter.claimId] },
+      en: {
+        objective: 'Researcher adjudicates the unresolved counter-evidence',
+        knowledgeGap: 'The leading explanation carries unresolved counter bindings',
+        rationale: `The strongest counter (${state.strongestCounter.text.slice(0, 120)}…) needs a researcher judgment: scope of applicability, comparability, or grounds for exclusion` +
+          (rank >= 0 ? `; ACH diagnosticity rank #${rank + 1} — it is itself key evidence for separating the competing hypotheses` : ''),
+        wouldChange: wouldChangeOf('', 'Accepting/excluding the counter directly changes the basis of the leading explanation\'s ranking').en.wouldChange,
+      },
     }));
   }
   // Information-gain ordering (P1.4, 2026-08-28): expected discrimination desc,
