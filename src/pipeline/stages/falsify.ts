@@ -470,6 +470,8 @@ export const falsifyStage: StageHandler = {
         })),
       ];
       let audit = new Map<string, LinkAuditDecision>();
+      /** Ids the audit never verdicted — their persisted relations carry the disclosure (round-2 P1-C: stage summaries are invisible to workbench researchers). */
+      const unauditedIds = new Set<string>();
       if (proposedLinks.length > 0) {
         try {
           const verifyRes = await callStructured<z.infer<typeof LinkVerifyOut>>(ctx, {
@@ -520,6 +522,7 @@ export const falsifyStage: StageHandler = {
           const auditedIds = new Set(verifyRes.data.verdicts.map((v) => v.claimId));
           const unaudited = proposedLinks.filter((l) => !auditedIds.has(l.claimId));
           if (unaudited.length > 0) {
+            for (const l of unaudited) unauditedIds.add(l.claimId);
             warnings.push(
               `${hyp.id}: link audit covered ${proposedLinks.length - unaudited.length}/${proposedLinks.length} proposed link(s) — ${unaudited.length} kept as proposed WITHOUT audit review (${unaudited.map((l) => l.claimId).join(', ')})`,
             );
@@ -564,13 +567,13 @@ export const falsifyStage: StageHandler = {
         // in uncertainties via the audit note, never silently re-worded.
         ctx.store.putObject(
           'evidence_relation',
-          mkRelation(decision?.relation ?? counterLinkByClaim.get(id)?.relation ?? 'weakens', id, proposalFamilyOf.get(id) ?? 'counter', decision?.note),
+          mkRelation(decision?.relation ?? counterLinkByClaim.get(id)?.relation ?? 'weakens', id, proposalFamilyOf.get(id) ?? 'counter', decision?.note ?? (unauditedIds.has(id) ? 'kept as proposed — NOT covered by the link audit (coverage miss)' : undefined)),
         );
         relations += 1;
       }
       for (const id of finalSupporting) {
         const decision = audit.get(id);
-        ctx.store.putObject('evidence_relation', mkRelation(decision?.relation ?? 'supports', id, proposalFamilyOf.get(id) ?? 'supporting', decision?.note));
+        ctx.store.putObject('evidence_relation', mkRelation(decision?.relation ?? 'supports', id, proposalFamilyOf.get(id) ?? 'supporting', decision?.note ?? (unauditedIds.has(id) ? 'kept as proposed — NOT covered by the link audit (coverage miss)' : undefined)));
         relations += 1;
       }
 

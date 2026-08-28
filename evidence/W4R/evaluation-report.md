@@ -11,7 +11,7 @@ fixes) with freshly executed baselines. Raw artifacts: `eval/results/{baseline-d
 |---|---|
 | FAR-Lab runs | zai glm-4.6 live via `--route zai`, 6/6 completed (retrieval/model calls served substantially from the content-addressed response cache where prompts were unchanged; receipts disclose cache hits — stages whose semantics changed this week, e.g. falsify, re-ran live) |
 | baseline-direct | glm-5.3 via bigmodel anthropic wire, 1 structured call/problem, 6/6 parsed |
-| baseline-rag | same model + EuropePMC top-5 retrieval (5/6 parsed; P3 parse failure kept per protocol) |
+| baseline-rag | same model + EuropePMC top-5 retrieval (4/6 parsed; P3+P1 parse failures in the final run kept per protocol — earlier runs parsed 5/6, model-output stability at temp 0.4 is itself a disclosed observation) |
 | Judge | not re-run in W4R (W4 disclosed the judge as auxiliary-only; deterministic metrics are the comparison) |
 
 ## Protocol deviations (disclosed, none metric-favorable)
@@ -19,7 +19,8 @@ fixes) with freshly executed baselines. Raw artifacts: `eval/results/{baseline-d
 1. **RAG retrieval source OpenAlex → EuropePMC**: OpenAlex keyless daily budget returned HTTP 429 on
    every baseline query; a corpus-less RAG baseline would have been a strawman. EuropePMC is a
    pipeline source family (same adapter code path), abstract-rich. Result: the RAG baseline got
-   STRONGER (27/27 citations resolved+title-matched, quote-grounded 27/27).
+   STRONGER (all retrieved-paper citations resolved+title-matched and quote-grounded: 27/27 in the
+   first run, 19/19 in the final run).
 2. **Baseline eval adapter restored from git history and hardened** (`thinking:{type:'disabled'}`,
    model glm-4.6, output budget 16000): the first attempts failed 6/6 parses — a broken baseline is
    not a baseline. Final runs: direct 6/6, rag 5/6 parsed.
@@ -77,8 +78,8 @@ check instead of the accidental zero-claims path.
 1. On grounding and counter-evidence the gap vs baselines is structural and unchanged-or-wider:
    100% locator-bound claims with 0 unsupported citations and structured counter-evidence on every
    run, vs 85% unsupported citations / zero structured counter-evidence (direct) and a genuinely
-   strong but shallow-binding RAG baseline (0% unsupported, but no claim model, no falsification
-   discipline, no plan executability).
+   strong but shallow-binding RAG baseline (0% unsupported, plan executability a tie, but no
+   claim model, no falsification audit chain, no structured counter-evidence).
 2. The refresh EARNED its keep by catching a real honesty regression (P5) that shipped during the
    week's feature work — fixed with the subject-coverage gate in the same session, validated live
    both directions.

@@ -634,7 +634,17 @@ export const buildEvidenceStage: StageHandler = {
     let subjectAdequate = assessment.adequate;
     if (!subjectAdequate) {
       gapSeekNote = `insufficient (2-of-2): ${assessment.first.gapDescription.slice(0, 160)}`;
+    } else if (ctx.run.tags.includes('evidence-insufficient')) {
+      // Resume path: a previous invocation tagged the run; this pass judges the
+      // subject covered (possibly after its own gap-seek) — un-refuse, and let the
+      // hypotheses stage proceed (round-2 review: the tag must be removable).
+      ctx.store.updateRun({ ...ctx.run, tags: ctx.run.tags.filter((x) => x !== 'evidence-insufficient') });
+      ctx.log('build_evidence: evidence-insufficient tag REMOVED — this pass judges the subject covered, hypothesis generation re-enabled');
     }
+    // Snapshot BEFORE gap-seek: processDocument increments verifiedCount in place,
+    // so the post-seek recovery check must compare against this pre-seek value
+    // (round-2 review caught the dead after-vs-after comparison).
+    const verifiedBeforeGapSeek = verifiedCount;
     if (verifiedCount < verifiedFloor) {
       ctx.log(`verified claims ${verifiedCount} < ${verifiedFloor} — evaluating evidence gap`);
       if (!assessment.first.enoughEvidence && assessment.first.queries.length > 0) {
@@ -730,12 +740,21 @@ export const buildEvidenceStage: StageHandler = {
     // judgment, otherwise the designed recovery path can never un-refuse the run.
     if (!subjectAdequate) {
       const verifiedNow = ctx.store.listObjects('claim', ctx.run.id).filter((c) => c.bindingStatus === 'verified').length;
-      if (verifiedNow > verifiedCount) {
-        ctx.log(`build_evidence: gap-seek added verified claims (${verifiedCount} -> ${verifiedNow}) — re-running subject-coverage assessment`);
+      if (verifiedNow > verifiedBeforeGapSeek) {
+        ctx.log(`build_evidence: gap-seek added verified claims (${verifiedBeforeGapSeek} -> ${verifiedNow}) — re-running subject-coverage assessment`);
         try {
           const reassessed = await assessSubjectCoverage();
           subjectAdequate = reassessed.adequate;
-          if (subjectAdequate) gapSeekNote += '; subject coverage recovered by gap-seek';
+          if (subjectAdequate) {
+            gapSeekNote += '; subject coverage recovered by gap-seek';
+            // The tag is refusal-enabling and must be removable: a recovery that
+            // flips the verdict has to un-refuse the run (round-2 review: the tag
+            // was add-only, making any recovery cosmetic).
+            if (ctx.run.tags.includes('evidence-insufficient')) {
+              ctx.store.updateRun({ ...ctx.run, tags: ctx.run.tags.filter((x) => x !== 'evidence-insufficient') });
+              ctx.log('build_evidence: evidence-insufficient tag REMOVED — subject coverage recovered, hypothesis generation re-enabled');
+            }
+          }
         } catch (e) {
           // re-assessment failed: keep the (insufficient) verdict from the first pass
           // and disclose — never widen a refusal on a failed call.

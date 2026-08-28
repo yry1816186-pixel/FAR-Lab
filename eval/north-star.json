@@ -116,7 +116,7 @@
         "value": 0.867,
         "detail": "strict (judge in contradicts/weakens) POOLED across two post-fix live problems: 26/30 (far-transfer 21/24=0.875 + probiotics replication 5/6=0.833). Pre-fix same-day baseline (identical question/route, run_498s42b8): 15/24=0.625, ALL 9 misses inverted (null-side hypotheses supported by no-effect claims labelled counter). Historical: 0.143 (2026-08-22 W9, misses mostly EMPTY). HONEST LIMITS: same-family judge (glm-4.6 judging glm-4.6, upper bound), n=30, 2 problems; direction anchoring (commit 2ce7c29) is the mechanism.",
         "at": "2026-08-29",
-        "evidence": "eval/results/relation-precision-fartransfer{,-postfix}-20260829.jsonl + relation-precision-probiotic-replication-20260829.jsonl; runs run_498s42b8…/run_jezdcm3q…/run (probiotics, latest in .far-run/far.db at 2026-08-29)",
+        "evidence": "eval/results/relation-precision-fartransfer{,-postfix}-20260829.jsonl + relation-precision-probiotic-replication-20260829.jsonl; runs run_498s42b8…/run_jezdcm3q…/run_tyxayqa3c94kh32xcv3v5kcvqq (probiotics)",
         "note": "target 0.70 MET on this sample; not claimed as converged — multi-problem replication is the next lever"
       },
       "target": 0.7,
