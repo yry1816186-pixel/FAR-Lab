@@ -43,7 +43,18 @@ export type ModelCallErrorKind =
   | 'auth_error'
   | 'quota_exceeded';
 
-export const DEFAULT_TOTAL_TIMEOUT_MS = 120_000;
+/**
+ * Default total budget per structured call (incl. retries + spacing).
+ * 300s, measured 2026-08-28 from live zai glm-4.6 receipts on this workspace:
+ * per-call latency median 21s, p90 81s, max 121s — the previous 120s default
+ * was BELOW a single successful call for large-payload purposes (claim
+ * extraction, cluster-dedup), so any retry made exhaustion certain
+ * (live-observed: run_498s42b8 died at generate_hypotheses/cluster-dedup
+ * with budget exhausted while build_evidence's 19 calls succeeded at up to
+ * 121s each). The per-attempt AbortController still bounds each individual
+ * call; FARLAB_TOTAL_BUDGET_MS overrides (30s floor, 600s ceiling).
+ */
+export const DEFAULT_TOTAL_TIMEOUT_MS = 300_000;
 
 export const MAX_TRANSPORT_RETRIES = 2;
 /**
@@ -884,7 +895,18 @@ const buildAnthropicRequestBody = (modelId: string, messages: ChatMessage[], req
     messages: rest.map((m) => ({ role: m.role, content: m.content })),
   };
   if (req.temperature !== undefined) body.temperature = req.temperature;
-  if (req.reasoning !== undefined) Object.assign(body, reasoningBodyFields('anthropic', req.reasoning));
+  if (req.reasoning !== undefined) {
+    Object.assign(body, reasoningBodyFields('anthropic', req.reasoning));
+  } else {
+    // Thinking-capable models on this wire think BY DEFAULT (live-probed 2026-08-28:
+    // glm-4.6, max_tokens 4096, no thinking param -> stop_reason max_tokens with the
+    // budget consumed by thinking blocks; on larger payloads the answer never starts —
+    // the D-082 thinking-only failure class, 3/3 corrective re-asks unrecoverable
+    // because every re-sample burns the same budget on reasoning). Protocol-legal fix:
+    // the Messages API's own thinking config carries type 'disabled'; a caller that
+    // deliberately wants reasoning sends req.reasoning and keeps it enabled.
+    body.thinking = { type: 'disabled' };
+  }
   return body;
 };
 

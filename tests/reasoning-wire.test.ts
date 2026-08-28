@@ -125,7 +125,7 @@ describe('transport emission via createCustomProvider', () => {
     expect(body.thinking).toEqual({ type: 'enabled', budget_tokens: 8192 });
   });
 
-  it('NO reasoning on the request: zero reasoning fields on either wire (legacy shape)', async () => {
+  it('NO reasoning on the request: zero reasoning fields on OpenAI wires; anthropic explicitly DISABLES thinking (thinking-capable models think by default — live-probed 2026-08-28)', async () => {
     const openaiRun = recorderFetch(async () => chatOk('{"ok":true}'));
     await createCustomProvider(config(), { fetchImpl: openaiRun.fetchImpl }).structuredCall(REQ, parseAny);
     const oBody = bodyOf(openaiRun.calls[0]!);
@@ -136,7 +136,7 @@ describe('transport emission via createCustomProvider', () => {
     const anthRun = recorderFetch(async () => anthropicOk('{"ok":true}'));
     await createCustomProvider(config({ wire: 'anthropic' }), { fetchImpl: anthRun.fetchImpl }).structuredCall(REQ, parseAny);
     const aBody = bodyOf(anthRun.calls[0]!);
-    expect(aBody.thinking).toBeUndefined();
+    expect(aBody.thinking).toEqual({ type: 'disabled' });
   });
 
   it('receipt records the served reasoning gear (provenance/reproducibility)', async () => {

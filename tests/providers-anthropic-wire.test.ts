@@ -64,6 +64,28 @@ const okBody = (over: Record<string, unknown> = {}) =>
   });
 
 describe('zai provider on the Anthropic Messages wire', () => {
+  it('disables thinking when no reasoning is requested (thinking-capable models think by default and can burn the whole max_tokens budget — live-probed 2026-08-28)', async () => {
+    const { fetchImpl, calls } = stubFetch(() => ({ status: 200, text: okBody() }));
+    const provider = createZaiProvider({ apiKey: 'fake-key', fetchImpl, sleep: async () => {} });
+    const res = await provider.structuredCall(REQ, parse);
+    expect(res.ok).toBe(true);
+    const body = calls[0]!.body as Record<string, unknown>;
+    expect(body['thinking']).toEqual({ type: 'disabled' });
+  });
+
+  it('keeps caller-requested reasoning untouched (no forced disable)', async () => {
+    const { fetchImpl, calls } = stubFetch(() => ({ status: 200, text: okBody() }));
+    const provider = createZaiProvider({ apiKey: 'fake-key', fetchImpl, sleep: async () => {} });
+    const res = await provider.structuredCall(
+      { ...REQ, reasoning: { style: 'thinking_budget', gear: 'low' } },
+      parse,
+    );
+    expect(res.ok).toBe(true);
+    const body = calls[0]!.body as Record<string, unknown>;
+    const thinking = body['thinking'] as Record<string, unknown> | undefined;
+    expect(thinking?.['type']).toBe('enabled');
+  });
+
   it('sends the Anthropic wire shape: /v1/messages URL, x-api-key + anthropic-version headers, top-level system, user-only messages, required max_tokens', async () => {
     const { fetchImpl, calls } = stubFetch(() => ({ status: 200, text: okBody() }));
     const provider = createZaiProvider({ apiKey: 'fake-key', fetchImpl, sleep: async () => {} });
