@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowUp, BookMarked, Brain, Check, Clock, Link2, Loader2, Paperclip, RotateCcw, Wrench, X, Zap } from 'lucide-react';
+import { ArrowUp, BookMarked, Brain, Check, Clock, Copy, Link2, Loader2, Paperclip, RotateCcw, Wrench, X, Zap } from 'lucide-react';
 import { useI18n } from '../i18n/LanguageContext';
 import type { DictKey } from '../i18n/dict';
 import { AttachIcon, DISPLAY_KIND, type AttachKind } from './common';
@@ -487,6 +487,18 @@ export function ConversationView({
             retryBusy={retrying}
           />
         ))}
+        {/* Turn-in-progress placeholder (Claude Code parity): the agent's side
+            of the dialogue shows an honest indeterminate "working" row while
+            the server runs the kernel loop — no fabricated steps, no fake
+            progress; the toolTrace lands with the reply when it completes. */}
+        {sending && (
+          <div className="conv-msg conv-msg--agent conv-msg--pending" aria-live="polite">
+            <div className="conv-pending">
+              <Loader2 size={13} className="attach-spinner" aria-hidden="true" />
+              <span>{t('conv.agentWorking')}</span>
+            </div>
+          </div>
+        )}
         <div ref={bottomRef} />
       </div>
 
@@ -688,6 +700,15 @@ function MessageBubble({
   retryBusy: boolean;
 }): JSX.Element {
   const { t } = useI18n();
+  // ChatGPT-parity message action: one-tap copy of the message body. Feedback
+  // is a transient check glyph on the button itself (no page-level flash).
+  const [copied, setCopied] = useState(false);
+  const copyMessage = (): void => {
+    void navigator.clipboard.writeText(message.content).then(() => {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    }).catch(() => { /* clipboard denied: the button simply does nothing visible */ });
+  };
   // automation records are deterministic system notices, not model replies
   if (message.role === 'automation') {
     return (
@@ -723,10 +744,13 @@ function MessageBubble({
             </summary>
             <ul role="list">
               {message.toolTrace.map((tool, i) => (
-                <li key={`${tool.tool}-${i}`} className={tool.ok ? '' : 'conv-tool--failed'}>
-                  <span className="mono">{tool.tool}</span>
-                  {tool.summary !== undefined && <span className="muted"> · {tool.summary}</span>}
-                  {tool.durationMs !== undefined && <span className="muted small"> · {tool.durationMs} ms</span>}
+                <li key={`${tool.tool}-${i}`} className={`conv-tool${tool.ok ? '' : ' conv-tool--failed'}`}>
+                  <span className={`conv-tool-dot${tool.ok ? ' is-ok' : ' is-failed'}`} aria-hidden="true" />
+                  <span className="mono conv-tool-name">{tool.tool}</span>
+                  {tool.summary !== undefined && <span className="conv-tool-summary">{tool.summary}</span>}
+                  {tool.durationMs !== undefined && (
+                    <span className="conv-tool-ms mono">{tool.durationMs >= 1000 ? `${(tool.durationMs / 1000).toFixed(1)} s` : `${tool.durationMs} ms`}</span>
+                  )}
                 </li>
               ))}
             </ul>
@@ -769,14 +793,28 @@ function MessageBubble({
           </div>
         )}
         {message.usage !== undefined && (
-          <p className="conv-usage muted small mono">{message.usage.modelId} · {message.usage.latencyMs} ms
+          <p className="conv-usage muted small mono">
+            {message.usage.modelId} · {message.usage.latencyMs >= 1000 ? `${(message.usage.latencyMs / 1000).toFixed(1)} s` : `${message.usage.latencyMs} ms`}
             {message.usage.modelCalls !== undefined ? ` · ${message.usage.modelCalls} ${t('conv.modelCalls')}` : ''}
-            {message.usage.inputTokens !== undefined || message.usage.outputTokens !== undefined
-              ? ` · ${(message.usage.inputTokens ?? 0) + (message.usage.outputTokens ?? 0)} tok`
-              : ''}
+            {(message.usage.inputTokens !== undefined || message.usage.outputTokens !== undefined) && (
+              <>
+                {' · '}
+                <span title={t('conv.usageInput')}>{t('conv.usageInChar')}{message.usage.inputTokens ?? 0}</span>
+                <span title={t('conv.usageOutput')}> / {t('conv.usageOutChar')}{message.usage.outputTokens ?? 0}</span>
+              </>
+            )}
           </p>
         )}
       </div>
+      <button
+        type="button"
+        className={`conv-copy${copied ? ' is-copied' : ''}`}
+        onClick={copyMessage}
+        aria-label={copied ? t('conv.copied') : t('conv.copyMessage')}
+        title={copied ? t('conv.copied') : t('conv.copyMessage')}
+      >
+        {copied ? <Check size={13} aria-hidden="true" /> : <Copy size={13} aria-hidden="true" />}
+      </button>
     </div>
   );
 }
