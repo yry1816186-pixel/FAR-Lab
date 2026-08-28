@@ -380,8 +380,8 @@ const main = async (): Promise<void> => {
     if (json()) jsonOutput(runs);
     else if (runs.length === 0) out(ink.muted('(no runs yet — create one: far research start "<question>")'));
     else table(
-      ['run', 'status', 'stage', 'created'],
-      runs.map((r) => [r.id, statusInk(r.status)(r.status), r.currentStage, r.createdAt]),
+      ['run', 'status', 'stage', 'question', 'created'],
+      runs.map((r) => [r.id, statusInk(r.status)(r.status), r.currentStage, (r.questionText ?? '').slice(0, 46), r.createdAt]),
     );
     app.close();
     return;

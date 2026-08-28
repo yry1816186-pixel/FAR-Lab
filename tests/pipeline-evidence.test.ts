@@ -72,6 +72,8 @@ interface Bench {
   ctx: StageContext;
   store: Store;
   run: ResearchRun;
+  /** The harness db handle — tests that exercise run-row writes (the honesty-gate tag) need it. */
+  db: Db;
 }
 
 /**
@@ -145,7 +147,7 @@ const bench = (
     db.close();
     fs.rmSync(dir, { recursive: true, force: true });
   });
-  return { ctx, store, run };
+  return { ctx, store, run, db };
 };
 
 const mkSource = (runId: string, id: string, extra: Record<string, unknown> = {}): SourceDocument =>
@@ -931,5 +933,53 @@ describe('build_evidence D-018 numeric anchoring (lane-06)', () => {
     }
     // no cross relation persisted for a not_comparable verdict (enrichment honesty)
     expect(store.listObjects('evidence_relation', ctx.run.id).filter((r) => r.targetClaimId !== undefined)).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// W4R subject-coverage honesty gate (2-of-2): adversarial review P1 — the gate
+// shipped with zero test coverage; these drive both agreement paths.
+// ---------------------------------------------------------------------------
+describe('build_evidence subject-coverage gate (2-of-2)', () => {
+  const gapInsufficient = (): StubStep => ({
+    rawOutput: JSON.stringify({
+      enoughEvidence: false,
+      gapDescription: 'fixture: verified claims study a different subject than the question names',
+      queries: [],
+    }),
+  });
+
+  it('two agreeing insufficient judgments flag the run (tag persisted + 2-of-2 verdict in summary)', async () => {
+    const { ctx, store, run, db } = bench([
+      extractionStep([{ text: 'CRISPR base editing increases kernel yield under drought.', quote: Q_VERBATIM[1], stance: 'supports' }]),
+      gapInsufficient(),
+      gapInsufficient(),
+    ]);
+    corpusOf(ctx, [mkSource(ctx.run.id, newId('src'))]);
+    // the bench assembles the run in memory; the gate's tag write needs the row
+    db.prepare('INSERT INTO runs (id, question_id, status, current_stage, doc, created_at, updated_at) VALUES (?,?,?,?,?,?,?)')
+      .run(run.id, run.questionId, run.status, run.currentStage, JSON.stringify(run), NOW, NOW);
+    const outcome = await buildEvidenceStage.execute(ctx);
+    expect(outcome.kind).toBe('done');
+    if (outcome.kind === 'done') {
+      expect(outcome.summary).toContain('insufficient (2-of-2');
+    }
+    const row = db.prepare('SELECT doc FROM runs WHERE id=?').get(run.id) as { doc: string };
+    expect(JSON.parse(row.doc).tags).toContain('evidence-insufficient');
+    expect(store.listObjects('claim', run.id)).toHaveLength(1); // claims persisted — the refusal is downstream
+  });
+
+  it('a confirm pass that disagrees un-refuses the run (no 2-of-2 verdict in the summary)', async () => {
+    const { ctx } = bench([
+      extractionStep([{ text: 'CRISPR base editing increases kernel yield under drought.', quote: Q_VERBATIM[1], stance: 'supports' }]),
+      gapInsufficient(),
+      gapAdequateStep(),
+    ]);
+    corpusOf(ctx, [mkSource(ctx.run.id, newId('src'))]);
+    const outcome = await buildEvidenceStage.execute(ctx);
+    expect(outcome.kind).toBe('done');
+    if (outcome.kind === 'done') {
+      expect(outcome.summary).not.toContain('insufficient (2-of-2)');
+    }
   });
 });

@@ -555,32 +555,6 @@ export const buildEvidenceStage: StageHandler = {
     // about a subject the literature does not contain. The assessment now runs on
     // EVERY run and its verdict is persisted on the run as an honest tag that
     // gates hypothesis generation (see hypotheses.ts refusal).
-    const gap = await callStructured<GapSeek>(ctx, {
-      stage: 'build_evidence',
-      purpose: 'evidence-gap-assessment',
-      systemPrompt:
-        'You assess whether the current verified evidence base can support ' +
-        'hypothesis generation for the research question, and if not, propose AT MOST 2 targeted ' +
-        'scholarly search queries that could close the most important gap. SUBJECT-COVERAGE RULE ' +
-        '(strict): enoughEvidence=true ONLY IF at least one verified claim directly measures, ' +
-        'observes, or analyzes the question\'s central subject entities (the named organism, ' +
-        'intervention, system, or quantity). A corpus of topically-adjacent papers that study ' +
-        'DIFFERENT subjects — even real, even relevant to the field, even explicitly noting the ' +
-        'mismatch — does NOT cover the subject: set enoughEvidence=false. If no retrieval could ' +
-        'realistically fix it (e.g. the named subject does not appear in the literature), return ' +
-        'empty queries and say exactly that in gapDescription. Never invent facts to fill gaps.',
-      payload: {
-        question: question.text,
-        verifiedClaimCount: verifiedCount,
-        verifiedClaimTexts: ctx.store.listObjects('claim', ctx.run.id)
-          .filter((c) => c.bindingStatus === 'verified')
-          .slice(0, 20)
-          .map((c) => c.text.slice(0, 300)),
-        sourceTitles: plan.usable.map((d) => d.title),
-      },
-      schema: GapSeekSchema,
-      temperature: 0,
-    });
     // 2-of-2 discipline: a single temp-0 judgment proved unstable on a healthy,
     // fully on-subject corpus (live-observed 2026-08-29: P1 ARG corpus judged
     // insufficient once, adequate on a same-prompt replay). Refusing hypothesis
@@ -588,8 +562,34 @@ export const buildEvidenceStage: StageHandler = {
     // framed independent judgment to agree. P5-class corpora (which explicitly
     // study different subjects) fail both framings; a stray misjudgment fails
     // only one and the run proceeds.
-    let subjectAdequate = gap.data.enoughEvidence;
-    if (!subjectAdequate) {
+    const assessSubjectCoverage = async (): Promise<{ adequate: boolean; first: GapSeek }> => {
+      const first = await callStructured<GapSeek>(ctx, {
+        stage: 'build_evidence',
+        purpose: 'evidence-gap-assessment',
+        systemPrompt:
+          'You assess whether the current verified evidence base can support ' +
+          'hypothesis generation for the research question, and if not, propose AT MOST 2 targeted ' +
+          'scholarly search queries that could close the most important gap. SUBJECT-COVERAGE RULE ' +
+          '(strict): enoughEvidence=true ONLY IF at least one verified claim directly measures, ' +
+          'observes, or analyzes the question\'s central subject entities (the named organism, ' +
+          'intervention, system, or quantity). A corpus of topically-adjacent papers that study ' +
+          'DIFFERENT subjects — even real, even relevant to the field, even explicitly noting the ' +
+          'mismatch — does NOT cover the subject: set enoughEvidence=false. If no retrieval could ' +
+          'realistically fix it (e.g. the named subject does not appear in the literature), return ' +
+          'empty queries and say exactly that in gapDescription. Never invent facts to fill gaps.',
+        payload: {
+          question: question.text,
+          verifiedClaimCount: ctx.store.listObjects('claim', ctx.run.id).filter((c) => c.bindingStatus === 'verified').length,
+          verifiedClaimTexts: ctx.store.listObjects('claim', ctx.run.id)
+            .filter((c) => c.bindingStatus === 'verified')
+            .slice(0, 40)
+            .map((c) => c.text.slice(0, 300)),
+          sourceTitles: plan.usable.map((d) => d.title),
+        },
+        schema: GapSeekSchema,
+        temperature: 0,
+      });
+      if (first.data.enoughEvidence) return { adequate: true, first: first.data };
       const confirmGap = await callStructured<GapSeek>(ctx, {
         stage: 'build_evidence',
         purpose: 'evidence-gap-assessment',
@@ -603,29 +603,32 @@ export const buildEvidenceStage: StageHandler = {
           'against the subject name honestly. Answer in the given JSON shape.',
         payload: {
           question: question.text,
-          claimOfTheReviewer: gap.data.gapDescription,
+          claimOfTheReviewer: first.data.gapDescription,
           verifiedClaimTexts: ctx.store.listObjects('claim', ctx.run.id)
             .filter((c) => c.bindingStatus === 'verified')
-            .slice(0, 20)
+            .slice(0, 40)
             .map((c) => c.text.slice(0, 300)),
         },
         schema: GapSeekSchema,
         temperature: 0,
       });
       if (confirmGap.data.enoughEvidence) {
-        subjectAdequate = true;
         ctx.log(
-          `build_evidence: first gap judgment said insufficient, independent confirm pass disagreed (subject covered) — proceeding. First judgment: ${gap.data.gapDescription.slice(0, 140)}`,
+          `build_evidence: first gap judgment said insufficient, independent confirm pass disagreed (subject covered) — proceeding. First judgment: ${first.data.gapDescription.slice(0, 140)}`,
         );
+        return { adequate: true, first: first.data };
       }
-    }
+      return { adequate: false, first: first.data };
+    };
+    const assessment = await assessSubjectCoverage();
+    let subjectAdequate = assessment.adequate;
     if (!subjectAdequate) {
-      gapSeekNote = `insufficient (2-of-2): ${gap.data.gapDescription.slice(0, 160)}`;
+      gapSeekNote = `insufficient (2-of-2): ${assessment.first.gapDescription.slice(0, 160)}`;
     }
     if (verifiedCount < verifiedFloor) {
       ctx.log(`verified claims ${verifiedCount} < ${verifiedFloor} — evaluating evidence gap`);
-      if (!gap.data.enoughEvidence && gap.data.queries.length > 0) {
-        gapSeekNote = `triggered: ${gap.data.gapDescription.slice(0, 120)}`;
+      if (!assessment.first.enoughEvidence && assessment.first.queries.length > 0) {
+        gapSeekNote = `triggered: ${assessment.first.gapDescription.slice(0, 120)}`;
         // W-A source rotation: gap-seek must not be a single point of failure on the
         // SAME family the corpus just degraded from (observed: OpenAlex budget
         // exhaustion killing both retrieval AND its own recovery). Ordered fallback,
@@ -641,7 +644,7 @@ export const buildEvidenceStage: StageHandler = {
         }
         const newDocIds: string[] = [];
         const corpus = ctx.store.listObjects('corpus_snapshot', ctx.run.id).at(-1);
-        for (const q of gap.data.queries.slice(0, GAP_SEEK_MAX_QUERIES)) {
+        for (const q of assessment.first.queries.slice(0, GAP_SEEK_MAX_QUERIES)) {
           if (ctx.cancelled()) throw new Error('cancelled by user in build_evidence gap-seek');
           let search: RawRetrievalResult | undefined;
           let usedFamily: SourceFamily | undefined;
@@ -691,7 +694,7 @@ export const buildEvidenceStage: StageHandler = {
             ...corpus,
             queries: [
               ...corpus.queries,
-              ...gap.data.queries.slice(0, GAP_SEEK_MAX_QUERIES).map((q) => ({ purpose: 'gap_followup' as const, text: `[gap-seek] ${q}` })),
+              ...assessment.first.queries.slice(0, GAP_SEEK_MAX_QUERIES).map((q) => ({ purpose: 'gap_followup' as const, text: `[gap-seek] ${q}` })),
             ],
             documentIds: [...corpus.documentIds, ...newDocIds.filter((id) => !corpus.documentIds.includes(id))],
           };
@@ -703,9 +706,25 @@ export const buildEvidenceStage: StageHandler = {
         }
         gapSeekNote += `; +${newDocIds.length} docs retrieved, claims now verified=${verifiedCount}`;
       } else {
-        gapSeekNote = gap.data.enoughEvidence
-          ? `not triggered (model judged evidence adequate: ${gap.data.gapDescription.slice(0, 80)})`
-          : 'triggered but no actionable queries returned';
+        // Never clobber a 2-of-2 insufficient verdict with branch-local notes —
+        // the subject-coverage conclusion outranks the count-based gap narrative.
+        gapSeekNote = !subjectAdequate
+          ? `insufficient (2-of-2, no actionable queries): ${assessment.first.gapDescription.slice(0, 120)}`
+          : assessment.first.enoughEvidence
+            ? `not triggered (model judged evidence adequate: ${assessment.first.gapDescription.slice(0, 80)})`
+            : 'triggered but no actionable queries returned';
+      }
+    }
+    // S4 (adversarial review 2026-08-29): the verdict is computed BEFORE gap-seek
+    // retrieval — a successful top-up that adds verified claims must re-enter the
+    // judgment, otherwise the designed recovery path can never un-refuse the run.
+    if (!subjectAdequate) {
+      const verifiedNow = ctx.store.listObjects('claim', ctx.run.id).filter((c) => c.bindingStatus === 'verified').length;
+      if (verifiedNow > verifiedCount) {
+        ctx.log(`build_evidence: gap-seek added verified claims (${verifiedCount} -> ${verifiedNow}) — re-running subject-coverage assessment`);
+        const reassessed = await assessSubjectCoverage();
+        subjectAdequate = reassessed.adequate;
+        if (subjectAdequate) gapSeekNote += '; subject coverage recovered by gap-seek';
       }
     }
     // W4R subject-coverage verdict → honest run tag (visible in the UI; consumed
@@ -713,7 +732,7 @@ export const buildEvidenceStage: StageHandler = {
     if (!subjectAdequate && !ctx.run.tags.includes('evidence-insufficient')) {
       ctx.store.updateRun({ ...ctx.run, tags: [...ctx.run.tags, 'evidence-insufficient'] });
       ctx.log(
-        `build_evidence: evidence flagged INSUFFICIENT for the question's subject — hypothesis generation will refuse: ${gap.data.gapDescription.slice(0, 160)}`,
+        `build_evidence: evidence flagged INSUFFICIENT for the question's subject — hypothesis generation will refuse: ${assessment.first.gapDescription.slice(0, 160)}`,
       );
     }
 

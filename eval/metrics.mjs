@@ -176,6 +176,14 @@ const buildZodPlan = (output, hypIds) => ({
   })),
   metrics: (output.plan?.metrics ?? []).map(String),
   statistics: [],
+  // S1 fairness fix (adversarial review 2026-08-29): the target shape now asks
+  // baselines for the multiplicity discipline; pass it through instead of silently
+  // dropping it, which made every multi-hypothesis baseline plan deterministically
+  // un-executable (0/6 planExec was an adapter artifact, not a scientific result).
+  ...(typeof output.plan?.multipleTestingPolicy === 'string'
+    && ['single_primary', 'alpha_spending', 'e_value_accumulation'].includes(output.plan.multipleTestingPolicy)
+    ? { multipleTestingPolicy: output.plan.multipleTestingPolicy }
+    : {}),
   decisionRules: {
     successCriterion: output.plan?.decisionRules?.successCriterion ?? '',
     weakeningCriterion: output.plan?.decisionRules?.weakeningCriterion ?? '',

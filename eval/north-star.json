@@ -100,7 +100,7 @@
       "current": {
         "value": 0.9667,
         "at": "2026-08-21",
-        "evidence": "eval/results/metrics-ev1.json"
+        "evidence": "eval/results/metrics-ev1.json MISSING since the 2026-08-24 repo-source cleanup (raw file deleted; number stands on the recorded receipt-era measurement — W4R 2026-08-29 re-measured srcVer 72/72=100% on eval/results/metrics-w4-refresh.json, superseding this entry on next ledger pass)"
       },
       "target": 0.98,
       "stretch": 0.995,
@@ -164,7 +164,7 @@
       "current": {
         "value": "5/5",
         "at": "2026-08-21",
-        "evidence": "eval/results/metrics-ev1.json"
+        "evidence": "eval/results/metrics-ev1.json MISSING since the 2026-08-24 repo-source cleanup (raw file deleted; W4R 2026-08-29 re-measured 6/6 on eval/results/metrics-w4-refresh.json — FAR-Lab side; baseline planExec comparability fixed same day, see evidence/W4R/evaluation-report.md)"
       },
       "target": "held at 5/5 under multiple-testing gate",
       "stretch": "external reviewer sample rates plans >=8/10 executable",

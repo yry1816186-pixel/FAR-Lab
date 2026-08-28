@@ -249,10 +249,20 @@ export class Store {
     return ResearchRun.parse(JSON.parse(String(row.doc)));
   }
 
-  listRuns(limit = 100): { id: string; status: string; currentStage: string; createdAt: string }[] {
-    return this.db.prepare('SELECT id, status, current_stage, created_at FROM runs ORDER BY created_at DESC LIMIT ?')
+  listRuns(limit = 100): { id: string; status: string; currentStage: string; createdAt: string; questionText: string | null }[] {
+    return this.db.prepare(
+      'SELECT r.id, r.status, r.current_stage, r.created_at, json_extract(q.json, \'$.text\') AS question '
+        + 'FROM runs r LEFT JOIN objects q ON q.kind = \'question\' AND q.id = r.question_id '
+        + 'ORDER BY r.created_at DESC LIMIT ?',
+    )
       .all(limit)
-      .map((r) => ({ id: String(r.id), status: String(r.status), currentStage: String(r.current_stage), createdAt: String(r.created_at) }));
+      .map((r) => ({
+        id: String(r.id),
+        status: String(r.status),
+        currentStage: String(r.current_stage),
+        createdAt: String(r.created_at),
+        questionText: r.question === null || r.question === undefined ? null : String(r.question),
+      }));
   }
 
   /** Workspace-level growth counters for observability/soak (reliability 2026-08-24):

@@ -833,6 +833,14 @@ function StateBand({ run, science, onResume, onDispatch, dispatchError, busy }: 
             claims: s.evidenceShape.claims, verified: s.evidenceShape.verified,
             support: s.evidenceShape.supportingRelations, counter: s.evidenceShape.counterRelations,
           })}</p>
+          {(() => {
+            // The WHY in researcher language: the honesty gate's refusal reason
+            // (or any hypotheses-stage skip reason) rides on the run's stage record.
+            const skipped = run.stages.find((st) => st.stage === 'generate_hypotheses');
+            return skipped?.error !== undefined
+              ? <p className="ss-line">{t('map.stateInsufficientWhy', { text: skipped.error.slice(0, 220) })}</p>
+              : null;
+          })()}
         </div>
       ) : (
         <div className="map-state">

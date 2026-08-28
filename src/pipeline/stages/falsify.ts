@@ -513,6 +513,17 @@ export const falsifyStage: StageHandler = {
             temperature: 0,
           });
           audit = applyLinkAudit(proposedLinks, verifyRes.data.verdicts);
+          // S3 (adversarial review 2026-08-29): "silence is not rejection" lets a
+          // lazy audit verdict ONE easy link and wave the rest through. Coverage is
+          // now checked deterministically and under-coverage is disclosed — the
+          // unaudited links keep the enrichment semantics, but never silently.
+          const auditedIds = new Set(verifyRes.data.verdicts.map((v) => v.claimId));
+          const unaudited = proposedLinks.filter((l) => !auditedIds.has(l.claimId));
+          if (unaudited.length > 0) {
+            warnings.push(
+              `${hyp.id}: link audit covered ${proposedLinks.length - unaudited.length}/${proposedLinks.length} proposed link(s) — ${unaudited.length} kept as proposed WITHOUT audit review (${unaudited.map((l) => l.claimId).join(', ')})`,
+            );
+          }
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           warnings.push(`${hyp.id}: link audit failed — original gated links kept unchanged (${msg.slice(0, 120)})`);

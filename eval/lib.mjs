@@ -67,6 +67,10 @@ Requirements:
    - steps: at least 3 steps, each with title, kind (literature|data_analysis|tool_run|simulation|experiment|human_review|other), method (what is actually done), failureConditions (what an outcome would count as this step failing)
    - metrics: at least 2
    - decisionRules: exactly these four fields, each non-empty: successCriterion, weakeningCriterion, falsificationCriterion, stopCriterion
+   - multipleTestingPolicy: when a plan tests several hypotheses, state the multiplicity
+     discipline explicitly as one of: "single_primary" (one confirmatory primary
+     comparison, the rest descriptive), "alpha_spending" (alpha allocated across
+     comparisons), or "e_value_accumulation" (e-values summed across comparisons)
 3. citations: list the sources you relied on. ${hasCorpus
     ? 'ONLY cite the provided literature. Each citation: {doi, title, quote} where quote is a verbatim excerpt (in English) from that source\'s abstract/title in the provided material that supports a claim you make.'
     : 'Cite sources from your own knowledge as {doi, title, quote} where quote is the specific supporting statement. If you cannot recall a concrete real source for a claim, DO NOT invent one — omit the citation for that claim. If you cannot recall any concrete sources, return an empty citations array and say so in "limitations".'}
@@ -74,7 +78,7 @@ Requirements:
 ${hasCorpus ? 'Ground every claim in the provided literature; do not import outside facts without marking them as unverified memory.' : 'You have no retrieval: answer from your own knowledge and mark its limits.'}
 
 Output a single JSON object:
-{"hypotheses":[{"statement":"...","mechanism":"...","assumptions":["..."],"predictions":["..."],"falsification":{"observable":"...","measurement":"...","expectedRelation":"...","decisionRule":"...","supportCondition":"...","weakeningCondition":"...","falsificationCondition":"...","confounders":["..."],"alternativeExplanations":["..."],"dataRequirements":["..."],"method":"...","failureInterpretation":"..."}}],"plan":{"objective":"...","steps":[{"title":"...","kind":"...","method":"...","failureConditions":["..."]}],"metrics":["..."],"decisionRules":{"successCriterion":"...","weakeningCriterion":"...","falsificationCriterion":"...","stopCriterion":"..."}},"citations":[{"doi":"...","title":"...","quote":"..."}],"limitations":"..."}
+{"hypotheses":[{"statement":"...","mechanism":"...","assumptions":["..."],"predictions":["..."],"falsification":{"observable":"...","measurement":"...","expectedRelation":"...","decisionRule":"...","supportCondition":"...","weakeningCondition":"...","falsificationCondition":"...","confounders":["..."],"alternativeExplanations":["..."],"dataRequirements":["..."],"method":"...","failureInterpretation":"..."}}],"plan":{"objective":"...","steps":[{"title":"...","kind":"...","method":"...","failureConditions":["..."]}],"metrics":["..."],"decisionRules":{"successCriterion":"...","weakeningCriterion":"...","falsificationCriterion":"...","stopCriterion":"..."},"multipleTestingPolicy":"single_primary|alpha_spending|e_value_accumulation"},"citations":[{"doi":"...","title":"...","quote":"..."}],"limitations":"..."}
 `;
 
 /** Light structural parse of the baseline output (shape check independent of our domain zod schemas). */
