@@ -39,7 +39,7 @@ import {
 import {
   attachRunToConversation, collectConversationSeeds, createConversation, deleteConversation,
   detachRunFromAllConversations, getConversation, listConversations, postConversationMessage,
-  resolveConversationProposal, resolveConversationReasoningRoute, retryConversationTurn,
+  renameConversation, resolveConversationProposal, resolveConversationReasoningRoute, retryConversationTurn,
   setConversationReasoningGear, ConversationError, type ConversationDeps,
 } from './conversations.js';
 import { startAutomationEngine, type AutomationEngine } from './automations.js';
@@ -2524,6 +2524,12 @@ function parseSeedSources(raw: unknown): string | {
       if (convId === undefined) throw notFound(`no route: ${method} ${url.pathname}`);
       if (segments.length === 4) {
         if (method === 'GET') return convRoute(() => sendJson(res, 200, { conversation: getConversation(app, convId) }));
+        if (method === 'PATCH') {
+          return convRoute(async () => {
+            const body = await readJsonObject(req);
+            sendJson(res, 200, { conversation: renameConversation(app, convId, body.title) });
+          });
+        }
         if (method === 'DELETE') return convRoute(() => { deleteConversation(app, convId); sendJson(res, 200, { ok: true }); });
         throw notFound(`method ${method} not allowed for ${url.pathname}`);
       }

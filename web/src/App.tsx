@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './conversation-dock.css';
 import { Bell, BellOff, Search, Settings, X } from 'lucide-react';
 import { ApiError } from './api/client';
-import { getEvents, getRun, listRuns, listConversations, createConversation, deleteConversation, searchAll } from './api/endpoints';
+import { getEvents, getRun, listRuns, listConversations, createConversation, deleteConversation, renameConversation, searchAll } from './api/endpoints';
 import { AppRail, type RailSurface } from './lab/AppRail';
 import { Library } from './lab/Library';
 import type { Conversation, ResearchRun, RunEvent, RunSummary } from './api/types';
@@ -516,6 +516,16 @@ export function App(): JSX.Element {
       });
     if (selectedConvId === id) { setSelectedConvId(null); setConvDocked(false); }
   }, [refreshConversations, selectedConvId]);
+  const renameConv = useCallback((id: string, title: string): void => {
+    void renameConversation(id, title)
+      .then(() => refreshConversations())
+      .catch((e: unknown) => {
+        setConvCreateError({
+          error: e instanceof ApiError ? e : new ApiError({ code: 'unknown', message: String(e), retryable: true }),
+          runId: '',
+        });
+      });
+  }, [refreshConversations]);
   const railSurface: RailSurface = libraryView
     ? 'library'
     : newResearchView
@@ -620,6 +630,7 @@ export function App(): JSX.Element {
           onOpenStudy={selectStudy}
           onOpenConversation={openConversation}
           onDeleteConversation={removeConversation}
+          onRenameConversation={renameConv}
           onOpenSettings={() => setSettingsOpen(true)}
         />
         <main className="content content--full" aria-label={t('app.title')}>

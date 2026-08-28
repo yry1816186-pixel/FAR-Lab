@@ -152,6 +152,25 @@ describe('resident conversation flow (HTTP, stub provider, kernel action protoco
     expect(turn.data.conversation.status).toBe('open');
   });
 
+  it('renames via PATCH (trim, 120 cap, updatedAt touched) and rejects empty honestly', async () => {
+    const rename = await json('PATCH', `/conversations/${convId}`, { title: '  耐药基因水平转移·文献笔记  ' });
+    expect(rename.status).toBe(200);
+    expect(rename.data.conversation.title).toBe('耐药基因水平转移·文献笔记');
+    expect(rename.data.conversation.updatedAt).toBeTruthy();
+
+    const cap = await json('PATCH', `/conversations/${convId}`, { title: 'x'.repeat(200) });
+    expect(cap.status).toBe(200);
+    expect((cap.data.conversation.title as string).length).toBe(120);
+
+    const empty = await json('PATCH', `/conversations/${convId}`, { title: '   ' });
+    expect(empty.status).toBe(400);
+    const missing = await json('PATCH', `/conversations/${convId}`, {});
+    expect(missing.status).toBe(400);
+
+    const ghost = await json('PATCH', '/conversations/conv_0000000000000000000000', { title: 'x' });
+    expect(ghost.status).toBe(404);
+  });
+
   it('rejects empty messages and bad seeds honestly', async () => {
     const empty = await json('POST', `/conversations/${convId}/messages`, { text: '   ' });
     expect(empty.status).toBe(400);

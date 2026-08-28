@@ -203,6 +203,25 @@ export function getConversation(app: App, id: string): Conversation {
   return mustGetConversation(app, id);
 }
 
+/** Rename a conversation (Doubao-parity conversation management). The title
+ *  is the researcher's own label for the dialogue — same validation as
+ *  creation (non-empty after trim, ≤120 chars); empty input is a 400, never a
+ *  silent no-op. Touches updatedAt so the renamed conversation re-ranks by
+ *  recency honestly. */
+export function renameConversation(app: App, id: string, title: unknown): Conversation {
+  const conv = mustGetConversation(app, id);
+  if (typeof title !== 'string' || title.trim().length === 0) {
+    throw new ConversationError(400, 'validation', 'field "title" must be a non-empty string');
+  }
+  const updated: Conversation = ConversationSchema.parse({
+    ...conv,
+    title: title.trim().slice(0, 120),
+    updatedAt: new Date().toISOString(),
+  });
+  app.store.putObject('conversation', updated);
+  return updated;
+}
+
 export function deleteConversation(app: App, id: string): void {
   if (app.store.getObject('conversation', id) === null) {
     throw new ConversationError(404, 'not_found', `conversation not found: ${id}`);

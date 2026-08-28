@@ -892,3 +892,23 @@
   border-color: var(--v2-refuted); font-weight: 600; padding: 0 10px;
 }
 .map-del.is-armed:disabled { opacity: 0.6; cursor: wait; }
+
+/* ---- Conversation rename (inline) + nav weight distinction ---- */
+.rail-conv-act {
+  flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+  height: 24px; width: 22px; padding: 0; border: none; border-radius: 6px;
+  background: none; color: var(--v2-text-3); cursor: pointer;
+}
+.rail-conv-act:hover { color: var(--v2-info-on-tint); background: var(--v2-info-tint); }
+.rail-conv-act:focus-visible { outline: 2px solid var(--v2-info); outline-offset: 1px; }
+.rail-rename-input {
+  width: 100%; padding: 4px 8px;
+  font-size: 12px; font-family: inherit;
+  color: var(--v2-text-1); background: var(--v2-page-bg);
+  border: 1px solid var(--v2-info); border-radius: 6px;
+}
+.rail-rename-input:focus-visible { outline: 2px solid var(--v2-info); outline-offset: 1px; }
+/* Primary nav stays one weight step above list links even when inactive
+   (vision-review finding: 12.5/12px alone was too weak a distinction). */
+.rail-nav-item { font-weight: 500; }
+.rail-nav-item.is-active { font-weight: 600; }

@@ -762,6 +762,14 @@ export const deleteConversation = async (id: string, signal?: AbortSignal): Prom
   await api.del(`${BASE}/conversations/${encodeURIComponent(id)}`, signal);
 };
 
+/** Rename a conversation (the researcher's own label for the dialogue). */
+export const renameConversation = async (id: string, title: string, signal?: AbortSignal): Promise<Conversation> =>
+  conversationOf((await api.patch(
+    `${BASE}/conversations/${encodeURIComponent(id)}`,
+    { title },
+    signal,
+  ) as { conversation?: unknown }).conversation);
+
 /** Approve (optionally remembering the kind for this conversation) or reject a pending proposal. */
 export const resolveConversationProposal = async (
   conversationId: string,

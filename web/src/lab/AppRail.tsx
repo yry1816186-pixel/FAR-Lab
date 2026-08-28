@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   BookOpen, ChevronLeft, ChevronRight, FlaskConical, Home, MessageSquare,
-  Plus, Settings, Trash2,
+  Pencil, Plus, Settings, Trash2,
 } from 'lucide-react';
 import { useI18n } from '../i18n/LanguageContext';
 import type { DictKey } from '../i18n/dict';
@@ -24,7 +24,7 @@ const COLLAPSE_KEY = 'farlab.railCollapsed';
 export function AppRail({
   surface, runs, conversations,
   onHome, onNewResearch, onLibrary, onOpenStudy, onOpenConversation,
-  onDeleteConversation, onOpenSettings,
+  onDeleteConversation, onRenameConversation, onOpenSettings,
 }: {
   surface: RailSurface;
   runs: RunSummary[];
@@ -35,6 +35,7 @@ export function AppRail({
   onOpenStudy: (runId: string) => void;
   onOpenConversation: (id: string) => void;
   onDeleteConversation: (id: string) => void;
+  onRenameConversation: (id: string, title: string) => void;
   onOpenSettings: () => void;
 }): JSX.Element | null {
   const { t } = useI18n();
@@ -42,6 +43,7 @@ export function AppRail({
     try { return window.localStorage.getItem(COLLAPSE_KEY) === '1'; } catch { return false; }
   });
   const [confirmConvId, setConfirmConvId] = useState<string | null>(null);
+  const [renamingConvId, setRenamingConvId] = useState<string | null>(null);
 
   const toggle = (): void => {
     setCollapsed((v) => {
@@ -116,43 +118,64 @@ export function AppRail({
         <div className="rail-group rail-group--scroll">
           {!collapsed && <p className="rail-group-title">{t('rail.convs')}</p>}
           {recentConvs.map((c) => (
-            <div key={c.id} className="rail-conv-row">
-              <button
-                type="button"
-                className={`rail-link${surface === 'conv' ? ' is-active' : ''}`}
-                onClick={() => onOpenConversation(c.id)}
-                title={c.title}
-              >
-                <span className="rail-link-icon" aria-hidden="true"><MessageSquare size={13} /></span>
+            renamingConvId === c.id ? (
+              <RenameInput
+                key={c.id}
+                initial={c.title}
+                onCommit={(title) => { setRenamingConvId(null); if (title !== null && title !== c.title) onRenameConversation(c.id, title); }}
+                onCancel={() => setRenamingConvId(null)}
+                label={t('rail.convRename')}
+              />
+            ) : (
+              <div key={c.id} className="rail-conv-row">
+                <button
+                  type="button"
+                  className={`rail-link${surface === 'conv' ? ' is-active' : ''}`}
+                  onClick={() => onOpenConversation(c.id)}
+                  title={c.title}
+                >
+                  <span className="rail-link-icon" aria-hidden="true"><MessageSquare size={13} /></span>
+                  {!collapsed && (
+                    <span className="rail-link-label">
+                      {c.title.length > 30 ? `${c.title.slice(0, 30)}…` : c.title}
+                    </span>
+                  )}
+                </button>
                 {!collapsed && (
-                  <span className="rail-link-label">
-                    {c.title.length > 30 ? `${c.title.slice(0, 30)}…` : c.title}
-                  </span>
+                  <>
+                    <button
+                      type="button"
+                      className="rail-conv-act"
+                      onClick={() => { setConfirmConvId(null); setRenamingConvId(c.id); }}
+                      aria-label={t('rail.convRename')}
+                      title={t('rail.convRename')}
+                    >
+                      <Pencil size={12} aria-hidden="true" />
+                    </button>
+                    {confirmConvId === c.id ? (
+                      <button
+                        type="button"
+                        className="rail-conv-del is-armed"
+                        onClick={() => { setConfirmConvId(null); onDeleteConversation(c.id); }}
+                        title={t('rail.convDelConfirm')}
+                      >
+                        {t('rail.convDelConfirm')}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="rail-conv-del"
+                        onClick={() => { setRenamingConvId(null); setConfirmConvId(c.id); window.setTimeout(() => setConfirmConvId((cur) => (cur === c.id ? null : cur)), 4000); }}
+                        aria-label={t('rail.convDelete')}
+                        title={t('rail.convDelete')}
+                      >
+                        <Trash2 size={12} aria-hidden="true" />
+                      </button>
+                    )}
+                  </>
                 )}
-              </button>
-              {!collapsed && (
-                confirmConvId === c.id ? (
-                  <button
-                    type="button"
-                    className="rail-conv-del is-armed"
-                    onClick={() => { setConfirmConvId(null); onDeleteConversation(c.id); }}
-                    title={t('rail.convDelConfirm')}
-                  >
-                    {t('rail.convDelConfirm')}
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="rail-conv-del"
-                    onClick={() => { setConfirmConvId(c.id); window.setTimeout(() => setConfirmConvId((cur) => (cur === c.id ? null : cur)), 4000); }}
-                    aria-label={t('rail.convDelete')}
-                    title={t('rail.convDelete')}
-                  >
-                    <Trash2 size={12} aria-hidden="true" />
-                  </button>
-                )
-              )}
-            </div>
+              </div>
+            )
           ))}
         </div>
       )}
@@ -161,5 +184,42 @@ export function AppRail({
         {navItem('rail.settings', <Settings size={15} aria-hidden="true" />, false, onOpenSettings)}
       </div>
     </nav>
+  );
+}
+
+/** Inline rename field (Doubao-parity): commit on Enter/blur, cancel on Esc.
+ *  Returns null (cancel) or the trimmed title; empty input cancels, matching
+ *  the server's non-empty contract. */
+function RenameInput({ initial, onCommit, onCancel, label }: {
+  initial: string;
+  onCommit: (title: string | null) => void;
+  onCancel: () => void;
+  label: string;
+}): JSX.Element {
+  const [text, setText] = useState(initial);
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    ref.current?.focus();
+    ref.current?.select();
+  }, []);
+  const commit = (): void => {
+    const trimmed = text.trim();
+    onCommit(trimmed.length > 0 ? trimmed.slice(0, 120) : null);
+  };
+  return (
+    <input
+      ref={ref}
+      type="text"
+      className="rail-rename-input"
+      value={text}
+      aria-label={label}
+      maxLength={120}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') { e.preventDefault(); commit(); }
+        else if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
+      }}
+    />
   );
 }
