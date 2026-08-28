@@ -45,28 +45,37 @@ npm run build
 # Set model provider key (choose one)
 export ZAI_API_KEY=your_zhipu_api_key          # Zhipu GLM (default)
 # export DASHSCOPE_API_KEY=your_dashscope_key   # Alibaba Qwen (competition route)
+# No key yet? Run the deterministic offline route instead: append --route offline
 
-# Run a minimal research pipeline
-far research start "What mechanisms drive horizontal transfer of antibiotic resistance genes in biofilms?" \
+# Run a minimal research pipeline.
+# In a fresh clone the CLI has no global `far` command — run it through the repo:
+node dist/cli/main.js research start "What mechanisms drive horizontal transfer of antibiotic resistance genes in biofilms?" \
   --domain microbiology --goal exploratory
+# (short form: npm run far -- research start …; `far <cmd>` works after `npm link`)
 
 # Watch progress in real time
-far research status <run-id> --watch
+node dist/cli/main.js research status <run-id> --watch
 
 # Inspect results
-far research inspect <run-id> --hypotheses
-far research inspect <run-id> --plan
+node dist/cli/main.js research inspect <run-id> --hypotheses
+node dist/cli/main.js research inspect <run-id> --plan
 
 # Export reproducibility bundle
-far research export <run-id> --format bundle --out ./output
+node dist/cli/main.js research export <run-id> --format bundle --out ./output
 
 # Verify bundle independently
-far verify <bundle-id>
+node dist/cli/main.js verify <bundle-id>
 ```
+
+> Shorthand below: `far` means `node dist/cli/main.js` (or `npm run far --`).
 
 ### Web Workbench
 
 ```bash
+# Build the web frontend once (a fresh clone has no web/dist — without this
+# step the server honestly reports "web workbench NOT built" and serves API only)
+cd web && npm install && npm run build && cd ..
+
 # Terminal 1: start API server + web frontend on port 3196
 npm run serve
 
