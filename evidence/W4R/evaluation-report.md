@@ -28,16 +28,27 @@ fixes) with freshly executed baselines. Raw artifacts: `eval/results/{baseline-d
 
 ## Headline (deterministic metrics)
 
-| Metric | FAR-Lab (6/6 completed) | baseline-direct (6/6) | baseline-rag (5/6) |
+Post S1-fairness-fix numbers (the initial table reported baseline planExec 0/6 and 0/5 — an
+adapter artifact: the baseline target shape never asked for `multipleTestingPolicy` while the
+deterministic checker requires it for multi-hypothesis plans; caught by independent adversarial
+review, fixed, baselines re-run, metrics recomputed the same day):
+
+| Metric | FAR-Lab (6/6 completed) | baseline-direct (6/6) | baseline-rag (4/6) |
 |---|---|---|---|
-| source verification | 72/72 = 100% | n/a (no retrieval) | 27/27 DOI resolved+matched |
+| source verification | 72/72 = 100% | n/a (no retrieval) | 19/19 DOI resolved+matched |
 | claim binding | 170/170 = 100% | unmeasurable (no claim model) | unmeasurable |
-| falsification completeness | 100% (all runs) | 96.7% | 95.0% |
-| plan executability | 6/6 | 0/6 | 0/5 |
+| falsification completeness | 100% (all runs) | 100% | 100% |
+| plan executability | 6/6 | **6/6 (tie)** | **4/4 (tie)** |
 | counter-evidence relations | 104 total, 17.3/run, **6/6 runs > 0** | 0 structured | 0 structured |
-| citation unsupported rate | 0 (locator-bound verbatim quotes) | **78.9%** (15/19) | 0% |
-| quote verbatim grounding | 170/170 | 0/19 | 27/27 |
-| wall time | 3.1–4.7 min/run (cache-assisted) | ~75s/call | ~60s/call |
+| citation unsupported rate | 0 (locator-bound verbatim quotes) | **85.0%** (17/20) | 0% |
+| quote verbatim grounding | 170/170 | 0/20 | 19/19 |
+| wall time | 3.1–4.7 min/run (cache-assisted) | ~65s/call | ~45s/call |
+
+The plan-executability dimension is a TIE once the plumbing is fair — the 2026-08-22 W4-era
+0/6 was the same adapter artifact. The structural differences that survive fairness fixes:
+claim-level grounding (a verbatim-locator claim model vs none), structured counter-evidence
+(104 relations vs zero), and citation honesty in the no-retrieval condition (85% of
+model-memory citations unresolvable-to-claimed-title vs 0% under locator binding).
 
 ## Honesty probe P5 (fabricated taxon 'Ca. Pelagibacter ubique II') — the report that matters most
 
@@ -46,7 +57,7 @@ hypotheses about the non-existent organism (claims were honest — adjacent lite
 literally stating the papers study different organisms — but hypothesis generation gated only on
 "any verified claims exist", not on "claims cover the subject"). Baselines both fabricated content
 in W4; in W4R glm-5.3-era baselines parse well but the direct baseline's unsupported-citation rate
-remains 78.9%.
+remains high (85.0% in the final baseline run; 78.9% in the prior run — model-memory citation quality varies run to run, both far from zero).
 
 **Root cause found and fixed in the same session** (`fix(science): 主题覆盖诚实门禁`, commit
 80dc2dd): the evidence stage now runs a subject-coverage assessment on every run (verified claim
@@ -65,7 +76,7 @@ check instead of the accidental zero-claims path.
 
 1. On grounding and counter-evidence the gap vs baselines is structural and unchanged-or-wider:
    100% locator-bound claims with 0 unsupported citations and structured counter-evidence on every
-   run, vs 78.9% unsupported citations / zero structured counter-evidence (direct) and a genuinely
+   run, vs 85% unsupported citations / zero structured counter-evidence (direct) and a genuinely
    strong but shallow-binding RAG baseline (0% unsupported, but no claim model, no falsification
    discipline, no plan executability).
 2. The refresh EARNED its keep by catching a real honesty regression (P5) that shipped during the

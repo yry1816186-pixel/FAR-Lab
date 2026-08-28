@@ -252,6 +252,10 @@ const baselineMetrics = (record) => {
         dependsOn: [],
       })),
       metrics: (record.output.plan?.metrics ?? []).map(String),
+      ...(typeof record.output.plan?.multipleTestingPolicy === 'string'
+        && ['single_primary', 'alpha_spending', 'e_value_accumulation'].includes(record.output.plan.multipleTestingPolicy)
+        ? { multipleTestingPolicy: record.output.plan.multipleTestingPolicy }
+        : {}),
       decisionRules: {
         successCriterion: record.output.plan?.decisionRules?.successCriterion ?? '',
         weakeningCriterion: record.output.plan?.decisionRules?.weakeningCriterion ?? '',
