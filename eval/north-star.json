@@ -112,11 +112,11 @@
       "id": "counter-evidence-substantive-hit",
       "what": "Counter-evidence seats whose relation survives blind re-judging as genuine counter signal (NEW metric: define in W-P2, backfill historical)",
       "current": {
-        "value": 0.143,
-        "detail": "strict (judge in contradicts/weakens) post-fix fullfix blind re-judge sample: 1/7, Wilson 95% [0.026,0.513]; limiting (+qualifies) also 0.143; misses mostly EMPTY (5 unrelated) not inverted (1 supports) — semantic residual per D-038, fix route = judge v2 adjudication layer once routes funded; pre-fix pooled was 0.308 strict / 0.615 limiting (relation-precision.jsonl n=13)",
-        "at": "2026-08-22",
-        "evidence": "eval/counter-evidence-metric.mjs run on spikes/output/relation-precision{,-contradicts-r2,-fullfix}.jsonl; evidence/W9/counter-evidence-metric.md",
-        "note": "strict 1/7 Wilson [0.026,0.513] stands (live-gated). W-G/F-A anchored counter queries LANDED offline: anchor pass-rate 0.563->0.825 on 80 real historical counter queries (retrieval-side root cause of EMPTY misses); live re-measure of the metric gated on D-036. W-G/F-B GRADE-lite certainty labels now surface to relation judges."
+        "value": 0.875,
+        "detail": "strict (judge in contradicts/weakens) on a FRESH live-run sample after the D-057/B direction-anchored falsify audit: 21/24, Wilson 95% [0.690,0.957]; inverted misses 9->3, empty 0. Pre-fix same-day baseline on the identical question/route (run_498s42b8): strict 15/24=0.625 [0.427,0.788], ALL 9 misses inverted (null-side hypotheses supported by no-effect claims labelled counter). Historical: 0.143 (2026-08-22, W9 fullfix, misses mostly EMPTY). HONEST LIMITS: same-family judge (glm-4.6 judging glm-4.6, upper bound), n=24, single problem (far-transfer); replication on more problems pending.",
+        "at": "2026-08-29",
+        "evidence": "eval/results/relation-precision-fartransfer-20260829.jsonl (pre) + relation-precision-fartransfer-postfix-20260829.jsonl (post); runs run_498s42b8jre9335a5s5m59dgxw / run_jezdcm3q77hh4pg4zmg3dx4zr4 in .far-run/far.db; fix commit 2ce7c29",
+        "note": "target 0.70 MET on this sample; not claimed as converged — multi-problem replication is the next lever"
       },
       "target": 0.7,
       "stretch": 0.85,
