@@ -71,8 +71,10 @@ export const ResearchRun = z.object({
   tags: z.array(z.string()).default([]),
   /**
    * Explicit model route for THIS run (user-selected at creation). Resolution order:
-   * run.providerConfigId > run.routeOverride > meta activeModelConfigId > env chain
-   * (FARLAB_MODEL_PROVIDER). A dangling id fails closed at call time — never a silent
+   * run.routeOverride > run.providerConfigId > meta activeModelConfigId > env chain
+   * (FARLAB_MODEL_PROVIDER) — routeOverride wins because the CLI pins it explicitly;
+   * the two never co-occur today (web sets providerConfigId, CLI sets routeOverride).
+   * A dangling id fails closed at call time — never a silent
    * fallback to another model (reproducibility over availability).
    */
   providerConfigId: ModelConfigId.optional(),

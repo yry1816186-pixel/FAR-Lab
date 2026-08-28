@@ -159,7 +159,20 @@ export function startAutomationEngine(app: App, deps: AutomationEngineDeps): Aut
     return fired;
   };
 
-  const timer = setInterval(() => { void tick(); }, deps.tickMs ?? 60_000);
+  // Reliability P1 (delayed audit 2026-08-29): tick() must NEVER reject into the
+  // interval callback — `void tick()` with no catch turns any throw (e.g. SQLITE_BUSY
+  // beyond busy_timeout mid-run) into an unhandledRejection, and Node's default
+  // terminates the whole server. The watchdog sweep got exactly this hardening;
+  // the automation engine now has it too: degrade visibly, keep serving.
+  const safeTick = async (): Promise<number> => {
+    try {
+      return await tick();
+    } catch (e) {
+      console.error(`[automations] tick failed (engine degraded for this pass, server keeps running): ${e instanceof Error ? e.message : String(e)}`);
+      return 0;
+    }
+  };
+  const timer = setInterval(() => { void safeTick(); }, deps.tickMs ?? 60_000);
   timer.unref?.();
   return {
     stop: (): void => clearInterval(timer),

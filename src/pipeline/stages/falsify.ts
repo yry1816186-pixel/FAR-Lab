@@ -530,6 +530,9 @@ export const falsifyStage: StageHandler = {
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           warnings.push(`${hyp.id}: link audit failed — original gated links kept unchanged (${msg.slice(0, 120)})`);
+          // The audit CALL failed: every link persists un-audited — stamp them all
+          // so the disclosure rides on the relations, not just this summary line.
+          for (const l of proposedLinks) unauditedIds.add(l.claimId);
         }
       }
       const auditDropped = [...audit.entries()].filter(([, d]) => d.dropped).map(([id]) => id);

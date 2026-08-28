@@ -275,7 +275,13 @@ Custom providers can be registered programmatically via the provider registry in
 ## Run Tests
 
 ```bash
-# Full test suite
+# The root vitest suite imports web/src modules — install web deps first
+# (CI does the same; see .github/workflows/ci.yml):
+cd web && npm install && cd ..
+
+# Full test suite. The experiment-sidecar tests additionally need Python + uv
+# (the suite skips them gracefully when uv is absent on the default path —
+# CI runs them for real).
 npm test
 
 # Watch mode (re-runs on file change)

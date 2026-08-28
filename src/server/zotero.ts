@@ -48,7 +48,9 @@ export class ZoteroUnavailableError extends Error {
   }
 }
 
-const ZOTERO_BASE = process.env.FAR_ZOTERO_BASE ?? 'http://127.0.0.1:23119';
+// Both spellings honored: FARLAB_ZOTERO_URL was documented in .env.example for
+// weeks while the code read FAR_ZOTERO_BASE — the documented name must work too.
+const ZOTERO_BASE = process.env.FAR_ZOTERO_BASE ?? process.env.FARLAB_ZOTERO_URL ?? 'http://127.0.0.1:23119';
 const ZOTERO_KEY_RE = /[A-Z0-9]{8}$/;
 
 interface RawZoteroItem {

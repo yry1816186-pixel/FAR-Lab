@@ -65,11 +65,16 @@ const questionTextOf = (payload: Record<string, unknown>): string =>
 
 /** The N most useful words of a question, for search-query templates. */
 const keywordsOf = (question: string, n: number): string => {
+  // CJK runs are kept whole regardless of length (zh words are 2-3 chars \u2014
+  // the historical length>3 filter dropped every one of them and zh questions
+  // fell back to English template vocabulary).
+  const cjk = [...question.matchAll(/[\u4e00-\u9fff]+/g)].map((m) => m[0]);
   const words = question
     .toLowerCase()
     .split(/[^a-z0-9\u4e00-\u9fff]+/)
     .filter((w) => w.length > 3);
-  return (words.length > 0 ? words : ['research', 'question']).slice(0, n).join(' ');
+  const all = [...cjk, ...words];
+  return (all.length > 0 ? all : ['research', 'question']).slice(0, n).join(' ');
 };
 
 type Handler = (payload: Record<string, unknown>) => unknown;
@@ -131,10 +136,18 @@ const claimExtraction: Handler = (p) => {
   // wrapper: internal ids are engineering objects and must not surface in the
   // researcher-facing evidence base (graph nodes, evidence list, exports all
   // render claim.text verbatim).
+  // CJK punctuation carries NO trailing whitespace, so the historical lookbehind
+  // `(?<=[.!?。！？])\s+` never split a zh abstract — the WHOLE abstract became one
+  // giant claim (live-observed 2026-08-29). Split after CJK terminators with zero
+  // whitespace, and after Latin terminators only with whitespace (keeps "e.g."
+  // and decimal points intact).
   const untrusted = asRecord(p.untrustedSourceContent);
   const abstract = untrusted === null ? null : asString(untrusted.abstract);
   if (abstract === null) return { claims: [] };
-  const sentences = abstract.split(/(?<=[.!?。！？])\s+/).filter((s) => s.trim().length > 0);
+  const sentences = abstract
+    .split(/(?<=[。！？；])|(?<=[.!?;])\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
   const picks = sentences.slice(0, Math.min(3, sentences.length));
   const stanceFor = (i: number): string => (i % 3 === 2 ? 'neutral' : 'supports');
   return {
