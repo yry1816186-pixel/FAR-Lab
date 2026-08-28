@@ -8,6 +8,7 @@ import {
   type ClaimClassification,
 } from '../api/endpoints';
 import type { HypothesisCandidate, ResearchRun, ScientificClaim } from '../api/types';
+import { zhFirst } from './bilingual';
 
 /**
  * Claim side of the study-map inspector — the §15 researcher judgement
@@ -25,7 +26,7 @@ export function ClaimInspector({ claim, run, hyps, balances, busy, op, onError }
   op: (act: () => Promise<unknown>) => Promise<void>;
   onError: (e: ApiError | null) => void;
 }): JSX.Element {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [linkHypId, setLinkHypId] = useState('');
   const [linkDir, setLinkDir] = useState<'supports' | 'counters'>('supports');
   const [excludeArmed, setExcludeArmed] = useState(false);
@@ -168,7 +169,7 @@ export function ClaimInspector({ claim, run, hyps, balances, busy, op, onError }
           <p className="insp-link-title">{t('map.linkClaimTitle')}</p>
           <select aria-label={t('map.linkHypLabel')} value={linkHypId} onChange={(e) => setLinkHypId(e.target.value)}>
             <option value="">{t('map.linkPickHyp')}</option>
-            {hyps.map((h) => <option key={h.id} value={h.id}>{h.statement.slice(0, 70)}</option>)}
+            {hyps.map((h) => <option key={h.id} value={h.id}>{zhFirst(h.statement, h.statementZh, lang).slice(0, 70)}</option>)}
           </select>
           <select aria-label={t('map.linkDirLabel')} value={linkDir} onChange={(e) => setLinkDir(e.target.value as 'supports' | 'counters')}>
             <option value="supports">{t('map.linkDirSupports')}</option>

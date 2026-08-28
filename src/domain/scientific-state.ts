@@ -46,6 +46,8 @@ export type StateDimensionNote = z.infer<typeof StateDimensionNote>;
 export const CompetingView = z.object({
   hypothesisId: HypothesisId,
   statement: z.string().min(1),
+  /** W-C bilingual display layer (optional): zh rendering; display-only, never canonical. */
+  statementZh: z.string().optional(),
   /** How it differs from the leader (distinctnessRationale, or the differing falsification observable). */
   differsBy: z.string().nullable(),
 });
@@ -68,6 +70,8 @@ export const ScientificState = z.object({
   leading: z.object({
     hypothesisId: HypothesisId,
     statement: z.string().min(1),
+    /** W-C bilingual display layer (optional): zh rendering; display-only, never canonical. */
+    statementZh: z.string().optional(),
     /** Deterministic composite: rank + top scorecard rationales. */
     whyItLeads: z.array(StateDimensionNote).default([]),
   }).nullable(),
@@ -139,6 +143,18 @@ export const isTemplateHypothesis = (h: HypothesisCandidate): boolean =>
 
 const isTemplateScopeDomain = (domain: string | undefined): boolean =>
   domain !== undefined && domain.includes('offline scope template');
+
+/**
+ * zh display form of a templateEvidence marker (closed set produced above; the
+ * web layer mirrors this in lab/bilingual.ts markerZh — keep the two in sync).
+ * Unknown markers pass through verbatim — never guess at domain content.
+ */
+export const templateMarkerZh = (marker: string): string => {
+  const hyp = /^(\d+)\/(\d+) active hypotheses are offline-template statements$/.exec(marker);
+  if (hyp !== null) return `${hyp[1]}/${hyp[2]} 个活跃假设是离线模板语句`;
+  if (marker === 'scope domain is the offline scope template') return '研究范围的领域值是离线范围模板';
+  return marker;
+};
 
 const STRENGTH_ORDER: Record<EvidenceStrength, number> = { strong: 3, moderate: 2, weak: 1, unrated: 0 };
 const GRADE_ORDER: Record<'high' | 'moderate' | 'low' | 'very_low', number> = { high: 3, moderate: 2, low: 1, very_low: 0 };
@@ -348,7 +364,6 @@ export function projectScientificState(input: {
     templateMarkers.push(`${templateHyps.length}/${active.length} active hypotheses are offline-template statements`);
   }
   if (isTemplateScopeDomain(questionDomain)) templateMarkers.push('scope domain is the offline scope template');
-
   const settled = runStatus === 'completed' || (runStatus === 'partial' && hypothesesStageConcluded);
   const excludedClaims = claims.filter((c) => c.researcher?.excluded === true).length;
   const counterRelations = relations.filter((r) => {
@@ -451,6 +466,7 @@ export function projectScientificState(input: {
   const competing: CompetingView[] = active.slice(1, 3).map((h) => ({
     hypothesisId: h.id,
     statement: h.statement,
+    ...(h.statementZh !== undefined ? { statementZh: h.statementZh } : {}),
     differsBy: differsByOf(h, leader),
   }));
 
@@ -503,7 +519,12 @@ export function projectScientificState(input: {
   return ScientificState.parse({
     ...base,
     kind: strongestSupport !== null || supportCandidates.size > 0 ? 'evidence_backed' : 'insufficient',
-    leading: { hypothesisId: leader.id, statement: leader.statement, whyItLeads },
+    leading: {
+      hypothesisId: leader.id,
+      statement: leader.statement,
+      ...(leader.statementZh !== undefined ? { statementZh: leader.statementZh } : {}),
+      whyItLeads,
+    },
     strongestSupport,
     strongestCounter,
     competing,

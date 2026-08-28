@@ -17,6 +17,7 @@ import { RELATION_POLARITY } from '../api/types';
 import { runStatusKey } from '../tones';
 import { EvidenceGraph } from '../components/detail/EvidenceGraph';
 import { ClaimInspector } from './ClaimInspector';
+import { zhFirst, markerZh } from './bilingual';
 import { useRunTruth } from '../components/detail/ResearchStatePanel';
 import { ScopeReview } from './ScopeReview';
 import { runLabel, type StudyGroup } from '../studies';
@@ -83,7 +84,7 @@ export function StudyMap({
   onClaimFocused?: () => void;
   onMutated: () => void;
 }): JSX.Element {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const truth = useRunTruth(run.id);
   const [question, setQuestion] = useState<ResearchQuestion | null>(null);
   const [claims, setClaims] = useState<ScientificClaim[]>([]);
@@ -492,7 +493,7 @@ export function StudyMap({
                       onClick={() => setInsp({ kind: 'hyp', hypId: h.id, rank: rank ?? 99 })}
                     >
                       <span className="map-hyp-rank">#{rank ?? '—'}{rank === 1 && t('map.topMark')}</span>
-                      <span className="map-hyp-statement">{h.statement}</span>
+                      <span className="map-hyp-statement">{zhFirst(h.statement, h.statementZh, lang)}</span>
                       <span className="map-hyp-stats"><span>✓ {sup}</span><span>✗ {ctr}</span></span>
                     </button>
                   );
@@ -650,7 +651,7 @@ function Inspector({ insp, run, liveClaim, liveHyp, hyps, balances, onClose, onM
   onClose: () => void;
   onMutated: () => void;
 }): JSX.Element {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [busy, setBusy] = useState(false);
   const [opError, setOpError] = useState<ApiError | null>(null);
   const [editing, setEditing] = useState(false);
@@ -734,9 +735,9 @@ function Inspector({ insp, run, liveClaim, liveHyp, hyps, balances, onClose, onM
             </div>
           ) : (
             <>
-              <p className="insp-body">{liveHyp.statement}</p>
+              <p className="insp-body">{zhFirst(liveHyp.statement, liveHyp.statementZh, lang)}</p>
               <p className="insp-meta">
-                {t('map.inspMechanism', { text: liveHyp.mechanism })}
+                {t('map.inspMechanism', { text: zhFirst(liveHyp.mechanism, liveHyp.mechanismZh, lang) })}
                 {liveHyp.falsification?.falsificationCondition !== undefined && t('map.inspFalsification', { text: liveHyp.falsification.falsificationCondition })}
                 {(liveHyp.uncertainties ?? []).length > 0 && t('map.inspUncertainties', { text: (liveHyp.uncertainties ?? []).join('；') })}
               </p>
@@ -814,7 +815,7 @@ function StateBand({ run, science, onResume, onDispatch, dispatchError, busy }: 
           <p className="ss-line">{t('map.stateTemplateBody')}</p>
           {s.templateEvidence.length > 0 && (
             <ul className="ss-markers">
-              {s.templateEvidence.map((e) => <li key={e}>{e}</li>)}
+              {s.templateEvidence.map((e) => <li key={e}>{markerZh(e, lang)}</li>)}
             </ul>
           )}
         </div>
@@ -828,7 +829,7 @@ function StateBand({ run, science, onResume, onDispatch, dispatchError, busy }: 
         </div>
       ) : (
         <div className="map-state">
-          {s.leading !== null && <p className="ss-leader">{s.leading.statement}</p>}
+          {s.leading !== null && <p className="ss-leader">{zhFirst(s.leading.statement, s.leading.statementZh, lang)}</p>}
           <div className="ss-grid">
             <div className="ss-cell">
               <p className="ss-k">{t('map.stateWhy')}</p>
@@ -881,7 +882,7 @@ function StateBand({ run, science, onResume, onDispatch, dispatchError, busy }: 
           {s.competing.length > 0 && (
             <p className="ss-line">
               {s.competing.map((c) => (
-                <span key={c.hypothesisId} className="ss-competing">{c.differsBy ?? c.statement}</span>
+                <span key={c.hypothesisId} className="ss-competing">{c.differsBy ?? zhFirst(c.statement, c.statementZh, lang)}</span>
               ))}
             </p>
           )}

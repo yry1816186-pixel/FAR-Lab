@@ -80,12 +80,14 @@ type Handler = (payload: Record<string, unknown>) => unknown;
 
 const scopeRefinement: Handler = (p) => {
   const question = questionTextOf(p);
-  const kw = keywordsOf(question, 4);
+  // Follow the question's own language (deterministic CJK detection) so a zh
+  // question does not get English template scaffolding in the scope panel.
+  const zh = /[一-鿿]/.test(question);
   return {
     domain: 'life sciences (offline scope template)',
-    phenomena: [kw.length > 0 ? `phenomena addressed by: ${question}` : 'the studied phenomenon'],
-    inScope: [`direct evidence bearing on: ${question}`],
-    outOfScope: ['tangential outcomes outside the stated question'],
+    phenomena: [zh ? `本研究问题所指的现象：${question}` : `phenomena addressed by: ${question}`],
+    inScope: [zh ? `与「${question}」直接相关的证据` : `direct evidence bearing on: ${question}`],
+    outOfScope: [zh ? '与上述问题无直接关联的切线性结果' : 'tangential outcomes outside the stated question'],
     goalType: 'exploratory',
     constraints: {
       assumptions: [],
@@ -125,17 +127,19 @@ const listwiseRerank: Handler = (p) => {
 const claimExtraction: Handler = (p) => {
   // Quotes must ground in exactly the text the caller showed: excerpt verbatim
   // sentences from untrustedSourceContent.abstract (first two sentences).
+  // The claim TEXT is the sentence itself — no "Claim N from source src_x…"
+  // wrapper: internal ids are engineering objects and must not surface in the
+  // researcher-facing evidence base (graph nodes, evidence list, exports all
+  // render claim.text verbatim).
   const untrusted = asRecord(p.untrustedSourceContent);
   const abstract = untrusted === null ? null : asString(untrusted.abstract);
   if (abstract === null) return { claims: [] };
   const sentences = abstract.split(/(?<=[.!?。！？])\s+/).filter((s) => s.trim().length > 0);
-  const source = asRecord(p.source);
-  const sourceId = source === null ? 'src' : (asString(source.id) ?? 'src');
   const picks = sentences.slice(0, Math.min(3, sentences.length));
   const stanceFor = (i: number): string => (i % 3 === 2 ? 'neutral' : 'supports');
   return {
     claims: picks.map((sentence, i) => ({
-      text: `Claim ${i + 1} from source ${sourceId}: ${sentence.trim()}`,
+      text: sentence.trim(),
       quote: sentence.trim(),
       stance: stanceFor(i),
     })),

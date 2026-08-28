@@ -363,7 +363,11 @@ export interface HypothesisCandidate {
   /** B5 lifecycle triage (R3); absent on objects created before B5 — treat as 'active'. */
   status?: 'active' | 'promoted' | 'rejected';
   statement: string;
+  /** W-C bilingual display layer (optional): zh rendering; display-only, never canonical. */
+  statementZh?: string;
   mechanism: string;
+  /** W-C bilingual display layer (optional): zh rendering; display-only, never canonical. */
+  mechanismZh?: string;
   derivation: {
     strategy: string;
     rationale: string;
@@ -1151,10 +1155,10 @@ export interface ScientificStateView {
   runId: string;
   kind: ScientificStateKind;
   templateEvidence: string[];
-  leading: { hypothesisId: string; statement: string; whyItLeads: StateDimensionNote[] } | null;
+  leading: { hypothesisId: string; statement: string; statementZh?: string; whyItLeads: StateDimensionNote[] } | null;
   strongestSupport: StateEvidenceRef | null;
   strongestCounter: StateEvidenceRef | null;
-  competing: Array<{ hypothesisId: string; statement: string; differsBy: string | null }>;
+  competing: Array<{ hypothesisId: string; statement: string; statementZh?: string; differsBy: string | null }>;
   discriminatingObservations: Array<{ betweenHypothesisIds: string[]; observable: string; expects: string[] }>;
   biggestUnknown: BiggestUnknown | null;
   /** Weakest-link propagation: ordinal level + every factor with its observed value and grade. */
