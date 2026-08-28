@@ -68,6 +68,7 @@ export function StudyMap({
   const [loadError, setLoadError] = useState<ApiError | null>(null);
   const [lifecycleBusy, setLifecycleBusy] = useState(false);
   const [cancelArmed, setCancelArmed] = useState(false);
+  const [cancelRequested, setCancelRequested] = useState(false);
 
   const loadScience = useCallback((rid: string): void => {
     const c = new AbortController();
@@ -162,8 +163,16 @@ export function StudyMap({
     setLifecycleBusy(true);
     setCancelArmed(false);
     try {
-      if (act === 'cancel') await cancelRun(run.id);
-      else await resumeRun(run.id);
+      if (act === 'cancel') {
+        // Server truth: the persisted flag takes effect at the next batch
+        // boundary — surface that instead of a silent wait.
+        const r = await cancelRun(run.id);
+        setCancelRequested(r.requested);
+        if (!r.requested) return; // nothing active to cancel — status refresh tells why
+      } else {
+        setCancelRequested(false);
+        await resumeRun(run.id);
+      }
       onMutated();
     } finally {
       setLifecycleBusy(false);
@@ -236,6 +245,7 @@ export function StudyMap({
             onArmCancel={() => setCancelArmed((v) => !v)}
             busy={lifecycleBusy}
             elapsedMin={elapsedMin}
+            cancelRequested={cancelRequested}
           />
         )}
         {(run.status === 'partial' || run.status === 'cancelled') && (
@@ -419,7 +429,7 @@ export function StudyMap({
 }
 
 /** Live execution narrative — six questions answered from real state, no fake progress. */
-function LiveBand({ run, events, onCancel, cancelArmed, onArmCancel, busy, elapsedMin }: {
+function LiveBand({ run, events, onCancel, cancelArmed, onArmCancel, busy, elapsedMin, cancelRequested }: {
   run: ResearchRun;
   events: RunEvent[];
   onCancel: () => void;
@@ -427,6 +437,7 @@ function LiveBand({ run, events, onCancel, cancelArmed, onArmCancel, busy, elaps
   onArmCancel: () => void;
   busy: boolean;
   elapsedMin: number;
+  cancelRequested: boolean;
 }): JSX.Element {
   const { t } = useI18n();
   // Latest 3 narrative-worthy events (receipts/checkpoints are machinery).
@@ -445,6 +456,9 @@ function LiveBand({ run, events, onCancel, cancelArmed, onArmCancel, busy, elaps
         {t('map.liveElapsed', { min: elapsedMin })}
       </p>
       <p className="mb-line">{t('map.liveWhy', { stage: stageLabel })}</p>
+      {cancelRequested && (
+        <p className="mb-line" role="status">{t('map.cancelPending')}</p>
+      )}
       {lines.length > 0 && (
         <ul className="mb-events">
           {lines.map((e) => (

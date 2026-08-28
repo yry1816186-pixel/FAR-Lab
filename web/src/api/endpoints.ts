@@ -261,8 +261,13 @@ export const createRun = async (input: CreateRunInput, signal?: AbortSignal): Pr
   });
 };
 
-export const cancelRun = async (runId: string, signal?: AbortSignal): Promise<void> => {
-  await api.post(`${BASE}/runs/${encodeURIComponent(runId)}/cancel`, {}, signal);
+/** Server truth: `requested:false` = nothing active to cancel (completed etc.) —
+ *  `requested:true` = flag persisted; takes effect at the next stage/batch boundary. */
+export const cancelRun = async (runId: string, signal?: AbortSignal): Promise<{ requested: boolean; reason?: string }> => {
+  const r = await api.post(`${BASE}/runs/${encodeURIComponent(runId)}/cancel`, {}, signal);
+  return typeof r === 'object' && r !== null && 'requested' in r
+    ? (r as { requested: boolean; reason?: string })
+    : { requested: true };
 };
 
 /** Researcher lifecycle (gap R1): hard-delete a settled run + everything it owns.

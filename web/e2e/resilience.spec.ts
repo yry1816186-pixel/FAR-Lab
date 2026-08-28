@@ -32,7 +32,7 @@ test('SSE mid-run drop: reconnect carries the run to completion (offline route)'
 
   // The run must still complete honestly — via reconnect, polling fallback,
   // or both; the verdict is the un-fakeable end state.
-  await expect(page.locator('.map-verdict, [class*="verdict"]')).toBeVisible({ timeout: 120_000 });
+  await expect(page.locator('.map-state')).toBeVisible({ timeout: 120_000 });
   await expect(page.locator('.map-hyp-card, [class*="hyp-card"]').first()).toBeVisible();
 });
 
@@ -55,7 +55,7 @@ test('failure injection: mid-run cancel (armed) -> honest cancelled state -> res
   const resume = page.getByRole('button', { name: /从此处恢复|Resume/ }).first();
   await expect(resume).toBeVisible({ timeout: 20_000 });
   await resume.click();
-  await expect(page.locator('.map-verdict, [class*="verdict"]')).toBeVisible({ timeout: 120_000 });
+  await expect(page.locator('.map-state')).toBeVisible({ timeout: 120_000 });
 });
 
 test('structure regression: §26 negative-acceptance invariants hold on the shipped surfaces', async ({ page }) => {
@@ -75,8 +75,8 @@ test('structure regression: §26 negative-acceptance invariants hold on the ship
   await page.locator('#nr-question').fill(QUESTION);
   await page.getByRole('button', { name: /^启动研究$|^Launch study$/ }).click();
   await expect(page).toHaveURL(/#study\/run_[a-z0-9]+/, { timeout: 30_000 });
-  await expect(page.locator('.map-verdict, [class*="verdict"]')).toBeVisible({ timeout: 120_000 });
-  const spine = await page.locator('.map-question, .map-evidence, .map-hyps, .map-verdict, [class*="map-"]').all();
+  await expect(page.locator('.map-state')).toBeVisible({ timeout: 120_000 });
+  const spine = await page.locator('.map-question, .map-state, .map-action, [class*="map-"]').all();
   expect(spine.length).toBeGreaterThan(0);
   expect(await page.locator('[role="tablist"]').count()).toBe(0);
 });

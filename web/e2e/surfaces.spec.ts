@@ -59,7 +59,8 @@ test('zh/en parity: every lab-home and map label renders in the chosen language'
   await expect(page.locator('.map-node-label').first()).toHaveText(/Research question/);
   await expect(page.getByText(/Evidence \(counter-first/).first()).toBeVisible();
   await expect(page.getByText(/Candidate hypotheses/).first()).toBeVisible();
-  await expect(page.getByText(/Current verdict/).first()).toBeVisible();
+  await expect(page.getByText(/Current scientific state/).first()).toBeVisible();
+  await expect(page.getByText(/Next best research action/).first()).toBeVisible();
 });
 
 test('theme contract: cycle pins [data-theme] on the document root', async ({ page }) => {
@@ -114,7 +115,7 @@ test('axe: no critical or serious violations on home or study map (zh, light)', 
   expect(homeViolations, homeViolations.map((v) => `${v.id}@${v.nodes}`).join(', ')).toEqual([]);
 
   await page.goto(`/#study/${studyId}`);
-  await expect(page.locator('.map-verdict')).toBeVisible();
+  await expect(page.locator('.map-state').first()).toBeVisible({ timeout: 60_000 });
   const mapViolations = await axeScan(page);
   expect(mapViolations, mapViolations.map((v) => `${v.id}@${v.nodes}`).join(', ')).toEqual([]);
 });
@@ -196,9 +197,9 @@ test('§8.2 pre-launch: draft -> scope proposal -> edit -> server truth -> launc
   expect(q.scope.domain).toBe('cognitive aging (edited by researcher)');
   expect(q.scope.phenomena).toContain('training-induced neuroplasticity');
 
-  // Launch: the remainder runs; the map lands on the verdict.
+  // Launch: the remainder runs; the map lands on the scientific state band.
   await page.getByRole('button', { name: /^启动研究$|^Launch study$/ }).click();
-  await expect(page.locator('.map-verdict')).toBeVisible({ timeout: 90_000 });
+  await expect(page.locator('.map-state').first()).toBeVisible({ timeout: 90_000 });
   const done = await (await request.get(`/api/v1/runs/${runId}`)).json() as { status: string };
   expect(done.status).toBe('completed');
 
@@ -207,13 +208,13 @@ test('§8.2 pre-launch: draft -> scope proposal -> edit -> server truth -> launc
 });
 
 
-test('deep-tools layer: map verdict links to every sanctioned deep panel and back', async ({ page }) => {
+test('deep-tools layer: map state band links to every sanctioned deep panel and back', async ({ page }) => {
   await page.goto(`/#study/${studyId}`);
-  await expect(page.locator('.map-verdict')).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator('.map-state').first()).toBeVisible({ timeout: 60_000 });
 
   // The four next-step links exist and target the correct deep panels.
   const expectLink = async (label: RegExp, tab: string): Promise<void> => {
-    const link = page.locator(`.map-verdict a[href="#run/${studyId}/${tab}"]`);
+    const link = page.locator(`.ss-links a[href="#run/${studyId}/${tab}"]`);
     await expect(link).toBeVisible();
     await expect(link).toContainText(label);
   };
@@ -224,12 +225,12 @@ test('deep-tools layer: map verdict links to every sanctioned deep panel and bac
 
   // Navigate into one deep panel (plan) and back to the map — the deep layer
   // and the map are one product, not separate apps.
-  await page.locator(`.map-verdict a[href="#run/${studyId}/plan"]`).click();
+  await page.locator(`.ss-links a[href="#run/${studyId}/plan"]`).click();
   await expect(page).toHaveURL(new RegExp(`#run/${studyId}/plan`));
   await expect(page.getByText(/判定规则|decision rule|步骤/i).first()).toBeVisible({ timeout: 15_000 });
   await page.goBack();
   await expect(page).toHaveURL(new RegExp(`#study/${studyId}`));
-  await expect(page.locator('.map-verdict')).toBeVisible();
+  await expect(page.locator('.map-state').first()).toBeVisible();
 });
 
 /** Inject axe-core and return critical/serious violations (impact-filtered, honest scope). */

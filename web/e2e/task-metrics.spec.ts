@@ -54,7 +54,7 @@ test('six core tasks: measured AFTER walkthrough', async ({ page }) => {
   metrics.push({ task: 'T3 判断当前进度 (live band, determinate n/9)', seconds: Number(((now() - t0) / 1000).toFixed(1)), primaryActions: clicks, note: 'stage + progress readable without leaving the map' });
 
   // ---- completion before the reading tasks
-  await expect(page.locator('.map-verdict, [class*="verdict"]')).toBeVisible({ timeout: 120_000 });
+  await expect(page.locator('.map-state')).toBeVisible({ timeout: 120_000 });
   await expect(page.locator('.map-hyp-card, [class*="hyp-card"]').first()).toBeVisible();
 
   // ---- T4 找到一条证据的原文: claim row -> inspector shows the locator quote
@@ -90,11 +90,14 @@ test('T6 从失败中恢复: cancel (armed) -> resume -> completed', async ({ pa
   await expect(cancelBtn).toBeVisible({ timeout: 15_000 });
   await cancelBtn.click(); clicks += 1;
   await page.getByRole('button', { name: /确认取消|Confirm cancel/ }).click(); clicks += 1;
-  await expect(page.getByText(/已取消|Cancelled|cancelled/).first()).toBeVisible({ timeout: 30_000 });
+  // Honest intermediate state: the request is acknowledged immediately...
+  await expect(page.getByText(/取消请求已记录|Cancellation recorded/).first()).toBeVisible({ timeout: 15_000 });
+  // ...then takes effect at the next batch boundary (measured 16s+ on offline retrieve).
+  await expect(page.getByText(/已取消——可从断点继续|Cancelled/).first()).toBeVisible({ timeout: 120_000 });
   const resume = page.getByRole('button', { name: /从此处恢复|Resume/ }).first();
   await expect(resume).toBeVisible({ timeout: 20_000 });
   await resume.click(); clicks += 1;
-  await expect(page.locator('.map-verdict, [class*="verdict"]')).toBeVisible({ timeout: 120_000 });
+  await expect(page.locator('.map-state')).toBeVisible({ timeout: 120_000 });
   metrics.push({
     task: 'T6 从失败中恢复 (cancel -> resume -> verdict)',
     seconds: Number(((now() - t0) / 1000).toFixed(1)),

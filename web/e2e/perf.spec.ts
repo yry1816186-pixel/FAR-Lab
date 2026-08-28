@@ -74,7 +74,7 @@ test('perf: home first paint and layout stability within "good" budgets', async 
 test('perf: study map renders the full corpus without long-task storms', async ({ page, request }) => {
   const runId = await provisionStudy(request);
   const v = await measureVitals(page, () => page.goto(`/#study/${runId}`, { waitUntil: 'domcontentloaded' }));
-  await expect(page.locator('.map-verdict, [class*="verdict"]')).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator('.map-state')).toBeVisible({ timeout: 60_000 });
   const counts = await page.evaluate(() => ({
     claims: document.querySelectorAll('.map-claim-row, [class*="claim-row"]').length,
     hyps: document.querySelectorAll('.map-hyp-card, [class*="hyp-card"]').length,

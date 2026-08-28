@@ -37,7 +37,7 @@ test('preview -> edit scope -> confirm launch lands on the study map', async ({ 
   await page.getByRole('button', { name: /确认启动研究|Confirm and launch/ }).click();
   await expect(page).toHaveURL(/#study\/run_[a-z0-9]+/, { timeout: 30_000 });
   await expect(page.locator('.map-question')).toContainText('sleep deprivation', { timeout: 20_000 });
-  await expect(page.locator('.map-verdict, [class*="verdict"]')).toBeVisible({ timeout: 120_000 });
+  await expect(page.locator('.map-state')).toBeVisible({ timeout: 120_000 });
 });
 
 test('direct launch stays one click (quick path unchanged)', async ({ page }) => {

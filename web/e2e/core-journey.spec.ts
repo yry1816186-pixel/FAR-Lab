@@ -48,7 +48,7 @@ test('full journey: formation -> launch -> study map -> inspector -> home', asyn
   // 4. The map: question, then materializing bands, verdict at the end —
   //    all on ONE canvas (no tabs), counter-first evidence when counters exist.
   await expect(page.locator('.map-question')).toContainText('resistance training', { timeout: 20_000 });
-  await expect(page.locator('.map-verdict, [class*="verdict"]')).toBeVisible({ timeout: 90_000 });
+  await expect(page.locator('.map-state')).toBeVisible({ timeout: 90_000 });
   await expect(page.locator('.map-hyp-card, [class*="hyp-card"]').first()).toBeVisible();
 
   // 5. Inspector: click the first claim/hypothesis object -> detail drawer,
