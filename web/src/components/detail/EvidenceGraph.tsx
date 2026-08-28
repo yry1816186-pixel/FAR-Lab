@@ -42,11 +42,42 @@ interface GraphEdge {
   strength?: 'strong' | 'moderate' | 'weak' | 'unrated';
 }
 
-const COL_X = { source: 60, claim: 330, hypothesis: 620 };
+const COL_X = { source: 70, claim: 380, hypothesis: 700 };
+const VIEW_W = 1000;
 const ROW_H = 34;
 const MAX_NODES_PER_COL = 40;
+/** First content row sits below the in-SVG column headers. */
+const HEADER_Y = 16;
+const FIRST_ROW_Y = 46;
 
 const STRENGTH_W: Record<NonNullable<GraphEdge['strength']>, number> = { strong: 2.2, moderate: 1.6, weak: 1.0, unrated: 1.2 };
+
+/**
+ * Truncation that keeps look-alike labels distinguishable: identical truncated
+ * labels (common with hypothesis statements sharing a long prefix) get their
+ * slice window extended in steps until they differ or hit the hard cap —
+ * the reader can always tell two rows apart at a glance.
+ */
+function truncateLabels(raw: string[], baseMax: number, hardMax: number): string[] {
+  const out = raw.map((s) => (s.length > baseMax ? `${s.slice(0, baseMax)}…` : s));
+  const dupeAt = (i: number): boolean => {
+    const own = out[i];
+    const ownRaw = raw[i];
+    if (own === undefined || ownRaw === undefined) return false;
+    return out.some((o, j) => j !== i && o === own && raw[j] !== undefined && raw[j] !== ownRaw);
+  };
+  let max = baseMax;
+  while (max < hardMax && out.some((_, i) => dupeAt(i))) {
+    max = Math.min(hardMax, max + 10);
+    out.forEach((label, i) => {
+      const original = raw[i];
+      if (original !== undefined && original.length > label.length - 1 && dupeAt(i)) {
+        out[i] = original.length > max ? `${original.slice(0, max)}…` : original;
+      }
+    });
+  }
+  return out;
+}
 
 export function EvidenceGraph({
   run,
@@ -110,21 +141,24 @@ export function EvidenceGraph({
     const visibleHyps = hypotheses.slice(0, cap);
 
     const nodeList: GraphNode[] = [];
+    const sourceLabels = truncateLabels(visibleSources.map((s) => s.title), 30, 52);
     visibleSources.forEach((s, i) => nodeList.push({
-      id: s.id, kind: 'source', x: COL_X.source, y: 30 + i * ROW_H,
-      label: s.title.length > 26 ? `${s.title.slice(0, 26)}…` : s.title, title: s.title,
+      id: s.id, kind: 'source', x: COL_X.source, y: FIRST_ROW_Y + i * ROW_H,
+      label: sourceLabels[i] ?? s.title, title: s.title,
       supportingCount: 0, counterCount: 0,
     }));
+    const claimLabels = truncateLabels(visibleClaims.map((c) => c.text), 36, 60);
     visibleClaims.forEach((c, i) => nodeList.push({
-      id: c.id, kind: 'claim', x: COL_X.claim, y: 30 + i * ROW_H,
-      label: c.text.length > 30 ? `${c.text.slice(0, 30)}…` : c.text, title: c.text,
+      id: c.id, kind: 'claim', x: COL_X.claim, y: FIRST_ROW_Y + i * ROW_H,
+      label: claimLabels[i] ?? c.text, title: c.text,
       tone: c.bindingStatus === 'verified' ? 'verified' : c.bindingStatus === 'resolved_unaligned' ? 'caution' : c.bindingStatus === 'unresolved' ? 'refuted' : 'unknown',
       supportingCount: supportingOf.get(c.id)?.size ?? 0,
       counterCount: counterOf.get(c.id)?.size ?? 0,
     }));
+    const hypLabels = truncateLabels(visibleHyps.map((h) => h.statement), 44, 72);
     visibleHyps.forEach((h, i) => nodeList.push({
-      id: h.id, kind: 'hypothesis', x: COL_X.hypothesis, y: 30 + i * ROW_H,
-      label: h.statement.length > 34 ? `${h.statement.slice(0, 34)}…` : h.statement, title: h.statement,
+      id: h.id, kind: 'hypothesis', x: COL_X.hypothesis, y: FIRST_ROW_Y + i * ROW_H,
+      label: hypLabels[i] ?? h.statement, title: h.statement,
       supportingCount: h.supportingClaimIds?.length ?? 0, counterCount: h.counterClaimIds?.length ?? 0,
     }));
 
@@ -157,7 +191,7 @@ export function EvidenceGraph({
       (claims.length > visibleClaims.length ? claims.length - visibleClaims.length : 0),
       (hypotheses.length > visibleHyps.length ? hypotheses.length - visibleHyps.length : 0),
     );
-    return { nodes: nodeList, edges: edgeList, height: 60 + maxRows * ROW_H, truncated };
+    return { nodes: nodeList, edges: edgeList, height: FIRST_ROW_Y + 18 + maxRows * ROW_H, truncated };
   }, [sources, claims, relations, hypotheses, filter, showAll]);
 
   const byId = useMemo(() => new Map(nodes.map((n) => [n.id, n] as const)), [nodes]);
@@ -252,7 +286,7 @@ export function EvidenceGraph({
       </div>
       <svg
         className="graph-svg"
-        viewBox={`0 0 800 ${height}`}
+        viewBox={`0 0 ${VIEW_W} ${height}`}
         role="img"
         aria-label={t('graph.aria', { s: sources.length, c: claims.length, h: hypotheses.length })}
         onWheel={onWheel}
@@ -261,6 +295,17 @@ export function EvidenceGraph({
         onMouseUp={endDrag}
         onMouseLeave={endDrag}
       >
+        {/* Column headers — the 3-second mental model (what each column IS). */}
+        <g>
+          <text x={COL_X.source} y={HEADER_Y} fontSize={11} fontWeight={600} fill="var(--v2-text-1)">{t('graph.colSource')}</text>
+          <text x={COL_X.claim} y={HEADER_Y} fontSize={11} fontWeight={600} fill="var(--v2-text-1)">{t('graph.colClaim')}</text>
+          <text x={COL_X.hypothesis} y={HEADER_Y} fontSize={11} fontWeight={600} fill="var(--v2-text-1)">{t('graph.colHyp')}</text>
+          {/* Polarity legend swatches — support/counter must be legible at a glance. */}
+          <line x1={COL_X.claim + 140} y1={HEADER_Y - 4} x2={COL_X.claim + 176} y2={HEADER_Y - 4} stroke="var(--v2-verified)" strokeWidth={2.6} />
+          <text x={COL_X.claim + 182} y={HEADER_Y} fontSize={10} fill="var(--v2-text-1)">{t('graph.legendSupport')}</text>
+          <line x1={COL_X.claim + 230} y1={HEADER_Y - 4} x2={COL_X.claim + 266} y2={HEADER_Y - 4} stroke="var(--v2-refuted)" strokeWidth={2.6} />
+          <text x={COL_X.claim + 272} y={HEADER_Y} fontSize={10} fill="var(--v2-text-1)">{t('graph.legendCounter')}</text>
+        </g>
         <g transform={`translate(${view.tx} ${view.ty}) scale(${view.k})`}>
           {edges.map((e) => {
             const a = byId.get(e.from);
@@ -270,15 +315,18 @@ export function EvidenceGraph({
             const pb = nodePos(b);
             const dim = activeEdges !== null && !activeEdges.has(e.from) && !activeEdges.has(e.to);
             const stroke = e.kind === 'supports' ? 'var(--v2-verified)' : e.kind === 'counters' ? 'var(--v2-refuted)' : 'var(--v2-border)';
+            // Focus mode must POP: active edges thicken further, everything else recedes.
+            const inFocus = activeEdges !== null && (activeEdges.has(e.from) || activeEdges.has(e.to));
+            const baseW = e.strength !== undefined ? STRENGTH_W[e.strength] : e.kind === 'locator' ? 0.8 : 2.2;
             return (
               <line
                 key={e.id}
                 x1={pa.x + (a.kind === 'source' ? 8 : 10)} y1={pa.y}
                 x2={pb.x - (b.kind === 'hypothesis' ? 10 : 8)} y2={pb.y}
                 stroke={stroke}
-                strokeWidth={e.strength !== undefined ? STRENGTH_W[e.strength] : e.kind === 'locator' ? 0.7 : 1.4}
+                strokeWidth={inFocus ? baseW + 0.8 : baseW}
                 strokeDasharray={e.dashed === true ? '4 3' : undefined}
-                opacity={dim ? 0.08 : e.kind === 'locator' ? 0.45 : 0.85}
+                opacity={dim ? 0.08 : e.kind === 'locator' ? 0.35 : inFocus ? 1 : 0.85}
               >
                 {e.strength !== undefined && <title>{`${t('graph.claimClaim')} — ${t(`graph.strength.${e.strength}`)}`}</title>}
               </line>
@@ -311,7 +359,8 @@ export function EvidenceGraph({
                 {n.kind === 'source' && <rect x={-8} y={-5} width={16} height={10} rx={2} fill={fill} stroke="var(--v2-border)" />}
                 {n.kind === 'claim' && <circle r={6} fill={fill} stroke={`var(--v2-${n.tone ?? 'unknown'})`} strokeWidth={2} />}
                 {n.kind === 'hypothesis' && <rect x={-10} y={-9} width={20} height={18} rx={5} fill={fill} stroke="var(--v2-info)" strokeWidth={2} />}
-                <text x={14} y={4} fontSize={11} fill="var(--v2-text-2)">{n.label}</text>
+                <title>{n.title}</title>
+                <text x={14} y={4} fontSize={11} fill="var(--v2-text-1)">{n.label}</text>
               </g>
             );
           })}

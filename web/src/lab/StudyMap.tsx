@@ -5,15 +5,16 @@ import { useI18n } from '../i18n/LanguageContext';
 import type { DictKey } from '../i18n/dict';
 import {
   cancelRun, dispatchAction, editHypothesis, forkHypothesis, getEvidence, getHypotheses,
-  getQuestion, getScience, promoteHypothesis, rejectHypothesis, resumeRun,
+  getQuestion, getScience, getSources, promoteHypothesis, rejectHypothesis, resumeRun,
 } from '../api/endpoints';
 import { DISPATCHABLE_ACTIONS, type DispatchableAction } from '../api/endpoints';
 import type {
-  AchResearcherAdjusted, EvidenceRelation, HypothesisCandidate, ResearchQuestion, ResearchRun, RunEvent, ScienceBundle, ScientificClaim,
+  AchResearcherAdjusted, EvidenceRelation, HypothesisCandidate, ResearchQuestion, ResearchRun, RunEvent, ScienceBundle, ScientificClaim, SourceDocument,
 } from '../api/types';
 import { runProgress } from '../api/types';
 import { RELATION_POLARITY } from '../api/types';
 import { runStatusKey } from '../tones';
+import { EvidenceGraph } from '../components/detail/EvidenceGraph';
 import { ClaimInspector } from './ClaimInspector';
 import { useRunTruth } from '../components/detail/ResearchStatePanel';
 import { ScopeReview } from './ScopeReview';
@@ -89,6 +90,7 @@ export function StudyMap({
   // empty->band swap measured as the map's dominant layout shift, §21).
   const [scienceLoaded, setScienceLoaded] = useState(false);
   const [relations, setRelations] = useState<EvidenceRelation[]>([]);
+  const [sources, setSources] = useState<SourceDocument[]>([]);
   const [hyps, setHyps] = useState<HypothesisCandidate[]>([]);
   const [ranks, setRanks] = useState<Map<string, number>>(new Map());
   const [adjusted, setAdjusted] = useState<AchResearcherAdjusted | null>(null);
@@ -106,6 +108,7 @@ export function StudyMap({
   const loadScience = useCallback((rid: string): void => {
     const c = new AbortController();
     void getQuestion(rid, c.signal).then(setQuestion).catch(() => setQuestion(null));
+    void getSources(rid, c.signal).then(setSources).catch(() => setSources([]));
     void getEvidence(rid, c.signal)
       .then((e) => { setClaims(e.claims); setRelations(e.relations); setScienceLoaded(true); })
       .catch((e: unknown) => { setClaims([]); setRelations([]); setScienceLoaded(true); if (e instanceof ApiError) setLoadError(e); });
@@ -310,6 +313,26 @@ export function StudyMap({
           </div>
         </section>
 
+        {/* The MAP of the study map: the reasoning structure made spatial —
+            sources ← claims (support/counter) ← ranked hypotheses. Reuses the
+            B7 landscape graph (real store objects only); claim clicks open the
+            map inspector, hypothesis clicks land on the hypotheses band. */}
+        {!draftable && (claims.length > 0 || activeHyps.length > 0) && (
+          <section className="map-node map-node--graph">
+            <p className="map-node-label">{t('map.graphLabel')}</p>
+            <div className="map-graph-frame">
+              <EvidenceGraph
+                run={run}
+                sources={sources}
+                claims={claims}
+                relations={relations}
+                onOpenClaim={(claimId) => { setInsp({ kind: 'claim', claimId }); }}
+                onOpenHypothesis={() => { document.getElementById('map-hyps')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
+              />
+            </div>
+          </section>
+        )}
+
         {draftable && (
           <ScopeReview
             run={run}
@@ -384,7 +407,7 @@ export function StudyMap({
             )}
         </section>
 
-        <section className="map-node">
+        <section className="map-node" id="map-hyps">
           <p className="map-node-label">{t('map.hypsLabel')}</p>
           {science?.state.discriminatingObservations.slice(0, 1).map((o) => (
             <p key={o.betweenHypothesisIds.join('-')} className="map-discrim">
