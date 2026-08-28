@@ -12,8 +12,8 @@
 import { ApiError } from './client';
 import type {
   AchAnalysis, AchResearcherAdjusted, EvidenceBody, EvidenceRelation, FeedbackSignal, HypothesisCandidate, HypothesisScorecard, HypothesisTournament,
-  ProvenanceReceipt, ResearchPlan, ResearchQuestion, ResearchRun, RunEvent,
-  RunSummary, ScientificClaim, SearchResponse, SearchHit, SourceDocument, VersionDiff, Revision,
+  NextActionView, ProvenanceReceipt, ResearchPlan, ResearchQuestion, ResearchRun, RunEvent,
+  RunSummary, ScienceBundle, ScientificClaim, ScientificStateView, SearchResponse, SearchHit, SourceDocument, StateDeltaView, VersionDiff, Revision,
 } from './types';
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
@@ -291,5 +291,39 @@ export function normalizeSearch(data: unknown): SearchResponse {
     claims: hits('claims'),
     // Optional since the segment is new (older servers omit it).
     ...(Array.isArray(data.conversations) ? { conversations: data.conversations.filter(looksLikeSearchHit) } : {}),
+  };
+}
+
+// ---- Product Spine (2026-08-28): /runs/:id/science projection ----
+
+const KINDS = new Set(['forming', 'template', 'insufficient', 'evidence_backed']);
+const ACTION_TYPES = new Set([
+  'RERUN_WITH_LIVE_ROUTE', 'DECLARE_INSUFFICIENT_EVIDENCE', 'EXECUTE_PLANNED_EXPERIMENT',
+  'CONSUME_FEEDBACK_INTO_REVISION', 'RESUME_EVIDENCE_DEBT', 'COUNTER_EVIDENCE_SEARCH',
+  'DISCRIMINATING_ANALYSIS', 'ADD_DISCRIMINATING_DATA', 'EXTEND_LITERATURE', 'RESEARCHER_REVIEW_COUNTERS',
+]);
+
+const looksLikeState = (v: unknown): v is ScientificStateView =>
+  isRecord(v) && typeof v.runId === 'string' && typeof v.kind === 'string' && KINDS.has(v.kind);
+
+const looksLikeAction = (v: unknown): v is NextActionView =>
+  isRecord(v) && typeof v.id === 'string' && typeof v.actionType === 'string' && ACTION_TYPES.has(v.actionType);
+
+const looksLikeDelta = (v: unknown): v is StateDeltaView =>
+  isRecord(v) && typeof v.id === 'string' && typeof v.toVersionLabel === 'string' && Array.isArray(v.whatChanged);
+
+export function normalizeScience(data: unknown): ScienceBundle {
+  if (!isRecord(data)) throw schemaError('science bundle');
+  const rec = data;
+  const state = looksLikeState(rec.state) ? rec.state : null;
+  if (state === null) throw schemaError('science.state');
+  return {
+    state,
+    nextActions: requireArray(rec, ['nextActions'], 'science bundle (nextActions)').filter(looksLikeAction),
+    deltas: requireArray(rec, ['deltas'], 'science bundle (deltas)').filter(looksLikeDelta),
+    experimentLeg: isRecord(rec.experimentLeg) && typeof rec.experimentLeg.kind === 'string'
+      ? { kind: rec.experimentLeg.kind, executabilityPassed: rec.experimentLeg.executabilityPassed === true }
+      : { kind: 'no_plan', executabilityPassed: false },
+    unconsumedFeedbackCount: typeof rec.unconsumedFeedbackCount === 'number' ? rec.unconsumedFeedbackCount : 0,
   };
 }

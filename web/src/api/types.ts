@@ -1099,3 +1099,91 @@ export interface ScreeningStopResult {
   view: ScreeningView;
   feedbackId?: string;
 }
+
+/* ---- Product Spine (2026-08-28): scientific state / next actions / deltas ---- */
+
+export type ScientificStateKind = 'forming' | 'template' | 'insufficient' | 'evidence_backed';
+
+export interface StateDimensionNote {
+  dimension: string;
+  qualitative: 'low' | 'moderate' | 'high' | 'not_assessed' | null;
+  rationale: string;
+  calibration: 'uncalibrated_llm_judgment' | 'deterministic' | 'human_expert';
+}
+
+export interface StateEvidenceRef {
+  claimId: string;
+  text: string;
+  rationale: string;
+  strength: 'strong' | 'moderate' | 'weak' | 'unrated';
+  gradeCertainty: 'high' | 'moderate' | 'low' | 'very_low' | null;
+}
+
+export type BiggestUnknown =
+  | { kind: 'unresolved_counter'; claimId: string; excerpt: string }
+  | { kind: 'hyp_uncertainty'; text: string }
+  | { kind: 'searched_no_counter'; queriesAttempted: number }
+  | { kind: 'template_content' }
+  | { kind: 'no_active_hyps' };
+
+export interface ScientificStateView {
+  runId: string;
+  kind: ScientificStateKind;
+  templateEvidence: string[];
+  leading: { hypothesisId: string; statement: string; whyItLeads: StateDimensionNote[] } | null;
+  strongestSupport: StateEvidenceRef | null;
+  strongestCounter: StateEvidenceRef | null;
+  competing: Array<{ hypothesisId: string; statement: string; differsBy: string | null }>;
+  discriminatingObservations: Array<{ betweenHypothesisIds: string[]; observable: string; expects: string[] }>;
+  biggestUnknown: BiggestUnknown | null;
+  confidence: { qualitative: 'low' | 'moderate' | 'high'; basis: string };
+  falsifiers: Array<{ hypothesisId: string; condition: string }>;
+  counters: { unresolvedCount: number; searchedAndFoundNone: { queriesAttempted: number; foundCount: number } | null };
+  evidenceShape: { claims: number; verified: number; supportingRelations: number; counterRelations: number; excludedByResearcher: number };
+}
+
+export type NextActionType =
+  | 'RERUN_WITH_LIVE_ROUTE' | 'DECLARE_INSUFFICIENT_EVIDENCE' | 'EXECUTE_PLANNED_EXPERIMENT'
+  | 'CONSUME_FEEDBACK_INTO_REVISION' | 'RESUME_EVIDENCE_DEBT' | 'COUNTER_EVIDENCE_SEARCH'
+  | 'DISCRIMINATING_ANALYSIS' | 'ADD_DISCRIMINATING_DATA' | 'EXTEND_LITERATURE' | 'RESEARCHER_REVIEW_COUNTERS';
+
+export interface NextActionView {
+  id: string;
+  runId: string;
+  actionType: NextActionType;
+  objective: string;
+  knowledgeGap: string;
+  rationale: string;
+  wouldChange: string;
+  expectedDiscrimination: 'high' | 'medium' | 'low';
+  feasibility: 'high' | 'medium' | 'low';
+  costClass: 'high' | 'medium' | 'low';
+  researcherDecisionRequired: boolean;
+  targets: { hypothesisIds: string[]; claimIds: string[] };
+  actionable: boolean;
+  actionHint: { kind: 'resume' | 'rerun-live' | 'guidance' };
+}
+
+export interface StateDeltaView {
+  id: string;
+  runId: string;
+  fromVersionLabel: string;
+  toVersionLabel: string;
+  at: string;
+  trigger: { feedbackSource: string; excerpt: string };
+  whatChanged: Array<{ objectType: string; objectId: string; operation: string; before: string | null; after: string | null; reason: string }>;
+  affectedHypothesisIds: string[];
+  affectedClaimIds: string[];
+  rankingImpact: 'weakened' | 'strengthened' | 'restructured' | 'unclear';
+  explanation: string;
+  qualityDelta: { status: 'improved' | 'neutral' | 'worse' | 'inconclusive'; claim: string };
+  remainingUncertainties: string[];
+}
+
+export interface ScienceBundle {
+  state: ScientificStateView;
+  nextActions: NextActionView[];
+  deltas: StateDeltaView[];
+  experimentLeg: { kind: string; executabilityPassed: boolean };
+  unconsumedFeedbackCount: number;
+}

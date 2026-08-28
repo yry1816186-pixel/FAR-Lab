@@ -31,7 +31,17 @@ export function useCreateRun(onCreated: (runId: string) => void): {
   submit: (ev: React.FormEvent) => Promise<void>;
   submitDraft: (ev?: React.FormEvent) => Promise<string | null>;
 } {
-  const [text, setText] = useState('');
+  const [text, setText] = useState(() => {
+    // Prefill from #lab/new?q=... (spine rerun affordance): the researcher's
+    // question rides the hash so a template-run rerun starts pre-loaded.
+    const m = /(?:^|[?&])q=([^&]+)/.exec(window.location.hash);
+    const raw = m?.[1];
+    try {
+      return raw !== undefined ? decodeURIComponent(raw.replace(/\+/g, ' ')) : '';
+    } catch {
+      return '';
+    }
+  });
   const [domain, setDomain] = useState('');
   const [goalType, setGoalType] = useState('');
   const [providerConfigId, setProviderConfigId] = useState('');

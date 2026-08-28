@@ -24,3 +24,6 @@ export * from './automation.js';
 export * from './tool-integration.js';
 export * from './iteration.js';
 export * from './screening.js';
+export * from './scientific-state.js';
+export * from './next-action.js';
+export * from './state-delta.js';

@@ -73,6 +73,10 @@ import { consolidateConversationProfile } from '../app/memory.js';
 import { EvidenceRelation, EvidenceRelationType } from '../domain/evidence.js';
 import { diagnosticityScores, removalSensitivity } from '../domain/ach.js';
 import { canonicalSha256 } from '../shared/crypto.js';
+import { deriveNextActions, projectScientificState } from '../domain/index.js';
+import { projectStateDeltas } from '../domain/state-delta.js';
+import { experimentLegStatus } from '../app/iteration.js';
+import { checkPlanExecutability } from '../pipeline/stages/plan.js';
 
 /**
  * Versioned HTTP API over the single application kernel (zero framework: native http +
@@ -703,6 +707,67 @@ function parseSeedSources(raw: unknown): string | {
       evidenceLevel: b.declaredEvidenceLevel,
     }));
     sendJson(res, 200, { bundles });
+  };
+
+  /**
+   * Product Spine (2026-08-28): the CURRENT SCIENTIFIC STATE + NEXT RESEARCH
+   * ACTIONS + STATE DELTAS — one deterministic projection over the run's own
+   * objects. No LLM, no persisted second truth: every field is derived at read
+   * time from schema-validated store objects (same discipline as
+   * achResearcherAdjusted above).
+   */
+  const runScience = (res: http.ServerResponse, runId: string): void => {
+    const run = mustGetRun(runId);
+    const question = app.store.getObject('question', run.questionId);
+    const claims = app.store.listObjects('claim', runId);
+    const relations = app.store.listObjects('evidence_relation', runId);
+    const hypotheses = app.store.listObjects('hypothesis', runId);
+    const scorecards = app.store.listObjects('scorecard', runId);
+    const corpus = app.store.listObjects('corpus_snapshot', runId).at(-1) ?? null;
+    const state = projectScientificState({
+      runId,
+      runStatus: run.status,
+      questionDomain: question?.scope.domain,
+      claims,
+      relations,
+      hypotheses,
+      scorecards,
+      counterQueriesAttempted: corpus?.queries.filter((q) => q.purpose === 'counter_evidence').length ?? 0,
+    });
+
+    const plan = app.store.listObjects('plan', runId).at(-1) ?? null;
+    const leg = experimentLegStatus(app.store, runId);
+    const hypothesisIds = new Set(hypotheses.map((h) => h.id));
+    const executabilityPassed = plan !== null && checkPlanExecutability(plan, hypothesisIds).passed;
+    const revisions = app.store.listObjects('revision', runId);
+    const consumed = new Set(revisions.map((r) => r.triggerFeedbackId));
+    const unconsumedFeedbackCount = app.store
+      .listObjects('feedback', runId)
+      .filter((s) => !consumed.has(s.id)).length;
+    const nextActions = deriveNextActions({
+      runId,
+      runStatus: run.status,
+      state,
+      leg: { kind: leg.kind, executabilityPassed },
+      unconsumedFeedbackCount,
+      hasEvidenceDebt: app.store.listObjects('source_document', runId).some((d) => d.verification === undefined),
+      planDatasets: plan?.dataRequirements.map((d) => ({ name: d.name, availability: d.availability })) ?? [],
+    });
+
+    const deltas = projectStateDeltas({
+      runId,
+      revisions,
+      feedbacks: app.store.listObjects('feedback', runId),
+      versionDiffs: app.store.listObjects('version_diff', runId),
+    });
+
+    sendJson(res, 200, {
+      state,
+      nextActions,
+      deltas,
+      experimentLeg: { kind: leg.kind, executabilityPassed },
+      unconsumedFeedbackCount,
+    });
   };
 
   /**
@@ -2164,6 +2229,7 @@ function parseSeedSources(raw: unknown): string | {
         }
         if (leaf === 'bundles' && method === 'GET') return runBundles(res, runId);
         if (leaf === 'corpus' && method === 'GET') return runCorpus(res, runId);
+        if (leaf === 'science' && method === 'GET') return runScience(res, runId);
         if (leaf === 'cancel' && method === 'POST') return cancelRun(res, runId);
         if (leaf === 'resume' && method === 'POST') return resumeRun(res, runId);
         if (leaf === 'feedback' && method === 'POST') return receiveFeedback(req, res, runId);

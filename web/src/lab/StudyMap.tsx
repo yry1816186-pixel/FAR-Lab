@@ -5,10 +5,10 @@ import { useI18n } from '../i18n/LanguageContext';
 import type { DictKey } from '../i18n/dict';
 import {
   cancelRun, editHypothesis, forkHypothesis, getEvidence, getHypotheses,
-  getQuestion, promoteHypothesis, rejectHypothesis, resumeRun,
+  getQuestion, getScience, promoteHypothesis, rejectHypothesis, resumeRun,
 } from '../api/endpoints';
 import type {
-  AchResearcherAdjusted, EvidenceRelation, HypothesisCandidate, ResearchQuestion, ResearchRun, RunEvent, ScientificClaim,
+  AchResearcherAdjusted, EvidenceRelation, HypothesisCandidate, ResearchQuestion, ResearchRun, RunEvent, ScienceBundle, ScientificClaim,
 } from '../api/types';
 import { runProgress } from '../api/types';
 import { RELATION_POLARITY } from '../api/types';
@@ -62,6 +62,7 @@ export function StudyMap({
   const [hyps, setHyps] = useState<HypothesisCandidate[]>([]);
   const [ranks, setRanks] = useState<Map<string, number>>(new Map());
   const [adjusted, setAdjusted] = useState<AchResearcherAdjusted | null>(null);
+  const [science, setScience] = useState<ScienceBundle | null>(null);
   const [insp, setInsp] = useState<Insp | null>(null);
   const [loadError, setLoadError] = useState<ApiError | null>(null);
   const [lifecycleBusy, setLifecycleBusy] = useState(false);
@@ -80,6 +81,9 @@ export function StudyMap({
         setAdjusted(h.achResearcherAdjusted);
       })
       .catch(() => { setHyps([]); setRanks(new Map()); setAdjusted(null); });
+    // Spine projection: state/next-actions/deltas. Failure is non-fatal (the
+    // map still renders its bands) but leaves science null — never fake state.
+    void getScience(rid, c.signal).then(setScience).catch(() => setScience(null));
   }, []);
 
   // Reload science objects on run switch AND on lifecycle transitions
@@ -146,8 +150,6 @@ export function StudyMap({
     .filter((h) => h.status === undefined || h.status === 'active')
     .sort((a, b) => (ranks.get(a.id) ?? 99) - (ranks.get(b.id) ?? 99)), [hyps, ranks]);
 
-  const top = activeHyps[0];
-  const counterClaims = claimOrder.filter((x) => x.bal.counters > 0);
   const settled = run.status === 'completed' || run.status === 'partial';
 
   const siblingStudies = useMemo(() => {
@@ -253,6 +255,14 @@ export function StudyMap({
 
         {!draftable && (
           <>
+        {settled && science !== null && (
+          <StateBand
+            run={run}
+            science={science}
+            onResume={() => { void lifecycle('resume'); }}
+            busy={lifecycleBusy}
+          />
+        )}
         <section className="map-node">
           <p className="map-node-label">{t('map.evidenceLabel')}</p>
           {claims.length === 0 && !running
@@ -291,6 +301,12 @@ export function StudyMap({
 
         <section className="map-node">
           <p className="map-node-label">{t('map.hypsLabel')}</p>
+          {science?.state.discriminatingObservations.slice(0, 1).map((o) => (
+            <p key={o.betweenHypothesisIds.join('-')} className="map-discrim">
+              <span className="map-discrim-tag">{t('map.discrimLabel')}</span>
+              {o.observable}
+            </p>
+          ))}
           {adjusted !== null && (
             <div className="map-band map-band--adjusted" role="status">
               <p className="mb-title">{t('map.adjustedTitle', { n: adjusted.excludedClaimIds.length })}</p>
@@ -329,30 +345,17 @@ export function StudyMap({
             )}
         </section>
 
-        {settled && (
+        {settled && science === null && (
           <section className="map-node">
             <p className="map-node-label">{t('map.verdictLabel')}</p>
-            {top !== undefined ? (
-              <div className="map-verdict">
-                <p className="v-statement">{top.statement}</p>
-                <p className="v-line">{t('map.uncertainty', { text: (top.uncertainties ?? [])[0] ?? t('map.uncertaintyNone') })}</p>
-                {counterClaims.length > 0
-                  ? <p className="v-line">{t('map.openCounters', { n: counterClaims.length })}</p>
-                  : <p className="v-line">{t('map.noCountersFound')}</p>}
+            <div className="map-verdict map-verdict--empty">
+              <p className="v-line">{t('map.noActiveHyps')}</p>
+              {run.status === 'partial' && (
                 <p className="v-line">
-                  {t('map.nextSteps')} · <a href={`#run/${run.id}/plan`}>{t('map.linkPlan')}</a> · <a href={`#run/${run.id}/hypotheses`}>{t('map.linkCompare')}</a> · <a href={`#run/${run.id}/revisions`}>{t('map.linkFeedback')}</a> · <a href={`#run/${run.id}/verify`}>{t('map.linkExport')}</a>
+                  {t('map.partialExportPath')} · <a href={`#run/${run.id}/verify`}>{t('map.verifyPanel')}</a>
                 </p>
-              </div>
-            ) : (
-              <div className="map-verdict map-verdict--empty">
-                <p className="v-line">{t('map.noActiveHyps')}</p>
-                {run.status === 'partial' && (
-                  <p className="v-line">
-                    {t('map.partialExportPath')} · <a href={`#run/${run.id}/verify`}>{t('map.verifyPanel')}</a>
-                  </p>
-                )}
-              </div>
-            )}
+              )}
+            </div>
           </section>
         )}
           </>
@@ -601,3 +604,165 @@ function Inspector({ insp, run, liveClaim, liveHyp, hyps, balances, onClose, onM
     </aside>
   );
 }
+
+/**
+ * CURRENT SCIENTIFIC STATE band (Product Spine M1-M4, 2026-08-28): the answer
+ * to "这个研究现在知道什么" — leading explanation, why it leads, strongest
+ * support/counter, biggest unknown, qualitative confidence, falsifier, next
+ * best research action, and what changed. Kind-aware: template content is
+ * REFUSED the leading slot (honest INSUFFICIENT instead of filler), and a
+ * formal insufficient outcome is a conclusion, never an error state.
+ */
+function StateBand({ run, science, onResume, busy }: {
+  run: ResearchRun;
+  science: ScienceBundle;
+  onResume: () => void;
+  busy: boolean;
+}): JSX.Element {
+  const { t } = useI18n();
+  const s = science.state;
+  const primary = science.nextActions[0] ?? null;
+  const rest = science.nextActions.slice(1, 4);
+  const leaderFalsifier = s.leading !== null
+    ? s.falsifiers.find((f) => f.hypothesisId === s.leading?.hypothesisId) ?? null
+    : null;
+  const unknownText = (() => {
+    const u = s.biggestUnknown;
+    if (u === null) return null;
+    switch (u.kind) {
+      case 'unresolved_counter': return t('map.unknown.unresolvedCounter', { excerpt: u.excerpt });
+      case 'hyp_uncertainty': return t('map.unknown.hypUncertainty', { text: u.text });
+      case 'searched_no_counter': return t('map.unknown.searchedNoCounter', { n: u.queriesAttempted });
+      case 'template_content': return t('map.unknown.templateContent');
+      case 'no_active_hyps': return t('map.unknown.noActiveHyps');
+    }
+  })();
+
+  return (
+    <section className="map-node">
+      <p className="map-node-label">{t('map.stateLabel')}</p>
+
+      {s.kind === 'template' ? (
+        <div className="map-state map-state--template" role="note">
+          <p className="ss-title">{t('map.stateTemplateTitle')}</p>
+          <p className="ss-line">{t('map.stateTemplateBody')}</p>
+          {s.templateEvidence.length > 0 && (
+            <ul className="ss-markers">
+              {s.templateEvidence.map((e) => <li key={e}>{e}</li>)}
+            </ul>
+          )}
+        </div>
+      ) : s.kind === 'insufficient' ? (
+        <div className="map-state map-state--insufficient" role="note">
+          <p className="ss-title">{t('map.stateInsufficientTitle')}</p>
+          <p className="ss-line">{t('map.stateShape', {
+            claims: s.evidenceShape.claims, verified: s.evidenceShape.verified,
+            support: s.evidenceShape.supportingRelations, counter: s.evidenceShape.counterRelations,
+          })}</p>
+        </div>
+      ) : (
+        <div className="map-state">
+          {s.leading !== null && <p className="ss-leader">{s.leading.statement}</p>}
+          <div className="ss-grid">
+            <div className="ss-cell">
+              <p className="ss-k">{t('map.stateWhy')}</p>
+              {s.leading !== null && s.leading.whyItLeads.length > 0
+                ? s.leading.whyItLeads.map((d) => (
+                  <p key={`${d.dimension}-${d.rationale}`} className="ss-why">
+                    <span className={`ss-dim ss-dim--${d.qualitative ?? 'n'}`}>{d.dimension}{d.qualitative !== null ? ` · ${t(`map.qual.${d.qualitative}` as DictKey)}` : ''}</span>
+                    <span className="ss-why-text">{d.rationale}</span>
+                  </p>
+                ))
+                : <p className="ss-why">{t('map.stateWhyEmpty')}</p>}
+            </div>
+            <div className="ss-cell">
+              <p className="ss-k">{t('map.stateSupport')}</p>
+              {s.strongestSupport !== null
+                ? <p className="ss-evidence"><span className="ss-excerpt">{s.strongestSupport.text}</span>{s.strongestSupport.gradeCertainty !== null && <span className="ss-grade">{`GRADE ${s.strongestSupport.gradeCertainty}`}</span>}</p>
+                : <p className="ss-evidence ss-evidence--none">—</p>}
+            </div>
+            <div className="ss-cell">
+              <p className="ss-k">{t('map.stateCounter')}</p>
+              {s.strongestCounter !== null
+                ? <p className="ss-evidence is-counter"><span className="ss-excerpt">{s.strongestCounter.text}</span></p>
+                : s.counters.searchedAndFoundNone !== null
+                  ? <p className="ss-evidence">{t('map.stateCounterSearchedNone', { n: s.counters.searchedAndFoundNone.queriesAttempted })}</p>
+                  : <p className="ss-evidence">{t('map.stateCounterNone')}</p>}
+            </div>
+            <div className="ss-cell">
+              <p className="ss-k">{t('map.stateUnknown')}</p>
+              {unknownText !== null && <p className="ss-evidence">{unknownText}</p>}
+            </div>
+          </div>
+          <p className="ss-line">{t('map.stateConfidence', { level: t(`map.qual.${s.confidence.qualitative}` as DictKey) })}</p>
+          {leaderFalsifier !== null && <p className="ss-line">{t('map.stateFalsifier', { text: leaderFalsifier.condition })}</p>}
+          {s.competing.length > 0 && (
+            <p className="ss-line">
+              {s.competing.map((c) => (
+                <span key={c.hypothesisId} className="ss-competing">{c.differsBy ?? c.statement}</span>
+              ))}
+            </p>
+          )}
+        </div>
+      )}
+
+      {primary !== null && (
+        <div className="map-action">
+          <p className="ma-title">{t('map.actionLabel')}{primary.researcherDecisionRequired && <span className="ma-decision">{t('map.actionDecisionRequired')}</span>}</p>
+          <p className="ma-objective">{primary.objective}</p>
+          <div className="ma-grid">
+            <p className="ma-line"><span className="ss-k">{t('map.actionGap')}</span>{primary.knowledgeGap}</p>
+            <p className="ma-line"><span className="ss-k">{t('map.actionWhyNow')}</span>{primary.rationale}</p>
+            <p className="ma-line"><span className="ss-k">{t('map.actionWouldChange')}</span>{primary.wouldChange}</p>
+          </div>
+          <p className="ma-meta">
+            {`${t('map.actionDiscrimination')} ${t(`map.qual.${primary.expectedDiscrimination}` as DictKey)} · ${t('map.actionFeasibility')} ${t(`map.qual.${primary.feasibility}` as DictKey)} · ${t('map.actionCost')} ${t(`map.qual.${primary.costClass}` as DictKey)}`}
+          </p>
+          {primary.actionable && primary.actionHint.kind === 'resume' && (
+            <button type="button" className="mb-act mb-act--primary" disabled={busy} onClick={onResume}>{t('map.actionRun')}</button>
+          )}
+          {primary.actionable && primary.actionHint.kind === 'rerun-live' && (
+            <a className="mb-act mb-act--primary" href={`#lab/new?q=${encodeURIComponent(run.questionText ?? '')}`}>{t('map.actionRerun')}</a>
+          )}
+          {rest.length > 0 && (
+            <details className="ma-rest">
+              <summary>{t('map.actionAlso')}（{rest.length}）</summary>
+              <ul>
+                {rest.map((a) => <li key={a.id}><span className="ma-rest-type">{a.actionType}</span>{a.objective}</li>)}
+              </ul>
+            </details>
+          )}
+        </div>
+      )}
+
+      {science.deltas.length > 0 && (
+        <div className="map-delta">
+          <p className="map-node-label">{t('map.deltaLabel')}</p>
+          {science.deltas.slice(0, 2).map((d) => (
+            <div key={d.id} className="md-item">
+              <p className="md-head">
+                <span className="md-versions">{`${d.fromVersionLabel} → ${d.toVersionLabel}`}</span>
+                <span className={`md-impact md-impact--${d.rankingImpact}`}>{t(`map.deltaImpact.${d.rankingImpact}` as DictKey)}</span>
+                <span className={`md-quality md-quality--${d.qualityDelta.status}`}>{t(`map.deltaQuality.${d.qualityDelta.status}` as DictKey)}</span>
+              </p>
+              <p className="md-line">{t('map.deltaTrigger', { source: d.trigger.feedbackSource })}：{d.trigger.excerpt}</p>
+              {d.whatChanged.slice(0, 3).map((op, i) => (
+                <p key={`${op.objectId}-${i}`} className="md-op">
+                  <span className="md-op-kind">{`${op.objectType} · ${op.operation}`}</span>
+                  {op.before !== null && op.after !== null ? `${op.before} → ${op.after}` : op.reason}
+                </p>
+              ))}
+              <p className="md-line"><span className="ss-k">{t('map.deltaWhy')}</span>{d.explanation}</p>
+            </div>
+          ))}
+          {science.deltas.length > 2 && <p className="md-more">+{science.deltas.length - 2}</p>}
+        </div>
+      )}
+
+      <p className="ss-links">
+        {t('map.nextSteps')} · <a href={`#run/${run.id}/plan`}>{t('map.linkPlan')}</a> · <a href={`#run/${run.id}/hypotheses`}>{t('map.linkCompare')}</a> · <a href={`#run/${run.id}/revisions`}>{t('map.linkFeedback')}</a> · <a href={`#run/${run.id}/verify`}>{t('map.linkExport')}</a>
+      </p>
+    </section>
+  );
+}
+     

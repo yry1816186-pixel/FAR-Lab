@@ -14,7 +14,7 @@
  */
 import { api, ApiError } from './client';
 import {
-  normalizeEvidence, normalizeEvents, normalizeHypotheses, normalizePlan, normalizeQuestion,
+  normalizeEvidence, normalizeEvents, normalizeHypotheses, normalizePlan, normalizeQuestion, normalizeScience,
   normalizeReceipts, normalizeRevisions, normalizeRun, normalizeRunSummaries, normalizeSearch, normalizeSources,
 } from './normalize';
 import type { Automation, BuiltinRouteSummary, ProviderTemplate as ProviderTemplateInfo, BuiltinRouteUpdateInput, BuiltinRoutesResponse, BundleSummary, Conversation, CorpusSnapshotInfo, FeedbackSourceKind, HealthReport, ModelConfigsResponse, ModelConfigInput, ModelConfigSummary, ModelConfigTestInput, ModelConfigTestResult, ResearchActionResponse, ResearchRun, RunEvent, RunSummary, ScientificGoalType, ScreeningDecisionResult, ScreeningStopResult, ScreeningView, SearchResponse, ToolIntegrationView, ToolTestRecord, UsageAggregate, VerificationReport, ZoteroAnnotation, ZoteroAnnotationsResponse, ZoteroLibItem, ZoteroLibraryResponse } from './types';
@@ -134,6 +134,10 @@ export const getHypotheses = async (runId: string, signal?: AbortSignal) =>
 
 export const getRevisions = async (runId: string, signal?: AbortSignal) =>
   normalizeRevisions(await api.getJson(`${BASE}/runs/${encodeURIComponent(runId)}/revisions`, signal));
+
+/** Product Spine (2026-08-28): current scientific state + next actions + deltas. */
+export const getScience = async (runId: string, signal?: AbortSignal) =>
+  normalizeScience(await api.getJson(`${BASE}/runs/${encodeURIComponent(runId)}/science`, signal));
 
 export const getReceipts = async (runId: string, signal?: AbortSignal) =>
   normalizeReceipts(await api.getJson(`${BASE}/runs/${encodeURIComponent(runId)}/receipts`, signal));
