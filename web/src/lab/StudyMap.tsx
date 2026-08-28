@@ -95,6 +95,8 @@ export function StudyMap({
   const [sources, setSources] = useState<SourceDocument[]>([]);
   const [hyps, setHyps] = useState<HypothesisCandidate[]>([]);
   const [ranks, setRanks] = useState<Map<string, number>>(new Map());
+  /** #1's basis, from its scorecard — the map must answer "why is #1 #1" without a deep dive. */
+  const [leaderWhy, setLeaderWhy] = useState<string | null>(null);
   const [adjusted, setAdjusted] = useState<AchResearcherAdjusted | null>(null);
   const [science, setScience] = useState<ScienceBundle | null>(null);
   const [insp, setInsp] = useState<Insp | null>(null);
@@ -120,6 +122,8 @@ export function StudyMap({
       .then((h) => {
         setHyps(h.hypotheses);
         setRanks(new Map(h.scorecards.map((s) => [s.hypothesisId, s.rank] as const)));
+        const top = h.scorecards.find((s) => s.rank === 1) ?? null;
+        setLeaderWhy(top !== null && top.overallRationale.trim().length > 0 ? top.overallRationale : null);
         setAdjusted(h.achResearcherAdjusted);
       })
       .catch(() => { setHyps([]); setRanks(new Map()); setAdjusted(null); });
@@ -494,6 +498,9 @@ export function StudyMap({
                     >
                       <span className="map-hyp-rank">#{rank ?? '—'}{rank === 1 && t('map.topMark')}</span>
                       <span className="map-hyp-statement">{zhFirst(h.statement, h.statementZh, lang)}</span>
+                      {rank === 1 && leaderWhy !== null && (
+                        <span className="map-hyp-why" title={leaderWhy}>{t('map.hypWhy', { text: leaderWhy.length > 110 ? `${leaderWhy.slice(0, 110)}…` : leaderWhy })}</span>
+                      )}
                       <span className="map-hyp-stats"><span>✓ {sup}</span><span>✗ {ctr}</span></span>
                     </button>
                   );
