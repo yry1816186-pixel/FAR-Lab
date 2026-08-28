@@ -122,4 +122,24 @@ describe('Orchestrator providerFor seam', () => {
     store.deleteMeta('activeModelConfigId');
     store.deleteObject('model_config', cfg.id);
   });
+
+  it('competition route mode refuses a pinned non-Qwen route (no side door around the gate)', async () => {
+    store.setMeta('competition_route_mode', 'on');
+    try {
+      const q = ResearchQuestion.parse({
+        id: newId('q'), text: 'pinned non-compliant route?', background: '', goalType: 'exploratory',
+        scope: { domain: 'test', phenomena: ['x'] }, constraints: {}, createdAt: new Date().toISOString(),
+      });
+      const run = store.createRun(q, { routeOverride: 'zai' });
+      const p = resolveRunProvider(store, run);
+      expect(p?.name).toBe('competition-route-gate');
+      const res = await p!.structuredCall(
+        { task: 'probe', systemPrompt: '', userPayload: {}, outputKind: 'json', purpose: 'test' },
+        () => ({ ok: true }),
+      );
+      expect(res.ok).toBe(false); // fail-closed refusal, never a silently non-compliant route
+    } finally {
+      store.deleteMeta('competition_route_mode');
+    }
+  });
 });

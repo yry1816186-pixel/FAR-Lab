@@ -138,14 +138,22 @@ type ModelProviderConfigChain =
   | { kind: 'missing'; configId: string };
 
 export const resolveRunProvider = (store: Store, run: ResearchRun): ModelProvider | null => {
+  const competition = readCompetitionRouteMode(store);
   // Run-scoped built-in route (CLI --route): pinned at creation so a resume in a
   // NEW process keeps the run on its route instead of falling to the workspace
   // default (live-observed: zai run resumed into a dead deepseek default, 402).
+  // The competition gate applies HERE too — a pinned route must not be a side door
+  // around Qwen-via-Bailian enforcement (only dashscope is compliant among the
+  // built-in routes: Qwen-family models on a *.aliyuncs.com endpoint).
   if (run.routeOverride !== undefined) {
+    if (competition && run.routeOverride !== 'dashscope') {
+      return competitionRefusalProvider(
+        `run-pinned route "${run.routeOverride}" is not the official competition route while competition route mode is ON — only dashscope (Qwen via Bailian) may serve production runs`,
+      );
+    }
     return builtinRouteProvider(run.routeOverride);
   }
   const configId = run.providerConfigId ?? store.getMeta(ACTIVE_MODEL_CONFIG_META_KEY);
-  const competition = readCompetitionRouteMode(store);
   if (configId === null) {
     // Competition mode must not leak into the caller's env-chain default (zai — a
     // non-Bailian route): a fail-closed refusal beats a silently non-compliant default.
