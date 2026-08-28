@@ -275,6 +275,21 @@ export const resumeRun = async (runId: string, signal?: AbortSignal): Promise<vo
   await api.post(`${BASE}/runs/${encodeURIComponent(runId)}/resume`, {}, signal);
 };
 
+/**
+ * Product Spine action dispatch (2026-08-28): map a NextResearchAction with a real
+ * orchestrator affordance onto a targeted stage reopen + immediate execution.
+ * Server validates the action's precondition again (plan executable / unconsumed
+ * feedback / evidence debt) — a 400 names the unsatisfied condition.
+ */
+export const DISPATCHABLE_ACTIONS = [
+  'EXECUTE_PLANNED_EXPERIMENT', 'CONSUME_FEEDBACK_INTO_REVISION', 'RESUME_EVIDENCE_DEBT',
+] as const;
+export type DispatchableAction = (typeof DISPATCHABLE_ACTIONS)[number];
+
+export const dispatchAction = async (runId: string, actionType: DispatchableAction, signal?: AbortSignal): Promise<void> => {
+  await api.post(`${BASE}/runs/${encodeURIComponent(runId)}/dispatch`, { actionType }, signal);
+};
+
 // ---- HX §8.2 pre-launch journey (server: draft + scope-proposal + PATCH question) ----
 
 /** Receipt-backed scope refinement returned for a parked draft (run paused, scope done). */

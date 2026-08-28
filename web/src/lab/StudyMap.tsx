@@ -4,9 +4,10 @@ import { ErrorBox } from '../components/common';
 import { useI18n } from '../i18n/LanguageContext';
 import type { DictKey } from '../i18n/dict';
 import {
-  cancelRun, editHypothesis, forkHypothesis, getEvidence, getHypotheses,
+  cancelRun, dispatchAction, editHypothesis, forkHypothesis, getEvidence, getHypotheses,
   getQuestion, getScience, promoteHypothesis, rejectHypothesis, resumeRun,
 } from '../api/endpoints';
+import { DISPATCHABLE_ACTIONS, type DispatchableAction } from '../api/endpoints';
 import type {
   AchResearcherAdjusted, EvidenceRelation, HypothesisCandidate, ResearchQuestion, ResearchRun, RunEvent, ScienceBundle, ScientificClaim,
 } from '../api/types';
@@ -169,6 +170,22 @@ export function StudyMap({
     }
   };
 
+  // Spine action dispatch: a REAL affordance per action type — the server re-validates
+  // the precondition and a 400 names the unsatisfied condition (shown, not swallowed).
+  const [dispatchError, setDispatchError] = useState<string | null>(null);
+  const dispatch = async (actionType: DispatchableAction): Promise<void> => {
+    setLifecycleBusy(true);
+    setDispatchError(null);
+    try {
+      await dispatchAction(run.id, actionType);
+      onMutated();
+    } catch (e) {
+      setDispatchError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLifecycleBusy(false);
+    }
+  };
+
   const elapsedMin = Math.max(0, Math.round((Date.now() - Date.parse(run.createdAt)) / 60_000));
 
   return (
@@ -260,6 +277,8 @@ export function StudyMap({
             run={run}
             science={science}
             onResume={() => { void lifecycle('resume'); }}
+            onDispatch={(a) => { void dispatch(a); }}
+            dispatchError={dispatchError}
             busy={lifecycleBusy}
           />
         )}
@@ -613,10 +632,12 @@ function Inspector({ insp, run, liveClaim, liveHyp, hyps, balances, onClose, onM
  * REFUSED the leading slot (honest INSUFFICIENT instead of filler), and a
  * formal insufficient outcome is a conclusion, never an error state.
  */
-function StateBand({ run, science, onResume, busy }: {
+function StateBand({ run, science, onResume, onDispatch, dispatchError, busy }: {
   run: ResearchRun;
   science: ScienceBundle;
   onResume: () => void;
+  onDispatch: (actionType: DispatchableAction) => void;
+  dispatchError: string | null;
   busy: boolean;
 }): JSX.Element {
   const { t } = useI18n();
@@ -735,11 +756,30 @@ function StateBand({ run, science, onResume, busy }: {
             {`${t('map.actionDiscrimination')} ${t(`map.qual.${primary.expectedDiscrimination}` as DictKey)} · ${t('map.actionFeasibility')} ${t(`map.qual.${primary.feasibility}` as DictKey)} · ${t('map.actionCost')} ${t(`map.qual.${primary.costClass}` as DictKey)}`}
           </p>
           {primary.actionable && primary.actionHint.kind === 'resume' && (
-            <button type="button" className="mb-act mb-act--primary" disabled={busy} onClick={onResume}>{t('map.actionRun')}</button>
+            DISPATCHABLE_ACTIONS.includes(primary.actionType as DispatchableAction) ? (
+              <button
+                type="button"
+                className="mb-act mb-act--primary"
+                disabled={busy}
+                onClick={() => onDispatch(primary.actionType as DispatchableAction)}
+              >
+                {t(`map.actionBtn.${primary.actionType}` as DictKey)}
+              </button>
+            ) : (
+              <button type="button" className="mb-act mb-act--primary" disabled={busy} onClick={onResume}>{t('map.actionRun')}</button>
+            )
           )}
           {primary.actionable && primary.actionHint.kind === 'rerun-live' && (
             <a className="mb-act mb-act--primary" href={`#lab/new?q=${encodeURIComponent(run.questionText ?? '')}`}>{t('map.actionRerun')}</a>
           )}
+          {dispatchError !== null && (
+            <p className="ma-error" role="alert">{dispatchError}</p>
+          )}
+          <p className="ma-leg">
+            {t('map.legLabel')}：{t(`map.leg.${science.experimentLeg.kind}` as DictKey)}
+            {science.experimentLeg.executabilityPassed && ` · ${t('map.legExecutable')}`}
+            {science.unconsumedFeedbackCount > 0 && ` · ${t('map.legFeedback', { n: science.unconsumedFeedbackCount })}`}
+          </p>
           {rest.length > 0 && (
             <details className="ma-rest">
               <summary>{t('map.actionAlso')}（{rest.length}）</summary>

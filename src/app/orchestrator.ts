@@ -613,6 +613,49 @@ export class Orchestrator {
     const ok = this.deps.store.requestCancel(runId);
     if (!ok) return false;
     this.deps.store.appendEvent(runId, { type: 'run_cancelled', detail: { via: 'persisted-request' } });
-    return true;
+    return ok;
+  }
+
+  /**
+   * Product Spine action dispatch (2026-08-28): researcher-directed stage reopen.
+   * Generalizes the three internal reopen helpers (feedback / evidence-debt /
+   * budget-skip) into ONE audited primitive the /runs/:id/actions endpoint maps
+   * NextResearchActions onto. Lease-held and evented like every transition;
+   * `attempt` counts are NEVER reset (provenance facts); status -> 'running' so
+   * a subsequent execute() walks the reopened stages. The caller owns launching
+   * execution (single execution per run stays an API-layer invariant).
+   */
+  async reopenStages(runId: string, stages: readonly RunStageName[], reason: string): Promise<ResearchRun> {
+    const run = this.deps.store.getRun(runId);
+    if (!run) throw new Error(`run not found: ${runId}`);
+    if (run.status === 'running') {
+      throw new Error(`run ${runId} is already running — reopen is for settled runs`);
+    }
+    const holder = leaseHolderId();
+    const leaseUntil = new Date(Date.now() + LEASE_TTL_MS).toISOString();
+    if (!this.deps.store.acquireLease(runId, holder, leaseUntil)) {
+      throw new RunLeaseHeldError(runId, this.deps.store.getRunLease(runId)?.holder ?? 'unknown');
+    }
+    try {
+      const next = await this.transition(runId, (r) => {
+        for (const stage of stages) {
+          const rec = r.stages.find((x) => x.stage === stage);
+          if (rec && (rec.state === 'done' || rec.state === 'skipped' || rec.state === 'failed')) {
+            rec.state = 'pending';
+            delete rec.endedAt;
+            delete rec.error;
+          }
+        }
+        r.status = 'running';
+        return r;
+      }, holder);
+      this.deps.store.appendEvent(runId, {
+        type: 'run_resumed', status: 'running',
+        detail: { reopened: 'action_dispatch', reason, stages: [...stages] },
+      });
+      return next;
+    } finally {
+      this.deps.store.releaseLease(runId, holder);
+    }
   }
 }

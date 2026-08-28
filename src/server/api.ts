@@ -778,6 +778,61 @@ function parseSeedSources(raw: unknown): string | {
   };
 
   /**
+   * Product Spine action dispatch (2026-08-28): POST /runs/:id/dispatch maps a
+   * NextResearchAction onto a REAL orchestrator operation — targeted stage
+   * reopen + immediate execution. Only actions with genuine machinery are
+   * dispatchable (loop-unblocking legs); science actions with no automated
+   * affordance are REJECTED honestly (422) — never a fake resume button.
+   */
+  const dispatchAction = async (req: http.IncomingMessage, res: http.ServerResponse, runId: string): Promise<void> => {
+    const run = mustGetRun(runId);
+    if (executing.has(runId)) throw alreadyRunning(runId);
+    const body = await readJsonObject(req);
+    const actionType = typeof body['actionType'] === 'string' ? body['actionType'] : '';
+    const DISPATCHABLE = new Set([
+      'EXECUTE_PLANNED_EXPERIMENT', 'CONSUME_FEEDBACK_INTO_REVISION', 'RESUME_EVIDENCE_DEBT',
+    ]);
+    if (!DISPATCHABLE.has(actionType)) {
+      throw validation(
+        `actionType '${actionType}' has no automated dispatch path — ` +
+          'loop-unblocking actions only (EXECUTE_PLANNED_EXPERIMENT / CONSUME_FEEDBACK_INTO_REVISION / RESUME_EVIDENCE_DEBT); ' +
+          'RERUN_WITH_LIVE_ROUTE goes through POST /runs with the same question',
+      );
+    }
+    if (run.status === 'running') throw alreadyRunning(runId);
+
+    if (actionType === 'EXECUTE_PLANNED_EXPERIMENT') {
+      const plan = app.store.listObjects('plan', runId).at(-1) ?? null;
+      const hypothesisIds = new Set(app.store.listObjects('hypothesis', runId).map((h) => h.id));
+      const executabilityPassed = plan !== null && checkPlanExecutability(plan, hypothesisIds).passed;
+      const leg = experimentLegStatus(app.store, runId);
+      if (!(leg.kind === 'unexecuted' || leg.kind === 'plan_revised_since_experiment') || !executabilityPassed) {
+        throw validation(
+          `cannot dispatch EXECUTE_PLANNED_EXPERIMENT: leg=${leg.kind}, executabilityPassed=${executabilityPassed} — the plan must be executable and unexecuted (or revised since the last experiment)`,
+        );
+      }
+      await app.orchestrator.reopenStages(runId, ['execute', 'feedback', 'revise', 'export'], `action:${actionType}`);
+    } else if (actionType === 'CONSUME_FEEDBACK_INTO_REVISION') {
+      const revisions = app.store.listObjects('revision', runId);
+      const consumed = new Set(revisions.map((r) => r.triggerFeedbackId));
+      const unconsumed = app.store.listObjects('feedback', runId).filter((s) => !consumed.has(s.id)).length;
+      if (unconsumed === 0) throw validation('cannot dispatch CONSUME_FEEDBACK_INTO_REVISION: no unconsumed feedback signals');
+      await app.orchestrator.reopenStages(runId, ['feedback', 'revise', 'export'], `action:${actionType}`);
+    } else {
+      const hasDebt = app.store.listObjects('source_document', runId).some((d) => d.verification === undefined);
+      if (!hasDebt) throw validation('cannot dispatch RESUME_EVIDENCE_DEBT: every source document is already verified');
+      await app.orchestrator.reopenStages(runId, ['verify_sources', 'build_evidence', 'export'], `action:${actionType}`);
+    }
+
+    if (!startRun(runId)) {
+      // Lost the single-execution slot between the check above and now — the reopen
+      // already happened, so resume semantics still own the continuation. Truthful 409.
+      throw alreadyRunning(runId);
+    }
+    sendJson(res, 202, { runId, actionType, dispatched: true });
+  };
+
+  /**
    * Retrieval transparency (D-060 phase-1): the executed query plan with purposes
    * (incl. the two structurally-guaranteed counter-evidence queries), per-family
    * failures and fusion stats — the retrieve stage stops being a black box.
@@ -2237,6 +2292,7 @@ function parseSeedSources(raw: unknown): string | {
         if (leaf === 'bundles' && method === 'GET') return runBundles(res, runId);
         if (leaf === 'corpus' && method === 'GET') return runCorpus(res, runId);
         if (leaf === 'science' && method === 'GET') return runScience(res, runId);
+        if (leaf === 'dispatch' && method === 'POST') return dispatchAction(req, res, runId);
         if (leaf === 'cancel' && method === 'POST') return cancelRun(res, runId);
         if (leaf === 'resume' && method === 'POST') return resumeRun(res, runId);
         if (leaf === 'feedback' && method === 'POST') return receiveFeedback(req, res, runId);

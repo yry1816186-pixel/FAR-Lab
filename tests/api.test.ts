@@ -226,8 +226,28 @@ const seedCompletedRun = async (): Promise<void> => {
         failureConditions: ['low transfection efficiency'],
         dependsOn: [],
       },
+      {
+        id: newId('task'),
+        title: 'quantify off-target burden',
+        kind: 'data_analysis',
+        inputs: ['sequencing data'],
+        outputs: ['off-target counts'],
+        method: 'align and count off-target loci per timepoint',
+        failureConditions: ['mapping quality collapse'],
+        dependsOn: [],
+      },
+      {
+        id: newId('task'),
+        title: 'compare duration arms',
+        kind: 'data_analysis',
+        inputs: ['off-target counts'],
+        outputs: ['duration effect estimate'],
+        method: 'paired comparison across duration arms',
+        failureConditions: ['insufficient power'],
+        dependsOn: [],
+      },
     ],
-    metrics: ['off-target/on-target ratio'],
+    metrics: ['off-target/on-target ratio', 'off-target loci per cell'],
     statistics: [],
     decisionRules: {
       successCriterion: '>=2x off-target increase',
@@ -1004,6 +1024,79 @@ describe('POST cancel and resume', () => {
     } finally {
       blockNext = false;
     }
+  });
+});
+
+// ---- Product Spine action dispatch (2026-08-28) --------------------------------
+
+describe('POST /api/v1/runs/:id/dispatch', () => {
+  it('rejects non-dispatchable action types honestly (422, no fake affordance)', async () => {
+    const { status, body } = await postJson(`${base}/api/v1/runs/${run1}/dispatch`, { actionType: 'COUNTER_EVIDENCE_SEARCH' });
+    expect(status).toBe(400);
+    expect(body.error.message).toContain('no automated dispatch path');
+  });
+
+  it('rejects CONSUME_FEEDBACK_INTO_REVISION when no unconsumed feedback exists', async () => {
+    const { status, body } = await postJson(`${base}/api/v1/runs/${run1}/dispatch`, { actionType: 'CONSUME_FEEDBACK_INTO_REVISION' });
+    expect(status).toBe(400);
+    expect(body.error.message).toContain('no unconsumed feedback');
+  });
+
+  it('dispatches CONSUME_FEEDBACK_INTO_REVISION after feedback arrives: reopens the feedback leg and executes', async () => {
+    const fb = await postJson(`${base}/api/v1/runs/${run1}/feedback`, { source: 'human_expert', content: 'weigh the dose-response heterogeneity more carefully' });
+    expect(fb.status).toBe(201);
+
+    const before = executorCalls.length;
+    const { status, body } = await postJson(`${base}/api/v1/runs/${run1}/dispatch`, { actionType: 'CONSUME_FEEDBACK_INTO_REVISION' });
+    expect(status).toBe(202);
+    expect(body).toMatchObject({ runId: run1, actionType: 'CONSUME_FEEDBACK_INTO_REVISION', dispatched: true });
+    await waitUntil(() => app.store.getRun(run1)?.status === 'completed' && executorCalls.length > before);
+    expect(executorCalls).toContain(run1);
+
+    // The reopen is audited: run_resumed event names the dispatch reason and stages.
+    const events = (await getJson(`${base}/api/v1/runs/${run1}/events`)).body.events;
+    const resumed = events.filter((e: { type: string }) => e.type === 'run_resumed').at(-1);
+    expect(resumed.detail).toMatchObject({ reopened: 'action_dispatch', reason: 'action:CONSUME_FEEDBACK_INTO_REVISION' });
+    expect(resumed.detail.stages).toEqual(['feedback', 'revise', 'export']);
+  });
+
+  it('dispatches EXECUTE_PLANNED_EXPERIMENT when the plan is executable and unexecuted', async () => {
+    const before = executorCalls.length;
+    const { status, body } = await postJson(`${base}/api/v1/runs/${run1}/dispatch`, { actionType: 'EXECUTE_PLANNED_EXPERIMENT' });
+    expect(status).toBe(202);
+    expect(body.dispatched).toBe(true);
+    await waitUntil(() => executorCalls.length > before && app.store.getRun(run1)?.status === 'completed');
+    const events = (await getJson(`${base}/api/v1/runs/${run1}/events`)).body.events;
+    const resumed = events.filter((e: { type: string }) => e.type === 'run_resumed').at(-1);
+    expect(resumed.detail.stages).toEqual(['execute', 'feedback', 'revise', 'export']);
+  });
+
+  it('rejects RESUME_EVIDENCE_DEBT when every source is verified; dispatches when debt exists', async () => {
+    const noDebt = await postJson(`${base}/api/v1/runs/${run1}/dispatch`, { actionType: 'RESUME_EVIDENCE_DEBT' });
+    expect(noDebt.status).toBe(400);
+    expect(noDebt.body.error.message).toContain('already verified');
+
+    // Seed an unverified source on run3 (partial run): evidence debt now real.
+    const unverified = SourceDocument.parse({
+      id: newId('src'), runId: run3, family: 'openalex',
+      identifiers: [{ kind: 'doi', value: '10.1000/late-arrival' }],
+      title: 'Late-arriving counter search hit', publicationYear: 2025, authors: ['B. Late'],
+      contentDepth: 'abstract', accessState: 'open', contentHash: 'b'.repeat(64),
+      retrievedAt: ts(30), parseStatus: 'ok',
+    });
+    app.store.putObject('source_document', unverified);
+    const before = executorCalls.length;
+    const { status } = await postJson(`${base}/api/v1/runs/${run3}/dispatch`, { actionType: 'RESUME_EVIDENCE_DEBT' });
+    expect(status).toBe(202);
+    await waitUntil(() => executorCalls.length > before && app.store.getRun(run3)?.status === 'completed');
+    const events = (await getJson(`${base}/api/v1/runs/${run3}/events`)).body.events;
+    const resumed = events.filter((e: { type: string }) => e.type === 'run_resumed').at(-1);
+    expect(resumed.detail.stages).toEqual(['verify_sources', 'build_evidence', 'export']);
+  });
+
+  it('404s for unknown runs', async () => {
+    const ghost = await postJson(`${base}/api/v1/runs/run_${'0'.repeat(26)}/dispatch`, { actionType: 'CONSUME_FEEDBACK_INTO_REVISION' });
+    expect(ghost.status).toBe(404);
   });
 });
 
