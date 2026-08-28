@@ -117,7 +117,17 @@ for (const r of runs) {
   const res = await judgeRediscovery({
     agentText: text,
     gtClaims: t.gtClaims,
-    call: (req, validate) => provider.structuredCall(req, validate),
+    // Judge configuration restored to its CALIBRATED shape (2026-08-29 drift fix):
+    // the 0.58-era measurement ran before the product transport disabled default
+    // thinking; the new default changed judge decomposition granularity (F1 0.58→0.03
+    // on IDENTICAL frozen artifacts) and thinking-enabled votes then failed on their
+    // small budgets. This wrapper re-enables thinking via the sanctioned reasoning
+    // route at the 'low' gear and raises every judge call's ceiling so thinking fits
+    // alongside the answer — instrument restoration, not metric tuning.
+    call: (req, validate) => provider.structuredCall(
+      { ...req, reasoning: { style: 'thinking_budget', gear: 'low' }, maxTokens: Math.max(req.maxTokens ?? 0, 16_000) },
+      validate,
+    ),
   });
   if (!res.ok) {
     records.push({ task: r.task, runId: r.runId, error: `${res.error.stage}: ${res.error.message}`.slice(0, 300) });

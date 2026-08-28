@@ -6,8 +6,8 @@
       "id": "rediscovery-mean-f1",
       "what": "Rediscovery eval mean F1 vs established findings (5-task authored seed, hypothesis-level)",
       "current": {
-        "value": 0.03,
-        "detail": "RE-MEASURED 2026-08-29 on the SAME agent artifacts and GT as the 0.58 record: mean F1 0.03 (crc-ici 0.578->0.160, arg-plasmid 0 in both eras). Cause is JUDGE-STACK DRIFT, not product drift: identical run/GT inputs; the judge wire behavior changed (anthropic-wire now disables thinking by default after the D-082 transport fix — with thinking ON all 3 adjudication votes fail (thinking eats the vote budget), with thinking OFF votes succeed but decomposition granularity/matching quality collapses). Remediation = W9-documented judge hardening (votes 3->5, anchored adjudication prompt, claim-count stabilization) re-run under the new wire; NOT a product regression.",
+        "value": 0.05,
+        "detail": "RE-MEASURED 2026-08-29 on the SAME frozen artifacts/GT, BOTH judge wire configs: thinking-off mean F1 0.03 (eval/results/rediscovery-nothink-20260829.jsonl), thinking-restored via reasoning route 0.05 (eval/results/rediscovery.jsonl) — the 2026-08-22 0.58 is NOT recoverable by wire config; the served model behind the glm-5.3 name changed decomposition behavior. Remediation = full judge recalibration on the current stack (fresh gold pass over claim-pair-gold + decomposition re-anchor); artifacts stay frozen for apples-to-apples. Judge artifact confirmed, product regression ruled out (agent texts unchanged).",
         "at": "2026-08-29",
         "evidence": "eval/results/rediscovery.jsonl (2026-08-29) vs rediscovery-v2-pass1.jsonl; live probe: crc with reasoning-route thinking -> {stage:adjudicate, all votes failed}",
         "note": "target 0.7 unchanged; judge hardening is the lever, agent artifacts are frozen and unchanged"
