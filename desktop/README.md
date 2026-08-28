@@ -28,8 +28,9 @@ API server 的 loopback 安全守卫（api.ts F-1）天然只放行本机访问�
 
 ## 已知边界（不掩盖）
 
-- **安装包/图标/签名未做**：`bundle.active=false`（tauri.conf.json）——`--no-bundle` 只产出裸
-  可执行文件；安装包需 icon 资产与 Windows 代码签名预算，列为后续项。
+- **安装包配置已就绪、签名未做**：`bundle.active=true`（targets=all，icons/ 已入库）——`npx tauri build`
+  可产出未签名安装包；Windows 代码签名预算仍列为后续项（审计更正 2026-08-29：此前此处写的
+  `bundle.active=false` 与 tauri.conf.json 不符）。
 - 发布版（非 dev）的仓库根定位依赖编译期 `CARGO_MANIFEST_DIR`，仅在源码树内构建有效；
   随安装包分发的形态需引入 sidecar 打包 Node 运行时（line-b2 方案 B），是发布工程的一部分。
 - Linux 无头环境不适用本壳（无图形界面）——CLI/API/远程 Web 是该场景的完整降级（方案 §14）。

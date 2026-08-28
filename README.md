@@ -18,7 +18,7 @@ Evidence-constrained, falsifiable scientific hypothesis generation and research-
 - **CLI workbench** (`far` binary) — 15+ commands covering the full lifecycle: create runs, inspect objects, resume from checkpoint, export reports/papers/bundles, record feedback, run experiments, verify reproducibility; optional interactive TUI (`packages/tui`, isolated Ink package)
 - **Web workbench** — React SPA with real-time SSE streaming (visible reconnect state), run sidebar, hypothesis tournament table, ACH comparison canvas, research composer with offline dictation (ONNX Runtime Whisper), command palette (`Ctrl+K`), i18n (zh/en), dark/light theme
 - **Human-in-the-loop feedback** — structured feedback signals (expert judgment, new literature, experiment results, reviewer comments) that causally drive the revise stage; direct hypothesis edit enters the same causal revision chain
-- **Tauri desktop shell** — system tray, deep links, hotkey bindings, hardened CSP (optional)
+- **Tauri desktop shell** — system tray, global hotkey, deep links (Windows: far:// scheme; other platforms unregistered), hardened CSP (optional)
 
 ## Requirements
 

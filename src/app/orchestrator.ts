@@ -4,6 +4,7 @@ import type { Store } from '../persistence/store.js';
 import type { StageHandler, StageContext } from '../pipeline/types.js';
 import { STAGE_ORDER } from '../domain/run.js';
 import { canonicalJson } from '../shared/crypto.js';
+import { totalBudgetFromEnv } from '../providers/http.js';
 import type { ArtifactStore, ModelProvider, SourceAdapter } from '../shared/ports.js';
 import type { SourceFamily } from '../domain/source.js';
 import { RunBudgetExhaustedError, makeRunBudget, type RunBudgetView } from './run-budget.js';
@@ -55,6 +56,24 @@ export class RunLeaseLostError extends Error {
 /** Lease TTL: renewed on every persisted write during execute(). Worst legit gap between writes = one callStructured chain under the provider layer's total retry budget (300s, src/providers/http.ts — raised 2026-08-28 from 120s after live receipts measured single zai calls at up to 121s); 660s keeps >2x headroom above that and >10x above the measured inter-signal p99 (57.4s, evidence/W8/signal-gap.json). The invariant TTL > worst inter-write gap is what stops the watchdog adopting (and re-executing, double-charging) a run whose worker is merely inside one long model call. Operational override FARLAB_LEASE_TTL_MS (floor 5s) exists for fault-injection harnesses and tight-sla deployments. */
 export const LEASE_TTL_MS = Math.max(5_000, Number(process.env.FARLAB_LEASE_TTL_MS ?? 660_000) || 660_000);
 
+/**
+ * Belt-and-braces (audit follow-up 2026-08-29): the invariant TTL > worst
+ * inter-write gap is documented above, but env overrides can silently break it
+ * (an operator raising FARLAB_TOTAL_BUDGET_MS without the lease). A warn-once at
+ * first orchestrator construction makes the invariant self-announcing instead of
+ * self-documenting — a warning, not a clamp: fault-injection harnesses legitimately
+ * run tight pairings.
+ */
+export const warnIfLeaseBudgetInvariantBroken = (): void => {
+  if (LEASE_TTL_MS < 2 * totalBudgetFromEnv()) {
+    console.warn(
+      `[far-lab] LEASE_TTL_MS (${LEASE_TTL_MS}ms) < 2x model-call budget (${totalBudgetFromEnv()}ms): a single long ` +
+      'call can expire the lease mid-flight and the watchdog may adopt (and re-execute, double-charging) the run. ' +
+      'Raise FARLAB_LEASE_TTL_MS to >= 2x FARLAB_TOTAL_BUDGET_MS unless this is a fault-injection harness.',
+    );
+  }
+};
+
 /** Stable per-process holder identity (pid + random boot nonce: pid reuse must not merge identities). */
 const BOOT_NONCE = randomBytes(4).toString('hex');
 export const leaseHolderId = (): string => `${process.pid}-${BOOT_NONCE}`;
@@ -68,7 +87,9 @@ export const leaseHolderId = (): string => `${process.pid}-${BOOT_NONCE}`;
  * checkpoints (ctx.checkpointed) make resume subtask-granular (dbos OAOO pattern).
  */
 export class Orchestrator {
-  constructor(private readonly deps: OrchestratorDeps) {}
+  constructor(private readonly deps: OrchestratorDeps) {
+    warnIfLeaseBudgetInvariantBroken();
+  }
 
   private stageRecord(run: ResearchRun, stage: RunStageName) {
     return run.stages.find((s) => s.stage === stage);

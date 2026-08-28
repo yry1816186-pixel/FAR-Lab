@@ -239,6 +239,12 @@ const baselineMetrics = (record) => {
         })
       : { passed: false, missing: ['falsification: absent'] },
   );
+  // Shape note (round-2 review): baseline plans bind ALL their hypotheses while
+  // FAR-Lab's plan stage caps bindings at MAX_REPRESENTATIVE_HYPOTHESES=2 — the
+  // >1-hypothesis multiple-testing branch therefore fires for baselines on a
+  // plan shape FAR-Lab itself never persists. The baseline is prompted toward
+  // the full shape and graded by output-derived values (not constants), so the
+  // dimension measures what the BASELINE declared, on its own natural shape.
   const execCheck = checkPlanExecutability(
     {
       objective: record.output.plan?.objective ?? '',
