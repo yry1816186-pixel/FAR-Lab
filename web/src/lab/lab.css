@@ -705,7 +705,7 @@
 
 /* ---- Study map: embedded evidence–hypothesis structure (B7 landscape on the spine) ---- */
 .map-graph-frame {
-  max-height: min(64vh, 560px);
+  max-height: min(70vh, 640px);
   overflow-y: auto;
   border: 1px solid var(--v2-border);
   border-radius: var(--radius-m);

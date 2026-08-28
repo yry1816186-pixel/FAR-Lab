@@ -300,11 +300,11 @@ export function EvidenceGraph({
           <text x={COL_X.source} y={HEADER_Y} fontSize={11} fontWeight={600} fill="var(--v2-text-1)">{t('graph.colSource')}</text>
           <text x={COL_X.claim} y={HEADER_Y} fontSize={11} fontWeight={600} fill="var(--v2-text-1)">{t('graph.colClaim')}</text>
           <text x={COL_X.hypothesis} y={HEADER_Y} fontSize={11} fontWeight={600} fill="var(--v2-text-1)">{t('graph.colHyp')}</text>
-          {/* Polarity legend swatches — support/counter must be legible at a glance. */}
+          {/* Polarity legend swatches + live counts — support/counter must be legible at a glance. */}
           <line x1={COL_X.claim + 140} y1={HEADER_Y - 4} x2={COL_X.claim + 176} y2={HEADER_Y - 4} stroke="var(--v2-verified)" strokeWidth={2.6} />
-          <text x={COL_X.claim + 182} y={HEADER_Y} fontSize={10} fill="var(--v2-text-1)">{t('graph.legendSupport')}</text>
-          <line x1={COL_X.claim + 230} y1={HEADER_Y - 4} x2={COL_X.claim + 266} y2={HEADER_Y - 4} stroke="var(--v2-refuted)" strokeWidth={2.6} />
-          <text x={COL_X.claim + 272} y={HEADER_Y} fontSize={10} fill="var(--v2-text-1)">{t('graph.legendCounter')}</text>
+          <text x={COL_X.claim + 182} y={HEADER_Y} fontSize={10} fill="var(--v2-text-1)">{`${t('graph.legendSupport')} ${edges.filter((e) => e.kind === 'supports').length}`}</text>
+          <line x1={COL_X.claim + 238} y1={HEADER_Y - 4} x2={COL_X.claim + 274} y2={HEADER_Y - 4} stroke="var(--v2-refuted)" strokeWidth={2.6} strokeDasharray="8 4" />
+          <text x={COL_X.claim + 280} y={HEADER_Y} fontSize={10} fill="var(--v2-text-1)">{`${t('graph.legendCounter')} ${edges.filter((e) => e.kind === 'counters').length}`}</text>
         </g>
         <g transform={`translate(${view.tx} ${view.ty}) scale(${view.k})`}>
           {edges.map((e) => {
@@ -317,19 +317,23 @@ export function EvidenceGraph({
             const stroke = e.kind === 'supports' ? 'var(--v2-verified)' : e.kind === 'counters' ? 'var(--v2-refuted)' : 'var(--v2-border)';
             // Focus mode must POP: active edges thicken further, everything else recedes.
             const inFocus = activeEdges !== null && (activeEdges.has(e.from) || activeEdges.has(e.to));
-            const baseW = e.strength !== undefined ? STRENGTH_W[e.strength] : e.kind === 'locator' ? 0.8 : 2.2;
+            const baseW = e.strength !== undefined ? STRENGTH_W[e.strength] : e.kind === 'locator' ? 1.0 : e.kind === 'counters' ? 2.6 : 2.2;
+            // Redundant polarity encoding (color-blind safe): counters dashed + thicker on
+            // top of the color pair — supports solid thin, counters dashed bold.
+            const dash = e.dashed === true ? '4 3' : e.kind === 'counters' ? '8 4' : undefined;
+            const d = `M ${pa.x + (a.kind === 'source' ? 8 : 10)} ${pa.y} C ${pa.x + (pb.x - pa.x) * 0.45} ${pa.y}, ${pb.x - (pb.x - pa.x) * 0.45} ${pb.y}, ${pb.x - (b.kind === 'hypothesis' ? 10 : 8)} ${pb.y}`;
             return (
-              <line
+              <path
                 key={e.id}
-                x1={pa.x + (a.kind === 'source' ? 8 : 10)} y1={pa.y}
-                x2={pb.x - (b.kind === 'hypothesis' ? 10 : 8)} y2={pb.y}
+                d={d}
+                fill="none"
                 stroke={stroke}
                 strokeWidth={inFocus ? baseW + 0.8 : baseW}
-                strokeDasharray={e.dashed === true ? '4 3' : undefined}
-                opacity={dim ? 0.08 : e.kind === 'locator' ? 0.35 : inFocus ? 1 : 0.85}
+                strokeDasharray={dash}
+                opacity={dim ? 0.08 : e.kind === 'locator' ? 0.5 : inFocus ? 1 : 0.85}
               >
                 {e.strength !== undefined && <title>{`${t('graph.claimClaim')} — ${t(`graph.strength.${e.strength}`)}`}</title>}
-              </line>
+              </path>
             );
           })}
           {nodes.map((n) => {
