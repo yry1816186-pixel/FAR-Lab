@@ -5,6 +5,7 @@ import type { EvidenceRelation, ResearchRun, ScientificClaim, SourceDocument } f
 import { useResource } from '../../hooks/useResource';
 import { useI18n } from '../../i18n/LanguageContext';
 import type { DictKey } from '../../i18n/dict';
+import { zhFirst, decodeEntities } from '../../lab/bilingual';
 
 /**
  * B7 evidence landscape: sources ← claims ← hypotheses as one interactive SVG
@@ -94,7 +95,7 @@ export function EvidenceGraph({
   onOpenClaim: (claimId: string) => void;
   onOpenHypothesis: () => void;
 }): ReactNode {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [filter, setFilter] = useState<Filter>('all');
   const [hover, setHover] = useState<string | null>(null);
   const [view, setView] = useState({ k: 1, tx: 0, ty: 0 });
@@ -141,24 +142,26 @@ export function EvidenceGraph({
     const visibleHyps = hypotheses.slice(0, cap);
 
     const nodeList: GraphNode[] = [];
-    const sourceLabels = truncateLabels(visibleSources.map((s) => s.title), 30, 52);
+    const sourceLabels = truncateLabels(visibleSources.map((s) => decodeEntities(s.title)), 30, 52);
     visibleSources.forEach((s, i) => nodeList.push({
       id: s.id, kind: 'source', x: COL_X.source, y: FIRST_ROW_Y + i * ROW_H,
-      label: sourceLabels[i] ?? s.title, title: s.title,
+      label: sourceLabels[i] ?? s.title, title: decodeEntities(s.title),
       supportingCount: 0, counterCount: 0,
     }));
-    const claimLabels = truncateLabels(visibleClaims.map((c) => c.text), 36, 60);
+    const claimLabels = truncateLabels(visibleClaims.map((c) => decodeEntities(c.text)), 36, 60);
     visibleClaims.forEach((c, i) => nodeList.push({
       id: c.id, kind: 'claim', x: COL_X.claim, y: FIRST_ROW_Y + i * ROW_H,
-      label: claimLabels[i] ?? c.text, title: c.text,
+      label: claimLabels[i] ?? c.text, title: decodeEntities(c.text),
       tone: c.bindingStatus === 'verified' ? 'verified' : c.bindingStatus === 'resolved_unaligned' ? 'caution' : c.bindingStatus === 'unresolved' ? 'refuted' : 'unknown',
       supportingCount: supportingOf.get(c.id)?.size ?? 0,
       counterCount: counterOf.get(c.id)?.size ?? 0,
     }));
-    const hypLabels = truncateLabels(visibleHyps.map((h) => h.statement), 44, 72);
+    // Hypothesis labels follow the reader's language when the W-C zh rendering exists.
+    const hypTexts = visibleHyps.map((h) => zhFirst(h.statement, h.statementZh, lang));
+    const hypLabels = truncateLabels(hypTexts, 44, 72);
     visibleHyps.forEach((h, i) => nodeList.push({
       id: h.id, kind: 'hypothesis', x: COL_X.hypothesis, y: FIRST_ROW_Y + i * ROW_H,
-      label: hypLabels[i] ?? h.statement, title: h.statement,
+      label: hypLabels[i] ?? h.statement, title: hypTexts[i] ?? h.statement,
       supportingCount: h.supportingClaimIds?.length ?? 0, counterCount: h.counterClaimIds?.length ?? 0,
     }));
 

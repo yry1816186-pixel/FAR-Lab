@@ -25,3 +25,18 @@ export const markerZh = (marker: string, lang: Lang): string => {
   }
   return marker;
 };
+
+/**
+ * Decode the closed set of HTML entities that source APIs put inside titles
+ * (live-observed 2026-08-29: PubMed-style "&lt;i&gt;LMX1A&lt;/i&gt; …" rendered verbatim
+ * on the map). Display-layer only — stored metadata stays byte-faithful to the
+ * API response it was verified against.
+ */
+export const decodeEntities = (text: string): string =>
+  text
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&');

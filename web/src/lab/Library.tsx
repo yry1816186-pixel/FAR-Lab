@@ -6,6 +6,7 @@ import type { LibrarySource, RunSummary } from '../api/types';
 import { ErrorBox, TimeAgo } from '../components/common';
 import { useI18n } from '../i18n/LanguageContext';
 import type { DictKey } from '../i18n/dict';
+import { decodeEntities } from './bilingual';
 import { runLabel } from '../studies';
 import './lab.css';
 
@@ -119,9 +120,9 @@ export function Library({ runs, onOpenStudy }: {
             {visible.map((s) => (
               <article key={s.id} className="lib-row">
                 <div className="lib-row-main">
-                  <h3 className="lib-title" title={s.title}>
+                  <h3 className="lib-title" title={decodeEntities(s.title)}>
                     {s.retractionStatus !== undefined && <span className="lib-flag lib-flag--retracted">{vocabLabel(RETRACTION_KEYS, s.retractionStatus)}</span>}
-                    {s.title}
+                    {decodeEntities(s.title)}
                   </h3>
                   <p className="lib-meta">
                     {s.authors.length > 0 && (
