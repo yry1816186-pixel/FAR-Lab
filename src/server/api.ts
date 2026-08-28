@@ -754,6 +754,11 @@ function parseSeedSources(raw: unknown): string | {
       unconsumedFeedbackCount,
       hasEvidenceDebt: app.store.listObjects('source_document', runId).some((d) => d.verification === undefined),
       planDatasets: plan?.dataRequirements.map((d) => ({ name: d.name, availability: d.availability })) ?? [],
+      achTopClaimIds: (app.store.listObjects('ach_analysis', runId).at(-1)?.diagnosticity ?? [])
+        .slice()
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 3)
+        .map((d) => d.claimId),
     });
 
     const deltas = projectStateDeltas({

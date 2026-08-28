@@ -78,6 +78,8 @@ export interface ActionDerivationInput {
   hasEvidenceDebt: boolean;
   /** Public dataset requirements the plan declared (for ADD_DISCRIMINATING_DATA). */
   planDatasets: Array<{ name: string; availability: string }>;
+  /** Top ACH-diagnosticity claim ids (desc, top 3; [] when no ACH analysis exists). Feeds expected-discrimination grading. */
+  achTopClaimIds: ClaimId[];
 }
 
 /**
@@ -86,7 +88,7 @@ export interface ActionDerivationInput {
  * The seq counter is call-local: deriveNextActions is pure and reentrant.
  */
 export function deriveNextActions(input: ActionDerivationInput): NextResearchAction[] {
-  const { runId, runStatus, state, leg, unconsumedFeedbackCount, hasEvidenceDebt, planDatasets } = input;
+  const { runId, runStatus, state, leg, unconsumedFeedbackCount, hasEvidenceDebt, planDatasets, achTopClaimIds } = input;
   let seq = 0;
   const mk = (
     actionType: NextActionType,
@@ -194,8 +196,13 @@ export function deriveNextActions(input: ActionDerivationInput): NextResearchAct
   }
 
   // -- evidence_backed: discrimination-driven science actions --
+  // Grading seam: when the ACH analysis ranked the strongest counter among its
+  // top-diagnosticity claims, adjudicating it is graded high — the projection
+  // never invents numbers, it only consumes the deterministic ACH ordering.
+  const achRankOf = (claimId: ClaimId): number => achTopClaimIds.indexOf(claimId);
+  const scienceActions: NextResearchAction[] = [];
   if (state.strongestCounter === null && state.counters.searchedAndFoundNone === null) {
-    actions.push(mk('COUNTER_EVIDENCE_SEARCH', {
+    scienceActions.push(mk('COUNTER_EVIDENCE_SEARCH', {
       objective: '对当前领先解释执行结构性反证检索',
       knowledgeGap: '领先解释尚无任何反证绑定，且无已记录的反证检索——它未被对抗性检验过',
       rationale: '没有反证暴露的解释其稳健性未知；反证检索是区分“确实强”与“未受检验”的唯一手段',
@@ -206,7 +213,7 @@ export function deriveNextActions(input: ActionDerivationInput): NextResearchAct
   }
   const obs = state.discriminatingObservations[0] ?? null;
   if (obs !== null) {
-    actions.push(mk('DISCRIMINATING_ANALYSIS', {
+    scienceActions.push(mk('DISCRIMINATING_ANALYSIS', {
       objective: '测量能区分前两名假设的判别性观察',
       knowledgeGap: '前两名假设的证伪条件指向不同观察量——现有证据无法区分它们',
       rationale: `判别观察：${obs.observable}。获得该观察的数据最可能改变当前排序`,
@@ -217,7 +224,7 @@ export function deriveNextActions(input: ActionDerivationInput): NextResearchAct
   }
   const publicDataset = planDatasets.find((d) => d.availability === 'public');
   if (publicDataset !== undefined && leaderId !== null) {
-    actions.push(mk('ADD_DISCRIMINATING_DATA', {
+    scienceActions.push(mk('ADD_DISCRIMINATING_DATA', {
       objective: `引入公开数据集 ${publicDataset.name} 检验领先假设`,
       knowledgeGap: '假设可检验但缺少已到位的数据',
       rationale: '计划已声明公开可用数据——这是成本最低的真实检验路径',
@@ -227,15 +234,30 @@ export function deriveNextActions(input: ActionDerivationInput): NextResearchAct
     }));
   }
   if (state.strongestCounter !== null) {
-    actions.push(mk('RESEARCHER_REVIEW_COUNTERS', {
+    const rank = achRankOf(state.strongestCounter.claimId);
+    scienceActions.push(mk('RESEARCHER_REVIEW_COUNTERS', {
       objective: '研究者裁决未消解的反证',
       knowledgeGap: '领先解释存在未消解的反证绑定',
-      rationale: `最强反证（${state.strongestCounter.text.slice(0, 120)}…）需要研究者判断：适用范围、可比性或排除理由`,
+      rationale: `最强反证（${state.strongestCounter.text.slice(0, 120)}…）需要研究者判断：适用范围、可比性或排除理由` +
+        (rank >= 0 ? `；ACH 判别力排名第 ${rank + 1}——它本身就是区分竞争假设的关键证据` : ''),
       wouldChange: wouldChangeOf('反证的接受/排除将直接改变领先解释的排序依据'),
-      expectedDiscrimination: 'high', feasibility: 'high', costClass: 'low',
+      expectedDiscrimination: rank >= 0 ? 'high' : 'medium', feasibility: 'high', costClass: 'low',
       researcherDecisionRequired: true,
       targets: { hypothesisIds: [], claimIds: [state.strongestCounter.claimId] },
     }));
   }
+  // Information-gain ordering (P1.4, 2026-08-28): expected discrimination desc,
+  // then cost asc — replaces the fixed append order so the FIRST science action
+  // is the highest expected discrimination per unit cost, derived not asserted.
+  const DISCRIM_RANK: Record<NextResearchAction['expectedDiscrimination'], number> = { high: 0, medium: 1, low: 2 };
+  const COST_RANK: Record<NextResearchAction['costClass'], number> = { low: 0, medium: 1, high: 2 };
+  scienceActions.sort((x, y) => {
+    const d = DISCRIM_RANK[x.expectedDiscrimination] - DISCRIM_RANK[y.expectedDiscrimination];
+    if (d !== 0) return d;
+    const c = COST_RANK[x.costClass] - COST_RANK[y.costClass];
+    if (c !== 0) return c;
+    return x.id < y.id ? -1 : 1; // stable: creation order (deterministic ids)
+  });
+  actions.push(...scienceActions);
   return actions.slice(0, 4);
 }

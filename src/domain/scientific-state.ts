@@ -104,6 +104,12 @@ export const ScientificState = z.object({
     agreement: z.number().min(-1).max(1).nullable(),
     /** Top-2 Bradley-Terry bootstrap CI separation. */
     topSeparation: z.enum(['disjoint', 'overlap', 'unknown']),
+    /** Composite weight-vector sensitivity (from the tournament record; null when absent). */
+    weightStability: z.object({
+      medianTau: z.number().min(-1).max(1),
+      worstTau: z.number().min(-1).max(1),
+      top1StableRate: z.number().min(0).max(1),
+    }).nullable(),
   }),
   falsifiers: z.array(z.object({
     hypothesisId: HypothesisId,
@@ -369,6 +375,13 @@ export function projectScientificState(input: {
       : tournament !== null && standingsByRank.length > 0 ? ('tournament' as const) : ('composite' as const),
     agreement,
     topSeparation: topOverlap === null ? ('unknown' as const) : topOverlap === 0 ? ('disjoint' as const) : ('overlap' as const),
+    weightStability: tournament?.weightSensitivity !== undefined
+      ? {
+        medianTau: tournament.weightSensitivity.medianTau,
+        worstTau: tournament.weightSensitivity.worstTau,
+        top1StableRate: tournament.weightSensitivity.top1StableRate,
+      }
+      : null,
   };
 
   const base = { runId, computedAt: new Date().toISOString(), templateEvidence: templateMarkers };

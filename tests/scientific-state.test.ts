@@ -181,7 +181,7 @@ describe('deriveConfidence — weakest-link uncertainty propagation (2026-08-28 
       counterQueriesAttempted: 2, evidenceBodies: [ebody(h1)], tournament: tour(h1, h2),
     });
     expect(s.confidence.qualitative).toBe('high');
-    expect(s.ordering).toEqual({ basis: 'tournament', agreement: null, topSeparation: 'disjoint' });
+    expect(s.ordering).toEqual({ basis: 'tournament', agreement: null, topSeparation: 'disjoint', weightStability: null });
     expect(s.confidence.factors.some((f) => f.includes('独立证据来源 3'))).toBe(true);
   });
 
@@ -269,6 +269,24 @@ describe('deriveConfidence — weakest-link uncertainty propagation (2026-08-28 
     expect(s2.ordering.agreement).toBeCloseTo(1 / 3, 5);
     expect(s2.ordering.basis).toBe('tournament');
   });
+
+  it('weightStability projects from the tournament record when the rank stage measured it', () => {
+    const h1 = hyp('a', 'H1');
+    const h2 = hyp('b', 'H2');
+    const t = tour(h1, h2, {
+      weightSensitivity: {
+        perturbation: 0.2, rounds: 48, medianTau: 0.83, worstTau: 0.33,
+        top1StableRate: 0.9, method: 'core RANK_WEIGHTS perturbed ±20%',
+      },
+    });
+    const s = projectScientificState({
+      runId: rid, runStatus: 'completed', questionDomain: 'cardiology',
+      claims: [claim('c1', 'c')], relations: [rel('r1', claim('c1', 'c'), h1, 'supports', 'strong')],
+      hypotheses: [h1, h2], scorecards: [card(h1, 1, 0.8, 0.6), card(h2, 2, 0.7, 0.4)],
+      counterQueriesAttempted: 0, evidenceBodies: [], tournament: t,
+    });
+    expect(s.ordering.weightStability).toEqual({ medianTau: 0.83, worstTau: 0.33, top1StableRate: 0.9 });
+  });
 });
 
 describe('deriveNextActions — derived from scientific state, not pipeline order', () => {
@@ -279,6 +297,7 @@ describe('deriveNextActions — derived from scientific state, not pipeline orde
     unconsumedFeedbackCount: 0,
     hasEvidenceDebt: false,
     planDatasets: [] as Array<{ name: string; availability: string }>,
+    achTopClaimIds: [] as string[],
   };
 
   it('template state -> rerun-with-live-route + formal insufficient conclusion, in that order', () => {
@@ -338,6 +357,46 @@ describe('deriveNextActions — derived from scientific state, not pipeline orde
     for (const a of actions) {
       if (!LOOP_TYPES.has(a.actionType)) expect(a.actionable).toBe(false);
     }
+  });
+
+  it('science actions sort by expected discrimination desc then cost asc (information-gain ordering)', () => {
+    const h1 = hyp('a', 'H1', {
+      falsification: {
+        observable: 'observable A', measurement: 'm', expectedRelation: 'r', decisionRule: 'd',
+        supportCondition: 's', weakeningCondition: 'w', falsificationCondition: 'f',
+        confounders: [], alternativeExplanations: [], dataRequirements: [], method: 'in vitro', failureInterpretation: 'fi',
+      },
+    });
+    const h2 = hyp('b', 'H2', {
+      falsification: {
+        observable: 'observable B', measurement: 'm', expectedRelation: 'r', decisionRule: 'd',
+        supportCondition: 's', weakeningCondition: 'w', falsificationCondition: 'f',
+        confounders: [], alternativeExplanations: [], dataRequirements: [], method: 'in vitro', failureInterpretation: 'fi',
+      },
+    });
+    const cCtr = claim('ctr', 'contradicting claim');
+    const cSup = claim('sup', 'supporting claim');
+    const state = projectScientificState({
+      runId: rid, runStatus: 'completed', questionDomain: 'cardiology',
+      claims: [cSup, cCtr], relations: [rel('r1', cSup, h1, 'supports', 'strong'), rel('r2', cCtr, h1, 'contradicts', 'weak')],
+      hypotheses: [h1, h2], scorecards: [card(h1, 1, 0.8, 0.6), card(h2, 2, 0.7, 0.4)],
+      counterQueriesAttempted: 2, evidenceBodies: [], tournament: null,
+    });
+    expect(state.kind).toBe('evidence_backed');
+    // strongestCounter exists; when ACH ranks it top-diagnostic, the review action
+    // is graded high-discrimination/low-cost and must lead over DISCRIMINATING_ANALYSIS
+    // (high/medium) — information-gain ordering, not fixed append order.
+    const withAch = deriveNextActions({ ...baseInput, state, achTopClaimIds: [cCtr.id] });
+    expect(withAch[0]?.actionType).toBe('RESEARCHER_REVIEW_COUNTERS');
+    expect(withAch[0]?.expectedDiscrimination).toBe('high');
+    expect(withAch[0]?.rationale).toContain('ACH 判别力排名第 1');
+    // Without ACH support the review action is honestly downgraded to medium, so
+    // DISCRIMINATING_ANALYSIS (high/medium) leads — the ordering responds to
+    // evidence, not to the rule's fixed position.
+    const withoutAch = deriveNextActions({ ...baseInput, state, achTopClaimIds: [] });
+    expect(withoutAch[0]?.actionType).toBe('DISCRIMINATING_ANALYSIS');
+    const review = withoutAch.find((a) => a.actionType === 'RESEARCHER_REVIEW_COUNTERS');
+    expect(review?.expectedDiscrimination).toBe('medium');
   });
 
   it('running runs derive nothing (the live band owns the narrative)', () => {

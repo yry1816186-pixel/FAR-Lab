@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bootstrapBtCis, bradleyTerry, compositeScore, BT_BOOTSTRAP_ROUNDS, deterministicEvidenceGrounding, type ContestedMatch } from '../src/pipeline/stages/rank.js';
+import { bootstrapBtCis, bradleyTerry, compositeScore, weightSensitivity, BT_BOOTSTRAP_ROUNDS, deterministicEvidenceGrounding, type ContestedMatch } from '../src/pipeline/stages/rank.js';
 import { stateFromReports } from '../src/app/campaign-driver.js';
 import type { ExperimentRun } from '../src/domain/index.js';
 
@@ -114,6 +114,57 @@ describe('composite weight-perturbation stability (property)', () => {
     const out = compositeScore(partial)!;
     expect(out.included).toEqual(['evidence_grounding', 'falsifiability', 'testability']);
     expect(out.excluded.length).toBe(4);
+  });
+});
+
+describe('weightSensitivity — measured weight-vector stability (persisted on the tournament)', () => {
+  const id = (t: string): string => `hyp_${t.padEnd(22, '0')}`;
+  const allDims = (v: number) => [
+    { dimension: 'evidence_grounding', value: v },
+    { dimension: 'falsifiability', value: v },
+    { dimension: 'testability', value: v },
+    { dimension: 'counter_evidence_exposure', value: v },
+    { dimension: 'scientific_plausibility', value: v },
+    { dimension: 'novelty', value: v },
+    { dimension: 'methodological_soundness', value: v },
+  ];
+
+  it('dominant candidate: order is invariant — medianTau=1, top1 always stable', () => {
+    const a = { id: id('dom'), dims: allDims(0.9) };
+    const b = { id: id('mid'), dims: allDims(0.5) };
+    const c = { id: id('low'), dims: allDims(0.2) };
+    const s = weightSensitivity([a, b, c], [a.id, b.id, c.id])!;
+    expect(s.medianTau).toBe(1);
+    expect(s.worstTau).toBe(1);
+    expect(s.top1StableRate).toBe(1);
+    expect(s.method).toContain('±20%');
+  });
+
+  it('order-flipping pair: stability degrades measurably (top1StableRate < 1)', () => {
+    // EXACT baseline composite tie with DIFFERENT dimension patterns (A leans on
+    // evidence_grounding; B is uniform): every perturbation breaks the tie, and
+    // which way it breaks depends on the weight draw — the measurable case.
+    const aDims = allDims(0.55).map((d) => (d.dimension === 'evidence_grounding' ? { ...d, value: 1.0 } : d));
+    const bDims = allDims(0.64);
+    expect(compositeScore(aDims)!.value).toBe(compositeScore(bDims)!.value);
+    const a = { id: id('efa'), dims: aDims };
+    const b = { id: id('uni'), dims: bDims };
+    const s = weightSensitivity([a, b], [a.id, b.id], { rounds: 64 })!;
+    expect(s.rounds).toBe(64);
+    expect(s.top1StableRate).toBeGreaterThan(0);
+    expect(s.top1StableRate).toBeLessThan(1);
+    expect(s.medianTau).toBeLessThan(1);
+  });
+
+  it('deterministic under the fixed seed; null below 2 scoreable candidates', () => {
+    const a = { id: id('aaa'), dims: allDims(0.9) };
+    const b = { id: id('bbb'), dims: allDims(0.4) };
+    const s1 = weightSensitivity([a, b], [a.id, b.id])!;
+    const s2 = weightSensitivity([a, b], [a.id, b.id])!;
+    expect(s1).toEqual(s2);
+    expect(weightSensitivity([a], [a.id])).toBeNull();
+    const nullDim = allDims(0.5).map((d) => ({ ...d, value: null as unknown as number }));
+    expect(weightSensitivity([{ id: id('nnn'), dims: nullDim }, b], [id('nnn'), b.id])).toBeNull();
   });
 });
 

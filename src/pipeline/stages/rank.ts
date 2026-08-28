@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { StageContext, StageHandler, StageOutcome } from '../types.js';
 import { callStructured } from '../llm.js';
 import { HypothesisComparison, HypothesisScorecard, HypothesisTournament, ScoreDimension, newId, buildAchAnalysis, buildEvidenceBody, countExperimentalAxes } from '../../domain/index.js';
-import type { EvidenceBody, LogLrBand, TournamentMatch } from '../../domain/index.js';
+import type { EvidenceBody, LogLrBand, RankWeightSensitivity, TournamentMatch } from '../../domain/index.js';
 import type { HypothesisCandidate } from '../../domain/index.js';
 import { assertNotCancelled, isRepresentative, mapBounded, partitionClaimRefs, runClaimIds, STAGE_CONCURRENCY } from './shared.js';
 import { canonicalSha256 } from '../../shared/crypto.js';
@@ -109,16 +109,21 @@ export interface CompositeResult {
 /**
  * Weighted average over VALID dimensions only: null values and direction-unclear
  * cost/risk dimensions are excluded and their weight leaves the denominator.
- * Returns null when nothing scoreable remains.
+ * Returns null when nothing scoreable remains. The weights param is the
+ * sensitivity-analysis seam (core weights perturbed; cost/risk held at
+ * COST_RISK_WEIGHT).
  */
-export const compositeScore = (dims: readonly ScoredDim[]): CompositeResult | null => {
+export const compositeScoreWithWeights = (
+  dims: readonly ScoredDim[],
+  weights: Readonly<Record<string, number>>,
+): CompositeResult | null => {
   const byDim = new Map<string, ScoredDim>();
   for (const d of dims) if (!byDim.has(d.dimension)) byDim.set(d.dimension, d); // first occurrence wins
   let numerator = 0;
   let denominator = 0;
   const included: string[] = [];
   const excluded: string[] = [];
-  for (const [name, weight] of Object.entries(RANK_WEIGHTS)) {
+  for (const [name, weight] of Object.entries(weights)) {
     const d = byDim.get(name);
     if (d === undefined) {
       excluded.push(`${name}: not scored`);
@@ -152,6 +157,93 @@ export const compositeScore = (dims: readonly ScoredDim[]): CompositeResult | nu
   // Round to 1e-6: float noise below that is not a scientific difference, and exact
   // ties must fall through to the deterministic evidence_grounding tie-break.
   return { value: Math.round((numerator / denominator) * 1e6) / 1e6, included, excluded };
+};
+
+export const compositeScore = (dims: readonly ScoredDim[]): CompositeResult | null =>
+  compositeScoreWithWeights(dims, RANK_WEIGHTS);
+
+// ---------------------------------------------------------------------------
+// Weight-vector sensitivity analysis (2026-08-28 hardening). The RANK_WEIGHTS
+// are disclosed design constants — the honest question is whether the ORDERING
+// they produce survives their own stated uncertainty. Deterministic: seeded
+// relative perturbation of the seven core weights, recomputed composites,
+// Kendall tau of each perturbed order vs the baseline composite order.
+// ---------------------------------------------------------------------------
+
+export const WEIGHT_SENSITIVITY_ROUNDS = 48;
+export const WEIGHT_SENSITIVITY_PERTURBATION = 0.2;
+export const WEIGHT_SENSITIVITY_SEED = 20260828;
+
+const tauOf = (ids: readonly string[], rankA: Map<string, number>, rankB: Map<string, number>): number | null => {
+  if (ids.length < 2) return null;
+  let concordant = 0;
+  let discordant = 0;
+  for (let i = 0; i < ids.length; i += 1) {
+    for (let j = i + 1; j < ids.length; j += 1) {
+      const da = (rankA.get(ids[i]!) ?? 0) - (rankA.get(ids[j]!) ?? 0);
+      const db = (rankB.get(ids[i]!) ?? 0) - (rankB.get(ids[j]!) ?? 0);
+      if (da === 0 || db === 0) continue;
+      if (Math.sign(da) === Math.sign(db)) concordant += 1;
+      else discordant += 1;
+    }
+  }
+  const pairs = concordant + discordant;
+  return pairs === 0 ? null : (concordant - discordant) / pairs;
+};
+
+/**
+ * Pure. `candidates` carry the SAME scored dimensions the baseline composite used;
+ * `baselineOrder` is the baseline composite order (best first). Returns null when
+ * fewer than 2 candidates have a scoreable composite (nothing to destabilize).
+ * Cost/risk dimensions keep their fixed COST_RISK_WEIGHT contribution — only the
+ * seven core weights are perturbed (disclosed in `method`).
+ */
+export const weightSensitivity = (
+  candidates: ReadonlyArray<{ id: string; dims: readonly ScoredDim[] }>,
+  baselineOrder: readonly string[],
+  opts: { rounds?: number; perturbation?: number; seed?: number } = {},
+): RankWeightSensitivity | null => {
+  const rounds = opts.rounds ?? WEIGHT_SENSITIVITY_ROUNDS;
+  const perturbation = opts.perturbation ?? WEIGHT_SENSITIVITY_PERTURBATION;
+  const rng = mulberry32(opts.seed ?? WEIGHT_SENSITIVITY_SEED);
+  const baseComposite = new Map<string, number | null>();
+  for (const c of candidates) {
+    const r = compositeScore(c.dims);
+    baseComposite.set(c.id, r?.value ?? null);
+  }
+  const ids = baselineOrder.filter((id) => baseComposite.get(id) !== null && baseComposite.get(id) !== undefined);
+  if (ids.length < 2) return null;
+  const baselineRank = new Map(ids.map((id, i) => [id, i + 1] as const));
+  const taus: number[] = [];
+  let top1Stable = 0;
+  for (let r = 0; r < rounds; r += 1) {
+    const weights: Record<string, number> = {};
+    for (const [name, w] of Object.entries(RANK_WEIGHTS)) {
+      weights[name] = w * (1 + perturbation * (2 * rng() - 1));
+    }
+    const perturbed = new Map<string, number>();
+    for (const c of candidates) {
+      if (!ids.includes(c.id)) continue;
+      perturbed.set(c.id, compositeScoreWithWeights(c.dims, weights)?.value ?? -Infinity);
+    }
+    const order = ids.slice().sort((a, b) => (perturbed.get(b) ?? -Infinity) - (perturbed.get(a) ?? -Infinity));
+    const perturbedRank = new Map(order.map((id, i) => [id, i + 1] as const));
+    const tau = tauOf(ids, baselineRank, perturbedRank);
+    if (tau !== null) taus.push(tau);
+    if (order[0] === ids[0]) top1Stable += 1;
+  }
+  if (taus.length === 0) return null;
+  const sorted = taus.slice().sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)]!;
+  const round4 = (v: number): number => Math.round(v * 1e4) / 1e4;
+  return {
+    perturbation,
+    rounds,
+    medianTau: round4(median),
+    worstTau: round4(sorted[0]!),
+    top1StableRate: round4(top1Stable / rounds),
+    method: `core RANK_WEIGHTS perturbed uniformly ±${(perturbation * 100).toFixed(0)}% relative (${rounds} seeded rounds, seed ${opts.seed ?? WEIGHT_SENSITIVITY_SEED}); cost/risk contributions held at their fixed weight; Kendall tau vs the baseline composite order`,
+  };
 };
 
 // ---------------------------------------------------------------------------
@@ -586,6 +678,8 @@ export const rankStage: StageHandler = {
       composite: number;
       evidenceGrounding: number | null;
       dimensions: DimensionScoreT[];
+      /** Exact dims the baseline composite consumed (direction-carrying) — the sensitivity seam. */
+      compositeDims: readonly ScoredDim[];
       excluded: string[];
     }
     const byId = new Map(targets.map((h) => [h.id, h]));
@@ -658,6 +752,7 @@ export const rankStage: StageHandler = {
         composite: composite.value,
         evidenceGrounding: compositeDims.find((d) => d.dimension === 'evidence_grounding')?.value ?? null,
         dimensions: scorecardDims,
+        compositeDims,
         excluded: composite.excluded,
       });
     }
@@ -676,6 +771,12 @@ export const rankStage: StageHandler = {
     });
 
     const n = ranked.length;
+    // Weight-vector sensitivity over the BASELINE composite order (before the
+    // tournament reorders anything) — deterministic, seeded, pure.
+    const weightSens: RankWeightSensitivity | null = weightSensitivity(
+      ranked.map((r) => ({ id: r.hyp.id, dims: r.compositeDims })),
+      ranked.map((r) => r.hyp.id),
+    );
     const weightDescription =
       `fixed weights evidence_grounding ${RANK_WEIGHTS.evidence_grounding}, falsifiability ${RANK_WEIGHTS.falsifiability}, ` +
       `testability ${RANK_WEIGHTS.testability}, counter_evidence_exposure ${RANK_WEIGHTS.counter_evidence_exposure}, ` +
@@ -890,6 +991,9 @@ export const rankStage: StageHandler = {
           }),
           algorithm: 'bradley-terry-ilsr-v1',
           uncertainty: tournamentUncertainty,
+          // Weight-vector sensitivity: is the composite ordering an artifact of the
+          // RANK_WEIGHTS design constants? (null when <2 scoreable candidates)
+          ...(weightSens !== null ? { weightSensitivity: weightSens } : {}),
           createdAt: new Date().toISOString(),
         }),
       );

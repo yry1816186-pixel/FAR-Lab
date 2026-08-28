@@ -91,6 +91,27 @@ export const TournamentStanding = z.object({
 });
 export type TournamentStanding = z.infer<typeof TournamentStanding>;
 
+/**
+ * Deterministic sensitivity analysis over the composite RANK_WEIGHTS (2026-08-28
+ * algorithm hardening): seeded relative perturbation of the core weights, recomputed
+ * composite orders, Kendall tau vs the baseline order. Answers "is the ranking an
+ * artifact of the weight vector?" — disclosed alongside the ranking per ACC-09.
+ */
+export const RankWeightSensitivity = z.object({
+  /** Relative perturbation half-width applied to each core weight (e.g. 0.2 = ±20%). */
+  perturbation: z.number().positive(),
+  rounds: z.number().int().positive(),
+  /** Median Kendall tau of perturbed orders vs baseline. */
+  medianTau: z.number().min(-1).max(1),
+  /** Worst (minimum) tau observed. */
+  worstTau: z.number().min(-1).max(1),
+  /** Fraction of rounds where the baseline #1 candidate stayed #1. */
+  top1StableRate: z.number().min(0).max(1),
+  /** Disclosed method line (what was perturbed, what was held fixed). */
+  method: z.string().min(1),
+});
+export type RankWeightSensitivity = z.infer<typeof RankWeightSensitivity>;
+
 export const HypothesisTournament = z.object({
   id: TournamentId,
   runId: RunId,
@@ -100,6 +121,8 @@ export const HypothesisTournament = z.object({
   standings: z.array(TournamentStanding),
   algorithm: z.literal('bradley-terry-ilsr-v1'),
   uncertainty: z.string().min(1),
+  /** Composite weight-vector sensitivity (absent on legacy records / single-candidate runs). */
+  weightSensitivity: RankWeightSensitivity.optional(),
   createdAt: z.string().datetime(),
 });
 export type HypothesisTournament = z.infer<typeof HypothesisTournament>;
