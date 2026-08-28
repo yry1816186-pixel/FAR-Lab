@@ -46,8 +46,22 @@ const sha = (s: string): string => createHash('sha256').update(s).digest('hex');
 export type ExperimentLegStatus =
   | { kind: 'no_plan' }
   | { kind: 'unexecuted'; planId: string }
+  | { kind: 'unexecutable'; planId: string; reason: string }
   | { kind: 'plan_revised_since_experiment'; planId: string; frozenAt: string; lastExperimentEndedAt: string }
   | { kind: 'current'; planId: string };
+
+/**
+ * Skip markers that mean "the leg never actually ran" (transport/budget), NOT a
+ * scientific executability verdict — those must stay retryable as 'unexecuted'.
+ * The scientific verdict carries a per-experiment-type breakdown instead
+ * (e.g. "tabular: Requires wet-lab …; literature-pool: … violates …").
+ */
+const TRANSPORTAL_SKIP_MARKERS = ['model call failed', 'budget'] as const;
+
+const isScientificUnexecutableSkip = (reason: string | undefined): boolean => {
+  if (reason === undefined || reason === '') return false;
+  return !TRANSPORTAL_SKIP_MARKERS.some((m) => reason.startsWith(m));
+};
 
 export const experimentLegStatus = (store: Store, runId: string): ExperimentLegStatus => {
   const plan = store.listObjects('plan', runId).at(-1);
@@ -56,7 +70,19 @@ export const experimentLegStatus = (store: Store, runId: string): ExperimentLegS
     .listObjects('experiment_run', runId)
     .filter((r) => r.specId.startsWith('xsp_') && r.status === 'completed')
     .sort((a, b) => (b.endedAt ?? b.createdAt).localeCompare(a.endedAt ?? a.createdAt))[0];
-  if (lastCompleted === undefined) return { kind: 'unexecuted', planId: plan.id };
+  if (lastCompleted === undefined) {
+    // The execute stage's LAST attempt may already carry the deterministic
+    // per-type executability verdict (spec drafted, then every experiment type
+    // judged unavailable). That is a scientific conclusion, not a retryable
+    // gap: re-presenting EXECUTE_PLANNED_EXPERIMENT would loop the same verdict
+    // forever (observed live on the 2026-08-28 gold run).
+    const execStage = store.getRun(runId)?.stages.find((s) => s.stage === 'execute');
+    const execSkipReason = execStage?.error;
+    if (execStage?.state === 'skipped' && execSkipReason !== undefined && isScientificUnexecutableSkip(execSkipReason)) {
+      return { kind: 'unexecutable', planId: plan.id, reason: execSkipReason };
+    }
+    return { kind: 'unexecuted', planId: plan.id };
+  }
   const frozenAt = plan.frozenAt ?? null;
   const endedAt = lastCompleted.endedAt ?? null;
   if (frozenAt !== null && endedAt !== null && frozenAt > endedAt) {

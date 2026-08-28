@@ -345,6 +345,28 @@ describe('deriveNextActions — derived from scientific state, not pipeline orde
     expect(actions[1]?.actionType).toBe('EXECUTE_PLANNED_EXPERIMENT');
   });
 
+  it('unexecutable leg: no EXECUTE re-offer, redesign action is a researcher judgment (no resume loop)', () => {
+    const h1 = hyp('a', 'H1');
+    const c1 = claim('c1', 'c');
+    const state = projectScientificState({
+      runId: rid, runStatus: 'completed', questionDomain: 'cardiology',
+      claims: [c1], relations: [rel('r1', c1, h1, 'supports')],
+      hypotheses: [h1], scorecards: [card(h1, 1, 0.8, 0.6)], counterQueriesAttempted: 0, evidenceBodies: [], tournament: null,
+    });
+    const verdict = 'tabular: Requires wet-lab clinical trial data; literature-pool: violates pooling constraint';
+    const actions = deriveNextActions({
+      ...baseInput, state,
+      leg: { kind: 'unexecutable', executabilityPassed: true, unexecutableReason: verdict },
+    });
+    expect(actions.some((a) => a.actionType === 'EXECUTE_PLANNED_EXPERIMENT')).toBe(false);
+    const redesign = actions.find((a) => a.actionType === 'REDESIGN_EXPERIMENT_FOR_LOCAL_EXECUTABILITY');
+    expect(redesign).toBeDefined();
+    expect(redesign?.actionable).toBe(false);
+    expect(redesign?.actionHint).toEqual({ kind: 'guidance' });
+    expect(redesign?.researcherDecisionRequired).toBe(true);
+    expect(redesign?.knowledgeGap).toContain('tabular: Requires wet-lab');
+  });
+
   it('no fake affordances: non-loop science actions are guidance, never resume buttons', () => {
     const state = projectScientificState({
       runId: rid, runStatus: 'completed', questionDomain: 'cardiology',
@@ -477,5 +499,25 @@ describe('partial-run honesty (2026-08-28 gold-run finding)', () => {
       leg: { kind: 'no_plan', executabilityPassed: false },
       unconsumedFeedbackCount: 0, hasEvidenceDebt: false, planDatasets: [],
     })).toEqual([]);
+  });
+});
+
+describe('no fake EXECUTE affordance (gold-run finding 2)', () => {
+  it('wet-lab/private-data plan: EXECUTE is not offered as actionable (no public dataset path)', () => {
+    const h1 = hyp('a', 'H1');
+    const c1 = claim('c1', 'c');
+    const state = projectScientificState({
+      runId: rid, runStatus: 'completed', questionDomain: 'cardiology',
+      claims: [c1], relations: [rel('r1', c1, h1, 'supports')],
+      hypotheses: [h1], scorecards: [card(h1, 1, 0.8, 0.6)], evidenceBodies: [], tournament: null,
+      counterQueriesAttempted: 2,
+    });
+    const actions = deriveNextActions({
+      runId: rid, runStatus: 'completed', state,
+      leg: { kind: 'unexecuted', executabilityPassed: false }, // api layer ANDs public-dataset availability
+      unconsumedFeedbackCount: 0, hasEvidenceDebt: false,
+      planDatasets: [{ name: 'AF hospitalization records', availability: 'must_collect' }],
+    });
+    expect(actions.some((a) => a.actionType === 'EXECUTE_PLANNED_EXPERIMENT' && a.actionable)).toBe(false);
   });
 });

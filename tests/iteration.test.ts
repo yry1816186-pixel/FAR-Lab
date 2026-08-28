@@ -129,6 +129,30 @@ describe('evaluateIteration (pure decision procedure)', () => {
     expect(it.reopenStages).toEqual(['execute', 'feedback', 'revise', 'export']);
   });
 
+  it('a SCIENTIFIC unexecutable skip verdict stops the execute-leg trigger (no verdict loop); a transport skip does not', () => {
+    const { store, runId } = openStore();
+    const hypId = addHypothesis(store, runId);
+    addPlan(store, runId, hypId);
+    const markExecuteSkipped = (reason: string): void => {
+      const run = store.getRun(runId)!;
+      const rec = run.stages.find((s) => s.stage === 'execute')!;
+      rec.state = 'skipped';
+      rec.error = reason;
+      store.updateRun(run);
+    };
+    // Scientific verdict (per-type breakdown, live gold-run wording 2026-08-28):
+    // the leg already ran its executability judgment — re-opening would loop it.
+    markExecuteSkipped('tabular: Requires wet-lab clinical trial data; literature-pool: violates pooling constraint');
+    const scientific = evaluateIteration({ store, runId, round: 1, budget: unlimitedBudget() });
+    expect(scientific.decision).toBe('stop');
+    expect(scientific.record.stopReason?.kind).toBe('no_actionable_work');
+    // Transport/budget skips mean the leg NEVER ran its verdict — still retryable.
+    markExecuteSkipped('model call failed (provider_error) in execute/experiment-spec-draft: zai: HTTP 529');
+    const transport = evaluateIteration({ store, runId, round: 1, budget: unlimitedBudget() });
+    expect(transport.decision).toBe('continue');
+    expect(transport.record.continueTrigger).toMatchObject({ kind: 'executable_plan_unexecuted', because: 'never_executed' });
+  });
+
   it('a causally REVISED plan (re-frozen after the experiment) re-arms the execute leg', () => {
     const { store, runId } = openStore();
     const hypId = addHypothesis(store, runId);

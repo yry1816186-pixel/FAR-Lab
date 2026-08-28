@@ -23,6 +23,7 @@ export const NextActionType = z.enum([
   'RERUN_WITH_LIVE_ROUTE',
   'DECLARE_INSUFFICIENT_EVIDENCE',
   'EXECUTE_PLANNED_EXPERIMENT',
+  'REDESIGN_EXPERIMENT_FOR_LOCAL_EXECUTABILITY',
   'CONSUME_FEEDBACK_INTO_REVISION',
   'RESUME_EVIDENCE_DEBT',
   'COUNTER_EVIDENCE_SEARCH',
@@ -71,8 +72,10 @@ export interface ActionDerivationInput {
   runStatus: string;
   state: ScientificState;
   leg: {
-    kind: 'no_plan' | 'unexecuted' | 'plan_revised_since_experiment' | 'current';
+    kind: 'no_plan' | 'unexecuted' | 'unexecutable' | 'plan_revised_since_experiment' | 'current';
     executabilityPassed: boolean;
+    /** Present only for the unexecutable verdict — the per-type breakdown. */
+    unexecutableReason?: string;
   };
   unconsumedFeedbackCount: number;
   hasEvidenceDebt: boolean;
@@ -167,6 +170,25 @@ export function deriveNextActions(input: ActionDerivationInput): NextResearchAct
       expectedDiscrimination: 'high', feasibility: 'high', costClass: 'medium',
       targets: leaderId !== null ? { hypothesisIds: [leaderId], claimIds: [] } : undefined,
       actionable: true, actionHint: { kind: 'resume' },
+    }));
+  }
+  if (leg.kind === 'unexecutable') {
+    // The deterministic executability verdict already ran and said NO for every
+    // experiment type — re-presenting "execute" would loop the same verdict
+    // (observed live 2026-08-28 gold run: wet-lab/ECO/private-cohort data not in
+    // public datasets; new-RCT collection violates literature-pool constraints).
+    // The honest next action is a RESEARCH JUDGMENT: redesign the experiment into
+    // a locally executable form, or accept that this study concludes on
+    // literature evidence alone.
+    actions.push(mk('REDESIGN_EXPERIMENT_FOR_LOCAL_EXECUTABILITY', {
+      objective: '把计划实验重新设计为本地可执行形式，或接受本研究以文献证据收束',
+      knowledgeGap: `实验腿的确定性判定：${leg.unexecutableReason ?? '计划实验无法由本地执行器执行'}`,
+      rationale: '执行器已按实验类型逐一判定不可用——重复派发只会得到同一判定；改变结论的唯二路径是改实验设计（如换成已发表效应的模拟/合并分析）或接受文献级收束',
+      wouldChange: wouldChangeOf('可执行的重设计将恢复证伪闭环；接受收束则本研究以当前证据状态定稿'),
+      expectedDiscrimination: 'high', feasibility: 'medium', costClass: 'low',
+      researcherDecisionRequired: true,
+      targets: leaderId !== null ? { hypothesisIds: [leaderId], claimIds: [] } : undefined,
+      actionable: false, actionHint: { kind: 'guidance' },
     }));
   }
   if (hasEvidenceDebt) {

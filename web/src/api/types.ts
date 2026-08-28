@@ -1193,6 +1193,6 @@ export interface ScienceBundle {
   state: ScientificStateView;
   nextActions: NextActionView[];
   deltas: StateDeltaView[];
-  experimentLeg: { kind: string; executabilityPassed: boolean };
+  experimentLeg: { kind: string; executabilityPassed: boolean; reason?: string };
   unconsumedFeedbackCount: number;
 }

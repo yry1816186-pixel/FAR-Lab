@@ -743,7 +743,11 @@ function parseSeedSources(raw: unknown): string | {
     const plan = app.store.listObjects('plan', runId).at(-1) ?? null;
     const leg = experimentLegStatus(app.store, runId);
     const hypothesisIds = new Set(hypotheses.map((h) => h.id));
-    const executabilityPassed = plan !== null && checkPlanExecutability(plan, hypothesisIds).passed;
+    const executabilityPassed = plan !== null && checkPlanExecutability(plan, hypothesisIds).passed
+      // Structural executability is NOT enough for an actionable EXECUTE: the honest
+      // executor also requires a resolvable path (public dataset, or a literature/meta
+      // mapping). A wet-lab/private-data plan must not promise a runnable experiment.
+      && plan.dataRequirements.some((d) => d.availability === 'public');
     const revisions = app.store.listObjects('revision', runId);
     const consumed = new Set(revisions.map((r) => r.triggerFeedbackId));
     const unconsumedFeedbackCount = app.store
@@ -753,7 +757,11 @@ function parseSeedSources(raw: unknown): string | {
       runId,
       runStatus: run.status,
       state,
-      leg: { kind: leg.kind, executabilityPassed },
+      leg: {
+        kind: leg.kind,
+        executabilityPassed,
+        ...(leg.kind === 'unexecutable' ? { unexecutableReason: leg.reason } : {}),
+      },
       unconsumedFeedbackCount,
       hasEvidenceDebt: app.store.listObjects('source_document', runId).some((d) => d.verification === undefined),
       planDatasets: plan?.dataRequirements.map((d) => ({ name: d.name, availability: d.availability })) ?? [],
@@ -775,7 +783,11 @@ function parseSeedSources(raw: unknown): string | {
       state,
       nextActions,
       deltas,
-      experimentLeg: { kind: leg.kind, executabilityPassed },
+      experimentLeg: {
+        kind: leg.kind,
+        executabilityPassed,
+        ...(leg.kind === 'unexecutable' ? { reason: leg.reason } : {}),
+      },
       unconsumedFeedbackCount,
     });
   };

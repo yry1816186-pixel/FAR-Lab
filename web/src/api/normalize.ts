@@ -322,7 +322,11 @@ export function normalizeScience(data: unknown): ScienceBundle {
     nextActions: requireArray(rec, ['nextActions'], 'science bundle (nextActions)').filter(looksLikeAction),
     deltas: requireArray(rec, ['deltas'], 'science bundle (deltas)').filter(looksLikeDelta),
     experimentLeg: isRecord(rec.experimentLeg) && typeof rec.experimentLeg.kind === 'string'
-      ? { kind: rec.experimentLeg.kind, executabilityPassed: rec.experimentLeg.executabilityPassed === true }
+      ? {
+          kind: rec.experimentLeg.kind,
+          executabilityPassed: rec.experimentLeg.executabilityPassed === true,
+          ...(typeof rec.experimentLeg.reason === 'string' ? { reason: rec.experimentLeg.reason } : {}),
+        }
       : { kind: 'no_plan', executabilityPassed: false },
     unconsumedFeedbackCount: typeof rec.unconsumedFeedbackCount === 'number' ? rec.unconsumedFeedbackCount : 0,
   };
