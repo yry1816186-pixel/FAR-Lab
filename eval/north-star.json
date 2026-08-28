@@ -6,8 +6,8 @@
       "id": "rediscovery-mean-f1",
       "what": "Rediscovery eval mean F1 vs established findings (5-task authored seed, hypothesis-level)",
       "current": {
-        "value": 0.05,
-        "detail": "RE-MEASURED 2026-08-29 on the SAME frozen artifacts/GT, BOTH judge wire configs: thinking-off mean F1 0.03 (eval/results/rediscovery-nothink-20260829.jsonl), thinking-restored via reasoning route 0.05 (eval/results/rediscovery.jsonl) — the 2026-08-22 0.58 is NOT recoverable by wire config; the served model behind the glm-5.3 name changed decomposition behavior. Remediation = full judge recalibration on the current stack (fresh gold pass over claim-pair-gold + decomposition re-anchor); artifacts stay frozen for apples-to-apples. Judge artifact confirmed, product regression ruled out (agent texts unchanged).",
+        "value": 0.14,
+        "detail": "RECALIBRATION IN PROGRESS 2026-08-29, same frozen artifacts/GT: v2.1-spec enforcement on the decomposition prompt (terse atomic sentences — the current model's verbose claims violated the protocol and dropped TF-IDF sims out of the band) recovered mean F1 0.03/0.05 -> 0.14 (crc 0.38, cdiff 0.31, arg 0 both eras). Remaining distance to 0.58 needs the full gold recalibration pass (fresh claim-pair decomposition under current stack + threshold re-derivation) — recorded as the next eval-infra task. Product regression ruled out (artifacts frozen).",
         "at": "2026-08-29",
         "evidence": "eval/results/rediscovery.jsonl (2026-08-29) vs rediscovery-v2-pass1.jsonl; live probe: crc with reasoning-route thinking -> {stage:adjudicate, all votes failed}",
         "note": "target 0.7 unchanged; judge hardening is the lever, agent artifacts are frozen and unchanged"

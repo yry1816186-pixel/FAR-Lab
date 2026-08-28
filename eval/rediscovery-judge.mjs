@@ -54,7 +54,13 @@ export const buildDecomposeTask = (agentText, gtClaims) => {
       protocol:
         `Decompose the agent output into atomic, verifiable scientific claims. ` +
         `PROTOCOL (fixed granularity): each claim = exactly one subject + one mechanism + one direction, ` +
-        `stated as a standalone declarative sentence. Aim for ${Math.max(3, target - 2)}-${target + 2} claims ` +
+        `stated as ONE terse declarative sentence of AT MOST 15 content words. Mirror the TERSENESS of the ` +
+        `two example claims below — no qualifiers, hedges, contexts, or "which/that" clauses: write ` +
+        `"MSS tumors yield low tumor mutational burden", NOT "Mismatch repair-proficient MSS colorectal ` +
+        `tumors, which constitute the majority, are known to carry a comparatively low tumor mutational ` +
+        `burden". Terse sentences are REQUIRED for the matcher — long sentences are scored as protocol ` +
+        `violations. ` +
+        `Aim for ${Math.max(3, target - 2)}-${target + 2} claims ` +
         `(the reference granularity is ${target} claims). Do NOT split one mechanism into fragments; do NOT merge two mechanisms into one claim. ` +
         `INCLUDE mechanistic/factual assertions the output commits to (hypothesis, mechanism, expected relations). ` +
         `EXCLUDE purely methodological predictions about experiments or measurements that assert no substantive finding. ` +

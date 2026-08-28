@@ -472,6 +472,13 @@ export const falsifyStage: StageHandler = {
       let audit = new Map<string, LinkAuditDecision>();
       /** Ids the audit never verdicted — their persisted relations carry the disclosure (round-2 P1-C: stage summaries are invisible to workbench researchers). */
       const unauditedIds = new Set<string>();
+      /**
+       * Anchor trail (round-1 F3 residue): the audit's direction anchors are the
+       * reasoning behind every CONFIRMED link, but they previously lived only in the
+       * call response. Persisted onto the relation's uncertainties for confirmed
+       * COUNTER links — the risky class a researcher most needs to inspect.
+       */
+      const anchorNoteById = new Map<string, string>();
       if (proposedLinks.length > 0) {
         try {
           const verifyRes = await callStructured<z.infer<typeof LinkVerifyOut>>(ctx, {
@@ -527,6 +534,11 @@ export const falsifyStage: StageHandler = {
               `${hyp.id}: link audit covered ${proposedLinks.length - unaudited.length}/${proposedLinks.length} proposed link(s) — ${unaudited.length} kept as proposed WITHOUT audit review (${unaudited.map((l) => l.claimId).join(', ')})`,
             );
           }
+          for (const v of verifyRes.data.verdicts) {
+            if (v.verdict === 'confirm' && v.hypPrediction.trim().length > 0 && v.claimFinding.trim().length > 0) {
+              anchorNoteById.set(v.claimId, `audit anchors — predicted: ${v.hypPrediction.slice(0, 140)}; observed: ${v.claimFinding.slice(0, 140)}`);
+            }
+          }
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           warnings.push(`${hyp.id}: link audit failed — original gated links kept unchanged (${msg.slice(0, 120)})`);
@@ -570,7 +582,7 @@ export const falsifyStage: StageHandler = {
         // in uncertainties via the audit note, never silently re-worded.
         ctx.store.putObject(
           'evidence_relation',
-          mkRelation(decision?.relation ?? counterLinkByClaim.get(id)?.relation ?? 'weakens', id, proposalFamilyOf.get(id) ?? 'counter', decision?.note ?? (unauditedIds.has(id) ? 'kept as proposed — NOT covered by the link audit (coverage miss)' : undefined)),
+          mkRelation(decision?.relation ?? counterLinkByClaim.get(id)?.relation ?? 'weakens', id, proposalFamilyOf.get(id) ?? 'counter', decision?.note ?? (unauditedIds.has(id) ? 'kept as proposed — NOT covered by the link audit (coverage miss)' : undefined) ?? anchorNoteById.get(id)),
         );
         relations += 1;
       }

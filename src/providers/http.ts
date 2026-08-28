@@ -20,8 +20,12 @@ import { REASONING_GEAR_BUDGET_TOKENS } from '../domain/model-config.js';
  *   - invalid_output: at most 3 corrective re-asks with an appended instruction
  *     (independent-sample corruption ~20% at large outputs; ~99% cumulative recovery,
  *     every attempt must still fully parse and zod-validate — D-034 era evidence).
- *   - everything else (auth_error, quota_exceeded, permanent 4xx, network-level
- *     transport failures): NO retry — never silently convert failure into success.
+ *   - everything else (auth_error, quota_exceeded, permanent 4xx): NO retry —
+ *     never silently convert failure into success. NETWORK-LEVEL transport
+ *     failures (ECONNRESET / socket hangup / fetch throw — classified 2026-08-29
+ *     as retryable per the reliability audit's overnight-run finding: one blip
+ *     parked a whole unattended run) join the SAME bounded transport-retry budget
+ *     with standard backoff — each attempt receipts, exhaustion still fails visibly.
  *   - Total budget (including retries, sleeps and JSON correction) defaults to 120s.
  *
  * Receipt discipline:
@@ -808,8 +812,13 @@ const classifyTransportError = (err: unknown, providerName: string): ClassifiedF
   const detail = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
   return {
     kind: 'provider_error',
-    retryable: false,
-    message: `${providerName}: network-level failure (${detail}); not retried per W1 retry discipline`,
+    // Network-level failures (fetch throws: ECONNRESET, socket hangup, DNS blips)
+    // are transient by nature — bounded retry under the SAME transport budget
+    // (reliability audit 2026-08-29: the old never-retry stance parked unattended
+    // overnight runs on a single blip). HTTP-graded failures keep their own
+    // classification above; this branch only sees actual transport throws.
+    retryable: true,
+    message: `${providerName}: network-level failure (${detail}); retrying within the bounded transport budget`,
   };
 };
 

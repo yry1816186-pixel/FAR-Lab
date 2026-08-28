@@ -650,15 +650,25 @@ describe('transport failure classification and retry budget', () => {
     expect(calls.length).toBe(1);
   });
 
-  it('does NOT retry network-level transport failures (DNS/TCP)', async () => {
+  it('retries network-level transport failures within the bounded budget (overnight-run discipline, 2026-08-29)', async () => {
     const networkError = Object.assign(new Error('fetch failed'), { name: 'TypeError' });
-    const { fetchImpl, calls } = recorderFetch([() => Promise.reject(networkError)]);
-    const provider = createDashScopeProvider({ apiKey: 'test-fixture-key-dashscope', fetchImpl });
+    const { fetchImpl, calls } = recorderFetch([() => Promise.reject(networkError), () => Promise.reject(networkError), () => Promise.reject(networkError), () => Promise.reject(networkError)]);
+    const provider = createDashScopeProvider({ apiKey: 'test-fixture-key-dashscope', fetchImpl, sleep: async () => {} });
     const res = await provider.structuredCall(REQ, parseHypothesis);
     expect(res.ok).toBe(false);
     expect(res.error?.kind).toBe('provider_error');
-    expect(res.error?.retryable).toBe(false);
-    expect(calls.length).toBe(1); // W1 discipline: only rate_limited/timeout/transient-5xx retry
+    expect((res.error?.message ?? '')).toContain('network-level');
+    // 1 initial + MAX_TRANSPORT_RETRIES(2) = 3 attempts, then fails visibly
+    expect(calls.length).toBe(3);
+  });
+
+  it('a transient network blip recovers on retry (one reset then a valid answer)', async () => {
+    const networkError = Object.assign(new Error('socket hang up'), { name: 'Error' });
+    const { fetchImpl, calls } = recorderFetch([() => Promise.reject(networkError), () => Promise.resolve(chatOk(RAW_OK))]);
+    const provider = createDashScopeProvider({ apiKey: 'test-fixture-key-dashscope', fetchImpl, sleep: async () => {} });
+    const res = await provider.structuredCall(REQ, parseHypothesis);
+    expect(res.ok).toBe(true);
+    expect(calls.length).toBe(2);
   });
 
   it('classifies a malformed HTTP 200 (no content) as provider_error, no retry', async () => {

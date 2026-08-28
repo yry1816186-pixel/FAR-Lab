@@ -143,6 +143,9 @@ for (const r of runs) {
     precision: Math.round(res.counts.precision * 1000) / 1000,
     recall: Math.round(res.counts.recall * 1000) / 1000,
     f1: res.f1,
+    adjudications: res.adjudications,
+    adjudicationVotes: res.adjudicationVotes,
+    scoredUnscored: res.scoredUnscored,
     claims: { agent: res.agentClaims, gt: t.gtClaims },
     topHypothesis: text,
   });
