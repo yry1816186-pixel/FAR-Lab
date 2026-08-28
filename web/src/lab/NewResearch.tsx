@@ -30,9 +30,13 @@ const linesOf = (items: readonly string[]): string => items.join('\n');
 const fromLines = (text: string): string[] =>
   text.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
 
-export function NewResearch({ onLaunched, onOpenConversation }: {
+export function NewResearch({ onLaunched, onOpenConversation, initialQuestion = null }: {
   onLaunched: (runId: string) => void;
   onOpenConversation: () => void;
+  /** Welcome-box quick start: hands the home's centered question box over to
+   *  the (possibly already-mounted) formation screen — updates the question
+   *  field when new text arrives. Null = no prefill. */
+  initialQuestion?: string | null;
 }): JSX.Element {
   const { t } = useI18n();
   const run = useCreateRun(onLaunched);
@@ -75,6 +79,14 @@ export function NewResearch({ onLaunched, onOpenConversation }: {
   // Keyboard path: arriving via "n" or the CTA puts the researcher straight
   // into the question — one keystroke from anywhere to typing (§9.8).
   useEffect(() => { textareaRef.current?.focus(); }, []);
+
+  // Welcome-box handover: the prop updates the field even when this screen is
+  // already mounted (useCreateRun's hash read only initializes on mount).
+  // run.setText is the stable useState setter.
+  useEffect(() => {
+    if (initialQuestion !== null && initialQuestion.trim().length > 0) run.setText(initialQuestion);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setText is the stable useState setter from useCreateRun
+  }, [initialQuestion]);
 
   const enterReview = (q: ResearchQuestion): void => {
     setProposal(q);

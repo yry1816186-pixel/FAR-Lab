@@ -230,6 +230,27 @@ export interface SourceDocument {
   verification?: SourceVerification;
 }
 
+/** Workspace-wide aggregated library entry (GET /v1/library/sources): one row
+ *  per DISTINCT document (identifier-deduplicated across runs), carrying the
+ *  runs that retrieved it. Projection type — the stored per-run SourceDocument
+ *  remains the truth plane. */
+export interface LibrarySource {
+  id: string;
+  title: string;
+  publicationYear: number | null;
+  authors: string[];
+  authorCount: number;
+  venue: string | null;
+  family: string;
+  contentDepth: ContentDepth;
+  accessState: AccessState;
+  publicationType: string | null;
+  identifiers: { kind: string; value: string }[];
+  retrievedAt: string;
+  retractionStatus?: 'retracted' | 'corrected' | 'expression_of_concern' | 'reinstated';
+  runIds: string[];
+}
+
 // ---- claims (src/domain/claim.ts) ----
 
 export type CitationBindingStatus = 'verified' | 'resolved_unaligned' | 'unresolved' | 'missing';

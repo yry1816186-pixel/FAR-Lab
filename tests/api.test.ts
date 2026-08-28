@@ -891,6 +891,47 @@ describe('run resource endpoints', () => {
     expect(without.body.plan).toBeNull();
   });
 
+  it('GET /library/sources aggregates workspace-wide and deduplicates by normalized identifier', async () => {
+    const before = (await getJson(`${base}/api/v1/library/sources`)).body;
+    expect(before.distinct).toBeGreaterThan(0);
+    const seeded = before.sources.find((s: { identifiers: { kind: string; value: string }[] }) =>
+      s.identifiers.some((i) => i.kind === 'doi' && i.value === '10.1000/example-resolved'));
+    expect(seeded).toBeDefined();
+    expect(seeded.runIds).toEqual([run1]);
+
+    // Same DOI in resolver-prefixed, different-case form on ANOTHER run: one
+    // distinct entry, both runIds attached.
+    const q = ResearchQuestion.parse({
+      id: newId('q'), text: 'Second study reusing the same paper',
+      background: 'b', goalType: 'exploratory',
+      scope: { domain: 'genome editing', phenomena: ['x'] }, constraints: {}, createdAt: ts(90),
+    });
+    const run = app.store.createRun(q);
+    const dup = SourceDocument.parse({
+      id: newId('src'), runId: run.id, family: 'crossref',
+      identifiers: [{ kind: 'doi', value: 'https://doi.org/10.1000/EXAMPLE-RESOLVED' }],
+      title: 'Same paper, other resolver form', authors: ['B. Someone'],
+      contentDepth: 'abstract', accessState: 'open',
+      contentHash: 'b'.repeat(64), retrievedAt: ts(91), parseStatus: 'ok',
+    });
+    app.store.putObject('source_document', dup);
+    const after = (await getJson(`${base}/api/v1/library/sources`)).body;
+    expect(after.distinct).toBe(before.distinct); // no new distinct entry
+    expect(after.stored).toBe(before.stored + 1);
+    const merged = after.sources.find((s: { identifiers: { kind: string; value: string }[] }) =>
+      s.identifiers.some((i) => i.kind === 'doi' && i.value === '10.1000/example-resolved'));
+    expect(merged.runIds).toContain(run1);
+    expect(merged.runIds).toContain(run.id);
+    expect(merged.runIds).toHaveLength(2);
+    // Ordering: the twice-referenced paper outranks single-run entries.
+    expect(after.sources[0].runIds.length).toBe(2);
+    // Cleanup: keep later assertions independent of this fixture.
+    app.store.deleteRunCascade(run.id);
+    const restored = (await getJson(`${base}/api/v1/library/sources`)).body;
+    expect(restored.stored).toBe(before.stored);
+    expect(restored.distinct).toBe(before.distinct);
+  });
+
   it('GET report serves the latest bundle report artifact as text/markdown', async () => {
     const res = await fetch(`${base}/api/v1/runs/${run1}/report`);
     expect(res.status).toBe(200);

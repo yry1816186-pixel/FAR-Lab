@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './conversation-dock.css';
 import { Bell, BellOff, Search, Settings, X } from 'lucide-react';
 import { ApiError } from './api/client';
-import { getEvents, getRun, listRuns, listConversations, createConversation, searchAll } from './api/endpoints';
+import { getEvents, getRun, listRuns, listConversations, createConversation, deleteConversation, searchAll } from './api/endpoints';
+import { AppRail, type RailSurface } from './lab/AppRail';
+import { Library } from './lab/Library';
 import type { Conversation, ResearchRun, RunEvent, RunSummary } from './api/types';
 import { useI18n } from './i18n/LanguageContext';
 import { usePolling } from './hooks/usePolling';
@@ -60,6 +62,10 @@ export function App(): JSX.Element {
   // Study-map vs legacy-deep-tools view for the selected run (route-driven).
   const [studyView, setStudyView] = useState(false);
   const [newResearchView, setNewResearchView] = useState(false);
+  // Workspace literature library (#library) + welcome-box question prefill
+  // (#lab/new?q=…). Prefill is consumed once by NewResearch on mount.
+  const [libraryView, setLibraryView] = useState(false);
+  const [prefilledQuestion, setPrefilledQuestion] = useState<string | null>(null);
 
   // ---- conversations (a tool, not the spine) ----
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -75,6 +81,8 @@ export function App(): JSX.Element {
   useEffect(() => { void refreshConversations(); }, [refreshConversations]);
   const openConversation = useCallback((id: string): void => {
     setSelectedConvId(id);
+    setLibraryView(false);
+    setNewResearchView(false);
     if (selectedRunId !== null) setConvDocked(true); // objects stay primary; dialogue docks
     void refreshConversations();
   }, [refreshConversations, selectedRunId]);
@@ -267,28 +275,41 @@ export function App(): JSX.Element {
     setSelectedRunId(runId);
     setStudyView(true);
     setNewResearchView(false);
+    setLibraryView(false);
     if (selectedConvId !== null) setConvDocked(true);
   }, [selectedConvId]);
   const openHome = useCallback((): void => {
     setSelectedRunId(null);
     setStudyView(false);
     setNewResearchView(false);
+    setLibraryView(false);
     closeConversation();
   }, [closeConversation]);
-  const openNewResearch = useCallback((): void => {
+  const openNewResearch = useCallback((prefill: string | null = null): void => {
     setNewResearchView(true);
     setSelectedRunId(null);
     setStudyView(false);
+    setLibraryView(false);
     setSelectedConvId(null);
     setConvDocked(false);
+    setPrefilledQuestion(prefill);
   }, []);
+  const openLibrary = useCallback((): void => {
+    setLibraryView(true);
+    setNewResearchView(false);
+    setSelectedRunId(null);
+    setStudyView(false);
+    closeConversation();
+  }, [closeConversation]);
 
-  // ---- shareable hash routes: #/ #lab/new #study/<id> #run/<id>/<tab> #conv/<id> ----
+  // ---- shareable hash routes: #/ #lab/new #library #study/<id> #run/<id>/<tab> #conv/<id> ----
   // Mount restore + back/forward + typed links all flow through here.
   const [routeTab, setRouteTab] = useState<string | null>(null);
   useEffect(() => {
     const route = parseHash(window.location.hash);
-    if (route.newResearch) setNewResearchView(true);
+    if (route.newResearch) { setNewResearchView(true); setLibraryView(false); }
+    if (route.library) { setLibraryView(true); setNewResearchView(false); }
+    if (route.prefilledQuestion !== null) setPrefilledQuestion(route.prefilledQuestion);
     if (route.runId !== null) { setSelectedRunId(route.runId); setStudyView(route.study); }
     if (route.convId !== null) {
       setSelectedConvId(route.convId);
@@ -300,13 +321,15 @@ export function App(): JSX.Element {
   const routedConvId = selectedConvId !== null && (selectedRunId === null || convDocked) ? selectedConvId : null;
   useHashRoute(selectedRunId, routeTab, (route) => {
     setNewResearchView(route.newResearch);
+    setLibraryView(route.library);
+    if (route.prefilledQuestion !== null) setPrefilledQuestion(route.prefilledQuestion);
     if (route.runId !== null && route.runId !== selectedRunId) { setSelectedRunId(route.runId); setStudyView(route.study); }
     else if (route.runId !== null) setStudyView(route.study);
     if (route.runId === null && selectedRunId !== null) { setSelectedRunId(null); setStudyView(false); }
     if (route.convId !== null) { setSelectedConvId(route.convId); if (route.runId !== null) setConvDocked(true); }
     else if (routedConvId !== null) { setSelectedConvId(null); setConvDocked(false); } // back/forward to a no-conv URL closes the dialogue
     setRouteTab(route.tab);
-  }, routedConvId, studyView, newResearchView);
+  }, routedConvId, studyView, newResearchView, libraryView);
 
   // ---- command palette: every entry is a real capability ----
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -361,7 +384,7 @@ export function App(): JSX.Element {
         id: 'new-research',
         labelKey: 'welcome.newResearch',
         groupKey: 'palette.groupActions',
-        run: openNewResearch,
+        run: () => openNewResearch(),
       },
       {
         id: 'go-home',
@@ -481,6 +504,28 @@ export function App(): JSX.Element {
 
   const studies = useMemo(() => groupStudies(runs), [runs]);
 
+  // ---- rail (Bohrium/Doubao parity): persistent navigation + conversation ops ----
+  const removeConversation = useCallback((id: string): void => {
+    void deleteConversation(id)
+      .then(() => refreshConversations())
+      .catch((e: unknown) => {
+        setConvCreateError({
+          error: e instanceof ApiError ? e : new ApiError({ code: 'unknown', message: String(e), retryable: true }),
+          runId: '',
+        });
+      });
+    if (selectedConvId === id) { setSelectedConvId(null); setConvDocked(false); }
+  }, [refreshConversations, selectedConvId]);
+  const railSurface: RailSurface = libraryView
+    ? 'library'
+    : newResearchView
+      ? 'new'
+      : selectedConvId !== null && selectedRunId === null
+        ? 'conv'
+        : selectedRunId !== null && studyView
+          ? 'study'
+          : 'home';
+
   return (
     <div className="app">
       <header className="app-header">
@@ -565,6 +610,18 @@ export function App(): JSX.Element {
       <AwarenessBar activeRuns={activeRuns} selectedRunId={selectedRunId} onSelect={selectStudy} />
 
       <div className="app-body app-body--noshell">
+        <AppRail
+          surface={railSurface}
+          runs={runs}
+          conversations={conversations}
+          onHome={openHome}
+          onNewResearch={() => openNewResearch()}
+          onLibrary={openLibrary}
+          onOpenStudy={selectStudy}
+          onOpenConversation={openConversation}
+          onDeleteConversation={removeConversation}
+          onOpenSettings={() => setSettingsOpen(true)}
+        />
         <main className="content content--full" aria-label={t('app.title')}>
           {convCreateError !== null && (
             /* Adversarial-audit P1 fix: the create-conversation failure must be
@@ -575,6 +632,7 @@ export function App(): JSX.Element {
           )}
           {newResearchView ? (
             <NewResearch
+              initialQuestion={prefilledQuestion}
               onLaunched={(runId) => selectStudy(runId)}
               onOpenConversation={() => {
                 void createConversation({})
@@ -587,6 +645,8 @@ export function App(): JSX.Element {
                   });
               }}
             />
+          ) : libraryView ? (
+            <Library runs={runs} onOpenStudy={selectStudy} />
           ) : selectedConvId !== null && selectedRunId === null ? (
             <ConversationView
               conversationId={selectedConvId}
@@ -600,10 +660,11 @@ export function App(): JSX.Element {
               runsError={runsError}
               conversations={conversations}
               onOpenStudy={selectStudy}
-              onNewResearch={openNewResearch}
+              onNewResearch={() => openNewResearch()}
               onOpenConversation={openConversation}
               onOpenSettings={() => setSettingsOpen(true)}
               onRetryRuns={() => void refreshRunsWithAbort()}
+              onAskQuestion={(text) => openNewResearch(text)}
             />
           ) : runDetail === null ? (
             detailLoading ? (

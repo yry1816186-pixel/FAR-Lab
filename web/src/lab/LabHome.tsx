@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Plus, Search } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Plus, Search, Sparkles } from 'lucide-react';
 import { ApiError } from '../api/client';
 import { Badge, ErrorBox, TimeAgo } from '../components/common';
 import { useI18n } from '../i18n/LanguageContext';
+import type { DictKey } from '../i18n/dict';
 import { getHypotheses } from '../api/endpoints';
 import type { Conversation, HypothesisCandidate, RunSummary } from '../api/types';
 import { runStatusKey, runStatusTone } from '../tones';
@@ -23,7 +24,7 @@ const STUDY_PREVIEW = 10;
  */
 export function LabHome({
   runs, runsLoading, runsError, conversations,
-  onOpenStudy, onNewResearch, onOpenConversation, onOpenSettings, onRetryRuns,
+  onOpenStudy, onNewResearch, onOpenConversation, onOpenSettings, onRetryRuns, onAskQuestion,
 }: {
   runs: RunSummary[];
   runsLoading: boolean;
@@ -34,6 +35,7 @@ export function LabHome({
   onOpenConversation: (id: string) => void;
   onOpenSettings: () => void;
   onRetryRuns: () => void;
+  onAskQuestion: (text: string) => void;
 }): JSX.Element {
   const { t } = useI18n();
   const fresh = !runsLoading && runs.length === 0;
@@ -123,6 +125,7 @@ export function LabHome({
           />
         ) : (
           <>
+            <QuestionWelcome onAsk={onAskQuestion} />
             <section className="queue-section" aria-labelledby="labq-judgment">
               <h2 className="queue-section-title" id="labq-judgment">{t('labhome.judgmentTitle')}</h2>
               <p className="queue-section-sub">{t('labhome.judgmentSub')}</p>
@@ -261,6 +264,75 @@ export function LabHome({
         )}
       </main>
     </div>
+  );
+}
+
+/** Question-first welcome zone (Bohrium parity): on a workspace with studies,
+ *  the fastest path to the next study is still ONE question — a centered box
+ *  that hands its text to research formation (route-carried prefill), plus
+ *  quick-task templates that fill the box with a real question skeleton. The
+ *  judgment queue below stays the operational heart of the home. */
+function QuestionWelcome({ onAsk }: { onAsk: (text: string) => void }): JSX.Element {
+  const { t } = useI18n();
+  const [text, setText] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const QUICK: { key: DictKey; template: string }[] = [
+    { key: 'labhome.qkHypotheses', template: t('labhome.qkHypothesesTpl') },
+    { key: 'labhome.qkEvidence', template: t('labhome.qkEvidenceTpl') },
+    { key: 'labhome.qkPlan', template: t('labhome.qkPlanTpl') },
+  ];
+
+  const submit = (): void => {
+    const trimmed = text.trim();
+    if (trimmed.length === 0) return;
+    onAsk(trimmed);
+  };
+
+  return (
+    <section className="qwelcome" aria-labelledby="qw-title">
+      <h1 className="qw-title" id="qw-title">{t('labhome.qwTitle')}</h1>
+      <p className="qw-sub">{t('labhome.qwSub')}</p>
+      <div className="qw-box">
+        <input
+          ref={inputRef}
+          type="text"
+          className="qw-input"
+          value={text}
+          placeholder={t('labhome.qwPlaceholder')}
+          aria-label={t('labhome.qwPlaceholder')}
+          maxLength={600}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }}
+        />
+        <button
+          type="button"
+          className="qw-go"
+          onClick={submit}
+          disabled={text.trim().length === 0}
+        >
+          {t('labhome.qwGo')}
+        </button>
+      </div>
+      <div className="qw-quick" role="group" aria-label={t('labhome.qwQuickLabel')}>
+        {QUICK.map((q) => (
+          <button
+            type="button"
+            key={q.key}
+            className="qw-chip"
+            onClick={() => {
+              setText(q.template);
+              inputRef.current?.focus();
+              inputRef.current?.setSelectionRange(q.template.length, q.template.length);
+            }}
+          >
+            <Sparkles size={11} aria-hidden="true" />
+            {t(q.key)}
+          </button>
+        ))}
+      </div>
+      <p className="qw-note">{t('labhome.qwNote')}</p>
+    </section>
   );
 }
 

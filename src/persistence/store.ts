@@ -496,6 +496,15 @@ export class Store {
       .map((r) => KIND_SCHEMAS[kind].parse(JSON.parse(String(r.json))) as DomainObject<K>);
   }
 
+  /** Workspace-wide object listing (library surfaces): every stored object of
+   *  one kind across ALL runs, oldest first. Same schema validation as the
+   *  per-run path — a row that fails validation throws here exactly as it
+   *  would there (fail visibly, never silently skip stored truth). */
+  listObjectsAcrossRuns<K extends ObjectKind>(kind: K): DomainObject<K>[] {
+    return this.db.prepare('SELECT json FROM objects WHERE kind=? ORDER BY created_at ASC').all(kind)
+      .map((r) => KIND_SCHEMAS[kind].parse(JSON.parse(String(r.json))) as DomainObject<K>);
+  }
+
   /** Hard delete of one stored object; false when nothing matched (idempotent).
    *  FTS mirror rows for mirrored kinds are dropped with the object, or search
    *  would keep returning deleted questions/hypotheses/claims/conversations.

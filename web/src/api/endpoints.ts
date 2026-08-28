@@ -17,7 +17,7 @@ import {
   normalizeEvidence, normalizeEvents, normalizeHypotheses, normalizePlan, normalizeQuestion, normalizeScience,
   normalizeReceipts, normalizeRevisions, normalizeRun, normalizeRunSummaries, normalizeSearch, normalizeSources,
 } from './normalize';
-import type { Automation, BuiltinRouteSummary, ProviderTemplate as ProviderTemplateInfo, BuiltinRouteUpdateInput, BuiltinRoutesResponse, BundleSummary, Conversation, CorpusSnapshotInfo, FeedbackSourceKind, HealthReport, ModelConfigsResponse, ModelConfigInput, ModelConfigSummary, ModelConfigTestInput, ModelConfigTestResult, ResearchActionResponse, ResearchRun, RunEvent, RunSummary, ScientificGoalType, ScreeningDecisionResult, ScreeningStopResult, ScreeningView, SearchResponse, ToolIntegrationView, ToolTestRecord, UsageAggregate, VerificationReport, ZoteroAnnotation, ZoteroAnnotationsResponse, ZoteroLibItem, ZoteroLibraryResponse } from './types';
+import type { Automation, BuiltinRouteSummary, ProviderTemplate as ProviderTemplateInfo, BuiltinRouteUpdateInput, BuiltinRoutesResponse, BundleSummary, Conversation, CorpusSnapshotInfo, FeedbackSourceKind, HealthReport, LibrarySource, ModelConfigsResponse, ModelConfigInput, ModelConfigSummary, ModelConfigTestInput, ModelConfigTestResult, ResearchActionResponse, ResearchRun, RunEvent, RunSummary, ScientificGoalType, ScreeningDecisionResult, ScreeningStopResult, ScreeningView, SearchResponse, ToolIntegrationView, ToolTestRecord, UsageAggregate, VerificationReport, ZoteroAnnotation, ZoteroAnnotationsResponse, ZoteroLibItem, ZoteroLibraryResponse } from './types';
 
 const BASE = '/api/v1';
 
@@ -42,6 +42,15 @@ export const getPlan = normalizeWrap('plan', normalizePlan);
 
 export const getSources = async (runId: string, signal?: AbortSignal) =>
   normalizeSources(await api.getJson(`${BASE}/runs/${encodeURIComponent(runId)}/sources`, signal));
+
+/** Workspace-wide literature library: distinct documents across all studies
+ *  (identifier-deduplicated server-side), most-referenced first. */
+export const getLibrarySources = async (signal?: AbortSignal): Promise<LibrarySource[]> => {
+  const data = await api.getJson(`${BASE}/library/sources`, signal);
+  const list = Array.isArray((data as { sources?: unknown }).sources) ? (data as { sources: unknown[] }).sources : [];
+  return list.filter((v): v is LibrarySource =>
+    typeof v === 'object' && v !== null && typeof (v as { title?: unknown }).title === 'string' && Array.isArray((v as { runIds?: unknown }).runIds));
+};
 
 export const getEvidence = async (runId: string, signal?: AbortSignal) =>
   normalizeEvidence(await api.getJson(`${BASE}/runs/${encodeURIComponent(runId)}/evidence`, signal));

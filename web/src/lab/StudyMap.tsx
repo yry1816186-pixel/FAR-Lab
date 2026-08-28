@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Trash2 } from 'lucide-react';
 import { ApiError } from '../api/client';
 import { ErrorBox } from '../components/common';
 import { useI18n } from '../i18n/LanguageContext';
 import type { DictKey } from '../i18n/dict';
 import {
-  cancelRun, dispatchAction, editHypothesis, forkHypothesis, getEvidence, getHypotheses,
+  cancelRun, deleteRun, dispatchAction, editHypothesis, forkHypothesis, getEvidence, getHypotheses,
   getQuestion, getScience, getSources, promoteHypothesis, rejectHypothesis, resumeRun,
 } from '../api/endpoints';
 import { DISPATCHABLE_ACTIONS, type DispatchableAction } from '../api/endpoints';
@@ -104,6 +105,8 @@ export function StudyMap({
   const [lifecycleBusy, setLifecycleBusy] = useState(false);
   const [cancelArmed, setCancelArmed] = useState(false);
   const [cancelRequested, setCancelRequested] = useState(false);
+  const [deleteArmed, setDeleteArmed] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   const loadScience = useCallback((rid: string): void => {
     const c = new AbortController();
@@ -221,6 +224,23 @@ export function StudyMap({
     }
   };
 
+  // Hard-delete this study (server cascades events/objects/checkpoints in one
+  // transaction), then return home. Errors surface via the map's ErrorBox path
+  // (loadError) — a failed delete never silently leaves the researcher on a
+  // deleted study.
+  const deleteStudy = async (): Promise<void> => {
+    setDeleteBusy(true);
+    try {
+      await deleteRun(run.id);
+      window.location.hash = '#/';
+    } catch (e) {
+      setLoadError(e instanceof ApiError ? e : new ApiError({ code: 'unknown', message: String(e), retryable: true }));
+      setDeleteArmed(false);
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
   // Spine action dispatch: a REAL affordance per action type — the server re-validates
   // the precondition and a 400 names the unsatisfied condition (shown, not swallowed).
   const [dispatchError, setDispatchError] = useState<string | null>(null);
@@ -273,6 +293,34 @@ export function StudyMap({
             ))}
           </optgroup>
         </select>
+        {/* Study management (Doubao-parity): delete THIS study — hard cascade
+            on the server (events, objects, checkpoints, one transaction),
+            armed confirm like cancel; never offered for a RUNNING study. */}
+        {!running && (
+          deleteArmed ? (
+            <button
+              type="button"
+              className="map-del is-armed"
+              disabled={deleteBusy}
+              onClick={() => { void deleteStudy(); }}
+            >
+              {deleteBusy ? t('map.delBusy') : t('map.delConfirm')}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="map-del"
+              onClick={() => {
+                setDeleteArmed(true);
+                window.setTimeout(() => setDeleteArmed((v) => (v ? false : v)), 4000);
+              }}
+              aria-label={t('map.delete')}
+              title={t('map.deleteHint')}
+            >
+              <Trash2 size={13} aria-hidden="true" />
+            </button>
+          )
+        )}
       </header>
 
       <main className="map-canvas">

@@ -713,3 +713,182 @@
   padding: var(--sp-3);
 }
 .map-graph-frame .graph-svg { border: none; border-radius: 0; background: transparent; }
+
+/* ---- Workspace navigation rail (Bohrium/Doubao parity shell) ---- */
+.app-rail {
+  width: 232px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--sp-3) var(--sp-2);
+  background: var(--v2-surface);
+  border-right: 1px solid var(--v2-border);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.app-rail.is-collapsed { width: 52px; padding: var(--sp-3) 6px; }
+.rail-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--sp-2); padding: 0 4px var(--sp-3);
+}
+.app-rail.is-collapsed .rail-head { justify-content: center; padding: 0 0 var(--sp-3); }
+.rail-brand { font-size: 13.5px; font-weight: 700; letter-spacing: 0.01em; color: var(--v2-text-1); }
+.rail-collapse {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 6px;
+  border: 1px solid transparent; background: none; color: var(--v2-text-3); cursor: pointer;
+}
+.rail-collapse:hover { color: var(--v2-text-1); background: var(--v2-surface-2); }
+.rail-collapse:focus-visible { outline: 2px solid var(--v2-info); outline-offset: 1px; }
+
+.rail-group {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: var(--sp-2) 0;
+  border-top: 1px solid var(--v2-border);
+}
+.rail-group:first-of-type { border-top: none; }
+.rail-group--scroll { overflow-y: auto; scrollbar-width: thin; }
+.rail-group--bottom { margin-top: auto; border-bottom: none; }
+.rail-group-title {
+  margin: 0 6px 4px; font-size: 10.5px; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--v2-text-3);
+}
+.rail-nav-item, .rail-link {
+  display: flex; align-items: center; gap: var(--sp-2);
+  padding: 6px 8px; border: none; border-radius: 7px;
+  background: none; color: var(--v2-text-2); font-size: 12.5px;
+  text-align: left; cursor: pointer; min-height: 30px;
+}
+.app-rail.is-collapsed .rail-nav-item, .app-rail.is-collapsed .rail-link { justify-content: center; padding: 6px 0; }
+.rail-nav-item:hover, .rail-link:hover { background: var(--v2-surface-2); color: var(--v2-text-1); }
+.rail-nav-item:focus-visible, .rail-link:focus-visible { outline: 2px solid var(--v2-info); outline-offset: 1px; }
+.rail-nav-item.is-active, .rail-link.is-active {
+  background: var(--v2-info-tint); color: var(--v2-info-on-tint); font-weight: 600;
+}
+.rail-nav-icon { display: inline-flex; flex-shrink: 0; }
+.rail-nav-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rail-link { padding: 5px 8px; min-height: 28px; font-size: 12px; }
+.rail-link-icon { display: inline-flex; flex-shrink: 0; color: var(--v2-text-3); }
+.rail-link.is-active .rail-link-icon { color: var(--v2-info-on-tint); }
+.rail-link-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rail-conv-row { display: flex; align-items: center; gap: 2px; }
+.rail-conv-row .rail-link { flex: 1; min-width: 0; }
+.rail-conv-del {
+  flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+  height: 24px; padding: 0 5px; border: none; border-radius: 6px;
+  background: none; color: var(--v2-text-3); cursor: pointer; font-size: 11px;
+}
+.rail-conv-del:hover { color: var(--v2-refuted); background: var(--v2-refuted-tint); }
+.rail-conv-del:focus-visible { outline: 2px solid var(--v2-info); outline-offset: 1px; }
+.rail-conv-del.is-armed {
+  background: var(--v2-refuted); color: #fff; font-weight: 600; padding: 0 7px;
+}
+
+/* ---- Question-first welcome zone (Bohrium parity) ---- */
+.qwelcome {
+  text-align: center;
+  padding: 44px 16px 36px;
+  margin-bottom: var(--sp-4);
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-border);
+  border-radius: var(--radius-m);
+}
+.qw-title { margin: 0 0 6px; font-size: 24px; font-weight: 700; letter-spacing: -0.01em; color: var(--v2-text-1); }
+.qw-sub { margin: 0 auto 20px; max-width: 52ch; font-size: 13px; line-height: 1.6; color: var(--v2-text-2); }
+.qw-box {
+  display: flex; gap: var(--sp-2); align-items: stretch;
+  max-width: 640px; margin: 0 auto 12px;
+}
+.qw-input {
+  flex: 1; min-width: 0;
+  padding: 11px 14px;
+  font-size: 13.5px; font-family: inherit;
+  color: var(--v2-text-1);
+  background: var(--v2-page-bg);
+  border: 1px solid var(--v2-form-border);
+  border-radius: 9px;
+}
+.qw-input::placeholder { color: var(--v2-text-3); }
+.qw-input:focus-visible { outline: 2px solid var(--v2-info); outline-offset: 1px; }
+.qw-go {
+  flex-shrink: 0; padding: 0 18px;
+  font-size: 13px; font-weight: 600; font-family: inherit;
+  color: var(--v2-btn-ink-fg); background: var(--v2-btn-ink);
+  border: none; border-radius: 9px; cursor: pointer;
+}
+.qw-go:hover:not(:disabled) { background: #26292d; }
+.qw-go:disabled { opacity: 0.45; cursor: not-allowed; }
+.qw-go:focus-visible { outline: 2px solid var(--v2-info); outline-offset: 2px; }
+.qw-quick { display: flex; justify-content: center; gap: var(--sp-2); flex-wrap: wrap; margin-bottom: 14px; }
+.qw-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 12px; font-size: 12px; font-family: inherit;
+  color: var(--v2-text-2); background: var(--v2-surface-2);
+  border: 1px solid var(--v2-border); border-radius: 999px; cursor: pointer;
+}
+.qw-chip:hover { color: var(--v2-info-on-tint); border-color: color-mix(in oklab, var(--v2-info) 40%, var(--v2-border)); background: var(--v2-info-tint); }
+.qw-chip:focus-visible { outline: 2px solid var(--v2-info); outline-offset: 1px; }
+.qw-note { margin: 0; font-size: 11.5px; color: var(--v2-text-3); }
+
+/* ---- Literature library (Bohrium-style knowledge base, truth-plane edition) ---- */
+.lib-stats { font-size: 12px; color: var(--v2-text-2); }
+.lib-empty { text-align: center; padding: 60px 16px; color: var(--v2-text-2); }
+.lib-empty h2 { margin: 12px 0 6px; font-size: 16px; color: var(--v2-text-1); }
+.lib-empty p { margin: 0; font-size: 13px; max-width: 48ch; margin-inline: auto; line-height: 1.6; }
+.lib-row {
+  display: flex; gap: var(--sp-3); align-items: flex-start; justify-content: space-between;
+  padding: var(--sp-3) var(--sp-2);
+  border-bottom: 1px solid var(--v2-border);
+}
+.lib-row:last-of-type { border-bottom: none; }
+.lib-row-main { min-width: 0; flex: 1; }
+.lib-title { margin: 0 0 4px; font-size: 13px; font-weight: 600; line-height: 1.45; color: var(--v2-text-1); }
+.lib-flag--retracted {
+  display: inline-block; margin-right: 6px; padding: 1px 6px;
+  font-size: 10.5px; font-weight: 600; border-radius: 4px;
+  color: var(--v2-refuted-on-tint); background: var(--v2-refuted-tint);
+}
+.lib-meta { margin: 0; font-size: 11.5px; color: var(--v2-text-2); line-height: 1.5; }
+.lib-row-runs { flex-shrink: 0; display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; max-width: 34%; }
+.lib-run-chip {
+  max-width: 180px; padding: 3px 9px;
+  font-size: 11px; font-family: inherit;
+  color: var(--v2-text-2); background: var(--v2-surface-2);
+  border: 1px solid var(--v2-border); border-radius: 6px; cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.lib-run-chip:hover { color: var(--v2-info-on-tint); border-color: color-mix(in oklab, var(--v2-info) 40%, var(--v2-border)); }
+.lib-run-chip:focus-visible { outline: 2px solid var(--v2-info); outline-offset: 1px; }
+.lib-run-more { font-size: 11px; color: var(--v2-text-3); align-self: center; }
+
+/* ---- Shell integration: the rail shares the app-body row; narrow screens
+       drop it entirely (queue/map keep full width — the "/" palette and "n"
+       key cover navigation there). ---- */
+@media (max-width: 900px) {
+  .app-rail { display: none; }
+}
+@media (max-width: 560px) {
+  .qwelcome { padding: 30px 12px 26px; }
+  .qw-title { font-size: 20px; }
+  .qw-box { flex-direction: column; }
+  .qw-go { padding: 10px 18px; }
+  .lib-row { flex-direction: column; }
+  .lib-row-runs { max-width: 100%; justify-content: flex-start; }
+}
+
+/* ---- Study delete (map topline, armed confirm like cancel) ---- */
+.map-del {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 4px; height: 26px; padding: 0 7px;
+  font-size: 12px; font-family: inherit;
+  color: var(--v2-text-3); background: none;
+  border: 1px solid transparent; border-radius: 6px; cursor: pointer;
+}
+.map-del:hover { color: var(--v2-refuted); background: var(--v2-refuted-tint); }
+.map-del:focus-visible { outline: 2px solid var(--v2-info); outline-offset: 1px; }
+.map-del.is-armed {
+  color: #fff; background: var(--v2-refuted);
+  border-color: var(--v2-refuted); font-weight: 600; padding: 0 10px;
+}
+.map-del.is-armed:disabled { opacity: 0.6; cursor: wait; }
