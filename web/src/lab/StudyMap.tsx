@@ -682,6 +682,10 @@ function StateBand({ run, science, onResume, onDispatch, dispatchError, busy }: 
     }
   })();
 
+  // Forming (partial parked before hypotheses concluded): the partial band
+  // owns the resume affordance — a premature state card would fake a verdict.
+  if (s.kind === 'forming') return <></>;
+
   return (
     <section className="map-node">
       <p className="map-node-label">{t('map.stateLabel')}</p>

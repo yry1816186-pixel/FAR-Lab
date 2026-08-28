@@ -328,10 +328,17 @@ export function projectScientificState(input: {
   tournament: HypothesisTournament | null;
   /** Count of purpose='counter_evidence' queries in the run's latest corpus snapshot. */
   counterQueriesAttempted: number;
+  /**
+   * Whether the hypothesis-producing stage has CONCLUDED (done/skipped/failed),
+   * from the run's stage table. A PARTIAL run parked before generate_hypotheses
+   * finished has not concluded anything — its honest state is 'forming', never
+   * a premature 'insufficient' conclusion.
+   */
+  hypothesesStageConcluded?: boolean;
 }): ScientificState {
   const {
     runId, runStatus, questionDomain, claims, relations, hypotheses, scorecards,
-    evidenceBodies, tournament, counterQueriesAttempted,
+    evidenceBodies, tournament, counterQueriesAttempted, hypothesesStageConcluded = true,
   } = input;
   const claimsById = new Map(claims.map((c) => [c.id, c] as const));
   const active = byRank(activeOf(hypotheses), scorecards);
@@ -342,7 +349,7 @@ export function projectScientificState(input: {
   }
   if (isTemplateScopeDomain(questionDomain)) templateMarkers.push('scope domain is the offline scope template');
 
-  const settled = runStatus === 'completed' || runStatus === 'partial';
+  const settled = runStatus === 'completed' || (runStatus === 'partial' && hypothesesStageConcluded);
   const excludedClaims = claims.filter((c) => c.researcher?.excluded === true).length;
   const counterRelations = relations.filter((r) => {
     const pol = r.relation === 'contradicts' || r.relation === 'weakens'

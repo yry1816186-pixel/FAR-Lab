@@ -440,3 +440,42 @@ describe('projectStateDeltas — WHAT CHANGED / WHY from the causal revision cha
     expect(d.affectedHypothesisIds).toEqual([h1.id]);
   });
 });
+
+describe('partial-run honesty (2026-08-28 gold-run finding)', () => {
+  it('partial parked BEFORE generate_hypotheses concluded projects forming — never a premature insufficient verdict', () => {
+    const s = projectScientificState({
+      runId: rid, runStatus: 'partial', questionDomain: 'cardiology',
+      claims: [claim('c1', 'real retrieved claim')], relations: [],
+      hypotheses: [], scorecards: [], evidenceBodies: [], tournament: null,
+      counterQueriesAttempted: 2, hypothesesStageConcluded: false,
+    });
+    expect(s.kind).toBe('forming');
+    expect(s.leading).toBeNull();
+  });
+
+  it('partial with hypotheses stage concluded still synthesizes (the science had its chance)', () => {
+    const h1 = hyp('a', 'H1');
+    const c1 = claim('c1', 'c');
+    const s = projectScientificState({
+      runId: rid, runStatus: 'partial', questionDomain: 'cardiology',
+      claims: [c1], relations: [rel('r1', c1, h1, 'supports')],
+      hypotheses: [h1], scorecards: [card(h1, 1, 0.8, 0.6)], evidenceBodies: [], tournament: null,
+      counterQueriesAttempted: 0, hypothesesStageConcluded: true,
+    });
+    expect(s.kind).toBe('evidence_backed');
+    expect(s.leading?.hypothesisId).toBe(h1.id);
+  });
+
+  it('deriveNextActions returns nothing for a forming partial (partial band owns resume)', () => {
+    const state = projectScientificState({
+      runId: rid, runStatus: 'partial', questionDomain: 'cardiology',
+      claims: [claim('c1', 'c')], relations: [], hypotheses: [], scorecards: [],
+      evidenceBodies: [], tournament: null, counterQueriesAttempted: 0, hypothesesStageConcluded: false,
+    });
+    expect(deriveNextActions({
+      runId: rid, runStatus: 'partial', state,
+      leg: { kind: 'no_plan', executabilityPassed: false },
+      unconsumedFeedbackCount: 0, hasEvidenceDebt: false, planDatasets: [],
+    })).toEqual([]);
+  });
+});

@@ -113,6 +113,9 @@ export function deriveNextActions(input: ActionDerivationInput): NextResearchAct
   };
   const settled = runStatus === 'completed' || runStatus === 'partial';
   if (!settled) return [];
+  // Partial-but-unconcluded (hypotheses stage never finished): the map's
+  // partial band owns the resume affordance — no premature science actions.
+  if (state.kind === 'forming') return [];
 
   const actions: NextResearchAction[] = [];
   const leaderId = state.leading?.hypothesisId ?? null;

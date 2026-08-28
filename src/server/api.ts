@@ -735,6 +735,9 @@ function parseSeedSources(raw: unknown): string | {
       evidenceBodies: app.store.listObjects('evidence_body', runId),
       tournament: app.store.listObjects('tournament', runId).at(-1) ?? null,
       counterQueriesAttempted: corpus?.queries.filter((q) => q.purpose === 'counter_evidence').length ?? 0,
+      hypothesesStageConcluded: run.stages.some(
+        (st) => st.stage === 'generate_hypotheses' && st.state !== 'pending' && st.state !== 'running',
+      ),
     });
 
     const plan = app.store.listObjects('plan', runId).at(-1) ?? null;
