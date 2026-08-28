@@ -280,6 +280,15 @@ export function StudyMap({
           />
         )}
 
+        {!draftable && settled && science === null && !scienceLoaded && (
+          /* Same §21 CLS contract as the claims/hyps bands: the state band is the
+             tallest top-of-map block — inserting it unreserved shifts everything
+             below (measured 0.228 vs 0.1 budget). */
+          <section className="map-node" aria-hidden="true">
+            <p className="map-node-label">{t('map.stateLabel')}</p>
+            <div className="map-band map-band--reserving map-band--state" />
+          </section>
+        )}
         {!draftable && (
           <>
         {settled && science !== null && (
@@ -287,7 +296,7 @@ export function StudyMap({
             run={run}
             science={science}
             onResume={() => { void lifecycle('resume'); }}
-            onDispatch={(a) => { void dispatch(a); }}
+            onDispatch={(a: DispatchableAction) => { void dispatch(a); }}
             dispatchError={dispatchError}
             busy={lifecycleBusy}
           />

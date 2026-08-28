@@ -537,6 +537,10 @@
 .map-question { min-height: 92px; }
 .map-scope-row { min-height: 30px; }
 .map-band--reserving { min-height: 260px; }
+/* §21 CLS: the scientific-state band (state grid + next-action block) is the
+   tallest map block; reserve its loading footprint so its late arrival does
+   not push every band below it (perf.spec map CLS budget 0.1). */
+.map-band--state { min-height: 460px; }
 
 /* §8.2 pre-launch scope review */
 .scope-review {
