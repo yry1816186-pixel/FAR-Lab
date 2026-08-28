@@ -210,6 +210,8 @@ const auditConfirm = (...claimIds: string[]) => ({
     verdicts: claimIds.map((claimId) => ({
       claimId,
       verdict: 'confirm',
+      hypPrediction: 'the hypothesis predicts the association in the stated direction',
+      claimFinding: 'the claim reports the association in that same direction',
       reason: 'audit confirms the claim bears directly on the hypothesis mechanism',
     })),
   }),
@@ -1049,7 +1051,7 @@ describe('critique_falsify stage', () => {
     };
     const audit = {
       verdicts: [
-        { claimId: cCounterProposed.id, verdict: 'relabel', relation: 'supports', reason: 'on reflection the finding directly corroborates the duration mechanism' },
+        { claimId: cCounterProposed.id, verdict: 'relabel', relation: 'supports', hypPrediction: 'the hypothesis predicts longer exposure duration strengthens the outcome', claimFinding: 'the claim reports the outcome tracking exposure duration as predicted', reason: 'on reflection the finding directly corroborates the duration mechanism' },
       ],
     };
     const { ctx } = makeCtx(run, store, [
@@ -1108,8 +1110,8 @@ describe('critique_falsify stage', () => {
     };
     const audit = {
       verdicts: [
-        { claimId: cStretch.id, verdict: 'relabel', relation: 'weakens', reason: 'different organism means reduced confidence, not direct incompatibility' },
-        { claimId: cSup.id, verdict: 'drop', reason: 'dose-response is about dose, not duration — stretched onto this hypothesis' },
+        { claimId: cStretch.id, verdict: 'relabel', relation: 'weakens', hypPrediction: 'the hypothesis predicts the duration mechanism drives the outcome', claimFinding: 'the claim reports the outcome in a different organism model', reason: 'different organism means reduced confidence, not direct incompatibility' },
+        { claimId: cSup.id, verdict: 'drop', hypPrediction: 'the hypothesis predicts the duration mechanism drives the outcome', claimFinding: 'the claim reports a dose-response relationship only', reason: 'dose-response is about dose, not duration — stretched onto this hypothesis' },
       ],
     };
     const { ctx } = makeCtx(run, store, [

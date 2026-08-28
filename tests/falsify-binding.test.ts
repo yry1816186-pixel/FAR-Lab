@@ -183,6 +183,8 @@ const auditConfirm = (hypId: string, ...claimIds: string[]): StubStep => ({
     verdicts: claimIds.map((claimId) => ({
       claimId,
       verdict: 'confirm',
+      hypPrediction: 'the hypothesis predicts the association in the stated direction',
+      claimFinding: 'the claim reports the association in that same direction',
       reason: 'audit confirms the claim bears directly on the hypothesis predictions',
     })),
   }),

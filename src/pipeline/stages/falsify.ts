@@ -91,6 +91,13 @@ const FalsifyOut = z.object({
  * proposed claim->hypothesis link. Anchored-band discipline follows the MLR-Bench
  * judge-anchoring pattern (full-sentence bands + anti-leniency) and AI-Scientist v1's
  * pessimistic-reviewer default (strictness under doubt), both mechanism-level borrows.
+ *
+ * D-057/B direction anchoring (2026-08-29, live-measured): the fresh blind re-judge of
+ * run_498s42b8 found 9/24 counter labels INVERTED (judge=supports, 0 empty) — every miss
+ * was a null-side hypothesis (predicts absence/no-effect/no-correlation) whose
+ * no-effect supporting claims were labelled contradicts/weakens. The audit now DECOMPOSES
+ * direction before naming a verdict: state the hypothesis's predicted direction, state
+ * the claim's finding direction, only then the relation between THOSE two statements.
  */
 const LinkVerifyOut = z.object({
   verdicts: z
@@ -99,13 +106,22 @@ const LinkVerifyOut = z.object({
         claimId: z.string().min(1),
         verdict: z.enum(['confirm', 'relabel', 'drop']),
         relation: z.enum(['contradicts', 'weakens', 'qualifies', 'supports']).optional(),
+        /** Anchor 1: the hypothesis's testable prediction, in the auditor's own words. */
+        hypPrediction: z.string().min(20),
+        /** Anchor 2: the claim's finding direction, as the claim states it. */
+        claimFinding: z.string().min(20),
         reason: z.string().min(20),
       }),
     )
     .min(1),
 });
 
-export type LinkVerdict = z.infer<typeof LinkVerifyOut>['verdicts'][number];
+export type LinkVerdict = {
+  claimId: string;
+  verdict: 'confirm' | 'relabel' | 'drop';
+  relation?: 'contradicts' | 'weakens' | 'qualifies' | 'supports';
+  reason: string;
+};
 type CritiqueRelation = 'contradicts' | 'weakens' | 'qualifies' | 'supports';
 
 export interface LinkAuditDecision {
@@ -292,7 +308,10 @@ export const falsifyStage: StageHandler = {
           '"contradicts" ONLY when the claim asserts a finding incompatible with the hypothesis\'s core prediction about ' +
           'the same subject AND the same quantity/relationship; "weakens" when the claim reduces confidence without ' +
           'direct incompatibility (uncontrolled confounder, weaker effect than the mechanism requires); "qualifies" when ' +
-          'the claim bounds the conditions under which the hypothesis applies. A claim stretched from a different ' +
+          'the claim bounds the conditions under which the hypothesis applies. NULL-SIDE DIRECTION: first read what the ' +
+          'hypothesis PREDICTS — an effect, or an ABSENCE (no effect / no correlation / no transfer). A finding of no ' +
+          'effect SUPPORTS a no-effect hypothesis and CONTRADICTS an effect hypothesis; never label by the claim\'s ' +
+          'valence alone. A claim stretched from a different ' +
           'subject, measure, or mechanistic layer must not be linked at all. For claims that bear NO real relation ' +
           'to this hypothesis, do NOT link them — list their ids in consideredClaimIds instead: the claims you ' +
           'examined and rejected as unrelated (a claim absent from both the links and consideredClaimIds reads as ' +
@@ -458,16 +477,23 @@ export const falsifyStage: StageHandler = {
             purpose: `link-verification:${hyp.id}`,
             systemPrompt:
               'You are a skeptical auditor of evidence links proposed by a different reviewer. For EACH proposed ' +
-              'claim->hypothesis link decide exactly one of: "confirm" (the proposed relation is defensible), ' +
-              '"relabel" (a different relation fits; supply it), or "drop" (the link is not defensible). Anchored ' +
-              'discipline: a claim SUPPORTS only if its finding is direct evidence for THIS hypothesis\'s core ' +
-              'mechanism or prediction on the same subject — topical kinship is NOT support. A claim CONTRADICTS ' +
-              'only if its finding is incompatible with the core prediction about the same subject and the same ' +
-              'quantity/relationship. A claim WEAKENS if it reduces confidence without direct incompatibility. A ' +
-              'claim QUALIFIES if it bounds the conditions under which the hypothesis applies. A link stretched from ' +
-              'a different subject, measure, or mechanistic layer must be DROPped. Be strict: a wrong support or ' +
-              'contradiction is worse than an honest drop; do not confirm out of politeness. Every verdict needs a ' +
-              'reason of at least 20 characters naming the exact evidence-to-mechanism relationship.',
+              'claim->hypothesis link work in exactly three anchored steps, and write all three into your verdict: ' +
+              '(1) hypPrediction — state the hypothesis\'s testable predicted direction in your own words, INCLUDING ' +
+              'whether it predicts an effect, an ABSENCE of effect, or a moderator/boundary; (2) claimFinding — state ' +
+              'the finding direction the claim itself reports; (3) only then decide exactly one of: "confirm" (the ' +
+              'proposed relation is the correct relation between those two directions), "relabel" (a different ' +
+              'relation fits; supply it), or "drop" (no defensible relation). ' +
+              'DIRECTION DISCIPLINE (null-side hypotheses): a hypothesis that predicts NO effect / no correlation / ' +
+              'no transfer is SUPPORTED by findings of no effect — labelling such a finding contradicts or weakens ' +
+              'is backwards. Symmetrically, an effect-predicting hypothesis is contradicted by no-effect findings. ' +
+              'Anchored discipline: a claim SUPPORTS only if its finding direction matches the hypothesis\'s predicted ' +
+              'direction as direct evidence for THIS hypothesis\'s core mechanism or prediction on the same subject — ' +
+              'topical kinship is NOT support. A claim CONTRADICTS only if its finding direction is opposite to the ' +
+              'predicted direction about the same subject and the same quantity/relationship. A claim WEAKENS if it ' +
+              'reduces confidence without direct opposition. A claim QUALIFIES if it bounds the conditions under which ' +
+              'the hypothesis applies. A link stretched from a different subject, measure, or mechanistic layer must ' +
+              'be DROPped. Be strict: a wrong support or contradiction is worse than an honest drop; do not confirm ' +
+              'out of politeness. Every reason needs at least 20 characters naming the exact direction relationship.',
             payload: {
               hypothesis: {
                 id: hyp.id,
@@ -475,6 +501,7 @@ export const falsifyStage: StageHandler = {
                 mechanism: hyp.mechanism,
                 predictions: hyp.predictions,
               },
+              expectedRelation: out.expectedRelation,
               proposedLinks: proposedLinks.map((l) => ({
                 claimId: l.claimId,
                 proposedRelation: l.relation,
