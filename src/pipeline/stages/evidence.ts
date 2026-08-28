@@ -548,25 +548,82 @@ export const buildEvidenceStage: StageHandler = {
     // triggers targeted top-up instead of passing a fixed bar of 3.
     const verifiedFloor = Math.max(GAP_SEEK_MIN_VERIFIED, Math.ceil(plan.usable.length / 2));
     let gapSeekNote = 'not triggered (enough verified evidence)';
-    if (verifiedCount < verifiedFloor) {
-      ctx.log(`verified claims ${verifiedCount} < ${verifiedFloor} — evaluating evidence gap`);
-      const gap = await callStructured<GapSeek>(ctx, {
+    // W4R subject-coverage gate (2026-08-29): the count-based floor alone let a
+    // corpus of topically-ADJACENT papers (which explicitly study different
+    // subjects — live-observed on the fabricated-taxon probe) count as "enough
+    // evidence", and hypothesis generation then produced confident mechanisms
+    // about a subject the literature does not contain. The assessment now runs on
+    // EVERY run and its verdict is persisted on the run as an honest tag that
+    // gates hypothesis generation (see hypotheses.ts refusal).
+    const gap = await callStructured<GapSeek>(ctx, {
+      stage: 'build_evidence',
+      purpose: 'evidence-gap-assessment',
+      systemPrompt:
+        'You assess whether the current verified evidence base can support ' +
+        'hypothesis generation for the research question, and if not, propose AT MOST 2 targeted ' +
+        'scholarly search queries that could close the most important gap. SUBJECT-COVERAGE RULE ' +
+        '(strict): enoughEvidence=true ONLY IF at least one verified claim directly measures, ' +
+        'observes, or analyzes the question\'s central subject entities (the named organism, ' +
+        'intervention, system, or quantity). A corpus of topically-adjacent papers that study ' +
+        'DIFFERENT subjects — even real, even relevant to the field, even explicitly noting the ' +
+        'mismatch — does NOT cover the subject: set enoughEvidence=false. If no retrieval could ' +
+        'realistically fix it (e.g. the named subject does not appear in the literature), return ' +
+        'empty queries and say exactly that in gapDescription. Never invent facts to fill gaps.',
+      payload: {
+        question: question.text,
+        verifiedClaimCount: verifiedCount,
+        verifiedClaimTexts: ctx.store.listObjects('claim', ctx.run.id)
+          .filter((c) => c.bindingStatus === 'verified')
+          .slice(0, 20)
+          .map((c) => c.text.slice(0, 300)),
+        sourceTitles: plan.usable.map((d) => d.title),
+      },
+      schema: GapSeekSchema,
+      temperature: 0,
+    });
+    // 2-of-2 discipline: a single temp-0 judgment proved unstable on a healthy,
+    // fully on-subject corpus (live-observed 2026-08-29: P1 ARG corpus judged
+    // insufficient once, adequate on a same-prompt replay). Refusing hypothesis
+    // generation is a high-cost action — it now requires a second, differently
+    // framed independent judgment to agree. P5-class corpora (which explicitly
+    // study different subjects) fail both framings; a stray misjudgment fails
+    // only one and the run proceeds.
+    let subjectAdequate = gap.data.enoughEvidence;
+    if (!subjectAdequate) {
+      const confirmGap = await callStructured<GapSeek>(ctx, {
         stage: 'build_evidence',
         purpose: 'evidence-gap-assessment',
         systemPrompt:
-          'You assess whether the current verified evidence base is too barren to support ' +
-          'hypothesis generation for the research question, and if so, propose AT MOST 2 targeted ' +
-          'scholarly search queries that could close the most important gap. If the evidence is ' +
-          'adequate, or no retrieval could realistically improve it, set enoughEvidence=true and ' +
-          'return empty queries. Never invent facts to fill gaps.',
+          'You are an independent auditor. A reviewer claimed the verified evidence below does ' +
+          'NOT cover the research question\'s subject. Your job is to check that claim. evidenceCovers=true ' +
+          'if ANY verified claim is ABOUT the question\'s named subject — measuring, observing, or ' +
+          'analyzing that very subject (same organism/intervention/system/quantity), not merely the ' +
+          'same field or topic. evidenceCovers=false only if every verified claim is about something ' +
+          'else (different organism, different intervention, different system) — check each claim ' +
+          'against the subject name honestly. Answer in the given JSON shape.',
         payload: {
           question: question.text,
-          verifiedClaimCount: verifiedCount,
-          sourceTitles: plan.usable.map((d) => d.title),
+          claimOfTheReviewer: gap.data.gapDescription,
+          verifiedClaimTexts: ctx.store.listObjects('claim', ctx.run.id)
+            .filter((c) => c.bindingStatus === 'verified')
+            .slice(0, 20)
+            .map((c) => c.text.slice(0, 300)),
         },
         schema: GapSeekSchema,
         temperature: 0,
       });
+      if (confirmGap.data.enoughEvidence) {
+        subjectAdequate = true;
+        ctx.log(
+          `build_evidence: first gap judgment said insufficient, independent confirm pass disagreed (subject covered) — proceeding. First judgment: ${gap.data.gapDescription.slice(0, 140)}`,
+        );
+      }
+    }
+    if (!subjectAdequate) {
+      gapSeekNote = `insufficient (2-of-2): ${gap.data.gapDescription.slice(0, 160)}`;
+    }
+    if (verifiedCount < verifiedFloor) {
+      ctx.log(`verified claims ${verifiedCount} < ${verifiedFloor} — evaluating evidence gap`);
       if (!gap.data.enoughEvidence && gap.data.queries.length > 0) {
         gapSeekNote = `triggered: ${gap.data.gapDescription.slice(0, 120)}`;
         // W-A source rotation: gap-seek must not be a single point of failure on the
@@ -650,6 +707,14 @@ export const buildEvidenceStage: StageHandler = {
           ? `not triggered (model judged evidence adequate: ${gap.data.gapDescription.slice(0, 80)})`
           : 'triggered but no actionable queries returned';
       }
+    }
+    // W4R subject-coverage verdict → honest run tag (visible in the UI; consumed
+    // by the hypotheses stage to refuse generation on an uncovered subject).
+    if (!subjectAdequate && !ctx.run.tags.includes('evidence-insufficient')) {
+      ctx.store.updateRun({ ...ctx.run, tags: [...ctx.run.tags, 'evidence-insufficient'] });
+      ctx.log(
+        `build_evidence: evidence flagged INSUFFICIENT for the question's subject — hypothesis generation will refuse: ${gap.data.gapDescription.slice(0, 160)}`,
+      );
     }
 
     // ---- D-018 claim-claim cross relations (populate the unused targetClaimId channel) ----

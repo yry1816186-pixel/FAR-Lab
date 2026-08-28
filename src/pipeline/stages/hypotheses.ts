@@ -444,6 +444,18 @@ export const generateHypothesesStage: StageHandler = {
           'no verified claims (bindingStatus=verified) for this run — hypothesis generation is evidence-constrained and refuses to run on an empty evidence base',
       };
     }
+    // W4R subject-coverage gate (2026-08-29): the evidence stage's gap assessment
+    // judged that no verified claim addresses the question's central subject
+    // (topical adjacency is not coverage). Generating confident hypotheses about
+    // an uncovered subject is fabrication-adjacent — the honest move is refusal,
+    // which skips the plan stage too and lands the run in honest abstention.
+    if (ctx.run.tags.includes('evidence-insufficient')) {
+      return {
+        kind: 'skipped',
+        reason:
+          'evidence flagged insufficient for the question\'s subject (run tag evidence-insufficient) — the verified claims do not measure or observe the question\'s central subject; refusing to generate hypotheses about an uncovered subject',
+      };
+    }
     const relations: EvidenceRelation[] = ctx.store.listObjects('evidence_relation', runId);
     const { supporting, counter } = bucketClaims(claims, relations);
     const existingClaimIds = runClaimIds(ctx);
