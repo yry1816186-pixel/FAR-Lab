@@ -461,7 +461,7 @@ describe('truncation discipline (W7-F2, finish_reason=length)', () => {
 // ---------------------------------------------------------------------------
 
 describe('transport failure classification and retry budget', () => {
-  it('classifies 429 as rate_limited, retries at most twice with jittered 1s/2s backoff (W4-F1)', async () => {
+  it('classifies 429 as rate_limited, retries at most twice with the 20s/30s RPM spacing (W4-F1 + 2026-08-28 live)', async () => {
     const { sleep, sleeps } = sleepRecorder();
     const rateLimited = () =>
       Promise.resolve(httpError(429, { error: { message: 'Too many requests', type: 'rate_limit_error', code: 'rate_limit_exceeded' } }));
@@ -474,8 +474,10 @@ describe('transport failure classification and retry budget', () => {
     expect(res.error?.retryable).toBe(true);
     expect(res.error?.httpStatus).toBe(429);
     expect(calls.length).toBe(3); // initial + 2 retries = hard cap
-    // random()=0.5 → jitter factor exactly 1.0: pure exponential 1000·2^(n-1)
-    expect(sleeps).toEqual([1_000, 2_000]);
+    // random()=0.5 → jitter factor exactly 1.0: 20s then 40s capped at the 30s max —
+    // wide enough to straddle a minute-scale account RPM window (observed as
+    // bigmodel code 1302 while build_evidence batches claim extractions).
+    expect(sleeps).toEqual([20_000, 30_000]);
     expect(res.error?.message).toContain('retry budget of 2 exhausted');
     // W4-F1 observability: the receipt records consumed retries
     expect(res.receipt.transportRetries).toBe(2);
@@ -541,7 +543,7 @@ describe('transport failure classification and retry budget', () => {
     const res = await provider.structuredCall(REQ, parseHypothesis);
     expect(res.ok).toBe(true);
     expect(calls.length).toBe(2);
-    expect(sleeps).toEqual([1_000]);
+    expect(sleeps).toEqual([20_000]); // RPM spacing curve
     expect(res.receipt.transportRetries).toBe(1);
   });
 
@@ -589,6 +591,47 @@ describe('transport failure classification and retry budget', () => {
     expect(res.ok).toBe(true);
     expect(calls.length).toBe(2);
     expect(sleeps).toEqual([15_000]); // overload spacing: 15s, not the standard 1s
+  });
+
+  // 429 code 1302 = account-level RPM throttle (observed live on glm-4.7-flash
+  // 2026-08-28 while build_evidence batches claim extractions) — minute-scale
+  // window, so the retry spacing must straddle it like the 529 window does.
+  it('retries HTTP 429 account-RPM throttling with wide spacing', async () => {
+    const { sleep, sleeps } = sleepRecorder();
+    const { fetchImpl, calls } = recorderFetch([
+      () => Promise.resolve(httpError(429, { error: { code: '1302', message: '您的账户已达到速率限制，请您控制请求频率' } })),
+      () => Promise.resolve(anthropicOk(RAW_OK)),
+    ]);
+    const provider = createZaiProvider({ apiKey: 'test-fixture-key-zai', fetchImpl, sleep, random: () => 0.5 });
+    const res = await provider.structuredCall(REQ, parseHypothesis);
+    expect(res.ok).toBe(true);
+    expect(calls.length).toBe(2);
+    expect(sleeps).toEqual([20_000]); // RPM spacing: 20s, not the standard 1s curve
+  });
+
+  it('pacing: FARLAB_MIN_CALL_INTERVAL_MS delays a back-to-back call to the same provider', async () => {
+    const prev = process.env.FARLAB_MIN_CALL_INTERVAL_MS;
+    process.env.FARLAB_MIN_CALL_INTERVAL_MS = '5000';
+    const { __resetPacerForTests } = await import('../src/providers/http.js');
+    __resetPacerForTests();
+    try {
+      const { sleep, sleeps } = sleepRecorder();
+      const first = recorderFetch([() => Promise.resolve(anthropicOk(RAW_OK))]);
+      const second = recorderFetch([() => Promise.resolve(anthropicOk(RAW_OK))]);
+      const provider = createZaiProvider({ apiKey: 'test-fixture-key-zai', fetchImpl: first.fetchImpl, sleep, random: () => 0.5 });
+      const p2 = createZaiProvider({ apiKey: 'test-fixture-key-zai', fetchImpl: second.fetchImpl, sleep, random: () => 0.5 });
+      await provider.structuredCall(REQ, parseHypothesis);
+      await p2.structuredCall(REQ, parseHypothesis);
+      // First call fires immediately; the second waits (interval minus the real
+      // milliseconds elapsed between the two calls) before its fetch.
+      expect(sleeps.length).toBe(1);
+      expect(sleeps[0]).toBeGreaterThan(4_000);
+      expect(sleeps[0]).toBeLessThanOrEqual(5_000);
+    } finally {
+      if (prev === undefined) delete process.env.FARLAB_MIN_CALL_INTERVAL_MS;
+      else process.env.FARLAB_MIN_CALL_INTERVAL_MS = prev;
+      __resetPacerForTests();
+    }
   });
 
   it('does NOT retry permanent 4xx (400 invalid model)', async () => {

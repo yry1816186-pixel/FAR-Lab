@@ -82,6 +82,37 @@ const RETRY_JITTER_RATIO = 0.25;
  */
 const OVERLOAD_INITIAL_DELAY_MS = 15_000;
 
+/**
+ * Account-level RPM throttling (observed live 2026-08-28: bigmodel glm-4.7-flash
+ * returns HTTP 429 code 1302 账户已达到速率限制 while build_evidence batches
+ * claim-extraction calls). The 1s/2s curve retried inside the same minute window
+ * and died; rate-limit calls space out at 20s/40s so the bounded retry count can
+ * straddle an RPM window (same discipline as the 529 overload spacing).
+ */
+const RATE_LIMIT_INITIAL_DELAY_MS = 20_000;
+
+/**
+ * Optional per-provider call pacing (env FARLAB_MIN_CALL_INTERVAL_MS, default 0 =
+ * off). Batch stages (claim extraction over N sources) otherwise fire back-to-back
+ * structured calls and hit the account RPM wall repeatedly; pacing prevents the
+ * wall instead of only recovering from it. Per-provider so a mixed chain never
+ * inherits one slow route's interval.
+ */
+const minCallIntervalMs = (): number => {
+  const raw = Number(process.env.FARLAB_MIN_CALL_INTERVAL_MS ?? '0');
+  return Number.isFinite(raw) && raw > 0 ? Math.min(raw, 60_000) : 0;
+};
+const lastCallAtByProvider = new Map<string, number>();
+/** Pacing wait for the next call to `providerName` (0 = fire now). Pure, testable. */
+export const pacingDelayMs = (providerName: string, now: number, minInterval: number): number => {
+  if (minInterval <= 0) return 0;
+  const last = lastCallAtByProvider.get(providerName);
+  return last === undefined ? 0 : Math.max(0, last + minInterval - now);
+};
+const markCall = (providerName: string, now: number): void => { lastCallAtByProvider.set(providerName, now); };
+/** Test seam: clear pacing history between suites. */
+export const __resetPacerForTests = (): void => { lastCallAtByProvider.clear(); };
+
 export const backoffDelayMs = (
   attempt: number,
   retryAfterMs?: number,
@@ -104,6 +135,17 @@ export const overloadBackoffDelayMs = (
   const exponent = Math.min(Math.max(attempt, 1) - 1, 2);
   const jitter = 1 - RETRY_JITTER_RATIO + 2 * RETRY_JITTER_RATIO * random();
   return cap(OVERLOAD_INITIAL_DELAY_MS * 2 ** exponent * jitter);
+};
+
+/** Rate-limit backoff (HTTP 429 account RPM): 20s then 40s, same discipline. */
+export const rateLimitBackoffDelayMs = (
+  attempt: number,
+  random: () => number = Math.random,
+): number => {
+  const cap = (ms: number) => Math.max(0, Math.min(Math.ceil(ms), RETRY_MAX_BACKOFF_MS));
+  const exponent = Math.min(Math.max(attempt, 1) - 1, 2);
+  const jitter = 1 - RETRY_JITTER_RATIO + 2 * RETRY_JITTER_RATIO * random();
+  return cap(RATE_LIMIT_INITIAL_DELAY_MS * 2 ** exponent * jitter);
 };
 
 /**
@@ -1101,6 +1143,15 @@ export async function runOpenAICompatStructuredCall<T>(
       });
     }
 
+    // Provider pacing (opt-in via FARLAB_MIN_CALL_INTERVAL_MS): sleep only the
+    // deficit, and only when this provider was called within the interval.
+    const interval = minCallIntervalMs();
+    if (interval > 0) {
+      const wait = pacingDelayMs(cfg.providerName, Date.now(), interval);
+      if (wait > 0 && wait < remaining) await sleep(wait);
+    }
+    markCall(cfg.providerName, Date.now());
+
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), remaining);
     let attempt: ChatAttempt;
@@ -1222,12 +1273,17 @@ export async function runOpenAICompatStructuredCall<T>(
     }
     // W4-F1: server Retry-After (when the failing response carried one) beats the
     // jittered exponential curve; both cap at RETRY_MAX_BACKOFF_MS. Capacity
-    // overload (529) uses the wider overload spacing so bounded retries can
-    // straddle the multi-minute window instead of dying inside it.
+    // overload (529) and account RPM throttling (429) use their wider spacings so
+    // bounded retries can straddle the multi-minute/minute window instead of
+    // dying inside it.
     await sleep(
       f.httpStatus === 529
         ? overloadBackoffDelayMs(transportRetries + 1, random)
-        : backoffDelayMs(transportRetries + 1, retryAfterMsHint, random),
+        : f.kind === 'rate_limited'
+          ? (retryAfterMsHint !== undefined
+              ? Math.min(Math.ceil(retryAfterMsHint), RETRY_MAX_BACKOFF_MS)
+              : rateLimitBackoffDelayMs(transportRetries + 1, random))
+          : backoffDelayMs(transportRetries + 1, retryAfterMsHint, random),
     );
     transportRetries += 1;
   }
