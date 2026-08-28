@@ -333,7 +333,10 @@ export function EvidenceGraph({
                 stroke={stroke}
                 strokeWidth={inFocus ? baseW + 0.8 : baseW}
                 strokeDasharray={dash}
-                opacity={dim ? 0.08 : e.kind === 'locator' ? 0.5 : inFocus ? 1 : 0.85}
+                {/* locator edges are containment plumbing, not argument structure:
+                    at full-corpus scale (100+ edges, live-observed 2026-08-29) they
+                    dominate the picture — keep them faint until hover isolates. */}
+                opacity={dim ? 0.08 : e.kind === 'locator' ? 0.22 : inFocus ? 1 : 0.85}
               >
                 {e.strength !== undefined && <title>{`${t('graph.claimClaim')} — ${t(`graph.strength.${e.strength}`)}`}</title>}
               </path>
