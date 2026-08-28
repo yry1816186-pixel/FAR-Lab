@@ -508,6 +508,20 @@ const appendTruncationCorrection = (messages: ChatMessage[], reason: string): Ch
 };
 
 /**
+ * Thinking-only corrective re-ask (D-082): the previous response spent its whole
+ * output on reasoning blocks and never emitted answer text. Ask for the answer
+ * directly — no preamble, no reasoning — under the same bounded re-ask budget.
+ */
+const appendThinkingOnlyCorrection = (messages: ChatMessage[], reason: string): ChatMessage[] => {
+  const correction =
+    `\n\nYour previous reply contained ONLY reasoning and no answer (${reason}).\n` +
+    'Reply again with ONLY the JSON object matching the requested structure — answer immediately, ' +
+    'no reasoning, no preamble, no markdown fences. Keep every required field concise. ' +
+    'Escape every double quote inside string values as \\" — never emit a raw " inside a string.';
+  return messages.map((m, i) => (i === messages.length - 1 ? { ...m, content: m.content + correction } : m));
+};
+
+/**
  * Parse raw model output as JSON. Layer order (every repair layer must still produce
  * text that JSON.parses; a layer whose guess yields invalid JSON self-corrects by
  * falling through to the next):
@@ -734,6 +748,24 @@ const parseAnthropicSuccessBody = (bodyText: string, providerName: string): Chat
     .map((b) => (typeof b['text'] === 'string' ? b['text'] : ''))
     .join('');
   if (text.length === 0) {
+    // Thinking-capable models (e.g. glm-4.6 on this wire) can legitimately return
+    // 200 with ONLY reasoning blocks — the answer text never materialized (budget
+    // spent thinking, or the model stopped after reasoning). That is an unusable
+    // MODEL OUTPUT, not a malformed transport body: classify as invalid_output so
+    // the bounded corrective re-ask can recover it (D-082, observed live 2026-08-28:
+    // build_evidence claim-extraction failed as non-retryable provider_error).
+    const hasThinking = blocks.some((b) => isRecord(b) && b['type'] === 'thinking');
+    if (hasThinking) {
+      return {
+        ok: false,
+        failure: {
+          kind: 'invalid_output',
+          retryable: false,
+          httpStatus: 200,
+          message: `${providerName}: HTTP 200 carried only thinking blocks (no answer text); body head: ${truncate(redactSecrets(bodyText), 200)}`,
+        },
+      };
+    }
     return {
       ok: false,
       failure: {
@@ -1139,6 +1171,23 @@ export async function runOpenAICompatStructuredCall<T>(
         kind: 'invalid_output',
         retryable: false,
         message: `${cfg.providerName}: model output was not valid JSON after ${MAX_INVALID_OUTPUT_RETRIES} corrective re-asks${truncationConfirmed ? ' (output truncated at token limit)' : ''}; last raw output head: ${truncate(lastRawContent, 200)}`,
+      });
+    }
+
+    // Wire-level invalid_output (e.g. Anthropic-wire 200 with only thinking
+    // blocks, D-082): the HTTP call succeeded but produced no usable text —
+    // recover through the SAME bounded corrective re-ask as schema rejections,
+    // with an instruction that targets the observed failure mode.
+    if (!attempt.ok && attempt.failure.kind === 'invalid_output') {
+      if (invalidOutputRetries < MAX_INVALID_OUTPUT_RETRIES) {
+        invalidOutputRetries += 1;
+        messages = appendThinkingOnlyCorrection(messages, attempt.failure.message);
+        continue;
+      }
+      return fail({
+        kind: 'invalid_output',
+        retryable: false,
+        message: `${cfg.providerName}: model produced no answer text after ${MAX_INVALID_OUTPUT_RETRIES} corrective re-asks (${truncate(attempt.failure.message, 200)})`,
       });
     }
 

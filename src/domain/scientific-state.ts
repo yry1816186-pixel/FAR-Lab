@@ -3,7 +3,8 @@ import { ClaimId, HypothesisId, RunId } from './ids.js';
 import type { ScientificClaim } from './claim.js';
 import { EvidenceStrength, type EvidenceRelation } from './evidence.js';
 import type { HypothesisCandidate } from './hypothesis.js';
-import type { HypothesisScorecard, ScoreDimension } from './scorecard.js';
+import type { HypothesisScorecard, ScoreDimension, HypothesisTournament } from './scorecard.js';
+import type { EvidenceBody } from './evidence-body.js';
 
 /**
  * Product Spine M1 (final product reconstruction, 2026-08-28): the CURRENT
@@ -83,7 +84,26 @@ export const ScientificState = z.object({
   ]).nullable(),
   confidence: z.object({
     qualitative: z.enum(['low', 'moderate', 'high']),
-    basis: z.literal('ordinal scorecard dimensions — uncalibrated, not probabilities'),
+    /**
+     * Weakest-link uncertainty propagation (2026-08-28 algorithm hardening):
+     * every factor considered, with its observed value and its grade — the
+     * ordinal level is the MIN over factors, never an average that hides the
+     * weakest input. Ordinal only: not calibrated probabilities.
+     */
+    factors: z.array(z.string().min(1)).default([]),
+  }),
+  /** Counter-evidence search coverage (symmetry guard): what was searched, what was found. */
+  counterEvidenceCoverage: z.object({
+    queriesAttempted: z.number().int().nonnegative(),
+    counterRelationsFound: z.number().int().nonnegative(),
+  }).nullable(),
+  /** How the current ordering was produced and how stable it is (internal consistency signal). */
+  ordering: z.object({
+    basis: z.enum(['tournament', 'composite', 'single_candidate']),
+    /** Kendall τ between composite rank order and tournament rank order; null when not computable (no tournament / <3 common). */
+    agreement: z.number().min(-1).max(1).nullable(),
+    /** Top-2 Bradley-Terry bootstrap CI separation. */
+    topSeparation: z.enum(['disjoint', 'overlap', 'unknown']),
   }),
   falsifiers: z.array(z.object({
     hypothesisId: HypothesisId,
@@ -177,13 +197,6 @@ const byRank = (hyps: HypothesisCandidate[], scorecards: HypothesisScorecard[]):
     .map((x) => x.h);
 };
 
-const QUAL_BY_VALUE: Array<[number, 'low' | 'moderate' | 'high']> = [[0.34, 'low'], [0.67, 'moderate']];
-
-const qualitativeOf = (value: number): 'low' | 'moderate' | 'high' => {
-  for (const [threshold, label] of QUAL_BY_VALUE) if (value < threshold) return label;
-  return 'high';
-};
-
 const differsByOf = (h: HypothesisCandidate, leader: HypothesisCandidate): string | null => {
   if (h.distinctnessRationale !== undefined && h.distinctnessRationale.trim().length > 0) return h.distinctnessRationale;
   const obsA = leader.falsification?.observable;
@@ -191,6 +204,104 @@ const differsByOf = (h: HypothesisCandidate, leader: HypothesisCandidate): strin
   if (obsA !== undefined && obsB !== undefined && obsA !== obsB) return `${obsA} vs ${obsB}`;
   if (h.mechanism !== undefined && h.mechanism.length > 0 && h.mechanism !== leader.mechanism) return h.mechanism;
   return null;
+};
+
+// ---------------------------------------------------------------------------
+// Uncertainty propagation (weakest-link). Every factor maps observed evidence
+// to an ordinal grade with a disclosed rule; the final level is the MIN over
+// factors. Replaces the pre-2026-08-28 ad hoc 0.34/0.67 single-value mapping,
+// which collapsed log-LR interval width, source count, rank separation and
+// counter coverage into one number and hid the weakest input.
+// ---------------------------------------------------------------------------
+
+type Grade = 'low' | 'moderate' | 'high';
+const CONFIDENCE_ORDER: Record<Grade, number> = { low: 0, moderate: 1, high: 2 };
+
+/** Log-LR interval width (log10): ≤0.5 narrow, ≤1.5 moderate, wider is low. */
+const gradeIntervalWidth = (width: number): Grade =>
+  width <= 0.5 ? 'high' : width <= 1.5 ? 'moderate' : 'low';
+
+/** Independent contributing sources: ≥3 broad base, 2 narrow, ≤1 single-source. */
+const gradeIndependentSources = (n: number): Grade =>
+  n >= 3 ? 'high' : n === 2 ? 'moderate' : 'low';
+
+/** Deterministic evidence-grounding dimension (the overridden, non-LLM score). */
+const gradeGrounding = (value: number | null): Grade => {
+  if (value === null) return 'moderate';
+  return value >= 0.67 ? 'high' : value >= 0.34 ? 'moderate' : 'low';
+};
+
+/** Top-2 BT bootstrap CI overlap ratio (overlap / narrower CI width; 0 = disjoint). */
+const top2OverlapRatio = (
+  top: { ciLow?: number; ciHigh?: number } | undefined,
+  runner: { ciLow?: number; ciHigh?: number } | undefined,
+): number | null => {
+  if (top?.ciLow === undefined || top.ciHigh === undefined || runner?.ciLow === undefined || runner.ciHigh === undefined) return null;
+  const overlap = Math.min(top.ciHigh, runner.ciHigh) - Math.max(top.ciLow, runner.ciLow);
+  if (overlap <= 0) return 0;
+  const narrower = Math.min(top.ciHigh - top.ciLow, runner.ciHigh - runner.ciLow);
+  return narrower > 0 ? Math.min(1, overlap / narrower) : 1;
+};
+
+/** Kendall τ between two complete rank orders over the same id set. */
+const kendallTau = (ids: string[], rankA: Map<string, number>, rankB: Map<string, number>): number | null => {
+  if (ids.length < 3) return null;
+  let concordant = 0;
+  let discordant = 0;
+  for (let i = 0; i < ids.length; i += 1) {
+    for (let j = i + 1; j < ids.length; j += 1) {
+      const da = (rankA.get(ids[i]!) ?? 0) - (rankA.get(ids[j]!) ?? 0);
+      const db = (rankB.get(ids[i]!) ?? 0) - (rankB.get(ids[j]!) ?? 0);
+      if (da === 0 || db === 0) continue;
+      if (Math.sign(da) === Math.sign(db)) concordant += 1;
+      else discordant += 1;
+    }
+  }
+  const pairs = concordant + discordant;
+  return pairs === 0 ? null : (concordant - discordant) / pairs;
+};
+
+interface ConfidenceInputs {
+  body: EvidenceBody | null;
+  grounding: number | null;
+  strongestCounterStrength: EvidenceStrength | null;
+  counterQueriesAttempted: number;
+  topOverlap: number | null;
+}
+
+const deriveConfidence = (c: ConfidenceInputs): { qualitative: Grade; factors: string[] } => {
+  const factors: Array<{ text: string; grade: Grade }> = [];
+  if (c.body !== null) {
+    const width = Math.abs(c.body.sumLogLrHigh - c.body.sumLogLrLow);
+    factors.push({ text: `证据区间宽度 ${width.toFixed(2)} log10-LR（≤0.5 窄 / ≤1.5 中 / 更宽 低）`, grade: gradeIntervalWidth(width) });
+    factors.push({ text: `独立证据来源 ${c.body.independentSources} 个（≥3 广 / 2 窄 / ≤1 单源）`, grade: gradeIndependentSources(c.body.independentSources) });
+  } else {
+    factors.push({ text: '无确定性证据体（log-LR/QBAF 未汇总）', grade: 'moderate' });
+  }
+  factors.push({ text: `确定性证据落地评分 ${c.grounding !== null ? c.grounding.toFixed(2) : '未评'}（≥0.67 高 / ≥0.34 中）`, grade: gradeGrounding(c.grounding) });
+  if (c.strongestCounterStrength !== null) {
+    const strong = c.strongestCounterStrength === 'strong';
+    factors.push({
+      text: `存在未消解反证（强度 ${c.strongestCounterStrength}）`,
+      grade: strong ? 'low' : 'moderate',
+    });
+  } else if (c.counterQueriesAttempted > 0) {
+    factors.push({ text: `已做 ${c.counterQueriesAttempted} 次反证检索、未发现可绑定反证`, grade: 'high' });
+  } else {
+    factors.push({ text: '未记录反证检索——领先解释未经对抗性检验', grade: 'moderate' });
+  }
+  if (c.topOverlap !== null) {
+    const grade: Grade = c.topOverlap <= 0.25 ? 'high' : c.topOverlap <= 0.75 ? 'moderate' : 'low';
+    factors.push({ text: `前两名排序的 bootstrap 置信区间重叠 ${(c.topOverlap * 100).toFixed(0)}%（≤25% 稳 / ≤75% 中 / 更高 低）`, grade });
+  } else {
+    factors.push({ text: '无前两名置信区间数据——排序稳定性未知', grade: 'moderate' });
+  }
+  let weakest: Grade = 'high';
+  for (const f of factors) if (CONFIDENCE_ORDER[f.grade] < CONFIDENCE_ORDER[weakest]) weakest = f.grade;
+  return {
+    qualitative: weakest,
+    factors: [...factors.map((f) => `${f.text} → ${f.grade}`), '序数结论（最弱环节传播），非校准概率'],
+  };
 };
 
 /**
@@ -205,10 +316,17 @@ export function projectScientificState(input: {
   relations: EvidenceRelation[];
   hypotheses: HypothesisCandidate[];
   scorecards: HypothesisScorecard[];
+  /** Deterministic per-hypothesis evidence bodies (kind 'evidence_body'). */
+  evidenceBodies: EvidenceBody[];
+  /** Latest pairwise tournament (kind 'tournament'), null when none was produced. */
+  tournament: HypothesisTournament | null;
   /** Count of purpose='counter_evidence' queries in the run's latest corpus snapshot. */
   counterQueriesAttempted: number;
 }): ScientificState {
-  const { runId, runStatus, questionDomain, claims, relations, hypotheses, scorecards, counterQueriesAttempted } = input;
+  const {
+    runId, runStatus, questionDomain, claims, relations, hypotheses, scorecards,
+    evidenceBodies, tournament, counterQueriesAttempted,
+  } = input;
   const claimsById = new Map(claims.map((c) => [c.id, c] as const));
   const active = byRank(activeOf(hypotheses), scorecards);
   const templateMarkers: string[] = [];
@@ -235,12 +353,31 @@ export function projectScientificState(input: {
     excludedByResearcher: excludedClaims,
   };
 
+  // ---- Counter-evidence coverage (symmetry guard) + ordering consistency ----
+  const coverage = { queriesAttempted: counterQueriesAttempted, counterRelationsFound: counterRelations };
+  const compositeRanks = new Map(scorecards.map((s) => [s.hypothesisId as string, s.rank] as const));
+  const tournamentRanks = new Map(
+    (tournament?.standings ?? []).map((s) => [s.hypothesisId as string, s.rank] as const),
+  );
+  const commonRanked = [...tournamentRanks.keys()].filter((id) => compositeRanks.has(id));
+  const agreement = kendallTau(commonRanked, compositeRanks, tournamentRanks);
+  const standingsByRank = (tournament?.standings ?? []).slice().sort((a, b) => a.rank - b.rank);
+  const topOverlap = top2OverlapRatio(standingsByRank[0], standingsByRank[1]);
+  const ordering = {
+    basis: active.length < 2
+      ? ('single_candidate' as const)
+      : tournament !== null && standingsByRank.length > 0 ? ('tournament' as const) : ('composite' as const),
+    agreement,
+    topSeparation: topOverlap === null ? ('unknown' as const) : topOverlap === 0 ? ('disjoint' as const) : ('overlap' as const),
+  };
+
   const base = { runId, computedAt: new Date().toISOString(), templateEvidence: templateMarkers };
   if (!settled) {
     return ScientificState.parse({
       ...base, kind: 'forming', leading: null, strongestSupport: null, strongestCounter: null,
       competing: [], discriminatingObservations: [], biggestUnknown: null,
-      confidence: { qualitative: 'low', basis: 'ordinal scorecard dimensions — uncalibrated, not probabilities' },
+      confidence: { qualitative: 'low', factors: ['研究进行中——判断尚未冻结', '序数结论，非校准概率'] },
+      counterEvidenceCoverage: coverage, ordering,
       falsifiers: [], counters: { unresolvedCount: 0, searchedAndFoundNone: null }, evidenceShape: shape,
     });
   }
@@ -250,7 +387,8 @@ export function projectScientificState(input: {
       ...base, kind: 'template', leading: null, strongestSupport: null, strongestCounter: null,
       competing: [], discriminatingObservations: [],
       biggestUnknown: { kind: 'template_content' },
-      confidence: { qualitative: 'low', basis: 'ordinal scorecard dimensions — uncalibrated, not probabilities' },
+      confidence: { qualitative: 'low', factors: ['模板产物不承载证据——不构成任何置信基础', '序数结论，非校准概率'] },
+      counterEvidenceCoverage: coverage, ordering,
       falsifiers: [], counters: { unresolvedCount: counterRelations, searchedAndFoundNone: null }, evidenceShape: shape,
     });
   }
@@ -262,7 +400,8 @@ export function projectScientificState(input: {
       ...base, kind: 'insufficient', leading: null, strongestSupport: null, strongestCounter: null,
       competing: [], discriminatingObservations: [],
       biggestUnknown: { kind: 'no_active_hyps' },
-      confidence: { qualitative: 'low', basis: 'ordinal scorecard dimensions — uncalibrated, not probabilities' },
+      confidence: { qualitative: 'low', factors: ['无活跃假设——无可赋信对象', '序数结论，非校准概率'] },
+      counterEvidenceCoverage: coverage, ordering,
       falsifiers: [], counters: { unresolvedCount: counterRelations, searchedAndFoundNone: null }, evidenceShape: shape,
     });
   }
@@ -329,10 +468,13 @@ export function projectScientificState(input: {
   }
 
   const grounding = leaderCard?.dimensions.find((d) => d.dimension === 'evidence_grounding')?.value ?? null;
-  const exposure = leaderCard?.dimensions.find((d) => d.dimension === 'counter_evidence_exposure')?.value ?? null;
-  const qual = grounding === null
-    ? 'low'
-    : qualitativeOf(exposure !== null ? Math.min(grounding, (grounding + exposure) / 2) : grounding);
+  const confidence = deriveConfidence({
+    body: evidenceBodies.find((b) => b.hypothesisId === leader.id) ?? null,
+    grounding,
+    strongestCounterStrength: strongestCounter?.strength ?? null,
+    counterQueriesAttempted,
+    topOverlap,
+  });
 
   const falsifiers = active.slice(0, 3)
     .filter((h) => h.falsification?.falsificationCondition !== undefined)
@@ -347,7 +489,9 @@ export function projectScientificState(input: {
     competing,
     discriminatingObservations,
     biggestUnknown,
-    confidence: { qualitative: qual, basis: 'ordinal scorecard dimensions — uncalibrated, not probabilities' },
+    confidence,
+    counterEvidenceCoverage: coverage,
+    ordering,
     falsifiers,
     counters: {
       unresolvedCount: unresolvedCounterCount,

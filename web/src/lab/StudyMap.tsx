@@ -695,6 +695,22 @@ function StateBand({ run, science, onResume, busy }: {
             </div>
           </div>
           <p className="ss-line">{t('map.stateConfidence', { level: t(`map.qual.${s.confidence.qualitative}` as DictKey) })}</p>
+          {s.confidence.factors.length > 0 && (
+            <details className="ss-factors">
+              <summary>{t('map.stateConfidenceFactors')}</summary>
+              <ul>
+                {s.confidence.factors.map((f) => <li key={f}>{f}</li>)}
+              </ul>
+            </details>
+          )}
+          {s.counterEvidenceCoverage !== null && (
+            <p className="ss-line">{t('map.stateCoverage', { q: s.counterEvidenceCoverage.queriesAttempted, n: s.counterEvidenceCoverage.counterRelationsFound })}</p>
+          )}
+          <p className="ss-line">{t('map.stateOrdering', {
+            basis: t(`map.order.basis.${s.ordering.basis}` as DictKey),
+            sep: t(`map.order.sep.${s.ordering.topSeparation}` as DictKey),
+            tau: s.ordering.agreement !== null ? s.ordering.agreement.toFixed(2) : '—',
+          })}</p>
           {leaderFalsifier !== null && <p className="ss-line">{t('map.stateFalsifier', { text: leaderFalsifier.condition })}</p>}
           {s.competing.length > 0 && (
             <p className="ss-line">

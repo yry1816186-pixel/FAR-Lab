@@ -732,6 +732,8 @@ function parseSeedSources(raw: unknown): string | {
       relations,
       hypotheses,
       scorecards,
+      evidenceBodies: app.store.listObjects('evidence_body', runId),
+      tournament: app.store.listObjects('tournament', runId).at(-1) ?? null,
       counterQueriesAttempted: corpus?.queries.filter((q) => q.purpose === 'counter_evidence').length ?? 0,
     });
 

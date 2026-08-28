@@ -1136,7 +1136,16 @@ export interface ScientificStateView {
   competing: Array<{ hypothesisId: string; statement: string; differsBy: string | null }>;
   discriminatingObservations: Array<{ betweenHypothesisIds: string[]; observable: string; expects: string[] }>;
   biggestUnknown: BiggestUnknown | null;
-  confidence: { qualitative: 'low' | 'moderate' | 'high'; basis: string };
+  /** Weakest-link propagation: ordinal level + every factor with its observed value and grade. */
+  confidence: { qualitative: 'low' | 'moderate' | 'high'; factors: string[] };
+  /** Counter-evidence search coverage (symmetry guard). */
+  counterEvidenceCoverage: { queriesAttempted: number; counterRelationsFound: number } | null;
+  /** How the ordering was produced and how stable it is. */
+  ordering: {
+    basis: 'tournament' | 'composite' | 'single_candidate';
+    agreement: number | null;
+    topSeparation: 'disjoint' | 'overlap' | 'unknown';
+  };
   falsifiers: Array<{ hypothesisId: string; condition: string }>;
   counters: { unresolvedCount: number; searchedAndFoundNone: { queriesAttempted: number; foundCount: number } | null };
   evidenceShape: { claims: number; verified: number; supportingRelations: number; counterRelations: number; excludedByResearcher: number };

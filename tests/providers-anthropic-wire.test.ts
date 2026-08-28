@@ -159,4 +159,52 @@ describe('zai provider on the Anthropic Messages wire', () => {
     expect(second).toHaveLength(first.length); // correction appended in place, no new message
     expect(second.every((m) => m.role === 'user')).toBe(true);
   });
+
+  // D-082 (observed live 2026-08-28): glm-4.6 can return 200 with ONLY a thinking
+  // block — the previous parser classified it as non-retryable provider_error and
+  // the run died in build_evidence. It must be invalid_output with a bounded
+  // thinking-specific corrective re-ask.
+  it('recovers a thinking-only 200 via a bounded corrective re-ask (D-082)', async () => {
+    let n = 0;
+    const { fetchImpl, calls } = stubFetch(() => {
+      n += 1;
+      return n === 1
+        ? { status: 200, text: okBody({ content: [{ type: 'thinking', thinking: '1. Analyze the request…' }], stop_reason: 'max_tokens' }) }
+        : { status: 200, text: okBody() };
+    });
+    const provider = createZaiProvider({ apiKey: 'fake-key', fetchImpl, sleep: async () => {} });
+    const res = (await provider.structuredCall(REQ, parse)) as Extract<StructuredCallResult<unknown>, { ok: true }>;
+    expect(res.ok).toBe(true);
+    expect(calls.length).toBe(2);
+    expect(res.receipt.correctiveReasks).toBe(1);
+    const secondMessages = (calls[1]?.body as Record<string, unknown>)['messages'] as Array<{ content: string }>;
+    expect(secondMessages[secondMessages.length - 1]?.content).toContain('contained ONLY reasoning');
+  });
+
+  it('fails visibly as invalid_output when every attempt is thinking-only (bounded, no infinite loop)', async () => {
+    const { fetchImpl, calls } = stubFetch(() => ({
+      status: 200,
+      text: okBody({ content: [{ type: 'thinking', thinking: 'reasoning without an answer' }] }),
+    }));
+    const provider = createZaiProvider({ apiKey: 'fake-key', fetchImpl, sleep: async () => {} });
+    const res = await provider.structuredCall(REQ, parse);
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.error.kind).toBe('invalid_output');
+      expect(res.error.message).toContain('no answer text');
+    }
+    expect(calls.length).toBe(4); // initial + 3 bounded re-asks
+  });
+
+  it('still treats a 200 with no recognizable blocks at all as malformed provider_error', async () => {
+    const { fetchImpl, calls } = stubFetch(() => ({ status: 200, text: okBody({ content: [] }) }));
+    const provider = createZaiProvider({ apiKey: 'fake-key', fetchImpl, sleep: async () => {} });
+    const res = await provider.structuredCall(REQ, parse);
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.error.kind).toBe('provider_error');
+      expect(res.error.message).toContain('no text content blocks');
+    }
+    expect(calls.length).toBe(1); // malformed body is terminal — never re-asked
+  });
 });
