@@ -55,7 +55,7 @@ export const MAX_TRANSPORT_RETRIES = 2;
  * every attempt must still fully parse and zod-validate.
  */
 const MAX_INVALID_OUTPUT_RETRIES = 3;
-const TRANSIENT_5XX: ReadonlySet<number> = new Set([500, 502, 503, 504]);
+const TRANSIENT_5XX: ReadonlySet<number> = new Set([500, 502, 503, 504, 529]);
 /** Z.ai returns HTTP 429 + code 1113 for exhausted balance — that is a quota wall, not a rate limit. */
 const QUOTA_ERROR_CODES: ReadonlySet<string> = new Set(['1113', 'insufficient_quota']);
 const QUOTA_MESSAGE_RE = /insufficient\s+(?:balance|quota)|余额不足|no resource package/i;
@@ -74,6 +74,13 @@ const QUOTA_MESSAGE_RE = /insufficient\s+(?:balance|quota)|余额不足|no resou
 export const RETRY_MAX_BACKOFF_MS = 30_000;
 const RETRY_INITIAL_DELAY_MS = 1_000;
 const RETRY_JITTER_RATIO = 0.25;
+/**
+ * Capacity-overload spacing (observed live 2026-08-28: glm-4.7-flash returns
+ * repeating HTTP 529 code 1305 访问量过大 in multi-minute windows). The standard
+ * 1s/2s curve retried INSIDE one window and died; overload calls space out at
+ * 15s/30s so the same bounded retry count can straddle a short window.
+ */
+const OVERLOAD_INITIAL_DELAY_MS = 15_000;
 
 export const backoffDelayMs = (
   attempt: number,
@@ -86,6 +93,17 @@ export const backoffDelayMs = (
   const base = RETRY_INITIAL_DELAY_MS * 2 ** exponent;
   const jitter = 1 - RETRY_JITTER_RATIO + 2 * RETRY_JITTER_RATIO * random();
   return cap(base * jitter);
+};
+
+/** Overload-class backoff (HTTP 529): 15s then 30s, same jitter/cap discipline. */
+export const overloadBackoffDelayMs = (
+  attempt: number,
+  random: () => number = Math.random,
+): number => {
+  const cap = (ms: number) => Math.max(0, Math.min(Math.ceil(ms), RETRY_MAX_BACKOFF_MS));
+  const exponent = Math.min(Math.max(attempt, 1) - 1, 2);
+  const jitter = 1 - RETRY_JITTER_RATIO + 2 * RETRY_JITTER_RATIO * random();
+  return cap(OVERLOAD_INITIAL_DELAY_MS * 2 ** exponent * jitter);
 };
 
 /**
@@ -1203,8 +1221,14 @@ export async function runOpenAICompatStructuredCall<T>(
       );
     }
     // W4-F1: server Retry-After (when the failing response carried one) beats the
-    // jittered exponential curve; both cap at RETRY_MAX_BACKOFF_MS.
-    await sleep(backoffDelayMs(transportRetries + 1, retryAfterMsHint, random));
+    // jittered exponential curve; both cap at RETRY_MAX_BACKOFF_MS. Capacity
+    // overload (529) uses the wider overload spacing so bounded retries can
+    // straddle the multi-minute window instead of dying inside it.
+    await sleep(
+      f.httpStatus === 529
+        ? overloadBackoffDelayMs(transportRetries + 1, random)
+        : backoffDelayMs(transportRetries + 1, retryAfterMsHint, random),
+    );
     transportRetries += 1;
   }
 }

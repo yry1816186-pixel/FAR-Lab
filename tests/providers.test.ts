@@ -576,6 +576,21 @@ describe('transport failure classification and retry budget', () => {
     expect(sleeps).toEqual([1_000, 2_000]);
   });
 
+  // 529 = origin overloaded (Cloudflare convention; observed live on glm-4.7-flash
+  // 2026-08-28 as code 1305 访问量过大) — transient by nature, retried like 5xx.
+  it('retries HTTP 529 overload and recovers', async () => {
+    const { sleep, sleeps } = sleepRecorder();
+    const { fetchImpl, calls } = recorderFetch([
+      () => Promise.resolve(httpError(529, { error: { code: '1305', message: '该模型当前访问量过大，请您稍后再试' } })),
+      () => Promise.resolve(anthropicOk(RAW_OK)),
+    ]);
+    const provider = createZaiProvider({ apiKey: 'test-fixture-key-zai', fetchImpl, sleep, random: () => 0.5 });
+    const res = await provider.structuredCall(REQ, parseHypothesis);
+    expect(res.ok).toBe(true);
+    expect(calls.length).toBe(2);
+    expect(sleeps).toEqual([15_000]); // overload spacing: 15s, not the standard 1s
+  });
+
   it('does NOT retry permanent 4xx (400 invalid model)', async () => {
     const { fetchImpl, calls } = recorderFetch([
       () =>
