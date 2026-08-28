@@ -738,6 +738,25 @@ describe('total-deadline timeout', () => {
     expect(callCount).toBeLessThanOrEqual(2);
     expect(res.receipt.latencyMs).toBeGreaterThanOrEqual(70); // real elapsed time, not fabricated
   });
+
+  it('FARLAB_TOTAL_BUDGET_MS overrides the budget with min/max clamps', async () => {
+    const { totalBudgetFromEnv } = await import('../src/providers/http.js');
+    const prev = process.env.FARLAB_TOTAL_BUDGET_MS;
+    try {
+      process.env.FARLAB_TOTAL_BUDGET_MS = '300000';
+      expect(totalBudgetFromEnv()).toBe(300_000);
+      process.env.FARLAB_TOTAL_BUDGET_MS = '5000'; // below the 30s floor
+      expect(totalBudgetFromEnv()).toBe(30_000);
+      process.env.FARLAB_TOTAL_BUDGET_MS = '999999999'; // above the 600s ceiling
+      expect(totalBudgetFromEnv()).toBe(600_000);
+      process.env.FARLAB_TOTAL_BUDGET_MS = 'not-a-number'; // garbage -> default
+      expect(totalBudgetFromEnv()).toBe(120_000);
+      delete process.env.FARLAB_TOTAL_BUDGET_MS;
+      expect(totalBudgetFromEnv()).toBe(120_000);
+    } finally {
+      if (prev !== undefined) process.env.FARLAB_TOTAL_BUDGET_MS = prev;
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------

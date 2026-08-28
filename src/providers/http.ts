@@ -113,6 +113,21 @@ const markCall = (providerName: string, now: number): void => { lastCallAtByProv
 /** Test seam: clear pacing history between suites. */
 export const __resetPacerForTests = (): void => { lastCallAtByProvider.clear(); };
 
+/**
+ * Total-budget env override (FARLAB_TOTAL_BUDGET_MS, default 120s, min 30s,
+ * max 600s). Under sustained provider overload the wide retry spacings
+ * (15s/30s for 529, 20s/30s for 429) plus slow responses mathematically
+ * cannot fit the default 120s — observed live 2026-08-28 evening: 4619 gold
+ * run attempt-9 died as "total budget exhausted" with 45s of spacing alone.
+ * An operator in a known overload window raises the budget; the per-attempt
+ * AbortController still bounds each individual call.
+ */
+export const totalBudgetFromEnv = (): number => {
+  const raw = Number(process.env.FARLAB_TOTAL_BUDGET_MS ?? '');
+  if (!Number.isFinite(raw) || raw <= 0) return DEFAULT_TOTAL_TIMEOUT_MS;
+  return Math.min(Math.max(Math.ceil(raw), 30_000), 600_000);
+};
+
 export const backoffDelayMs = (
   attempt: number,
   retryAfterMs?: number,
@@ -1064,7 +1079,7 @@ export async function runOpenAICompatStructuredCall<T>(
   const fetchImpl: FetchLike = deps.fetchImpl ?? ((url, init) => fetch(url, init));
   const sleep: SleepLike = deps.sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const random: () => number = deps.random ?? Math.random;
-  const totalTimeoutMs = deps.totalTimeoutMs ?? DEFAULT_TOTAL_TIMEOUT_MS;
+  const totalTimeoutMs = deps.totalTimeoutMs ?? totalBudgetFromEnv();
   const wire = cfg.wire ?? 'openai';
   const base = cfg.baseUrl.replace(/\/+$/, '');
   const url =
