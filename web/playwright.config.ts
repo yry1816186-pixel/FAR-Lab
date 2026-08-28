@@ -21,7 +21,10 @@ const BASE = process.env.FARLAB_E2E_BASE_URL ?? `http://127.0.0.1:${PORT}`;
 export default defineConfig({
   testDir: './e2e',
   timeout: 120_000,
-  retries: process.env.CI ? 1 : 0,
+  // 1 retry everywhere: the perf-vitals specs measure wall-clock paint times and
+  // a locally loaded machine (parallel builds/servers) can push a healthy app
+  // past budget on one draw; a real regression fails twice (CI already had 1).
+  retries: 1,
   workers: 1,
   reporter: process.env.CI ? [['github'], ['list']] : 'list',
   use: {
