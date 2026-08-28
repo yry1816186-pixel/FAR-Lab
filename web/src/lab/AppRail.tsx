@@ -24,7 +24,7 @@ const COLLAPSE_KEY = 'farlab.railCollapsed';
 export function AppRail({
   surface, runs, conversations,
   onHome, onNewResearch, onLibrary, onOpenStudy, onOpenConversation,
-  onDeleteConversation, onRenameConversation, onOpenSettings,
+  onDeleteConversation, onRenameConversation, onNewConversation, onOpenSettings,
 }: {
   surface: RailSurface;
   runs: RunSummary[];
@@ -36,6 +36,7 @@ export function AppRail({
   onOpenConversation: (id: string) => void;
   onDeleteConversation: (id: string) => void;
   onRenameConversation: (id: string, title: string) => void;
+  onNewConversation: () => void;
   onOpenSettings: () => void;
 }): JSX.Element | null {
   const { t } = useI18n();
@@ -114,9 +115,34 @@ export function AppRail({
         </div>
       )}
 
-      {recentConvs.length > 0 && (
-        <div className="rail-group rail-group--scroll">
-          {!collapsed && <p className="rail-group-title">{t('rail.convs')}</p>}
+      <div className="rail-group rail-group--scroll">
+        {/* The group renders even with zero conversations — "new conversation"
+            must never depend on a conversation already existing. */}
+        {!collapsed && (
+          <p className="rail-group-title">
+            {t('rail.convs')}
+            <button
+              type="button"
+              className="rail-group-add"
+              onClick={onNewConversation}
+              aria-label={t('rail.newConv')}
+              title={t('rail.newConv')}
+            >
+              <Plus size={12} aria-hidden="true" />
+            </button>
+          </p>
+        )}
+        {collapsed && (
+          <button
+            type="button"
+            className="rail-link"
+            onClick={onNewConversation}
+            aria-label={t('rail.newConv')}
+            title={t('rail.newConv')}
+          >
+            <span className="rail-link-icon" aria-hidden="true"><Plus size={13} /></span>
+          </button>
+        )}
           {recentConvs.map((c) => (
             renamingConvId === c.id ? (
               <RenameInput
@@ -177,8 +203,7 @@ export function AppRail({
               </div>
             )
           ))}
-        </div>
-      )}
+      </div>
 
       <div className="rail-group rail-group--bottom">
         {navItem('rail.settings', <Settings size={15} aria-hidden="true" />, false, onOpenSettings)}

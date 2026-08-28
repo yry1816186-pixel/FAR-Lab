@@ -526,6 +526,18 @@ export function App(): JSX.Element {
         });
       });
   }, [refreshConversations]);
+  // Rail "new conversation" (Doubao parity): a REAL POST creates it (never a
+  // fake open); failure surfaces through the primary ErrorBox path.
+  const newConversation = useCallback((): void => {
+    void createConversation({})
+      .then((c) => { void refreshConversations(); setSelectedConvId(c.id); setConvDocked(false); })
+      .catch((e: unknown) => {
+        setConvCreateError({
+          error: e instanceof ApiError ? e : new ApiError({ code: 'unknown', message: String(e), retryable: true }),
+          runId: '',
+        });
+      });
+  }, [refreshConversations]);
   const railSurface: RailSurface = libraryView
     ? 'library'
     : newResearchView
@@ -631,6 +643,7 @@ export function App(): JSX.Element {
           onOpenConversation={openConversation}
           onDeleteConversation={removeConversation}
           onRenameConversation={renameConv}
+          onNewConversation={newConversation}
           onOpenSettings={() => setSettingsOpen(true)}
         />
         <main className="content content--full" aria-label={t('app.title')}>

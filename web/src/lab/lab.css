@@ -912,3 +912,13 @@
    (vision-review finding: 12.5/12px alone was too weak a distinction). */
 .rail-nav-item { font-weight: 500; }
 .rail-nav-item.is-active { font-weight: 600; }
+
+/* Group-title inline add button (new conversation) */
+.rail-group-add {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; margin-left: 4px; vertical-align: -4px;
+  border: none; border-radius: 5px; background: none;
+  color: var(--v2-text-3); cursor: pointer;
+}
+.rail-group-add:hover { color: var(--v2-info-on-tint); background: var(--v2-info-tint); }
+.rail-group-add:focus-visible { outline: 2px solid var(--v2-info); outline-offset: 1px; }
