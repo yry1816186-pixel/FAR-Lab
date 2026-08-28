@@ -41,6 +41,35 @@ type Insp =
 
 const LIVE_REFETCH_MS = 4_000;
 
+/** Word-boundary ellipsis — a study title cut mid-word ("…increas") reads as broken, not shortened. */
+const ellipsize = (text: string, max: number): string => {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  const lastSpace = cut.lastIndexOf(' ');
+  return `${(lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`;
+};
+
+/** Audit strings embed "(archived full object: sha256:…)"; the hash belongs in a tooltip, not the visible line. */
+const stripArchiveHash = (s: string): string => s.replace(/\s*\(archived full object: sha256:[0-9a-f]+…?\)/g, '');
+
+/**
+ * Stored revision labels are id-based ("hyp_p10bkqa…@v1") — audit-canonical but
+ * engineering-object leakage when shown verbatim. Render the OBJECT KIND with
+ * the version marker; the raw label stays reachable on hover (title).
+ */
+const versionLabelDisplay = (label: string, t: ReturnType<typeof useI18n>['t']): string => {
+  if (!/[a-z]{3}_[a-z0-9]{8,}/.test(label)) return label;
+  return label
+    .split(/;\s*/)
+    .map((part) => {
+      const m = part.match(/^([a-z]+)_[a-z0-9]+@(.*)$/);
+      if (m === null) return part;
+      const kindKey = m[1] === 'hyp' ? 'hypothesis' : m[1] === 'pln' ? 'plan' : m[1] === 'clm' ? 'claim' : m[1] === 'exp' ? 'experiment' : 'other';
+      return `${t(`map.obj.${kindKey}` as DictKey)}@${m[2]}`;
+    })
+    .join('; ');
+};
+
 export function StudyMap({
   run, events, studies, focusClaimId, onClaimFocused, onMutated,
 }: {
@@ -230,14 +259,14 @@ export function StudyMap({
             <optgroup label={t('map.thisStudy')}>
               {siblingStudies.own.runs.slice(0, 12).map((r) => (
                 <option key={r.id} value={r.id}>
-                  {`${t(runStatusKey(r.status))} · ${runLabel(r).slice(0, 48)}${r.id === run.id ? t('map.currentMark') : ''}`}
+                  {`${t(runStatusKey(r.status))} · ${ellipsize(runLabel(r), 48)}${r.id === run.id ? t('map.currentMark') : ''}`}
                 </option>
               ))}
             </optgroup>
           )}
           <optgroup label={t('map.otherStudies')}>
             {siblingStudies.others.slice(0, 24).map((g) => (
-              <option key={g.key} value={g.latest.id}>{runLabel(g.latest).slice(0, 60)}</option>
+              <option key={g.key} value={g.latest.id}>{ellipsize(runLabel(g.latest), 60)}</option>
             ))}
           </optgroup>
         </select>
@@ -847,7 +876,10 @@ function StateBand({ run, science, onResume, onDispatch, dispatchError, busy }: 
           {science.deltas.slice(0, 2).map((d) => (
             <div key={d.id} className="md-item">
               <p className="md-head">
-                <span className="md-versions">{`${d.fromVersionLabel} → ${d.toVersionLabel}`}</span>
+                <span
+                  className="md-versions"
+                  title={`${d.fromVersionLabel} → ${d.toVersionLabel}`}
+                >{`${versionLabelDisplay(d.fromVersionLabel, t)} → ${versionLabelDisplay(d.toVersionLabel, t)}`}</span>
                 <span className={`md-impact md-impact--${d.rankingImpact}`}>{t(`map.deltaImpact.${d.rankingImpact}` as DictKey)}</span>
                 <span className={`md-quality md-quality--${d.qualityDelta.status}`}>{t(`map.deltaQuality.${d.qualityDelta.status}` as DictKey)}</span>
               </p>
@@ -855,7 +887,9 @@ function StateBand({ run, science, onResume, onDispatch, dispatchError, busy }: 
               {d.whatChanged.slice(0, 3).map((op, i) => (
                 <p key={`${op.objectId}-${i}`} className="md-op">
                   <span className="md-op-kind">{`${op.objectType} · ${op.operation}`}</span>
-                  {op.before !== null && op.after !== null ? `${op.before} → ${op.after}` : op.reason}
+                  {op.before !== null && op.after !== null
+                    ? <span title={`${op.before} → ${op.after}`}>{`${stripArchiveHash(op.before)} → ${stripArchiveHash(op.after)}`}</span>
+                    : op.reason}
                 </p>
               ))}
               <p className="md-line"><span className="ss-k">{t('map.deltaWhy')}</span>{d.explanation}</p>

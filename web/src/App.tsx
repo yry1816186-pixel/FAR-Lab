@@ -489,7 +489,11 @@ export function App(): JSX.Element {
           <p className="muted">{t('app.subtitle')}</p>
         </div>
         <div className="app-header-right">
-          <div className={`conn ${online ? 'conn--online' : 'conn--offline'}`} role="status">
+          <div
+            className={`conn ${online ? 'conn--online' : 'conn--offline'}`}
+            role="status"
+            title={online ? t('conn.online') : t('conn.offline')}
+          >
             <span className="conn-dot" aria-hidden="true" />
             {online ? <span className="sr-only">{t('conn.online')}</span> : t('conn.offline')}
           </div>
