@@ -160,12 +160,13 @@ export class Store {
 
   // ---- runs (transactional mutable authority) ----
 
-  createRun(question: ResearchQuestion, opts: { providerConfigId?: string } = {}, now = new Date().toISOString()): ResearchRun {
+  createRun(question: ResearchQuestion, opts: { providerConfigId?: string; routeOverride?: 'zai' | 'dashscope' | 'deepseek' | 'universal' | 'offline' } = {}, now = new Date().toISOString()): ResearchRun {
     const run: ResearchRun = ResearchRun.parse({
       id: newId('run'), questionId: question.id, status: 'created', currentStage: 'scope',
       stages: STAGE_ALL.map((stage) => ({ stage, state: 'pending' })),
       createdAt: now, updatedAt: now, tags: [],
       ...(opts.providerConfigId !== undefined ? { providerConfigId: opts.providerConfigId } : {}),
+      ...(opts.routeOverride !== undefined ? { routeOverride: opts.routeOverride } : {}),
     });
     this.db.transaction(() => {
       this.putObject('question', question);

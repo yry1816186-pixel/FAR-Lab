@@ -8,7 +8,7 @@ import { Store } from '../src/persistence/store.js';
 import { openArtifactStore } from '../src/persistence/artifacts.js';
 import { Orchestrator } from '../src/app/orchestrator.js';
 import { ModelProviderConfig, ResearchQuestion, newId } from '../src/domain/index.js';
-import { resolveRunProvider } from '../src/app/provider-resolver.js';
+import { resolveRunProvider, resolveRunReasoningRoute } from '../src/app/provider-resolver.js';
 import type { ModelProvider } from '../src/shared/ports.js';
 import type { StageHandler } from '../src/pipeline/types.js';
 import type { ResearchRun, RunStageName } from '../src/domain/run.js';
@@ -99,5 +99,27 @@ describe('Orchestrator providerFor seam', () => {
     const seen: { providerNames: string[] } = { providerNames: [] };
     await recordingOrchestrator(seen).execute(run.id, { stopAfter: 'retrieve' });
     expect(seen.providerNames).toEqual(['env-chain']);
+  });
+
+  it('a run-pinned routeOverride keeps the run on its registry route even with an active config set', async () => {
+    // The live-observed bug: CLI --route zai run resumed into the workspace's
+    // dead deepseek default. routeOverride must outrank the active config.
+    const cfg = ModelProviderConfig.parse({
+      id: newId('mcfg'), label: 'dead default', wire: 'openai', baseUrl: 'https://example-invalid.test/v1',
+      modelId: 'm', apiKey: 'test-fixture-key-2', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    });
+    store.putObject('model_config', cfg);
+    store.setMeta('activeModelConfigId', cfg.id);
+    const q = ResearchQuestion.parse({
+      id: newId('q'), text: 'pinned route?', background: '', goalType: 'exploratory',
+      scope: { domain: 'test', phenomena: ['x'] }, constraints: {}, createdAt: new Date().toISOString(),
+    });
+    const run = store.createRun(q, { routeOverride: 'offline' });
+    const seen: { providerNames: string[] } = { providerNames: [] };
+    await recordingOrchestrator(seen, (r) => resolveRunProvider(store, r)).execute(run.id, { stopAfter: 'retrieve' });
+    expect(seen.providerNames).toEqual(['custom:mcfg_cli_offline']);
+    expect(resolveRunReasoningRoute(store, run)).toBeNull(); // active config reasoning must not leak onto a pinned route
+    store.deleteMeta('activeModelConfigId');
+    store.deleteObject('model_config', cfg.id);
   });
 });

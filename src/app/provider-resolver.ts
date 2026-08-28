@@ -8,6 +8,24 @@ import { createFallbackProvider } from '../providers/fallback.js';
 import { computeRequestHash } from '../providers/http.js';
 import { canonicalSha256 } from '../shared/crypto.js';
 import { isQwenFamily, isBailianEndpoint } from '../model-plane/capabilities.js';
+import { getProvider } from '../providers/index.js';
+import { createOfflineDevProvider } from '../providers/offline.js';
+
+/** Registry route a run may pin via routeOverride — same set the CLI --route accepts. */
+export type BuiltinRouteName = 'zai' | 'dashscope' | 'deepseek' | 'universal' | 'offline';
+
+/** The built-in provider for a named route ('offline' = the deterministic dev wire). */
+export const builtinRouteProvider = (route: BuiltinRouteName): ModelProvider | null => {
+  if (route === 'offline') {
+    return createOfflineDevProvider({
+      id: 'mcfg_cli_offline', label: '离线开发路由 (routeOverride)',
+      createdAt: '2026-08-28T00:00:00.000Z', updatedAt: '2026-08-28T00:00:00.000Z',
+      wire: 'offline', baseUrl: 'https://offline.farlab.invalid/v1',
+      modelId: 'farlab-offline-deterministic', apiKey: '', fallbackConfigIds: [],
+    });
+  }
+  return getProvider(route) ?? null;
+};
 
 /**
  * Runtime model-route resolution for the user configuration layer:
@@ -120,6 +138,12 @@ type ModelProviderConfigChain =
   | { kind: 'missing'; configId: string };
 
 export const resolveRunProvider = (store: Store, run: ResearchRun): ModelProvider | null => {
+  // Run-scoped built-in route (CLI --route): pinned at creation so a resume in a
+  // NEW process keeps the run on its route instead of falling to the workspace
+  // default (live-observed: zai run resumed into a dead deepseek default, 402).
+  if (run.routeOverride !== undefined) {
+    return builtinRouteProvider(run.routeOverride);
+  }
   const configId = run.providerConfigId ?? store.getMeta(ACTIVE_MODEL_CONFIG_META_KEY);
   const competition = readCompetitionRouteMode(store);
   if (configId === null) {
@@ -155,6 +179,9 @@ export const resolveRunReasoningRoute = (
   store: Store,
   run: ResearchRun,
 ): { style: ReasoningStyle; defaultGear: ReasoningGear; modelId: string } | null => {
+  // A run pinned to a registry route uses that route's wire defaults — the
+  // ACTIVE config's reasoning declaration must not leak onto it.
+  if (run.routeOverride !== undefined) return null;
   const configId = run.providerConfigId ?? store.getMeta(ACTIVE_MODEL_CONFIG_META_KEY);
   if (configId === null) return null;
   const chain = buildChain(store, configId);

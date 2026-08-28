@@ -71,11 +71,19 @@ export const ResearchRun = z.object({
   tags: z.array(z.string()).default([]),
   /**
    * Explicit model route for THIS run (user-selected at creation). Resolution order:
-   * run.providerConfigId > meta activeModelConfigId > env chain (FARLAB_MODEL_PROVIDER).
-   * A dangling id fails closed at call time — never a silent fallback to another model
-   * (reproducibility over availability).
+   * run.providerConfigId > run.routeOverride > meta activeModelConfigId > env chain
+   * (FARLAB_MODEL_PROVIDER). A dangling id fails closed at call time — never a silent
+   * fallback to another model (reproducibility over availability).
    */
   providerConfigId: ModelConfigId.optional(),
+  /**
+   * Built-in registry route pinned to this run (CLI `--route zai|dashscope|deepseek|universal|offline`).
+   * Named-route starts MUST persist their route: resume executes in a NEW process where
+   * the start-time providerOverride no longer exists, and without this field the run
+   * silently falls to the workspace default route — live-observed 2026-08-28: a zai run
+   * resumed straight into a dead deepseek default (HTTP 402) despite zai being healthy.
+   */
+  routeOverride: z.enum(['zai', 'dashscope', 'deepseek', 'universal', 'offline']).optional(),
 });
 export type ResearchRun = z.infer<typeof ResearchRun>;
 

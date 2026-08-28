@@ -103,8 +103,11 @@ const startRun = async (question: string, goalType: string, domain: string, rout
   // demo and acceptance path that needs no keys or network; live names resolve
   // through the registry. Absent -> product-layer default (UI route > env chain).
   const routeOpts: AppOptions = {};
+  /** Narrowed after the registry lookup below: route is a valid registry name. */
+  let routeOverride: 'zai' | 'dashscope' | 'deepseek' | 'universal' | 'offline' | undefined;
   if (route !== undefined) {
     if (route === 'offline') {
+      routeOverride = 'offline';
       const { createOfflineDevProvider } = await import('../providers/offline.js');
       routeOpts.providerOverride = createOfflineDevProvider({
         id: 'mcfg_cli_offline', label: '离线开发路由 (CLI --route offline)',
@@ -117,6 +120,8 @@ const startRun = async (question: string, goalType: string, domain: string, rout
       const prov = getProvider(route);
       if (prov === undefined) die(`--route: unknown route "${route}" (offline | zai | dashscope | deepseek | universal)`, 2);
       routeOpts.providerOverride = prov;
+      // getProvider(route) returned a provider above — the string is a registry name.
+      routeOverride = route as 'zai' | 'dashscope' | 'deepseek' | 'universal';
     }
   }
   const app = await createApp(routeOpts);
@@ -126,7 +131,11 @@ const startRun = async (question: string, goalType: string, domain: string, rout
       scope: { domain, phenomena: [question] },
       constraints: {}, createdAt: new Date().toISOString(),
     });
-    const run = app.store.createRun(q);
+    // Pin the route ON THE RUN (routeOverride): resume executes in a new process
+    // where routeOpts.providerOverride does not exist — without the persisted
+    // field a --route zai run would silently fall to the workspace default on
+    // resume (live-observed 2026-08-28: dead deepseek 402 default).
+    const run = app.store.createRun(q, routeOverride !== undefined ? { routeOverride } : {});
     if (json()) jsonOutput({ runId: run.id, status: run.status });
     else out(`${marker()} ${ink.ok('created')} run ${ink.bold(run.id)} — executing pipeline (progress on stderr)`);
     const done = await app.orchestrator.execute(run.id);
