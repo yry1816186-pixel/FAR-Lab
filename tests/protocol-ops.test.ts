@@ -10,14 +10,15 @@ import type { App } from '../src/app/composition.js';
 /**
  * Protocol ops (convergence 2026-08-29): read-side projection + the
  * human-attested record path over a REAL app/store. Truth gates: the ledger
- * advances only through the domain state machine; the outcome bridge mints
- * the experiment FeedbackSignal exactly once; ethics gate fails closed.
+ * advances only through the domain state machine (rejections THROW, nothing
+ * persists); the outcome bridge mints the experiment FeedbackSignal exactly
+ * once; a terminal ledger stays closed even against explicit re-publish.
  */
 
 const tmp = (): string => fs.mkdtempSync(path.join(os.tmpdir(), 'far-protops-'));
 
 const setup = async (): Promise<{ app: App; runId: string }> => {
-  const app = await createApp({ dataDir: path.join(tmp(), 'far.db') });
+  const app = await createApp({ dataDir: tmp() });
   const q = ResearchQuestion.parse({
     id: newId('q'),
     text: 'What drives interface impedance growth in polymer electrolyte cells?',
@@ -125,21 +126,19 @@ describe('protocol ops', () => {
     }
   });
 
-  it('invalid transitions surface as 409-mapped ProtocolOpError, nothing persisted', async () => {
+  it('invalid transitions throw ProtocolOpError and persist nothing', async () => {
     const { app, runId } = await setup();
     try {
-      const cold = recordProtocolEvent(app, runId, { actor: 'R. Yuan', kind: 'step_completed', stepId: 'ps1' });
-      expect(cold.status).toBe('awaiting_human'); // no throw: the record was rejected by the state machine
-      const rejected = recordProtocolEvent(app, runId, { actor: 'R. Yuan', kind: 'measurement', measurement: { variableName: 'interfacial impedance', value: 'high' } });
-      expect(rejected.status).toBe('awaiting_human');
-      expect(() => recordProtocolEvent(app, runId, { actor: 'x', kind: 'deviation' })).toThrow(ProtocolOpError);
+      expect(() => recordProtocolEvent(app, runId, { actor: 'R. Yuan', kind: 'step_completed', stepId: 'ps1' })).toThrow(ProtocolOpError);
+      expect(() => recordProtocolEvent(app, runId, { actor: 'R. Yuan', kind: 'measurement', measurement: { variableName: 'interfacial impedance', value: 'high' } })).toThrow(ProtocolOpError);
+      expect(() => recordProtocolEvent(app, runId, { actor: 'R. Yuan', kind: 'deviation' })).toThrow(ProtocolOpError);
       expect(app.store.listObjects('protocol_execution', runId)[0]?.records).toHaveLength(0);
     } finally {
       await app.close();
     }
   });
 
-  it('completion publishes the experiment feedback signal exactly once', async () => {
+  it('completion publishes the experiment feedback signal exactly once; the terminal ledger stays closed', async () => {
     const { app, runId } = await setup();
     try {
       recordProtocolEvent(app, runId, { actor: 'R. Yuan', kind: 'step_started', stepId: 'ps1' });
@@ -150,12 +149,29 @@ describe('protocol ops', () => {
       expect(signals).toHaveLength(1);
       expect(signals[0]?.source).toBe('experiment');
       expect(signals[0]?.target?.kind).toBe('protocol');
-      // terminal ledger: further records fail-closed
+      // terminal: further records fail closed, even with an explicit publishOutcome
       expect(() => recordProtocolEvent(app, runId, { actor: 'R. Yuan', kind: 'measurement', measurement: { variableName: 'interfacial impedance', value: 42 } })).toThrow(ProtocolOpError);
-      // explicit re-publish cannot mint a second signal
-      const again = recordProtocolEvent(app, runId, { actor: 'R. Yuan', kind: 'abort', note: 'late abort attempt', publishOutcome: true });
-      expect(again.ok).toBeUndefined();
+      expect(() => recordProtocolEvent(app, runId, { actor: 'R. Yuan', kind: 'abort', note: 'late abort', publishOutcome: true })).toThrow(ProtocolOpError);
       expect(app.store.listObjects('feedback', runId)).toHaveLength(1);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('run without a protocol 404s honestly', async () => {
+    const app = await createApp({ dataDir: tmp() });
+    try {
+      const q = ResearchQuestion.parse({
+        id: newId('q'),
+        text: 'q',
+        background: '',
+        goalType: 'exploratory',
+        scope: { domain: 'd', phenomena: ['p'] },
+        constraints: {},
+        createdAt: new Date().toISOString(),
+      });
+      const run = app.store.createRun(q);
+      expect(() => getProtocolState(app, run.id)).toThrow(ProtocolOpError);
     } finally {
       await app.close();
     }
