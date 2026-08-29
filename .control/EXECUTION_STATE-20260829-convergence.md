@@ -454,3 +454,27 @@ O(h^{1+π/ω})、NVB H1 稳定、自适应率）✓——但 hypotheses 阶段�
   独立四维审计：均未做。goal 完成判据未满足。
 - 登记的下一杠杆：hypotheses 按方法选择路由（数值/理论族→问题模型派生
   假设）；NetCDF 数据族；StudyMap 问题模型带。
+
+## NetCDF 数据平面落地（68726e4，main ff，2026-08-30 02:4x）
+
+CPS-AOSSA-3 核心切片：sidecar netcdf.py（xarray+netcdf4，剖析/QC/闭枚举
+特征提取）+ domain local_netcdf resolver/format + dataset-netcdf.ts
+（不可变 raw 采集 + 派生 CSV lineage 链）。3 项测试跑在真实 NCEP 气温
+文件（work/scenario-b/air_temperature.nc，7.75MB）+ 真实 sidecar 上，
+缺文件 skipIf 诚实跳过。全量 2257 passed 0 failed。
+
+# 会话终局（本 turn 9 个 main 提交）
+
+6c769ae 问题模型 → 90f8c11 披露 → 4ee30c4 FEM 均匀 → 40d3db6 AFEM →
+68726e4 NetCDF 数据面（+3 控制面记录提交）。场景 A live 闭环
+（run_5mw5q5e9，bundle 15/15 verified）。
+
+## 剩余（按杠杆，下一会话起点）
+
+1. 场景 B 端到端：~10 篇文献 + NetCDF → baseline→split→train→有界调参→
+   untouched test→UQ→报告→复现（数据平面已备；需要 run 级串联：
+   netcdf 采集/提取进 execute 级联的 data_analysis 路径）。
+2. 假设按方法选择路由（数值族→问题模型派生假设——run_fq3rdff1 证据）。
+3. StudyMap 问题模型带 + FEM/数据集呈现。
+4. 场景 C 端到端（机制全备；真实人类执行 BLOCKED-user）。
+5. baseline benchmark + completion-gate + 独立四维审计（终局）。
