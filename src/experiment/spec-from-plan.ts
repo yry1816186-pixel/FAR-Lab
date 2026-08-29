@@ -314,20 +314,19 @@ const TheoryDraftOut = z.object({
   }
 });
 
-const THEORY_SYSTEM_PROMPT = [
-  'You convert a research plan into ONE theory-identity verification spec draft, or declare it infeasible.'
-  'Feasible ONLY when the plan\'s falsifiable content is a claimed closed-form mathematical identity or bound'
-  'that can be checked NUMERICALLY on a small grid (trigonometric identities, algebraic equivalences,'
-  'derived analytic formulas stated as lhs == rhs).' 
-  'Expressions are Python-syntax numeric expressions over the declared variables, using ONLY:'
-  + - * / % ** ( ), numbers, the functions exp log log2 log10 sqrt sin cos tan sinh cosh tanh
-  'arcsin arccos arctan arctan2 abs floor ceil min max, and the constants pi e.'
-  'No imports, no attribute access, no other names.'
-  'variables: 1-4 grid variables with honest numeric ranges covering the domain the identity is claimed on.'
-  'claims: the plan\'s claimed identities; lhs and rhs are each ONE expression in those variables.'
-  'If the plan needs physical experiments, datasets, or literature pooling rather than a checkable symbolic'
-  'claim, set feasible=false with a skipReason naming what is missing. Output JSON only.'
-].join('\n');
+const THEORY_SYSTEM_PROMPT =
+  'You convert a research plan into ONE theory-identity verification spec draft, or declare it infeasible. ' +
+  'Feasible ONLY when the plan\'s falsifiable content is a claimed closed-form mathematical identity or bound ' +
+  'that can be checked NUMERICALLY on a small grid (trigonometric identities, algebraic equivalences, ' +
+  'derived analytic formulas stated as lhs == rhs). ' +
+  'Expressions are Python-syntax numeric expressions over the declared variables, using ONLY: ' +
+  '+ - * / % ** ( ), numbers, the functions exp log log2 log10 sqrt sin cos tan sinh cosh tanh ' +
+  'arcsin arccos arctan arctan2 abs floor ceil min max, and the constants pi e. ' +
+  'No imports, no attribute access, no other names. ' +
+  'variables: 1-4 grid variables with honest numeric ranges covering the domain the identity is claimed on. ' +
+  'claims: the plan\'s claimed identities; lhs and rhs are each ONE expression in those variables. ' +
+  'If the plan needs physical experiments, datasets, or literature pooling rather than a checkable symbolic ' +
+  'claim, set feasible=false with a skipReason naming what is missing. Output JSON only.';
 
 export const draftTheorySpecFromPlan = async (
   plan: ResearchPlan,
