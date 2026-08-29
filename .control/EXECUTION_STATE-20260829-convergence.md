@@ -419,3 +419,38 @@ f3678e1+123325c 控制面 / 40d3db6 AFEM 自适应腿。
 2. CPS-AOSSA-3：NetCDF/xarray 数据族 + QC + DatasetVersion（场景 B 前置）。
 3. StudyMap 问题模型带 + FEM 实验呈现（数值腿有真实内容可显示）。
 4. completion-gate + 独立四维审计（终局）。
+
+## 场景 A live run #1 发现（2026-08-30 02:0x，run_fq3rdff1，zai glm-4.6）
+
+管线诚实工作但暴露 run 级 LLM-first 残留：问题模型 formed（5 目标/
+well_posed_computational/7 变量含单位/2 未知项）、方法选择选中
+numerical_simulation（obj1/3/4）✓、12 源 10 切题主张（P1 O(h)、角奇异
+O(h^{1+π/ω})、NVB H1 稳定、自适应率）✓——但 hypotheses 阶段被主题覆盖
+门禁诚实拒绝（主张不「测量实现是否达到阶」）→ 后续全跳。
+
+**登记新缺口（下一语义切片）**：方法选择选中纯数值/理论族时，假设生成应
+允许从问题模型的形式期望派生（收敛阶期望=可证伪假设，判别器=执行），
+而非强制文献主张条件化。门禁本身无错——错在管线把文献假设当作唯一
+假设来源。第二问（理论化问法）用于今晚贯通场景 A。
+
+## 场景 A 端到端 LIVE 闭环达成（2026-08-30 02:1x，run_5mw5q5e9，work/scenario-a）
+
+第二问（理论化问法）12 阶段全 done：问题模型（5 目标 well_posed_computational
+/6 变量）→ 方法选择 5/5 目标选中 numerical_simulation → 12 源/12 切题主张 →
+11 假设（无模板内容）→ 证伪/排序 → 计划 → **FEM 自适应腿真实执行**
+（draft 模型自选 adaptive + 奇性制造解 sin(2πx)cos(2πy)+x^0.7·sin、混合边界；
+真实 sidecar Python 3.14.1 lockfile 钉扎；10 轮 AFEM；H1~ndof slope -0.484
+（最优 -0.5 带内）；StatReport fem_h1_error_final_round verdict=supports
+机械裁决，exploratory 未绑定诚实标注）→ 导出 IMRaD+2图6表+replay bundle
+（bnd_khmwksfh…）→ **far verify 15/15 PASS**（120 live 回执 zai|glm-4.6、
+哈希/锁文件/taint 全一致）。
+
+第一问 run_fq3rdff1 保留为诚实拒绝证据（主题覆盖门禁对实现验证类问题的
+合理拒绝 + run 级路由缺口登记）。
+
+## 会话终态剩余（诚实）
+
+- 场景 B（NetCDF）、场景 C 端到端、baseline benchmark、completion-gate、
+  独立四维审计：均未做。goal 完成判据未满足。
+- 登记的下一杠杆：hypotheses 按方法选择路由（数值/理论族→问题模型派生
+  假设）；NetCDF 数据族；StudyMap 问题模型带。
