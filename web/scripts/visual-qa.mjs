@@ -21,8 +21,8 @@ async function newPage({ theme = 'light', lang = 'zh', width = 1440, height = 96
   // Set theme+lang via the app's own persistence keys before UI settles.
   await page.evaluate(([th, lg]) => {
     try {
-      localStorage.setItem('farlab.theme', th);
-      localStorage.setItem('farlab.lang', lg);
+      localStorage.setItem('far-theme', th);
+      localStorage.setItem('farlab.web.lang', lg);
     } catch { /* fresh profile */ }
   }, [theme, lang]);
   await page.reload({ waitUntil: 'networkidle' });
@@ -55,7 +55,9 @@ for (let i = 0; i < 90; i++) {
 }
 console.log('final status', status);
 
+const ONLY = process.env.VQ_ONLY ?? 'all';
 // 2. zh/light full sweep (desktop).
+if (true)
 {
   const { ctx, page } = await newPage({ theme: 'light', lang: 'zh' });
   await shot(page, '01-home-fresh');

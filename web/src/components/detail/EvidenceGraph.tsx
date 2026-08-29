@@ -351,7 +351,10 @@ export function EvidenceGraph({
             const pa = nodePos(a);
             const pb = nodePos(b);
             const dim = activeEdges !== null && !activeEdges.has(e.from) && !activeEdges.has(e.to);
-            const stroke = e.kind === 'supports' ? 'var(--v2-verified)' : e.kind === 'counters' ? 'var(--v2-refuted)' : 'var(--v2-border)';
+            // Locator edges stay context-tinted (NOT --v2-border: the dark-theme
+            // border token is near-black on a near-black canvas — measured
+            // invisible in dark QA 2026-08-29).
+            const stroke = e.kind === 'supports' ? 'var(--v2-verified)' : e.kind === 'counters' ? 'var(--v2-refuted)' : 'var(--v2-text-3)';
             // Focus mode must POP: active edges thicken further, everything else recedes.
             const inFocus = activeEdges !== null && (activeEdges.has(e.from) || activeEdges.has(e.to));
             const baseW = e.strength !== undefined ? STRENGTH_W[e.strength] : e.kind === 'locator' ? 1.0 : e.kind === 'counters' ? 2.6 : 2.2;

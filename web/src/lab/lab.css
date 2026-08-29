@@ -926,6 +926,15 @@
   .lib-row-runs { max-width: 100%; justify-content: flex-start; }
 }
 
+/* Graph toolbar filters: the ACTIVE state stays in the quiet info voice —
+   the primary ink button reads as a shout inside the graph (dark-theme QA
+   2026-08-29: a bright block out-weighing the visualization itself). */
+.graph-toolbar .btn--primary {
+  color: var(--v2-info-on-tint);
+  background: var(--v2-info-tint);
+  border-color: color-mix(in oklab, var(--v2-info) 40%, transparent);
+}
+
 /* ---- Study delete (map topline, armed confirm like cancel) ---- */
 .map-del {
   display: inline-flex; align-items: center; justify-content: center;
