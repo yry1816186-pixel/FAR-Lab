@@ -8,6 +8,6 @@
 ===== node scripts/surgery/apply-protocol-export-fix.mjs =====
 [surgery:protocol-export-fix] declaration block already sits above the limitations array — nothing to do
 ===== node scripts/surgery/apply-protocol-export-tests.mjs =====
-[surgery:protocol-export-tests] api.test.ts replaced:     expect(body.checks).toHaveLength(15); // slice-4: +protocol_evidence_resolvable (protocol-less fixture passes the check empty)
-[surgery:protocol-export-tests] protocol-export.test.ts replaced:     expect(paperMd).toContain('human-attested ledger');
+[surgery:protocol-export-tests] api count assertion already 15 — nothing to do
+[surgery:protocol-export-tests] paper assertion already lowercase — nothing to do
 APPLY_RC=0
