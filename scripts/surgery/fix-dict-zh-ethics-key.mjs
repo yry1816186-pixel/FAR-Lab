@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 /**
- * One-shot anchored fix (slice 2 iteration, 2026-08-29): the committed
- * dict.ts carries 'map.protocol.ethicsApprovalBody' in the EN object only —
- * zh lacks it, so DictKey (= keyof typeof zh) misses the key and
- * `web npm run build` fails with TS2353 (dict.ts en literal, line ~1777) +
- * TS2345 (ProtocolPanel.tsx t() call, line ~168). Root typecheck/lint/
- * vitest never compile web sources, which is why the base diagnose stayed
- * green while ci failed. Adds the missing zh key and asserts the zh/en key
- * sets are otherwise identical (fail-loud on any further drift).
+ * One-shot anchored fix, v2 (slice 2 iteration, 2026-08-29). v1 required
+ * en-minus-zh to be exactly [map.protocol.ethicsApprovalBody]; #20's
+ * apply-log proved the extractor sees a second key, feedback.intro, that
+ * tsc does NOT flag (exactly one TS2353 on the f54316a tree) — zh carries
+ * it in a form the two-space-quoted-key regex cannot see. v2 inserts the
+ * missing protocol key whenever it appears in missingInZh, dumps every
+ * zh-segment line mentioning 'feedback' verbatim (JSON-escaped) into the
+ * log for the record, still fails loudly on zh-minus-en drift (the
+ * type-breaking direction), and never touches the en block.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 
@@ -38,13 +39,24 @@ const enKeys = keysOf(enSeg);
 const missingInZh = [...enKeys].filter((k) => !zhKeys.has(k));
 const missingInEn = [...zhKeys].filter((k) => !enKeys.has(k));
 
+// Evidence: dump every zh-segment line mentioning 'feedback' verbatim so
+// the tree record shows how zh carries keys the extractor cannot parse
+// (tsc is the semantic authority; this closes the extractor-vs-compiler gap).
+for (const l of zhSeg.split('\n')) {
+  if (/feedback/i.test(l)) console.log('[surgery:dict-fix] zh feedback line: ' + JSON.stringify(l));
+}
+
+if (missingInEn.length !== 0) {
+  console.error(`[surgery:dict-fix] zh has keys missing from en: ${JSON.stringify(missingInEn)}`);
+  process.exit(1);
+}
+if (missingInZh.length > 0 && !missingInZh.includes(KEY)) {
+  console.error(`[surgery:dict-fix] unexpected drift: en-minus-zh = ${JSON.stringify(missingInZh)} and the protocol key is not among it`);
+  process.exit(1);
+}
 if (zhKeys.has(KEY)) {
   console.log('[surgery:dict-fix] zh already has the key — nothing to do');
 } else {
-  if (missingInZh.length !== 1 || missingInZh[0] !== KEY) {
-    console.error(`[surgery:dict-fix] unexpected drift: en-minus-zh = ${JSON.stringify(missingInZh)}, zh-minus-en = ${JSON.stringify(missingInEn)}`);
-    process.exit(1);
-  }
   const L = zhSeg.split('\n');
   const hits = L.map((l, i) => (/^ {2}'map\.protocol\./.test(l) ? i : -1)).filter((i) => i >= 0);
   if (hits.length < 1) {
@@ -55,8 +67,8 @@ if (zhKeys.has(KEY)) {
   writeFileSync(DICT, src.slice(0, zhOpenAt) + L.join('\n') + src.slice(enOpenAt));
   console.log('[surgery:dict-fix] added zh key map.protocol.ethicsApprovalBody (审批机构)');
 }
-if (missingInEn.length !== 0) {
-  console.error(`[surgery:dict-fix] zh has keys missing from en: ${JSON.stringify(missingInEn)}`);
-  process.exit(1);
+const residual = missingInZh.filter((k) => k !== KEY);
+if (residual.length > 0) {
+  console.log(`[surgery:dict-fix] residual extractor-visible drift (logged, not fatal — tsc reports no error for it): ${JSON.stringify(residual)}`);
 }
-console.log('[surgery:dict-fix] zh/en key sets verified identical (post-fix)');
+console.log('[surgery:dict-fix] done');
