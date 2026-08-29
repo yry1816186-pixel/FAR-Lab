@@ -27,8 +27,8 @@
    人工执行节点，停止提示指向协议；快照 +protocolsRegistered；ExperimentLegStatus
    union 不变（api/next-action/web 零破坏）
 5. **HTTP 面**（src/server/protocol-ops.ts + api.ts 手术）：
-   GET /runs/:id/protocol（协议+台账+采集表+步骤态）、
-   POST /runs/:id/protocol/records（人工背书记录；完成/显式发布一次性铸造 experiment 反馈）
+     GET /runs/:id/protocol（协议+台账+采集表+步骤态）、
+     POST /runs/:id/protocol/records（人工背书记录；完成/显式发布一次性铸造 experiment 反馈）
 6. **大文件手术机制**：store.ts/api.ts/README 由 CI 内锚点脚本落库
    （scripts/surgery/*.mjs + .github/workflows/surgery.yml，fail-loud 唯一锚点 + 幂等，
    仅 converge/** 分支）——本会话无本地写权限下的安全路径，全部一次命中
@@ -176,27 +176,31 @@
 2. **我的一次提交信息失真（0db9d9d）**：单文件调用只改了触发标记却挂了
    fix(test) 信息——真实修复在下一提交 a807768 并在信息中显式纠正。教训：
    多文件修复一律用 push_files 单提交，不用 create_or_update_file 拆分
-3. **诊断早期崩溃（runs #30/#31，48s）**：两轮 bump 的 diagnose 在安装阶段即崩
-   （早于快照步），而快照步无 if: always() → 无 diag 落库，裁决通道断。疑瞬时
-   故障（#29 同链路 3m32s 正常）；已 bump 4 重试，并把「快照步补 if: always()」
-   登记为手术面缺陷（下切片修复）
-4. **ci 取证干扰**：PR 开启后聚簇推送使本分支 ci run 全部 37-45s 早终（疑似
-   并发取消/排队效应；对照 #651 于 PR 开启前 2m37s 真跑）——不可作裁决依据。
-   **改以末位收尾提交的单次 ci 为唯一合并门**（此后零推送）
+3. **根因九（a807768 checks 页注解铁证）**：v1 锚点把 protocolEvidence 声明块
+   插在 `const bundleId`（limitations 数组**之后**），使用点在数组内——
+   TS2448/TS2454 先使用后声明，ci `Build backend dist` 步 ~40s 真红。
+   **连带纠正两处我此前的误判**：①#30/#31 诊断 48s 早崩并非瞬时故障——
+   diagnose 的 build 步同因真红，快照步无 if:always() 故无证据落库；
+   ②本分支 ci 37-45s 短 run 并非并发取消干扰——就是 build 真红。
+   修复：apply-protocol-export-fix.mjs 把声明块移到 limitations 数组之前
+   （诊断步亦补 if:always() + BUILD 段先行——本提交的 surgery.yml 落地）
+4. **教训（锚点手术的顺序约束）**：insert-only 锚点补丁只验证锚唯一，不验证
+   声明-使用相对位置——跨多锚点的补丁必须把声明块锚在**最早使用点之前**；
+   更稳的做法是先声明后使用单一锚块（本修复采用：声明+限制行同块上移）
 
 ## 切片 4 验证状态（诚实）
 
-- bump-1 诊断（f89db40）：源码五文件补丁全绿（typecheck/lint/tui/web build），
-  唯一红=夹具 pln 前缀（根因七）；apply 一次全中（apply-log 铁证）
-- a807768 修复树：因 #30/#31 诊断早崩 + ci 聚簇干扰，未取得独立全量绿快照——
-  **由本末位提交的 ci 单次裁决补齐**（若红则按其注解继续修）
-- **最终合并门 = 本末位提交（surgery 合法休眠 + 控制面补记）head 上的 ci 全绿，
-  此后无任何推送**
+- bump-1 诊断（f89db40，树=补丁前）：源码五文件补丁的 typecheck/lint/tui/web
+  无法在本快照裁决（树未含补丁）；唯一红=夹具 pln 前缀（根因七）；
+  apply 一次全中（apply-log 铁证）
+- a807768：ci checks 注解暴露根因九（TS2448/TS2454，export.ts:860）——修复中
+- **最终合并门 = 末位休眠收尾提交 head 上的 ci 单次全绿，此后无任何推送**
 
 ## 登记未做（后续切片，非本 PR 声称范围）
 
-- 范式覆盖深化：theory（CAS 集成）、archive（登记库检索接口）
-- 手术面缺陷：diagnose 快照步补 if: always()（#30/#31 早崩无快照）；
+- 范式覆盖深化：theory（CAS 集成）、archive（登记库检索接口）——侦察已完成
+  （protocol-from-plan.ts 七范式统一处理，缺各自动可执行腿）
+- 手术面改进（本轮已部分落地：diagnose 快照步 if:always() + BUILD 段）：
   apply-log/diag 保留策略
 - 手术 workflow 在 main 保持休眠（workflow_dispatch + 单 no-op job 合法形态）；
   apply-log.txt / diag.txt 留树内作为切片取证记录（path-hygiene 允许）

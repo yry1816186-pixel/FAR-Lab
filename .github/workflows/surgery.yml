@@ -1,25 +1,159 @@
 name: surgery
 
-# Remote-surgery patch plane — DORMANT (post-slice-4 neutralization,
-# 2026-08-29). Reactivated three times, always branch-scoped to one
-# converge/** slice and triggered only by the scripts/surgery/.diag-trigger
-# marker:
-#   slice 2 (converge/web-protocol, PR #133) — apply-web-protocol.mjs
-#   slice 3 (converge/protocol-cli, PR #134) — apply-cli-protocol.mjs
-#   slice 4 (converge/export-protocol, PR #135) — apply-protocol-export.mjs:
-#     six insert-only edits routing the protocol chain into the export plane
-#     (provenance/verify/export/paper-outline/package; bot commit df7f5b7,
-#     evidence in scripts/surgery/apply-log.txt).
-# Mechanism + hardening: see scripts/surgery/README.md.
-# Validity: a workflow must declare at least one job (the zero-job form was
-# invalid and registered a phantom failure run per carrying push — #22-#25).
-# Known defect (registered, slice-5 candidate): the diagnose job's snapshot
-# step lacks `if: always()`, so an early crash (runs #30/#31, 48s) leaves NO
-# diag.txt — the next reactivation must add it.
+# Remote-surgery patch plane — slice 4 fix round (converge/export-protocol):
+# root cause 9 (declaration-after-use in export.ts) repaired by moving the
+# block; runs BOTH slice-4 scripts (idempotent). Same hardening as before.
+# Re-neutralized to workflow_dispatch-only + no-op job at slice end.
 on:
   workflow_dispatch:
+  push:
+    branches: ['converge/export-protocol']
+    paths: ['scripts/surgery/.diag-trigger']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: surgery-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  dormant:
+  apply:
     runs-on: ubuntu-latest
     steps:
-      - run: echo 'surgery patch plane dormant — see scripts/surgery/README.md'
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Apply anchored patch scripts (idempotent, fail-loud, logged)
+        run: |
+          set -o pipefail
+          rc=0
+          run_script () {
+            echo "===== node scripts/surgery/$1.mjs =====" | tee -a /tmp/apply.log
+            if ! node "scripts/surgery/$1.mjs" 2>&1 | tee -a /tmp/apply.log; then
+              echo "SCRIPT FAILED: $1" | tee -a /tmp/apply.log
+              rc=1
+            fi
+          }
+          run_script apply-protocol-export
+          run_script apply-protocol-export-fix
+          echo "APPLY_RC=$rc" | tee -a /tmp/apply.log
+          exit $rc
+      - name: Commit applied patches + apply log (always)
+        if: always()
+        run: |
+          git config user.name "farlab-surgery-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          [ -f /tmp/apply.log ] || echo '(apply log missing — apply step crashed before first tee)' > /tmp/apply.log
+          cp /tmp/apply.log scripts/surgery/apply-log.txt
+          git add src/domain/provenance.ts src/app/verify.ts src/pipeline/stages/export.ts src/pipeline/paper-outline.ts src/report/package.ts scripts/surgery/apply-log.txt
+          if git diff --cached --quiet; then
+            echo "nothing to apply — tree already current"
+          else
+            git commit -m "chore(surgery): root cause 9 — move protocol declarations above the limitations array"
+            git pull --rebase
+            git push
+          fi
+
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Install python deps for the experiment sidecar
+        run: pip install numpy --quiet
+      - name: Install root dependencies
+        run: npm ci
+      - name: Install web dependencies (root suite imports web/src)
+        working-directory: web
+        run: npm ci
+      - name: Install TUI dependencies (ci-only coverage)
+        working-directory: packages/tui
+        run: |
+          set -o pipefail
+          npm ci 2>&1 | tee /tmp/tui-install.txt || echo "TUI_INSTALL_FAILED" >> /tmp/tui-install.txt
+      - name: Install desktop dependencies (ci-only coverage)
+        working-directory: desktop
+        run: |
+          set -o pipefail
+          npm ci 2>&1 | tee /tmp/desktop-install.txt || echo "DESKTOP_INSTALL_FAILED" >> /tmp/desktop-install.txt
+      - name: Build backend dist (suite imports compiled output)
+        run: |
+          set -o pipefail
+          npm run build 2>&1 | tee /tmp/build.txt || echo "BUILD_FAILED" >> /tmp/build.txt
+      - name: Typecheck (backend + CLI)
+        run: |
+          set -o pipefail
+          npm run typecheck 2>&1 | tee /tmp/typecheck.txt || echo "TYPECHECK_FAILED" >> /tmp/typecheck.txt
+      - name: Lint
+        run: |
+          set -o pipefail
+          npm run lint 2>&1 | tee /tmp/lint.txt || echo "LINT_FAILED" >> /tmp/lint.txt
+      - name: Full test suite (same gates as ci.yml verify)
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee /tmp/vitest.txt || echo "VITEST_FAILED" >> /tmp/vitest.txt
+      - name: TUI package tests (ci-only coverage)
+        working-directory: packages/tui
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee /tmp/tui-test.txt || echo "TUI_TEST_FAILED" >> /tmp/tui-test.txt
+      - name: CLI smoke (ci-only coverage)
+        run: |
+          set -o pipefail
+          node dist/cli/main.js --help 2>&1 | tee /tmp/cli.txt || echo "CLI_FAILED" >> /tmp/cli.txt
+      - name: License ledger gate (ci-only coverage)
+        run: |
+          set -o pipefail
+          node zcode-harness/scripts/license-ledger.mjs --check 2>&1 | tee /tmp/license.txt || echo "LICENSE_FAILED" >> /tmp/license.txt
+      - name: Secret scan (ci-only coverage)
+        run: |
+          set -o pipefail
+          node zcode-harness/scripts/secret-scan.mjs 2>&1 | tee /tmp/secret.txt || echo "SECRET_FAILED" >> /tmp/secret.txt
+      - name: Path hygiene (ci-only coverage)
+        run: |
+          set -o pipefail
+          node zcode-harness/scripts/path-hygiene.mjs 2>&1 | tee /tmp/hygiene.txt || echo "HYGIENE_FAILED" >> /tmp/hygiene.txt
+      - name: Web production build (ci-only coverage)
+        working-directory: web
+        run: |
+          set -o pipefail
+          npm run build 2>&1 | tee /tmp/webbuild.txt || echo "WEBBUILD_FAILED" >> /tmp/webbuild.txt
+      - name: Commit diagnostics
+        if: always()
+        run: |
+          git config user.name "farlab-surgery-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          mkdir -p scripts/surgery
+          {
+            echo '===== tui install (last 20 lines) ====='; tail -n 20 /tmp/tui-install.txt 2>/dev/null || echo '(missing)';
+            echo; echo '===== desktop install (last 20 lines) ====='; tail -n 20 /tmp/desktop-install.txt 2>/dev/null || echo '(missing)';
+            echo; echo '===== BUILD (last 60 lines — root cause 9 verdict) ====='; tail -n 60 /tmp/build.txt 2>/dev/null || echo '(build never ran)';
+            echo; echo '===== typecheck (last 30 lines) ====='; tail -n 30 /tmp/typecheck.txt 2>/dev/null || echo '(missing)';
+            echo; echo '===== lint (last 30 lines) ====='; tail -n 30 /tmp/lint.txt 2>/dev/null || echo '(missing)';
+            echo; echo '===== FULL vitest (last 400 lines) ====='; tail -n 400 /tmp/vitest.txt 2>/dev/null || echo '(missing)';
+            echo; echo '===== tui test (last 40 lines) ====='; tail -n 40 /tmp/tui-test.txt 2>/dev/null || echo '(missing)';
+            echo; echo '===== cli smoke (last 20 lines) ====='; tail -n 20 /tmp/cli.txt 2>/dev/null || echo '(missing)';
+            echo; echo '===== license (last 30 lines) ====='; tail -n 30 /tmp/license.txt 2>/dev/null || echo '(missing)';
+            echo; echo '===== secret scan (last 40 lines) ====='; tail -n 40 /tmp/secret.txt 2>/dev/null || echo '(missing)';
+            echo; echo '===== path hygiene (last 40 lines) ====='; tail -n 40 /tmp/hygiene.txt 2>/dev/null || echo '(missing)';
+            echo; echo '===== web build (last 60 lines) ====='; tail -n 60 /tmp/webbuild.txt 2>/dev/null || echo '(missing)';
+          } > scripts/surgery/diag.txt
+          git add scripts/surgery/diag.txt
+          if git diff --cached --quiet; then
+            echo "no diagnostics change"
+          else
+            git stash
+            git pull --rebase
+            git stash pop
+            git add scripts/surgery/diag.txt
+            git commit -m "chore(surgery): diagnostics snapshot (full suite + ci-only gates)"
+            git push
+          fi
