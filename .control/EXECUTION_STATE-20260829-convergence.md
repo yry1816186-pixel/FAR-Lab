@@ -495,3 +495,19 @@ CPS-AOSSA-3 核心切片：sidecar netcdf.py（xarray+netcdf4，剖析/QC/闭枚
 问题模型→披露→FEM 均匀→AFEM→NetCDF 数据面→场景 A live 闭环
 （bundle 15/15）→场景 B 数据链（可复现）。goal 完成判据仍未满足：
 场景 B 文献+run 级整合、场景 C、benchmark、completion-gate、四维审计。
+
+## 场景 B 端到端贯通（422f05e，2026-08-30 03:5x）
+
+文献腿（run_b07h78df，zai，9 阶段 done，12 源/33 主张/9 假设，问题模型
+6 目标，方法选择混合）+ 数据腿桥接同一 run（3 dataset_records +
+StatReport）→ bundle bnd_7evnh6rr 15/15 verified（111 live 回执）。
+completion-gate.mjs 已运行：NOT_READY，唯一缺口 ACC-02（B-QWEN
+dashscope key，BLOCKED-user 09-05 裁定），其余 25 live + 16 tested。
+
+## 终局状态（goal 判据对照，诚实）
+
+- 场景 A：✅ live 端到端（bundle 15/15）。场景 B：✅ 两腿桥接端到端
+  （bundle 15/15；run 级自动串联仍为登记缺口）。场景 C：机制全备，
+  真实人类执行 BLOCKED-user。
+- benchmark 对照、独立四维审计：未做（下一会话杠杆）。
+- completion-gate：NOT_READY（唯一项=用户侧凭据）。
