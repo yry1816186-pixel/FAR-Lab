@@ -250,6 +250,14 @@ const main = async (): Promise<void> => {
     const { hydrateEnvFromDotEnv } = await import('../platform/dotenv.js');
     hydrateEnvFromDotEnv(process.env, path.resolve(process.cwd(), '.env'));
   }
+  // Network plane (proxy/CA) is BOOT-time-only in Node's fetch — if the
+  // hydrated env carries FARLAB_HTTP(S)_PROXY / FARLAB_CA_CERT that this
+  // process was not started with, re-exec once with the Node-native env set.
+  // `far probe net` is exempt (it reports on the CURRENT process honestly).
+  if (process.argv[3] !== 'net') {
+    const { ensureNetworkEnvAtBoot } = await import('../shared/net-env.js');
+    if (ensureNetworkEnvAtBoot()) return;
+  }
   const [, , cmd, sub] = process.argv;
   if (!cmd || flag('--help') || flag('-h') || cmd === 'help') { console.log(HELP); return; }
 
@@ -385,6 +393,33 @@ const main = async (): Promise<void> => {
       runs.map((r) => [r.id, statusInk(r.status)(r.status), r.currentStage, (r.questionText ?? '').slice(0, 46), r.createdAt]),
     );
     app.close();
+    return;
+  }
+
+  if (cmd === 'probe' && process.argv[3] === 'net') {
+    // Network plane (extensibility lane): honest proxy/CA status + a REAL
+    // loopback self-test (local TLS server + local CONNECT proxy; a child
+    // process started with the researcher's env fetches through the tunnel).
+    // Never contacts external networks.
+    const { probeNetwork } = await import('../shared/net-env.js');
+    const r = await probeNetwork();
+    if (json()) {
+      out(JSON.stringify(r, null, 2));
+    } else {
+      out(`${marker()} network plane probe`);
+      out(`  proxy configured : ${r.proxyConfigured ? 'yes' : 'no'}`);
+      if (r.proxyConfigured) {
+        out(`  https proxy      : ${r.proxy.https ?? '(none)'}`);
+        out(`  http proxy       : ${r.proxy.http ?? '(none)'}`);
+        out(`  no-proxy         : ${r.proxy.noProxy ?? '(default)'}`);
+        out(`  engaged at boot  : ${r.envProxyEngaged ? 'yes' : 'no — this process was started without the env; long-running entrypoints re-exec once to apply it'}`);
+      }
+      out(`  custom CA        : ${r.caConfigured ? r.caFile! : 'no'}`);
+      if (r.caValid !== undefined) out(`  CA valid         : ${r.caValid.ok ? 'yes' : `NO — ${r.caValid.reason}`}`);
+      out(`  self-test        : ${r.selfTest.ok ? ink.ok('PASS') : ink.err('FAIL')} — ${r.selfTest.detail}`);
+      for (const n of r.notes) out(`  note             : ${n}`);
+    }
+    process.exitCode = r.selfTest.ok || (!r.proxyConfigured && r.caConfigured && r.caValid?.ok === true) ? 0 : 1;
     return;
   }
 

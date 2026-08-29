@@ -22,6 +22,11 @@ if (stale.length > 0) {
   process.exit(3);
 }
 
+// Proxy/CA env is boot-time-only in Node's fetch — apply the FARLAB_* network
+// plan (one-shot re-exec) before anything dials out.
+const { ensureNetworkEnvAtBoot } = await import('../dist/shared/net-env.js');
+if (ensureNetworkEnvAtBoot()) process.exit(process.exitCode ?? 0);
+
 const { createApp } = await import('../dist/app/composition.js');
 const { createApiServer } = await import('../dist/server/api.js');
 

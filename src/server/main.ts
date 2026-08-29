@@ -1,12 +1,16 @@
 #!/usr/bin/env node
 import { createApp } from '../app/composition.js';
 import { createApiServer } from './api.js';
+import { ensureNetworkEnvAtBoot } from '../shared/net-env.js';
 
 /**
  * HTTP API entrypoint (node dist/server/main.js). Env: PORT (default 8787),
  * HOST (default 127.0.0.1), FARLAB_DATA_DIR (default .far-run — shared with the CLI).
  * Graceful shutdown: SIGINT/SIGTERM -> server.close + db.close.
  */
+
+// Proxy/CA env is boot-time-only in Node's fetch — apply before anything dials out.
+if (ensureNetworkEnvAtBoot()) process.exit(process.exitCode ?? 0);
 
 const parsePort = (): number => {
   const raw = process.env.PORT;

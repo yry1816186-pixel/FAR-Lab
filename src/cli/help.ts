@@ -64,6 +64,9 @@ Usage:
   far probe [provider] [--live] [--json]         Model-route health: config check by default
                                                   (key presence, never values); --live makes one
                                                   minimal real chat call per route (costs ~1 token)
+  far probe net [--json]                         Network plane: HTTP(S) proxy / custom CA status +
+                                                  real loopback self-test (local TLS + CONNECT proxy;
+                                                  no external network contact)
   far probe-custom [mcfg-id] [--live] [--json]   Same health surface for user-defined model configs
                                                   (Settings / mcfg_* routes); --live = one real call
   far data info [--json]                         Data footprint: runs, db size, artifacts, exports
