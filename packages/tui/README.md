@@ -62,10 +62,11 @@ FAR_URL=http://127.0.0.1:3196/api/v1  # 默认（本地服务端）
 1. **SSH 上的 TUI（推荐）**：`ssh <host>` 后在远端直接 `far-tui`（FAR_URL 默认该机
    loopback）。终端即传输层；数据目录归属 = 该 OS 用户。
 2. **SSH 隧道 + 本地 TUI/浏览器**：`ssh -L 3196:127.0.0.1:3196 <host>`（服务端
-   `far serve` 或 `node scripts/serve.mjs`），本地 `FAR_URL=http://127.0.0.1:3196/api/v1`
+   `PORT=3196 far serve` 或 `node scripts/serve.mjs`——注意 `far serve` 不带 PORT
+   时默认 8787，与隧道端口必须一致），本地 `FAR_URL=http://127.0.0.1:3196/api/v1`
    的 TUI 或浏览器打开 `http://localhost:3196`。隧道出口仍是 loopback，F-1 不被绕过。
 3. **无头服务器 + 浏览器**：同上隧道形态的 Web 工作台；无图形界面的服务器用
-   `far serve` + CLI 完整降级。
+   `PORT=3196 far serve` + CLI 完整降级。
 
 会话恢复语义：TUI 附着的 SSE 流断线后按游标续接（Last-Event-ID/afterSeq）；
 run 执行体（lease）过期即"冻结"，TUI 详情以 [已冻结] 如实标注并用 `r` 恢复。

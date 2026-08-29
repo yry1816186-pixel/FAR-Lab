@@ -44,22 +44,31 @@ Usage:
                                                   RU-8 campaign driver: DAG readiness, stop rules, alpha ledger
                                                   Execute / queue an ExperimentSpec through the
                                                   durable scheduler (real datasets+models+stats)
+  far experiment simulate <simspec.json>          Execute a SimulationSpec (CRN/simulator) directly:
+                                                  simulate -> mechanical stats -> verdict -> feedback
   far experiment worker [--max-jobs N] [--max-running N]
                                                   Drain queued experiments as a worker
   far experiment status [--job <id>] | cancel <job-id> | logs <experiment-run-id>
                                                   Job/experiment truth: queue state, cooperative
                                                   cancel, content-addressed training logs
+  far experiment dead-list | requeue <job-id>     Dead-letter queue for poison jobs: list and
+                                                  (bounded) requeue after a crash loop
+  far experiment approve <specId> --by <name>     Approve a draft experiment spec (preregistration
+  far experiment rerun <specId>                   gate); rerun re-executes an approved spec
   far agent refine <run-id> [--turns N] [--top-k N] [--max-concurrent N] [--json]
                                                   Iterative evidence-gap refinement on a
                                                   completed run: parallel pro/contra literature
                                                   sub-agents + tool-using refinement loop;
-                                                  sessions/reports/events fully audited
+                                                  sessions/reports/events fully audited;
+                                                  --resume <ags-id> reattaches to a live session
   far probe [provider] [--live] [--json]         Model-route health: config check by default
                                                   (key presence, never values); --live makes one
                                                   minimal real chat call per route (costs ~1 token)
   far probe-custom [mcfg-id] [--live] [--json]   Same health surface for user-defined model configs
                                                   (Settings / mcfg_* routes); --live = one real call
   far data info [--json]                         Data footprint: runs, db size, artifacts, exports
+  far data obs [--json]                          Reliability observability: process/storage state,
+                                                  per-run recovery phases, workspace error profile
   far memory <query> [--kind <k>] [--json]       Search the re-audit memory queue (kind:
                                                   episodic|semantic|experiment_outcome|profile)
   far backup [<dest.db>]                         Consistent DB snapshot via VACUUM INTO (never

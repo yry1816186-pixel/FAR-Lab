@@ -41,10 +41,15 @@ export const writeNotifyEnabled = (on: boolean): boolean => {
   }
   // 'default': enabling IS the permission moment (async — the event fires after
   // the browser dialog resolves; callers read the final state from the event).
+  // A rejected permission promise (browser quirk / dismissed dialog) must not
+  // surface as an unhandled rejection: the preference simply stays off.
   void window.Notification.requestPermission().then((granted) => {
     const enabled = granted === 'granted';
     window.localStorage.setItem(PREF_KEY, enabled ? 'on' : 'off');
     window.dispatchEvent(new CustomEvent(NOTIFY_CHANGE_EVENT, { detail: { enabled } }));
+  }, () => {
+    window.localStorage.setItem(PREF_KEY, 'off');
+    window.dispatchEvent(new CustomEvent(NOTIFY_CHANGE_EVENT, { detail: { enabled: false } }));
   });
   return false;
 };

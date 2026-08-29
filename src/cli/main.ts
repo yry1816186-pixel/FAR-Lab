@@ -765,7 +765,7 @@ const main = async (): Promise<void> => {
     return;
   }
 
-  if (cmd === 'data') die('data requires a subcommand: info', 2);
+  if (cmd === 'data') die('data requires a subcommand: info | obs', 2);
 
   if (cmd === 'gc') {
     const app = await createApp();

@@ -255,9 +255,14 @@ mod tests {
 
 
 /// Navigate the workbench to a hash route (quick capture / deep links).
+///
+/// The hash is deep-link input (attacker-controllable up to the protocol-launch
+/// consent): it is JSON-encoded so no quote/newline in it can break out of the
+/// JS string literal executed by `eval` (which bypasses page CSP).
 fn navigate_hash(app: &tauri::AppHandle, hash: &str) {
     if let Some(w) = app.get_webview_window("main") {
-        let script = format!("location.hash = '{hash}';");
+        let encoded = serde_json::to_string(hash).unwrap_or_else(|_| "\"#lab/new\"".to_string());
+        let script = format!("location.hash = {encoded};");
         let _ = w.eval(&script);
     }
 }
@@ -267,7 +272,9 @@ fn navigate_hash(app: &tauri::AppHandle, hash: &str) {
 fn handle_deep_link(app: &tauri::AppHandle, payload: &str) {
     if let Some(start) = payload.find("far://") {
         let rest = &payload[start + "far://".len()..];
-        let end = rest.find(['"', ' ', '\\']).unwrap_or(rest.len());
+        // Cut at characters that cannot be part of a hash route we ever mint
+        // (defense in depth on top of navigate_hash's JSON encoding).
+        let end = rest.find(['"', '\'', ' ', '\\']).unwrap_or(rest.len());
         let path = &rest[..end];
         if path.is_empty() {
             navigate_hash(app, "#lab/new");

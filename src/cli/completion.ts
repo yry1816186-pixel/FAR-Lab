@@ -24,6 +24,7 @@ export const FAR_COMMANDS: readonly CompletionCommand[] = [
       { name: 'resume', help: 'resume a partial/failed run' },
       { name: 'export', help: 'export report or bundle' },
       { name: 'feedback', help: 'record feedback on a run' },
+      { name: 'counter-search', help: 'run one counter-evidence search into the corpus' },
       { name: 'lineage', help: 'trajectory graph (revisions/hypotheses/evidence)' },
       { name: 'supervise', help: 'live supervisor analysis with action hints' },
       { name: 'fork', help: 'branch a settled run (alternative direction)' },
@@ -36,10 +37,15 @@ export const FAR_COMMANDS: readonly CompletionCommand[] = [
     subs: [
       { name: 'run', help: 'execute an ExperimentSpec now' },
       { name: 'enqueue', help: 'queue an ExperimentSpec' },
+      { name: 'simulate', help: 'execute a SimulationSpec (CRN/simulator)' },
       { name: 'worker', help: 'drain queued experiments' },
       { name: 'status', help: 'job and experiment truth' },
+      { name: 'dead-list', help: 'list dead-lettered poison jobs' },
+      { name: 'requeue', help: 'requeue a dead-lettered job' },
       { name: 'cancel', help: 'cooperatively cancel a job' },
       { name: 'logs', help: 'content-addressed training logs' },
+      { name: 'approve', help: 'approve a draft experiment spec' },
+      { name: 'rerun', help: 'rerun an approved spec' },
     ],
   },
   {
@@ -58,7 +64,10 @@ export const FAR_COMMANDS: readonly CompletionCommand[] = [
   { name: 'memory', help: 'search the re-audit memory queue', subs: [] },
   { name: 'backup', help: 'VACUUM INTO snapshot of the database', subs: [] },
   { name: 'gc', help: 'sweep unreferenced artifact blobs (dry-run by default)', subs: [] },
-  { name: 'data', help: 'data footprint', subs: [{ name: 'info', help: 'runs, db size, artifacts, exports' }] },
+  { name: 'data', help: 'data footprint', subs: [
+    { name: 'info', help: 'runs, db size, artifacts, exports' },
+    { name: 'obs', help: 'reliability observability snapshot' },
+  ] },
   { name: 'verify', help: 'verify a reproducibility bundle', subs: [] },
   { name: 'new', help: 'interactive wizard (TTY only)', subs: [] },
   {
