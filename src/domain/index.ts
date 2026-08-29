@@ -21,6 +21,7 @@ export * from './ach.js';
 export * from './prediction.js';
 export * from './meta.js';
 export * from './theory.js';
+export * from './fem.js';
 export * from './paper-outline.js';
 export * from './conversation.js';
 export * from './automation.js';
@@ -30,4 +31,5 @@ export * from './screening.js';
 export * from './scientific-state.js';
 export * from './next-action.js';
 export * from './state-delta.js';
+
 

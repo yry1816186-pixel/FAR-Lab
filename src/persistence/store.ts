@@ -19,6 +19,7 @@ import {
   ProtocolSpec, ProtocolExecution,
   ScientificProblemModel, MethodSelection,
   TheorySpec,
+  FemSpec,
 } from '../domain/index.js';
 import { z } from 'zod';
 import { STAGE_ORDER } from '../domain/run.js';
@@ -43,6 +44,7 @@ const KIND_SCHEMAS = {
   problem_model: ScientificProblemModel,
   method_selection: MethodSelection,
   theory_spec: TheorySpec,
+  fem_spec: FemSpec,
   feedback: FeedbackSignal,
   revision: Revision,
   version_diff: VersionDiff,
@@ -1250,4 +1252,5 @@ export class Store {
 const STAGE_ALL: readonly RunStageName[] = STAGE_ORDER;
 export { STAGE_ALL };
 export type { StageRecord, ResearchRun };
+
 

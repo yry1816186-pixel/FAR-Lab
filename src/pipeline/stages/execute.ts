@@ -2,11 +2,12 @@ import type { StageContext, StageHandler, StageOutcome } from '../types.js';
 import { ExperimentSpec, newId, newProtocolExecution, ProtocolSpec } from '../../domain/index.js';
 import type { ResearchPlan } from '../../domain/plan.js';
 import { draftSpecFromPlan, draftMetaSpecFromPlan } from '../../experiment/spec-from-plan.js';
-import { draftTheorySpecFromPlan } from '../../experiment/spec-from-plan.js';
+import { draftTheorySpecFromPlan, draftFemSpecFromPlan } from '../../experiment/spec-from-plan.js';
 import { draftProtocolFromPlan, planHashOf, protocolForPlan } from '../../experiment/protocol-from-plan.js';
 import { executeExperiment } from '../../experiment/executor.js';
 import { executeMetaAnalysis } from '../../experiment/executor-meta.js';
 import { executeTheoryAnalysis } from '../../experiment/executor-theory.js';
+import { executeFemAnalysis } from '../../experiment/executor-fem.js';
 import { RunBudgetExhaustedError } from '../../app/run-budget.js';
 import { experimentLegStatus } from '../../app/iteration.js';
 import { TemplateModeRefusal, refuseTemplateMode } from './shared.js';
@@ -151,6 +152,42 @@ export const executeStage: StageHandler = {
         }
       }
 
+      // Slice-6 numerical-PDE leg: plans whose discriminating content is an
+      // elliptic boundary-value verification get a FEM convergence experiment
+      // (manufactured solution -> sympy-exact forcing -> P1 mixed-boundary
+      // assembly -> refinement ladder -> mechanical order verdict), instead of
+      // falling straight to the human protocol. Honestly scoped: uniform P1
+      // refinement on the unit square, not a solver certification.
+      const femDraft = await draftFemSpecFromPlan(plan, question.text, plane);
+      if (femDraft.kind === 'fem' && femDraft.spec !== undefined) {
+        try {
+          refuseTemplateMode(ctx, femDraft.executionMode ?? 'test', 'fem draft');
+          const executed = await executeFemAnalysis(ctx.store, ctx.artifacts, femDraft.spec, {
+            shouldCancel: () => ctx.cancelled() || ctx.disowned(),
+          });
+          const rep = executed.statReports[0];
+          const m = executed.measurement;
+          const lastL2 = m.l2Orders[m.l2Orders.length - 1];
+          const lastH1 = m.h1Orders[m.h1Orders.length - 1];
+          return {
+            kind: 'done',
+            summary:
+              'numerical PDE experiment ' + executed.run.id + ': P1 FEM convergence verified for u=' +
+              m.manufactured.slice(0, 60) +
+              ' (L2 order ' + (lastL2 !== undefined ? lastL2.toFixed(3) : '?') +
+              ', H1 order ' + (lastH1 !== undefined ? lastH1.toFixed(3) : '?') +
+              ', verdict=' + (rep?.verdict ?? 'exploratory') +
+              ') - uniform refinement on the unit square - ' +
+              'plan-drafted, exploratory (theory-fixed rates; binding needs operator approval)',
+          };
+        } catch (e) {
+          if (e instanceof RunBudgetExhaustedError) throw e;
+          if (e instanceof TemplateModeRefusal) return { kind: 'skipped', reason: e.message };
+          const msg = e instanceof Error ? e.message : String(e);
+          return { kind: 'skipped', reason: 'numerical PDE execution failed (run continues): ' + msg.slice(0, 240) };
+        }
+      }
+
       // Protocol fallback (paradigm-honest execution): the computational legs are
       // unavailable, so the real-world legs get their frozen preregistration.
       const existing = protocolForPlan(ctx.store, ctx.run.id, plan);
@@ -241,3 +278,4 @@ export const executeStage: StageHandler = {
     }
   },
 };
+

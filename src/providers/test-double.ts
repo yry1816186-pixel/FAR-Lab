@@ -573,6 +573,11 @@ const problemModelFormation: Handler = (p) => {
   };
 };
 
+const femSpecDraft: Handler = () => ({
+  feasible: false,
+  skipReason: 'offline development route: synthetic plans are not mapped to numerical-PDE experiments (no fabricated FEM verification)',
+});
+
 const modelConfigTest: Handler = () => ({ ok: true });
 
 /**
@@ -652,6 +657,7 @@ const HANDLERS: Readonly<Record<string, Handler>> = {
   'experiment-spec-draft': experimentSpecDraft,
   'meta-spec-draft': metaSpecDraft,
   'theory-spec-draft': theorySpecDraft,
+  'fem-spec-draft': femSpecDraft,
   'model-config-test': modelConfigTest,
   'conversation:turn:turn': conversationTurn,
 };
@@ -789,4 +795,5 @@ export const createTestDoubleProvider = (cfg: ModelProviderConfig): ModelProvide
     },
   };
 };
+
 

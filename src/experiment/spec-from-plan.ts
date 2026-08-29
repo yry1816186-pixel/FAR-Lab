@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { newId, ExperimentSpec } from '../domain/index.js';
 import { MetaAnalysisSpec } from '../domain/meta.js';
+import { FemSpec } from '../domain/fem.js';
 import { TheorySpec, THEORY_GRID_POINTS, THEORY_DEFAULT_TOLERANCE } from '../domain/theory.js';
 import type { ResearchPlan } from '../domain/plan.js';
 import { invokeStructured, type ModelPlaneDeps } from '../pipeline/llm.js';
@@ -389,3 +390,105 @@ export const draftTheorySpecFromPlan = async (
   });
   return { kind: 'theory', spec, executionMode };
 };
+
+// ---------------------------------------------------------------------------
+// Slice-6: numerical-PDE (FEM verification) leg
+// ---------------------------------------------------------------------------
+
+const FemDraftOut = z.object({
+  feasible: z.boolean(),
+  skipReason: z.string().min(10).optional(),
+  manufacturedSolution: z.string().min(1).max(300).optional(),
+  /** Boundary split — every edge must be named; >= 1 Dirichlet edge. */
+  boundary: z.object({
+    bottom: z.enum(['dirichlet', 'neumann']),
+    top: z.enum(['dirichlet', 'neumann']),
+    left: z.enum(['dirichlet', 'neumann']),
+    right: z.enum(['dirichlet', 'neumann']),
+  }).optional(),
+}).superRefine((d, ctx) => {
+  if (d.feasible && (d.manufacturedSolution === undefined || d.boundary === undefined)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'feasible=true requires manufacturedSolution and boundary' });
+  }
+});
+
+const FEM_SYSTEM_PROMPT =
+  'You convert a research plan into ONE numerical-PDE verification spec draft, or declare it infeasible. ' +
+  'Feasible ONLY when the plan\'s discriminating content is an elliptic boundary-value claim on the unit square ' +
+  '(a Poisson problem with mixed Dirichlet/Neumann conditions, verified by the method of manufactured solutions). ' +
+  'manufacturedSolution: a smooth Python-syntax numeric expression over x and y using ONLY: ' +
+  '+ - * / % ** ( ), numbers, the functions exp log log2 log10 sqrt sin cos tan sinh cosh tanh ' +
+  'arcsin arccos arctan arctan2 abs floor ceil min max, and the constants pi e. ' +
+  'It must be smooth on [0,1]^2 and exercise BOTH boundary kinds when the plan names them. ' +
+  'boundary: exactly one dirichlet|neumann value for each of bottom/top/left/right; at least one edge dirichlet ' +
+  '(pure-Neumann Poisson is ill-posed). ' +
+  'If the plan needs datasets, literature pooling, physical experiments, or symbolic identities instead, set ' +
+  'feasible=false with a skipReason naming the mismatch. Output JSON only.';
+
+export interface FemSpecDraftOutcome {
+  kind: 'fem' | 'skip';
+  spec?: FemSpec;
+  executionMode?: 'live' | 'test';
+  reason?: string;
+}
+
+/** Deterministic preregistered ladder (the model never picks resolutions). */
+export const FEM_DRAFT_LEVELS = [8, 16, 32] as const;
+
+export const draftFemSpecFromPlan = async (
+  plan: ResearchPlan,
+  questionText: string,
+  plane: ModelPlaneDeps,
+): Promise<FemSpecDraftOutcome> => {
+  let draft: z.infer<typeof FemDraftOut>;
+  let executionMode: 'live' | 'test';
+  try {
+    const res = await invokeStructured<z.infer<typeof FemDraftOut>>(plane, {
+      stage: 'execute',
+      purpose: 'fem-spec-draft',
+      systemPrompt: FEM_SYSTEM_PROMPT,
+      payload: {
+        researchQuestion: questionText,
+        objective: plan.objective,
+        variables: plan.variables,
+        steps: plan.steps.map((s) => ({ title: s.title, kind: s.kind, method: s.method })),
+        decisionRules: { success: plan.decisionRules.successCriterion, falsification: plan.decisionRules.falsificationCriterion },
+        hypothesisIds: plan.hypothesisIds,
+      },
+      schema: FemDraftOut,
+      temperature: 0.1,
+      maxTokens: 1024,
+    });
+    draft = res.data;
+    executionMode = res.executionMode;
+  } catch (e) {
+    if (e instanceof RunBudgetExhaustedError) throw e;
+    return { kind: 'skip', reason: `fem spec drafting failed: ${(e instanceof Error ? e.message : String(e)).slice(0, 180)}` };
+  }
+  if (!draft.feasible || draft.manufacturedSolution === undefined || draft.boundary === undefined) {
+    return { kind: 'skip', reason: draft.skipReason ?? 'plan is not testable by numerical PDE verification on the unit square' };
+  }
+  const spec = FemSpec.parse({
+    id: newId('xsp'),
+    runId: plan.runId,
+    planId: plan.id,
+    planStepId: plan.steps[0]?.id ?? newId('task'),
+    question: questionText.slice(0, 500),
+    experimentType: 'numerical_pde',
+    pde: { kind: 'poisson_2d_mixed' },
+    domain: 'unit_square',
+    manufacturedSolution: draft.manufacturedSolution,
+    boundary: draft.boundary,
+    levels: [...FEM_DRAFT_LEVELS],
+    errorNorms: ['l2', 'h1'],
+    thresholdProvenance: 'community-standard',
+    compute: { device: 'local', maxParallel: 1, timeoutMs: 300_000 },
+    approvals: [],
+    exploratoryNote: `Plan-drafted exploratory PDE verification for ${plan.id}: P1 rates are theory-fixed (L2 order 2, H1 order 1); hypothesis-bound FEM specs require operator approval.`,
+    validation: { passed: false, missing: ['pending deterministic validation at execution'] },
+    createdAt: new Date().toISOString(),
+  });
+  return { kind: 'fem', spec, executionMode };
+};
+
+
