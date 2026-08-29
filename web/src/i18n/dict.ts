@@ -11,6 +11,7 @@ export type Lang = 'zh' | 'en';
 export const zh = {
   // Protocol band (web slice 2026-08-29) — paradigm-honest execution surface
   'map.protocol.title': '研究协议（人工执行台账）',
+  'map.protocol.ethicsApprovalBody': '审批机构',
   'map.protocol.honesty': '此协议由人执行、由人背书——软件不执行、不代填、不推断。',
   'map.protocol.paradigmLabel': '范式',
   'map.protocol.planFrozen': '冻结于计划 {hash}',
