@@ -17,6 +17,8 @@ import { RELATION_POLARITY } from '../api/types';
 import { runStatusKey } from '../tones';
 import { EvidenceGraph } from '../components/detail/EvidenceGraph';
 import { ClaimInspector } from './ClaimInspector';
+import { ProtocolPanel } from './ProtocolPanel';
+import { getProtocolState, type ProtocolStateView } from '../api/protocol';
 import { zhFirst, markerZh, dimensionLabel, decodeEntities } from './bilingual';
 import { useRunTruth } from '../components/detail/ResearchStatePanel';
 import { ScopeReview } from './ScopeReview';
@@ -119,6 +121,10 @@ export function StudyMap({
   // (e.g. a long-lived 3196 instance). Fail visibly: without this the state
   // band silently vanishes and the user cannot know why.
   const [spineUnavailable, setSpineUnavailable] = useState(false);
+  // Protocol plane (web slice): frozen preregistration + human-attested
+  // ledger. A 404 is the common case (computational plan) — band absent.
+  const [protocol, setProtocol] = useState<ProtocolStateView | null>(null);
+  const [protocolError, setProtocolError] = useState<ApiError | null>(null);
   const [lifecycleBusy, setLifecycleBusy] = useState(false);
   const [cancelArmed, setCancelArmed] = useState(false);
   const [cancelRequested, setCancelRequested] = useState(false);
@@ -143,6 +149,15 @@ export function StudyMap({
     // Spine projection: state/next-actions/deltas. Failure is non-fatal (the
     // map still renders its bands) but leaves science null — never fake state.
     // A 404 is specifically the old-server case: surfaced as its own notice.
+    // Protocol projection (web slice): read-only view over the frozen
+    // preregistration + ledger. 404 = no protocol registered for this run
+    // (the plan ran computationally) — the band simply does not render.
+    void getProtocolState(rid, c.signal)
+      .then(setProtocol)
+      .catch((e: unknown) => {
+        if (e instanceof ApiError && e.status === 404) return;
+        setProtocolError(e instanceof ApiError ? e : new ApiError({ code: 'unknown', message: String(e), retryable: true }));
+      });
     void getScience(rid, c.signal)
       .then(setScience)
       .catch((e: unknown) => {
@@ -155,7 +170,7 @@ export function StudyMap({
   // (running -> completed/partial): the live band disappears exactly when the
   // final evidence/hypotheses land — without this the map keeps the last
   // (possibly empty) snapshot from mid-run.
-  useEffect(() => { setInsp(null); setLoadError(null); setSpineUnavailable(false); loadScience(run.id); }, [run.id, run.status, loadScience]);
+  useEffect(() => { setInsp(null); setLoadError(null); setSpineUnavailable(false); setProtocol(null); setProtocolError(null); loadScience(run.id); }, [run.id, run.status, loadScience]);
 
   // Palette claim-hit deep focus: once this run's claims arrive, open the
   // inspector on the targeted claim (consumed once).
@@ -561,6 +576,15 @@ export function StudyMap({
         </section>
 
         {settled && science === null && (
+        {(protocol !== null || protocolError !== null) && (
+          <ProtocolPanel
+            runId={run.id}
+            state={protocol}
+            fetchError={protocolError}
+            onMutated={() => { onMutated(); loadScience(run.id); }}
+          />
+        )}
+
           <section className="map-node">
             <p className="map-node-label">{t('map.verdictLabel')}</p>
             <div className="map-verdict map-verdict--empty">
