@@ -7,7 +7,7 @@
 （目标原文：物理工作必须诚实转化为可执行 protocol、检查表、采集表、外部接口与人工确认节点，
 绝不伪装成已执行）。
 
-## 本会话落地（全部在 PR #131，CI 为唯一验证面——本会话无本地执行工具）
+## 本会话落地（全部在 PR #131→#132，CI 为唯一验证面——本会话无本地执行工具）
 
 1. **域模型**（src/domain/protocol.ts，12 项域测试）：
    - ProtocolSpec：预注册操作化——材料（含危章）/仪器（含校准要求）/分组臂/抽样计划/
@@ -35,20 +35,38 @@
 7. **文档**：SCIENTIFIC_MODEL.md §7.5 协议语义 + §1 对象图 + §11 非目标边界
    （不成为 ELN/LIMS 替代品）；README 特性条目
 
+切片 1 已合并 main（ec4cb26，PR #132 squash）：全量 213 文件/2205 用例
+2198 通过 7 诚实跳过 0 失败；手术 workflow 合并前休眠。
+
+## 切片 2（converge/web-protocol，PR #133）——web 表面
+
+1. **web/src/api/protocol.ts**：协议 HTTP 契约镜像 + coerceMeasurementInput
+   （数值本地收敛，避免 409 往返；5 单测）
+2. **web/src/lab/ProtocolPanel.tsx**：范式/状态/planHash 冻结徽章；伦理门 fail-closed
+   呈现与审批表单；步骤台账（依赖序按钮态）；测量记录表（QC 徽章+采集表披露）；
+   偏差三问；暂停/恢复/中止（armed）；终态只读+结果发布状态；非 404 拉取失败可见
+3. **StudyMap 锚点手术**（apply-web-protocol.mjs）：协议拉取并入 loadScience
+   （404=无协议→带缺席）；band 位于假设带与结论回退之间；dict.ts zh/en map.protocol.*
+   键；lab.css 样式。**中途一次错位**：band 落在结论条件括号内（相邻 JSX 根，
+   lint/web 构建全红）——d607462 修正落位并加自愈逻辑（移除错位块+正确位插入）
+4. **tests/protocol-api.test.ts**：真服务器 HTTP 契约（投影 200/404×2、依赖序 409、
+   无效体 400、QC 失败值保留）——补上 #132 登记的 HTTP e2e 留白
+5. 手术 workflow 分支作用域重启用→本切片末位重新休眠（仅 workflow_dispatch）
+
 ## 验证状态（诚实）
 
-- 域层提交 fef9744 CI 全绿（9m41s，全量 2173+ 测试含新增 protocol-domain 12 例）
-- 中途一次 typecheck 失败（测试桩丢失泛型 <T>，5a77a71 修复）；后续提交的最终
-  CI 状态见 PR #131 checks——合并前以 head 全绿为准
-- 手术机制两轮全部命中（store kinds、api 路由），无静默改动可能（锚点不唯一即退出）
+- 切片 1：全量绿（见上）+ 311f4a7 ci verify succeeded
+- 切片 2：最终裁决以 head ci 全绿为准（含 web-e2e/release-pack）
+- 迭代历史：中途 lint 解析错误（手术脚本语法、band 错位）已修；
+  两次 diagnose 提交与我推送竞态失败（cosmetic，不影响代码）
 
 ## 登记未做（后续切片，非本 PR 声称范围）
 
-- web 表面：StudyMap/RunDetail 协议视图与记录表单（API 已就绪）
-- CLI：`far protocol show/record`（HTTP 已可用；CLI 命令面待加）
+- CLI：`far protocol show/record`（HTTP 已可用；CLI 命令面待加，模式已侦察：
+  experiment.ts 的 CliResult/openWorld/UsageError 结构）
 - 导出链：协议+台账入 bundle（verify 项）与论文 limitations 投影
 - 范式覆盖深化：theory（CAS 集成）、archive（登记库检索接口）
-- 手术 workflow 在合并前应降级为 workflow_dispatch-only（避免 main 上自修改面）
+- 手术 workflow 在 main 保持休眠（本切片末位已重新休眠）
 
 ## 用户侧不变
 

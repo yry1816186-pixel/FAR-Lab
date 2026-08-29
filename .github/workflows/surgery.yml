@@ -1,14 +1,17 @@
 name: surgery
 
-# Remote-surgery patch plane — web slice 2 (2026-08-29): re-enabled for
-# THIS branch only while the web protocol surface lands. Same discipline as
-# slice 1: committed .mjs anchor scripts, fail-loud unique anchors, idempotent
-# re-runs, no shell inputs, never pull_request. Neutralized back to
-# workflow_dispatch-only before the merge (see scripts/surgery/README.md).
+# Remote-surgery patch plane (2026-08-29 convergence): anchored, reviewable
+# patch scripts for large files that cannot be safely rewritten whole from a
+# remote work surface. Each patch is a committed .mjs script under
+# scripts/surgery/ — fail-loud anchors, idempotent re-runs, no shell inputs.
+#
+# DORMANT: re-neutralized after web slice 2 (same discipline as slice 1).
+# Push triggers removed — this workflow runs only on explicit manual
+# dispatch (workflow_dispatch). On main the apply scripts no-op (anchors
+# already applied); a manual dispatch only refreshes diagnostics. Mechanism,
+# per-slice branch lifecycle and history: scripts/surgery/README.md.
 on:
-  push:
-    branches: ['converge/web-protocol']
-    paths: ['scripts/surgery/**', '.github/workflows/surgery.yml']
+  workflow_dispatch:
 
 permissions:
   contents: write
