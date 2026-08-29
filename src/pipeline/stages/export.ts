@@ -854,13 +854,6 @@ export const exportStage: StageHandler = {
     // fully live (synthetic / replayed / mixed external evidence must not be able
     // to hide inside a bundle that looks reproducible-live).
     const truthAll = truthProfileFromReceipts(run.id, allReceipts);
-    const limitations = [
-      '模型环节为 LLM 生成、具有非确定性：bundle 可复放的是输入快照、模型元数据、receipts 与工件哈希，不保证重新生成逐字节一致的输出。',
-      ...(truthAll.klass !== 'live' ? [truthDisclosureLine(truthAll)] : []),
-      ...collectMissing(inputs, { lockMissing, receipts: allReceipts, templateHypCount, templatePlanCount }),      ...protocolLimitationLines,
-
-    ];
-
     // Slice-4 protocol evidence: content-address the frozen spec and the ledger; the
     // ledger's honesty counts ride the bundle and its limitations line is verbatim-
     // checkable (verify re-derives counts and requires the disclosure line).
@@ -894,6 +887,13 @@ export const exportStage: StageHandler = {
           + `${deviations} 项偏差、${qcFailed} 项 QC 失败测量如实留存；物理环节复现需人工按采集表重做`,
       );
     }
+
+    const limitations = [
+      '模型环节为 LLM 生成、具有非确定性：bundle 可复放的是输入快照、模型元数据、receipts 与工件哈希，不保证重新生成逐字节一致的输出。',
+      ...(truthAll.klass !== 'live' ? [truthDisclosureLine(truthAll)] : []),
+      ...collectMissing(inputs, { lockMissing, receipts: allReceipts, templateHypCount, templatePlanCount }),      ...protocolLimitationLines,
+
+    ];
 
     const bundleId = newId('bnd');
     const bundle = ReproducibilityBundle.parse({

@@ -6,5 +6,5 @@
 [surgery:protocol-export] package.ts already writes protocol files — nothing to do
 [surgery:protocol-export] all edits done
 ===== node scripts/surgery/apply-protocol-export-fix.mjs =====
-[surgery:protocol-export-fix] declaration block already sits above the limitations array — nothing to do
+[surgery:protocol-export-fix] declaration block moved above the limitations array (root cause 9 fixed; guard inversion root cause 10 fixed)
 APPLY_RC=0
