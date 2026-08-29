@@ -17,7 +17,7 @@ test('preview on the offline route surfaces honest unavailability, never a fabri
   const q = page.locator('#nr-question');
   await q.fill(QUESTION);
 
-  await page.getByRole('button', { name: /先看范围再启动|Preview scope first/ }).click();
+  await page.getByRole('button', { name: /预览研究范围|^Preview scope$/ }).click();
 
   // The refusal is visible in researcher language and names the route — no
   // template scope dressed up as an analysis of this question.
@@ -41,7 +41,7 @@ test('direct launch stays one click (quick path unchanged)', async ({ page }) =>
 test('a draft persisted by the preview attempt surfaces in the home judgment queue with a continue action', async ({ page }) => {
   await page.goto('/#lab/new');
   await page.locator('#nr-question').fill(QUESTION);
-  await page.getByRole('button', { name: /先看范围再启动|Preview scope first/ }).click();
+  await page.getByRole('button', { name: /预览研究范围|^Preview scope$/ }).click();
   // The refusal surfaces (the draft run was persisted BEFORE the proposal).
   await expect(page.locator('.errorbox').first()).toBeVisible({ timeout: 30_000 });
 

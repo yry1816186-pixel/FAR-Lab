@@ -18,7 +18,7 @@ import './lab.css';
  * (no mandatory chat round-trip), and conversational refinement as an OPTION.
  * Launch navigates to the study map where the live run is watched.
  *
- * §8.2 pre-launch scope review: "先看范围再启动" persists a DRAFT run, runs ONLY
+ * §8.2 pre-launch scope review: "预览研究范围" persists a DRAFT run, runs ONLY
  * the scope stage (receipt-backed proposal), parks the run, and lets the
  * researcher EDIT the refined scope before committing — 启动 continues the
  * draft via /resume. Direct launch stays one click for the quick path.
