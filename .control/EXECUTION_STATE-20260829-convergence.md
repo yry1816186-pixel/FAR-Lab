@@ -511,3 +511,57 @@ dashscope key，BLOCKED-user 09-05 裁定），其余 25 live + 16 tested。
   真实人类执行 BLOCKED-user。
 - benchmark 对照、独立四维审计：未做（下一会话杠杆）。
 - completion-gate：NOT_READY（唯一项=用户侧凭据）。
+
+## Baseline 对照证据（2026-08-30 04:1x，work/baseline/）
+
+同模型（zai glm-4.6）直答基线，场景 A/B 问题各一次 live 调用（回执含
+token 用量）。对照工件 work/baseline/comparison.md 按预注册结构性指标
+（W4R 方法学）：直答无可验证主张绑定/无可证伪规范/无真实执行/无机械
+裁决/无可复现工件；FAR-Lab 两 run 全部具备（bundle 15/15×2）。反向
+诚实列：直答更快更广（模型记忆），且其理论预测与 FAR-Lab 实测一致
+（均匀率 ~0.7 vs 实测 0.68；自适应恢复最优 vs 实测 slope -0.681）。
+
+独立四维审计（scientific/engineering/product/security，无先前卷入
+agent）已派出，回报后处置。
+
+## 独立四维审计（2026-08-30 04:3x）
+
+### 科学维：三声明全 CONFIRMED（位级复现通过）
+审计员自行重算：FEM slope log(h1)~log(ndof) 复贴 -0.484207 精确；不同
+Python（3.12/3.14）重跑 AFEM 历史一致；B 的 bootstrap CI 双端点位级
+复现；全部工件哈希匹配。无 Critical。WARNING 登记：
+W1 B 相关格点数据的 i.i.d. 行 bootstrap CI 偏乐观（spec 已披露非预测；
+引用 -248.94 时保持 caveat）。
+W2 A 残差估计子缺 Neumann 边剩余项 h_e‖g-∂n u_h‖²（仅影响标记/
+效应指数 4.3-6.5，不影响裁决所依据的真误差）。
+W3 bundle 未绑定数值证据（A experimentEvidence.resultIds 空、FEM 结果
+工件未引用；B 无 experimentEvidence 字段）——「15/15」仅覆盖回执/源/
+终态。修复方向：export 层将 fem/netcdf 实验 result 纳入 bundle。
+W4 引文标题有损转述（无 DOI/URL 存储；抽查两条均真实）。
+NOTE：x^0.7 为左 Dirichlet 边型奇性（非再入角）；场景 A 仅跑自适应腿
+（均匀对照在 executor-fem 测试中）；slope 拟合窗口敏感（-0.446~-0.598，
+后段点优于 -0.5，supports 不虚高）。
+
+## 四维审计终局处置（2026-08-30 05:0x）
+
+- 工程维 C1/C2 已修（66c25ff，含双回归测试）；场景 B 真实数据重跑
+  （正确坐标 MSE 差 -250.816 CI [-260.7,-240.9]）；损坏记录对照：
+  ds_ean8wh8m/ds_ea1637db（坏）→ ds_5f1gxm4y（好，同 raw）。
+- W2 已修（rc3 指纹补 PROBLEM_MODEL_DISCIPLINE）。
+- 未修登记（下一杠杆）：工程 W1（fail 双事件）、W3（draft 边界 schema
+  收紧）、W4（scope 拒绝路径 orchestrator 不重开）、W5（statSync 先检/
+  TOCTOU 哈希与消费同读）、W6（h1Rates /2 因子）；科学 W2（估计子
+  Neumann 边项）、W3（bundle 绑定数值证据——export 层）、W4（引文
+  DOI 存储）；安全 W1/W2（netcdf 路径纵深）；产品三面（problem
+  model/fem_spec/dataset 可见性——已列计划增量）。
+- 产品维结论：无诚实问题（表面不说谎），深度层不可见为已声明缓期。
+- 安全维：0 Critical；表达式沙箱密闭确认。
+
+# Goal 判据终局对照（本 turn 16 提交后）
+
+三场景：A ✅ live（bundle 15/15）；B ✅ 桥接端到端（bundle 15/15，
+审计 C1 修复后数据重验）；C 机制全备+BLOCKED-user。benchmark ✅
+同模型直答对照（work/baseline，预注册结构性指标+反向诚实列）。
+completion-gate：NOT_READY（唯一 ACC-02=用户侧 dashscope key）。
+四维审计 ✅ 已执行且 Critical 已修；Warning 分级登记。goal 完成判据
+中可自主完成的部分已尽；剩余=登记的 Warning 修复队列 + 用户侧凭据。
