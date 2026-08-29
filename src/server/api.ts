@@ -28,7 +28,6 @@ import { ACTIVE_MODEL_CONFIG_META_KEY, readCompetitionRouteMode, writeCompetitio
 import { discoverModels } from '../providers/discovery.js';
 import { ingestPdfTextPayload, ingestSdm, ingestTextToSdm, ingestBytes, persistDatasetProfile, loadSdmByRef, loadDatasetProfileByRef, ingestSvgPlot, loadPlotPointsByRef, jsonRefusalReason, type IngestOutcome } from '../ingest/service.js';
 import type { DatasetProfileDoc } from '../ingest/dataset.js';
-import { approveExperiment, ExperimentOpError } from './experiment-ops.js';
 import { fetchZoteroAnnotations, fetchZoteroLibrary, ZoteroUnavailableError } from './zotero.js';
 import {
   buildScreeningView,
@@ -1900,7 +1899,7 @@ function parseSeedSources(raw: unknown): string | {
       apiKey = typeof body.apiKey === 'string' ? body.apiKey : '';
     }
     try {
-      const result = await discoverModels({ wire, baseUrl, apiKey }, fetch as unknown as Parameters<typeof discoverModels>[1]);
+      const result = await discoverModels({ wire, baseUrl, apiKey }, fetch);
       sendJson(res, 200, result);
     } catch (e) {
       throw new HttpError(502, {
@@ -2289,25 +2288,10 @@ function parseSeedSources(raw: unknown): string | {
         }
         throw notFound(`no route: ${method} ${url.pathname}`);
       }
-        if (segments.length === 7 && segments[4] === 'experiments' && segments[6] === 'approve' && method === 'POST') {
-          // BP-5 confirmatory binding approval (hypothesis-bound comparisons).
-          const body = await readJsonObject(req);
-          try {
-            const result = approveExperiment(app, runId, segments[5]!, body);
-            sendJson(res, 200, result);
-            return;
-          } catch (e) {
-            if (e instanceof ExperimentOpError) {
-              throw new HttpError(e.status, {
-                code: e.code,
-                message: e.message,
-                retryable: false,
-                ...(e.code === 'not_found' ? { runId } : {}),
-              });
-            }
-            throw e;
-          }
-        }
+      // (POST /runs/:id/experiments/:specId/approve removed 2026-08-29: zero
+      // product callers — approval goes through `far experiment approve` /
+      // experiment-ops directly; the route's untested HTTP surface carried
+      // validation risk with no user.)
       if (segments.length === 5 && segments[4] === 'evaluations' && method === 'GET') {
         // AVO fusion G8 projection: the deterministic evaluator family over this
         // run's scientific state (multi-dimensional, no invented single score).
@@ -2421,7 +2405,7 @@ function parseSeedSources(raw: unknown): string | {
           // RU-6: enrich evidence edges with their original relation type so the
           // CiTO IRI is exact (lineage edges carry the collapsed counter/support kind).
           const relationTypes: Record<string, EvidenceRelationType> = {};
-          for (const rel of app.store.listObjects('evidence_relation', runId) as unknown as Array<{ id: string; relation: string }>) {
+          for (const rel of app.store.listObjects('evidence_relation', runId)) {
             const parsedRel = EvidenceRelationType.safeParse(rel.relation);
             if (parsedRel.success) relationTypes[rel.id] = parsedRel.data;
           }
@@ -2768,7 +2752,7 @@ function parseSeedSources(raw: unknown): string | {
           // from the (now updated) proposal resolutions. Non-fatal by design — a
           // memory hiccup must never invalidate an approval; visible in server logs.
           try {
-            consolidateConversationProfile(app.store, conversation as unknown as Parameters<typeof consolidateConversationProfile>[1]);
+            consolidateConversationProfile(app.store, conversation); // store-typed Conversation satisfies the structural param
           } catch (e) {
             process.stderr.write(`far-server: profile consolidation failed after proposal ${proposalId}: ${e instanceof Error ? e.message : String(e)}\n`);
           }
@@ -2901,23 +2885,9 @@ function parseSeedSources(raw: unknown): string | {
       return search(res, url);
     }
 
-    // RU-1 cross-run research memory: list + deterministic-ranked search.
-    if (segments[2] === 'memory' && segments.length === 3 && method === 'GET') {
-      const q = url.searchParams.get('q');
-      const kind = url.searchParams.get('kind');
-      if (kind !== null && !/^(episodic|semantic|experiment_outcome|profile)$/.test(kind)) {
-        throw validation('query "kind" must be a memory kind');
-      }
-      if (q !== null && q.trim().length > 0) {
-        const items = app.store.searchMemory({
-          query: q.trim(),
-          ...(kind !== null ? { kinds: [kind as 'episodic' | 'semantic' | 'experiment_outcome' | 'profile'] } : {}),
-        });
-        return sendJson(res, 200, { query: q.trim(), items });
-      }
-      const items = app.store.listMemory(kind !== null ? { kind: kind as 'episodic' } : {});
-      return sendJson(res, 200, { items });
-    }
+    // (GET /api/v1/memory removed 2026-08-29: zero product callers across
+    // web/CLI/TUI — the researcher surface for memory search is `far memory`;
+    // the store API stays available for that CLI path.)
 
     if (segments[2] === 'verify' && segments.length === 4 && method === 'GET') {
       return verify(res, segments[3]!);

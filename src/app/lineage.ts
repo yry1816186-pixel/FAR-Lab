@@ -112,7 +112,7 @@ export const buildLineageGraph = (opts: { store: Store; rootRunId: string }): Li
 
   // ---- per-run scientific members ----
   for (const runId of family) {
-    for (const h of store.listObjects('hypothesis', runId) as unknown as Array<Partial<HypothesisCandidate> & { id: string; statement: string; version: number; status: string }>) {
+    for (const h of store.listObjects('hypothesis', runId)) {
       nodes.push({
         id: h.id, kind: 'hypothesis', runId,
         label: h.statement.slice(0, 80),
@@ -121,7 +121,7 @@ export const buildLineageGraph = (opts: { store: Store; rootRunId: string }): Li
       });
     }
 
-    for (const rel of store.listObjects('evidence_relation', runId) as unknown as EvidenceRelation[]) {
+    for (const rel of store.listObjects('evidence_relation', runId)) {
       nodes.push({
         id: rel.id, kind: 'evidence_relation', runId,
         label: `${rel.relation}: ${rel.rationale.slice(0, 70)}`,

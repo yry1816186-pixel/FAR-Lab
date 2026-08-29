@@ -42,7 +42,9 @@ async function loadPdfjs(): Promise<typeof import('pdfjs-dist')> {
     const isNode = typeof process !== 'undefined' && process.versions?.node !== undefined;
     if (isNode) {
       const legacy = await import('pdfjs-dist/legacy/build/pdf.mjs');
-      return legacy as unknown as typeof import('pdfjs-dist');
+      // The legacy build's module type diverges from the main entry type only in
+      // worker plumbing; the pdf API used here is the same — single documented cast.
+      return legacy as typeof import('pdfjs-dist');
     }
     const pdfjs = await import('pdfjs-dist');
     pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).href;

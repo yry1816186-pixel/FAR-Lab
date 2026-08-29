@@ -25,7 +25,9 @@ const MODEL_BASE = '/models/whisper-base';
 // The DOM lib types self.postMessage with a Window signature; this worker is
 // compiled inside the app program, so narrow to the worker shape explicitly.
 const post = (msg: WorkerResponse): void => {
-  (self as unknown as { postMessage: (m: WorkerResponse) => void }).postMessage(msg);
+  // DOM lib types self as Window (postMessage with targetOrigin overloads); this
+  // module is a dedicated worker — single narrow cast to the worker call shape.
+  (self as { postMessage: (m: WorkerResponse) => void }).postMessage(msg);
 };
 
 let asr: AutomaticSpeechRecognitionPipeline | null = null;

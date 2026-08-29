@@ -2,11 +2,11 @@ import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
 import {
   PromptRegistry, definePrompt, materializePrompt, promptFingerprint, planePrompts, regressionSnapshotEntries,
-} from '../src/model-plane/prompts.js';
+} from './fixtures/model-plane/prompts.js';
 import {
   BENCHMARK_SUITES, runSuite, compareModels, type SuiteResult,
-} from '../src/model-plane/benchmark.js';
-import { candidate } from '../src/model-plane/routing.js';
+} from './fixtures/model-plane/benchmark.js';
+import { candidate } from './fixtures/model-plane/routing.js';
 import { createTestStubProvider, type StubStep } from '../src/providers/test-stub.js';
 import { UNTRUSTED_DATA_RULE } from '../src/shared/untrusted.js';
 

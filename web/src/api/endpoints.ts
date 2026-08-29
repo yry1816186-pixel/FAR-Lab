@@ -80,8 +80,7 @@ const screeningViewOf = (data: unknown): ScreeningView => {
       const q = n as Record<string, unknown>;
       return typeof q.srcId === 'string' && typeof q.title === 'string' && Array.isArray(q.authors)
         && (q.phase === 'random' || q.phase === 'model');
-    }).map((n) => {
-      const q = n as unknown as Record<string, unknown>;
+    }).map((q) => {
       return {
         srcId: String(q.srcId),
         title: String(q.title),

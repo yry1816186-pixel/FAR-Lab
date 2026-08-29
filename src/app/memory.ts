@@ -53,7 +53,7 @@ export const consolidateRun = (store: Store, runId: string, now = new Date().toI
   }));
 
   // ---- experiment_outcome: every terminal experiment becomes reusable knowledge ----
-  const experiments = store.listObjects('experiment_run', runId) as unknown as ExperimentRun[];
+  const experiments = store.listObjects('experiment_run', runId);
   for (const exp of experiments) {
     if (exp.status === 'queued' || exp.status === 'running') {
       skipped.push(`${exp.id}: non-terminal (${exp.status})`);
@@ -116,13 +116,13 @@ export const semanticFindingsForRun = (
   runId: string,
   now = new Date().toISOString(),
 ): MemoryItem[] => {
-  const relations = store.listObjects('evidence_relation', runId) as unknown as Array<{ claimId?: string; sourceDocumentId?: string; relation: string }>;
+  const relations = store.listObjects('evidence_relation', runId);
   const claimsById = new Map(
-    (store.listObjects('claim', runId) as unknown as Array<{ id: string; text: string; locators: Array<{ sourceDocumentId: string }> }>)
+    store.listObjects('claim', runId)
       .map((c) => [c.id, c]),
   );
   const docsById = new Map(
-    (store.listObjects('source_document', runId) as unknown as Array<{ id: string; identifiers: Array<{ kind: string; value: string }> }>)
+    store.listObjects('source_document', runId)
       .map((d) => [d.id, d]),
   );
   const findings = new Map<string, { claim: { id: string; text: string; locators: Array<{ sourceDocumentId: string }> }; relations: string[] }>();

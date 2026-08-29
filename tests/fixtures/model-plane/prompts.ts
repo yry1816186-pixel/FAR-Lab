@@ -1,5 +1,5 @@
-import { canonicalSha256 } from '../shared/crypto.js';
-import { UNTRUSTED_DATA_RULE } from '../shared/untrusted.js';
+import { canonicalSha256 } from '../../../src/shared/crypto.js';
+import { UNTRUSTED_DATA_RULE } from '../../../src/shared/untrusted.js';
 
 /**
  * PROMPT ASSET REGISTRY (model-plane lane, 2026-08-24).

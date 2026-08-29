@@ -326,7 +326,7 @@ export async function verifyBundle(bundleId: string, deps: VerifyDeps): Promise<
     // before the field existed are disclosed as legacy (pass with count) — the
     // check fails only when the bundle's own claims are label-less, i.e. produced
     // by a build that dropped the labeling discipline.
-    const runClaims = store.listObjects('claim', bundle.runId) as unknown as Array<{ taint?: string }>;
+    const runClaims = store.listObjects('claim', bundle.runId);
     const labeled = runClaims.filter((c) => c.taint === 'derived_untrusted' || c.taint === 'trusted' || c.taint === 'untrusted_literal');
     const unlabeled = runClaims.length - labeled.length;
     checks.push({

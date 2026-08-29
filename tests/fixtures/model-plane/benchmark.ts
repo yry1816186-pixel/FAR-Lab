@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import type { StructuredCallResult } from '../shared/ports.js';
-import { strictSchemaOrUndefined } from '../providers/http.js';
-import { describeShape, validateStructured, withModelSlot } from '../pipeline/llm.js';
+import type { StructuredCallResult } from '../../../src/shared/ports.js';
+import { strictSchemaOrUndefined } from '../../../src/providers/http.js';
+import { describeShape, validateStructured, withModelSlot } from '../../../src/pipeline/llm.js';
 import type { RouteCandidate } from './routing.js';
 
 /**

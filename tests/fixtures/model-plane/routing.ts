@@ -1,9 +1,9 @@
-import type { ModelProvider } from '../shared/ports.js';
+import type { ModelProvider } from '../../../src/shared/ports.js';
 import {
   capabilitiesForModel,
   isQwenFamily,
   type ModelCapabilities,
-} from './capabilities.js';
+} from '../../../src/model-plane/capabilities.js';
 
 /**
  * DETERMINISTIC TASK-CLASS ROUTER (model-plane lane, 2026-08-24).

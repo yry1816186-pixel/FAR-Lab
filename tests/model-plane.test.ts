@@ -6,8 +6,8 @@ import {
 } from '../src/model-plane/capabilities.js';
 import {
   routeCall, candidate, TASK_CLASSES, type RouteCandidate, type RoutingDecision,
-} from '../src/model-plane/routing.js';
-import { createModelPlane } from '../src/model-plane/plane.js';
+} from './fixtures/model-plane/routing.js';
+import { createModelPlane } from './fixtures/model-plane/plane.js';
 import { createTestStubProvider } from '../src/providers/test-stub.js';
 import { createDashScopeProvider } from '../src/providers/dashscope.js';
 

@@ -1,4 +1,4 @@
-import type { ModelProvider, StructuredCallRequest, StructuredCallResult } from '../shared/ports.js';
+import type { ModelProvider, StructuredCallRequest, StructuredCallResult } from '../../../src/shared/ports.js';
 import {
   routeCall,
   type RouteCandidate,

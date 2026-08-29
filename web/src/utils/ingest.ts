@@ -121,7 +121,7 @@ export async function parseCitationEntries(text: string): Promise<CitationEntry[
     const entries: CitationEntry[] = [];
     for (const first of cite.data) {
       // CSL-JSON entries are an open shape: keyword/tags live outside the core typing.
-      const rec = first as unknown as Record<string, unknown>;
+      const rec = first as Record<string, unknown>;
       const doi = first.DOI ?? undefined;
       const title = typeof first.title === 'string' ? first.title : undefined;
       const authors = Array.isArray(first.author)

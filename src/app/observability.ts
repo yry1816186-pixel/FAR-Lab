@@ -147,6 +147,9 @@ export interface ProcessSample {
 
 export const sampleProcess = (): ProcessSample => {
   const mu = process.memoryUsage();
+  // Undocumented internals: intersection typing, no assertion (optional members
+  // simply read as undefined on runtimes that lack them → the -1 honest marker).
+  const procInternals: NodeJS.Process & { _getActiveHandles?: () => unknown[]; _getActiveRequests?: () => unknown[] } = process;
   return {
     at: new Date().toISOString(),
     pid: process.pid,
@@ -155,8 +158,8 @@ export const sampleProcess = (): ProcessSample => {
     heapUsedMb: Math.round((mu.heapUsed / 1048576) * 10) / 10,
     heapTotalMb: Math.round((mu.heapTotal / 1048576) * 10) / 10,
     externalMb: Math.round((mu.external / 1048576) * 10) / 10,
-    activeHandles: (process as unknown as { _getActiveHandles?: () => unknown[] })._getActiveHandles?.().length ?? -1,
-    activeRequests: (process as unknown as { _getActiveRequests?: () => unknown[] })._getActiveRequests?.().length ?? -1,
+    activeHandles: procInternals._getActiveHandles?.().length ?? -1,
+    activeRequests: procInternals._getActiveRequests?.().length ?? -1,
   };
 };
 

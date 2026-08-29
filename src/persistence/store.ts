@@ -124,7 +124,7 @@ export class Store {
   }
 
   private reindexFts(kind: string): void {
-    const rows = this.db.prepare('SELECT id, json FROM objects WHERE kind=?').all(kind);
+    const rows = this.db.prepare('SELECT id, json FROM objects WHERE kind=?').all(kind) as Array<Record<string, unknown>>;
     this.db.prepare('DELETE FROM far_search WHERE kind=?').run(kind);
     if (this.trigramReady) this.db.prepare('DELETE FROM far_search_tri WHERE kind=?').run(kind);
     const insert = this.db.prepare('INSERT INTO far_search (kind, obj_id, body) VALUES (?,?,?)');
@@ -328,7 +328,7 @@ export class Store {
    * external anchor (documented in RU3-COGSEC.md, not yet built).
    */
   verifyEventChain(runId: string): { ok: boolean; firstBrokenSeq: number | null; length: number } {
-    const rows = this.db.prepare('SELECT seq, payload, prev_hash FROM events WHERE run_id=? ORDER BY seq ASC').all(runId);
+    const rows = this.db.prepare('SELECT seq, payload, prev_hash FROM events WHERE run_id=? ORDER BY seq ASC').all(runId) as Array<Record<string, unknown>>;
     let parentPrev: string | null = null;
     let parentPayload = '';
     for (const r of rows) {
@@ -422,7 +422,7 @@ export class Store {
     if (opts.afterSeq !== undefined) { where.push('seq>?'); params.push(opts.afterSeq); }
     const rows = this.db.prepare(
       `SELECT DISTINCT run_id, seq FROM event_tags WHERE ${where.join(' AND ')} ORDER BY run_id, seq LIMIT ${limit}`,
-    ).all(...params);
+    ).all(...params) as Array<{ run_id: string; seq: number }>;
     if (rows.length === 0) return [];
     // Fetch each matched event's payload, preserving (run_id, seq) order.
     const fetchEvent = this.db.prepare('SELECT seq, payload FROM events WHERE run_id=? AND seq=?');
@@ -470,7 +470,7 @@ export class Store {
     // lineage_edges/PROV-O/CiTO exactly like the one-shot backfill did for
     // history. Deterministic derivation, same fields the backfill reads.
     if (kind === 'evidence_relation' || kind === 'revision') {
-      this.recordLineageEdgesFromPayload(kind, parsed as unknown as Record<string, unknown>, runId);
+      this.recordLineageEdgesFromPayload(kind, parsed as Record<string, unknown>, runId);
     }
     this.touchFts(kind);
   }
@@ -638,10 +638,19 @@ export class Store {
   } {
     this.ensureFts();
     interface Row { run_id: string; id: string; json: string; snippet?: string; rank?: number }
+    /** node:sqlite .all() rows are Record<string, unknown>; narrow by explicit field
+     * mapping (String() matches what parse() below already does defensively). */
+    const rowsFrom = (rows: Array<Record<string, unknown>>): Row[] => rows.map((r) => ({
+      run_id: String(r['run_id']),
+      id: String(r['id']),
+      json: String(r['json']),
+      ...(r['snippet'] !== undefined ? { snippet: String(r['snippet']) } : {}),
+      ...(r['rank'] !== undefined ? { rank: Number(r['rank']) } : {}),
+    }));
     const fetch = (kind: 'question' | 'hypothesis' | 'claim' | 'conversation', limit: number): SearchHit[] => {
       if (limit <= 0) return [];
       const parse = (r: Row): SearchHit => {
-        const parsed = KIND_SCHEMAS[kind].parse(JSON.parse(String(r.json))) as unknown as {
+        const parsed = KIND_SCHEMAS[kind].parse(JSON.parse(String(r.json))) as {
           id: string; runId?: string; text?: string; statement?: string; title?: string;
         };
         return {
@@ -665,35 +674,35 @@ export class Store {
           // NOTE: the token window counts TRIGRAMS (3-char pieces), so 12 tokens
           // ≈ 4 visible chars — the «» markers get ellipsised away. 64 trigrams
           // ≈ a full phrase with markers intact (live-probed, RU-10 GO3).
-          const triRows = this.db.prepare(
+          const triRows = rowsFrom(this.db.prepare(
             `SELECT o.run_id AS run_id, o.id, o.json, snippet(far_search_tri, 2, '«', '»', '…', 64) AS snippet, rank
                FROM far_search_tri f JOIN objects o ON o.id = f.obj_id AND o.kind = f.kind
               WHERE far_search_tri MATCH ? AND f.kind = ?
               ORDER BY rank LIMIT ?`,
-          ).all(ftsQuery, kind, limit) as unknown as Row[];
+          ).all(ftsQuery, kind, limit));
           if (triRows.length > 0) return triRows.map(parse);
         } catch {
           // trigram unavailable — fall through to unicode61
         }
       }
       try {
-        const rows = this.db.prepare(
+        const rows = rowsFrom(this.db.prepare(
           `SELECT o.run_id AS run_id, o.id, o.json, snippet(far_search, 2, '«', '»', '…', 12) AS snippet, rank
              FROM far_search f JOIN objects o ON o.id = f.obj_id AND o.kind = f.kind
             WHERE far_search MATCH ? AND f.kind = ?
             ORDER BY rank LIMIT ?`,
-        ).all(ftsQuery, kind, limit) as unknown as Row[];
+        ).all(ftsQuery, kind, limit));
         if (rows.length > 0) return rows.map(parse);
       } catch {
         // FTS5 unavailable (pre-Node-24 runtime) — fall through to LIKE below.
       }
       // 2) LIKE fallback (and FTS-miss safety net for odd tokenization).
       const esc = q.replace(/[\\%_]/g, (c) => `\\${c}`);
-      const rows = this.db
+      const rows = rowsFrom(this.db
         .prepare(
           "SELECT run_id, id, json FROM objects WHERE kind=? AND json LIKE ? ESCAPE '\\' ORDER BY created_at DESC LIMIT ?",
         )
-        .all(kind, `%${esc}%`, limit) as unknown as Row[];
+        .all(kind, `%${esc}%`, limit));
       return rows.map(parse);
     };
     // ResearchQuestion carries no runId in its payload, so its objects row is
@@ -1112,7 +1121,7 @@ export class Store {
     const limit = Math.min(filter.limit ?? 100, 500);
     const rows = this.db.prepare(
       `SELECT * FROM memory_items${where.length > 0 ? ` WHERE ${where.join(' AND ')}` : ''} ORDER BY created_at DESC LIMIT ${limit}`,
-    ).all(...params);
+    ).all(...params) as Array<Record<string, unknown>>;
     return rows.map((r) => this.memoryFromRow(r));
   }
 
@@ -1177,7 +1186,7 @@ export class Store {
     const params: unknown[] = [...ids];
     if (opts.kinds !== undefined && opts.kinds.length > 0) { where.push(`kind IN (${opts.kinds.map(() => '?').join(',')})`); params.push(...opts.kinds); }
     if (opts.trustClasses !== undefined && opts.trustClasses.length > 0) { where.push(`trust_class IN (${opts.trustClasses.map(() => '?').join(',')})`); params.push(...opts.trustClasses); }
-    const rows = this.db.prepare(`SELECT * FROM memory_items WHERE ${where.join(' AND ')} AND status = 'active'`).all(...params);
+    const rows = this.db.prepare(`SELECT * FROM memory_items WHERE ${where.join(' AND ')} AND status = 'active'`).all(...params) as Array<Record<string, unknown>>;
     const nowMs = Date.now();
     const ranked = rows
       .map((r) => this.memoryFromRow(r))
