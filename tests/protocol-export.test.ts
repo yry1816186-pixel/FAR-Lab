@@ -208,7 +208,7 @@ const seedProtocol = (runId: string, hypId: string) => {
   const protocol = ProtocolSpec.parse({
     id: newId('prt'),
     runId,
-    planId: newId('plan'),
+    planId: newId('pln'),
     planHash: 'b'.repeat(64),
     hypothesisIds: [hypId],
     title: 'Bench duration-series assay',
