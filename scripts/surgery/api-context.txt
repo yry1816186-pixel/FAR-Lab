@@ -1,4 +1,4 @@
-total lines: 2981
+total lines: 3025
 
 ===== first 60 lines =====
 1: import http from 'node:http';
@@ -23,394 +23,393 @@ total lines: 2981
 20: import { buildLineageGraph } from '../app/lineage.js';
 21: import { runEvaluators } from '../app/evaluators.js';
 22: import { runResearchAction, ActionError } from './actions.js';
-23: import { connectClaim, editHypothesis, forkHypothesis, HypothesisOpError, promoteHypothesis, rejectHypothesis } from './hypothesis-ops.js';
-24: import {
-25:   annotateClaim, ClaimOpError, excludeClaim, excludedClaimIdsOf, pinClaim, reclassifyClaim, reinstateClaim,
-26: } from './claim-ops.js';
-27: import { ACTIVE_MODEL_CONFIG_META_KEY, readCompetitionRouteMode, writeCompetitionRouteMode } from '../app/provider-resolver.js';
-28: import { discoverModels } from '../providers/discovery.js';
-29: import { ingestPdfTextPayload, ingestSdm, ingestTextToSdm, ingestBytes, persistDatasetProfile, loadSdmByRef, loadDatasetProfileByRef, ingestSvgPlot, loadPlotPointsByRef, jsonRefusalReason, type IngestOutcome } from '../ingest/service.js';
-30: import type { DatasetProfileDoc } from '../ingest/dataset.js';
-31: import { fetchZoteroAnnotations, fetchZoteroLibrary, ZoteroUnavailableError } from './zotero.js';
-32: import {
-33:   buildScreeningView,
-34:   getOrCreateScreeningSession,
-35:   recordScreeningDecision,
-36:   ScreeningError,
-37:   stopScreeningSession,
-38: } from './screening.js';
-39: import {
-40:   attachRunToConversation, collectConversationSeeds, createConversation, deleteConversation,
-41:   detachRunFromAllConversations, getConversation, listConversations, postConversationMessage,
-42:   renameConversation, resolveConversationProposal, resolveConversationReasoningRoute, retryConversationTurn,
-43:   setConversationReasoningGear, ConversationError, type ConversationDeps,
-44: } from './conversations.js';
-45: import { startAutomationEngine, type AutomationEngine } from './automations.js';
-46: import { TerminalManager } from './terminal.js';
-47: import { resolveInsideRoot } from '../agent/capabilities/workspace-tools.js';
-48: import { aggregateRunUsage, aggregateWorkspaceUsage } from '../app/usage-ledger.js';
-49: import { workspaceSpendStatus, writeSpendLimit } from '../app/spend-limit.js';
-50: import {
-51:   ConversationSchema,
-52:   FeedbackSignal,
-53:   FeedbackSourceKind,
-54:   ModelProviderConfig,
-55:   ObjectRef,
-56:   ProviderWireProtocol,
-57:   ResearchQuestion,
-58:   ScientificGoalType,
-59:   SourceDocument,
-60:   ToolIntegrationSchema,
+23: import { getProtocolState, recordProtocolEvent, ProtocolOpError } from './protocol-ops.js';
+24: import { connectClaim, editHypothesis, forkHypothesis, HypothesisOpError, promoteHypothesis, rejectHypothesis } from './hypothesis-ops.js';
+25: import {
+26:   annotateClaim, ClaimOpError, excludeClaim, excludedClaimIdsOf, pinClaim, reclassifyClaim, reinstateClaim,
+27: } from './claim-ops.js';
+28: import { ACTIVE_MODEL_CONFIG_META_KEY, readCompetitionRouteMode, writeCompetitionRouteMode } from '../app/provider-resolver.js';
+29: import { discoverModels } from '../providers/discovery.js';
+30: import { ingestPdfTextPayload, ingestSdm, ingestTextToSdm, ingestBytes, persistDatasetProfile, loadSdmByRef, loadDatasetProfileByRef, ingestSvgPlot, loadPlotPointsByRef, jsonRefusalReason, type IngestOutcome } from '../ingest/service.js';
+31: import type { DatasetProfileDoc } from '../ingest/dataset.js';
+32: import { fetchZoteroAnnotations, fetchZoteroLibrary, ZoteroUnavailableError } from './zotero.js';
+33: import {
+34:   buildScreeningView,
+35:   getOrCreateScreeningSession,
+36:   recordScreeningDecision,
+37:   ScreeningError,
+38:   stopScreeningSession,
+39: } from './screening.js';
+40: import {
+41:   attachRunToConversation, collectConversationSeeds, createConversation, deleteConversation,
+42:   detachRunFromAllConversations, getConversation, listConversations, postConversationMessage,
+43:   renameConversation, resolveConversationProposal, resolveConversationReasoningRoute, retryConversationTurn,
+44:   setConversationReasoningGear, ConversationError, type ConversationDeps,
+45: } from './conversations.js';
+46: import { startAutomationEngine, type AutomationEngine } from './automations.js';
+47: import { TerminalManager } from './terminal.js';
+48: import { resolveInsideRoot } from '../agent/capabilities/workspace-tools.js';
+49: import { aggregateRunUsage, aggregateWorkspaceUsage } from '../app/usage-ledger.js';
+50: import { workspaceSpendStatus, writeSpendLimit } from '../app/spend-limit.js';
+51: import {
+52:   ConversationSchema,
+53:   FeedbackSignal,
+54:   FeedbackSourceKind,
+55:   ModelProviderConfig,
+56:   ObjectRef,
+57:   ProviderWireProtocol,
+58:   ResearchQuestion,
+59:   ScientificGoalType,
+60:   SourceDocument,
 
 ===== context around every occurrence of "createApiServer" =====
 occurrences: 1
---- lines 228..263 (hit at 242) ---
-228:   const segments = decodeSegments(pathname);
-229:   if (segments === null) return 'unsafe';
-230:   for (const seg of segments) {
-231:     if (seg === '..' || seg.includes('/') || seg.includes('\\') || seg.includes('\0') || /:/.test(seg)) return 'unsafe';
-232:   }
-233:   const abs = path.resolve(staticRoot, ...segments);
-234:   if (abs !== staticRoot && !abs.startsWith(staticRoot + path.sep)) return 'unsafe';
-235:   if (fs.existsSync(abs) && fs.statSync(abs).isFile()) return abs;
-236:   return null;
-237: };
-238: 
-239: const mimeFor = (file: string): string =>
-240:   MIME_TYPES[path.extname(file).slice(1).toLowerCase()] ?? 'application/octet-stream';
-241: 
-242: export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServer {
-243:   const executor = opts.executor ?? ((runId: string, execOpts?: { stopAfter?: RunStageName }) => app.orchestrator.execute(runId, execOpts));
-244:   const staticRoot = path.resolve(opts.staticRoot ?? path.join(process.cwd(), 'web', 'dist'));
-245: 
-246:   /** One in-flight execution per run id; a second request fails with 409 semantics. */
-247:   const executing = new Map<string, Promise<unknown>>();
-248: 
-249:   const startRun = (runId: string, execOpts?: { stopAfter?: RunStageName }): boolean => {
-250:     if (executing.has(runId)) return false;
-251:     const run = Promise.resolve()
-252:       .then(() => executor(runId, execOpts))
-253:       .catch((e: unknown) => {
-254:         // Stage failures are persisted by the orchestrator into run state (visible via
-255:         // GET /runs/:id). A throw here means the execution itself never ran — log it,
-256:         // and for the lease-held case also persist a run event: the 202 already went
-257:         // out, so the run timeline is the only place this refusal is observable.
-258:         const msg = e instanceof Error ? e.message : String(e);
-259:         process.stderr.write(`far-api: execution of run ${runId} failed: ${msg}\n`);
-260:         if (e instanceof RunLeaseHeldError) {
-261:           app.store.appendEvent(runId, { type: 'note', detail: { reason: 'execution_refused_lease_held', error: msg } });
-262:         }
-263:         return undefined;
+--- lines 229..264 (hit at 243) ---
+229:   const segments = decodeSegments(pathname);
+230:   if (segments === null) return 'unsafe';
+231:   for (const seg of segments) {
+232:     if (seg === '..' || seg.includes('/') || seg.includes('\\') || seg.includes('\0') || /:/.test(seg)) return 'unsafe';
+233:   }
+234:   const abs = path.resolve(staticRoot, ...segments);
+235:   if (abs !== staticRoot && !abs.startsWith(staticRoot + path.sep)) return 'unsafe';
+236:   if (fs.existsSync(abs) && fs.statSync(abs).isFile()) return abs;
+237:   return null;
+238: };
+239: 
+240: const mimeFor = (file: string): string =>
+241:   MIME_TYPES[path.extname(file).slice(1).toLowerCase()] ?? 'application/octet-stream';
+242: 
+243: export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServer {
+244:   const executor = opts.executor ?? ((runId: string, execOpts?: { stopAfter?: RunStageName }) => app.orchestrator.execute(runId, execOpts));
+245:   const staticRoot = path.resolve(opts.staticRoot ?? path.join(process.cwd(), 'web', 'dist'));
+246: 
+247:   /** One in-flight execution per run id; a second request fails with 409 semantics. */
+248:   const executing = new Map<string, Promise<unknown>>();
+249: 
+250:   const startRun = (runId: string, execOpts?: { stopAfter?: RunStageName }): boolean => {
+251:     if (executing.has(runId)) return false;
+252:     const run = Promise.resolve()
+253:       .then(() => executor(runId, execOpts))
+254:       .catch((e: unknown) => {
+255:         // Stage failures are persisted by the orchestrator into run state (visible via
+256:         // GET /runs/:id). A throw here means the execution itself never ran — log it,
+257:         // and for the lease-held case also persist a run event: the 202 already went
+258:         // out, so the run timeline is the only place this refusal is observable.
+259:         const msg = e instanceof Error ? e.message : String(e);
+260:         process.stderr.write(`far-api: execution of run ${runId} failed: ${msg}\n`);
+261:         if (e instanceof RunLeaseHeldError) {
+262:           app.store.appendEvent(runId, { type: 'note', detail: { reason: 'execution_refused_lease_held', error: msg } });
+263:         }
+264:         return undefined;
 
 ===== context around every occurrence of "experiment-ops" =====
 occurrences: 1
---- lines 2279..2314 (hit at 2293) ---
-2279:               throw new HttpError(e.status, {
-2280:                 code: e.code,
-2281:                 message: e.message,
-2282:                 retryable: false,
-2283:                 ...(e.code === 'not_found' ? { runId } : {}),
-2284:               });
-2285:             }
-2286:             throw e;
-2287:           }
-2288:         }
-2289:         throw notFound(`no route: ${method} ${url.pathname}`);
-2290:       }
-2291:       // (POST /runs/:id/experiments/:specId/approve removed 2026-08-29: zero
-2292:       // product callers — approval goes through `far experiment approve` /
-2293:       // experiment-ops directly; the route's untested HTTP surface carried
-2294:       // validation risk with no user.)
-2295:       if (segments.length === 5 && segments[4] === 'evaluations' && method === 'GET') {
-2296:         // AVO fusion G8 projection: the deterministic evaluator family over this
-2297:         // run's scientific state (multi-dimensional, no invented single score).
-2298:         mustGetRun(runId);
-2299:         sendJson(res, 200, { runId, evaluations: runEvaluators({ store: app.store, runId, now: new Date().toISOString() }) });
-2300:         return;
-2301:       }
-2302:       if (segments.length === 5 && segments[4] === 'lineage' && method === 'GET') {
-2303:         // AVO fusion G3 projection: the queryable research trajectory graph
-2304:         // (run revision family + hypotheses + evidence + causal revisions).
-2305:         // Read-only over the store; 404s honestly when the run does not exist.
-2306:         mustGetRun(runId);
-2307:         sendJson(res, 200, buildLineageGraph({ store: app.store, rootRunId: runId }));
-2308:         return;
-2309:       }
-2310:       if (segments.length === 5 && segments[4] === 'supervision' && method === 'GET') {
-2311:         // AVO fusion G2 projection: current supervisor analysis (fresh, not a
-2312:         // stored snapshot) so UX shows the live trajectory health. Read-only.
-2313:         mustGetRun(runId);
-2314:         sendJson(res, 200, analyzeTrajectory({ store: app.store, runId }));
+--- lines 2280..2315 (hit at 2294) ---
+2280:               throw new HttpError(e.status, {
+2281:                 code: e.code,
+2282:                 message: e.message,
+2283:                 retryable: false,
+2284:                 ...(e.code === 'not_found' ? { runId } : {}),
+2285:               });
+2286:             }
+2287:             throw e;
+2288:           }
+2289:         }
+2290:         throw notFound(`no route: ${method} ${url.pathname}`);
+2291:       }
+2292:       // (POST /runs/:id/experiments/:specId/approve removed 2026-08-29: zero
+2293:       // product callers — approval goes through `far experiment approve` /
+2294:       // experiment-ops directly; the route's untested HTTP surface carried
+2295:       // validation risk with no user.)
+2296:       if (segments.length === 5 && segments[4] === 'evaluations' && method === 'GET') {
+2297:         // AVO fusion G8 projection: the deterministic evaluator family over this
+2298:         // run's scientific state (multi-dimensional, no invented single score).
+2299:         mustGetRun(runId);
+2300:         sendJson(res, 200, { runId, evaluations: runEvaluators({ store: app.store, runId, now: new Date().toISOString() }) });
+2301:         return;
+2302:       }
+2303:       if (segments.length === 5 && segments[4] === 'lineage' && method === 'GET') {
+2304:         // AVO fusion G3 projection: the queryable research trajectory graph
+2305:         // (run revision family + hypotheses + evidence + causal revisions).
+2306:         // Read-only over the store; 404s honestly when the run does not exist.
+2307:         mustGetRun(runId);
+2308:         sendJson(res, 200, buildLineageGraph({ store: app.store, rootRunId: runId }));
+2309:         return;
+2310:       }
+2311:       if (segments.length === 5 && segments[4] === 'supervision' && method === 'GET') {
+2312:         // AVO fusion G2 projection: current supervisor analysis (fresh, not a
+2313:         // stored snapshot) so UX shows the live trajectory health. Read-only.
+2314:         mustGetRun(runId);
+2315:         sendJson(res, 200, analyzeTrajectory({ store: app.store, runId }));
 
 ===== context around every occurrence of "experiments/:specId/approve" =====
 occurrences: 1
---- lines 2277..2312 (hit at 2291) ---
-2277:           } catch (e) {
-2278:             if (e instanceof ClaimOpError) {
-2279:               throw new HttpError(e.status, {
-2280:                 code: e.code,
-2281:                 message: e.message,
-2282:                 retryable: false,
-2283:                 ...(e.code === 'not_found' ? { runId } : {}),
-2284:               });
-2285:             }
-2286:             throw e;
-2287:           }
-2288:         }
-2289:         throw notFound(`no route: ${method} ${url.pathname}`);
-2290:       }
-2291:       // (POST /runs/:id/experiments/:specId/approve removed 2026-08-29: zero
-2292:       // product callers — approval goes through `far experiment approve` /
-2293:       // experiment-ops directly; the route's untested HTTP surface carried
-2294:       // validation risk with no user.)
-2295:       if (segments.length === 5 && segments[4] === 'evaluations' && method === 'GET') {
-2296:         // AVO fusion G8 projection: the deterministic evaluator family over this
-2297:         // run's scientific state (multi-dimensional, no invented single score).
-2298:         mustGetRun(runId);
-2299:         sendJson(res, 200, { runId, evaluations: runEvaluators({ store: app.store, runId, now: new Date().toISOString() }) });
-2300:         return;
-2301:       }
-2302:       if (segments.length === 5 && segments[4] === 'lineage' && method === 'GET') {
-2303:         // AVO fusion G3 projection: the queryable research trajectory graph
-2304:         // (run revision family + hypotheses + evidence + causal revisions).
-2305:         // Read-only over the store; 404s honestly when the run does not exist.
-2306:         mustGetRun(runId);
-2307:         sendJson(res, 200, buildLineageGraph({ store: app.store, rootRunId: runId }));
-2308:         return;
-2309:       }
-2310:       if (segments.length === 5 && segments[4] === 'supervision' && method === 'GET') {
-2311:         // AVO fusion G2 projection: current supervisor analysis (fresh, not a
-2312:         // stored snapshot) so UX shows the live trajectory health. Read-only.
+--- lines 2278..2313 (hit at 2292) ---
+2278:           } catch (e) {
+2279:             if (e instanceof ClaimOpError) {
+2280:               throw new HttpError(e.status, {
+2281:                 code: e.code,
+2282:                 message: e.message,
+2283:                 retryable: false,
+2284:                 ...(e.code === 'not_found' ? { runId } : {}),
+2285:               });
+2286:             }
+2287:             throw e;
+2288:           }
+2289:         }
+2290:         throw notFound(`no route: ${method} ${url.pathname}`);
+2291:       }
+2292:       // (POST /runs/:id/experiments/:specId/approve removed 2026-08-29: zero
+2293:       // product callers — approval goes through `far experiment approve` /
+2294:       // experiment-ops directly; the route's untested HTTP surface carried
+2295:       // validation risk with no user.)
+2296:       if (segments.length === 5 && segments[4] === 'evaluations' && method === 'GET') {
+2297:         // AVO fusion G8 projection: the deterministic evaluator family over this
+2298:         // run's scientific state (multi-dimensional, no invented single score).
+2299:         mustGetRun(runId);
+2300:         sendJson(res, 200, { runId, evaluations: runEvaluators({ store: app.store, runId, now: new Date().toISOString() }) });
+2301:         return;
+2302:       }
+2303:       if (segments.length === 5 && segments[4] === 'lineage' && method === 'GET') {
+2304:         // AVO fusion G3 projection: the queryable research trajectory graph
+2305:         // (run revision family + hypotheses + evidence + causal revisions).
+2306:         // Read-only over the store; 404s honestly when the run does not exist.
+2307:         mustGetRun(runId);
+2308:         sendJson(res, 200, buildLineageGraph({ store: app.store, rootRunId: runId }));
+2309:         return;
+2310:       }
+2311:       if (segments.length === 5 && segments[4] === 'supervision' && method === 'GET') {
+2312:         // AVO fusion G2 projection: current supervisor analysis (fresh, not a
+2313:         // stored snapshot) so UX shows the live trajectory health. Read-only.
 
 ===== context around every occurrence of "readJson" =====
-occurrences: 32
---- lines 361..396 (hit at 375) ---
-361:           return;
-362:         }
-363:         if (!overflowed) chunks.push(chunk);
-364:       });
-365:       req.on('end', () => {
-366:         if (overflowed) {
-367:           reject(validation(`request body exceeds the ${MAX_BODY_BYTES}-byte limit`));
-368:         } else {
-369:           resolve(Buffer.concat(chunks));
-370:         }
-371:       });
-372:       req.on('error', (e: Error) => reject(validation(`request body read failed: ${e.message}`)));
-373:     });
-374: 
-375:   const readJsonObject = async (req: http.IncomingMessage): Promise<Record<string, unknown>> => {
-376:     const body = (await readBody(req)).toString('utf8');
-377:     if (body.trim().length === 0) throw validation('request body required: a JSON object');
-378:     let parsed: unknown;
-379:     try {
-380:       parsed = JSON.parse(body);
-381:     } catch (e) {
-382:       throw validation(`request body is not valid JSON: ${e instanceof Error ? e.message : String(e)}`);
-383:     }
-384:     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-385:       throw validation('request body must be a JSON object');
-386:     }
-387:     return parsed as Record<string, unknown>;
-388:   };
-389: 
-390:   // ---- run lookups ----
-391: 
-392:   const mustGetRun = (runId: string) => {
-393:     const run = app.store.getRun(runId);
-394:     if (!run) throw notFound(`run not found: ${runId}`, runId);
-395:     return run;
-396:   };
---- lines 663..698 (hit at 677) ---
-663:       }
-664:       year = rec.year;
-665:     }
-666:     let authors: string[] = [];
-667:     if (rec.authors !== undefined) {
-668:       if (!Array.isArray(rec.authors) || rec.authors.some((a) => typeof a !== 'string')) return `seeds[${i}].authors: string array`;
-669:       authors = (rec.authors as string[]).slice(0, 20).map((a) => a.slice(0, 200));
-670:     }
-671:     out.push({ title, identifiers, ...(text !== undefined ? { text } : {}), ...(year !== undefined ? { year } : {}), authors });
-672:   }
-673:   return out;
-674: }
-675: 
-676:   const createRun = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
-677:     const body = await readJsonObject(req);
-678:     const runId = await createRunWithSeeds(body);
-679:     sendJson(res, 202, { runId, ...(body.draft === true ? { draft: true } : {}) });
-680:   };
-681: 
-682:   /**
-683:    * Shared run-creation core (POST /runs and conversation launch): question
-684:    * validation, optional model route, seed ingestion and async start. With
-685:    * draft:true (§8.2) the run + seeds persist but execution does NOT start —
-686:    * scope-proposal / PATCH question / resume complete the pre-launch journey.
-687:    */
-688:   const createRunWithSeeds = async (body: Record<string, unknown>): Promise<string> => {
-689:     const { text, domain, goalType } = body as { text?: unknown; domain?: unknown; goalType?: unknown };
-690:     if (body.draft !== undefined && typeof body.draft !== 'boolean') {
-691:       throw validation('field "draft" must be a boolean when given');
-692:     }
-693:     if (typeof text !== 'string' || text.trim().length === 0) {
-694:       throw validation('field "text" is required (non-empty string: the research question)');
-695:     }
-696:     const dom = domain === undefined ? 'unspecified' : domain;
-697:     if (typeof dom !== 'string' || dom.trim().length === 0) {
-698:       throw validation('field "domain" must be a non-empty string when given');
---- lines 913..948 (hit at 927) ---
-913:       unconsumedFeedbackCount,
-914:     });
-915:   };
-916: 
-917:   /**
-918:    * Product Spine action dispatch (2026-08-28): POST /runs/:id/dispatch maps a
-919:    * NextResearchAction onto a REAL orchestrator operation — targeted stage
-920:    * reopen + immediate execution. Only actions with genuine machinery are
-921:    * dispatchable (loop-unblocking legs); science actions with no automated
-922:    * affordance are REJECTED honestly (422) — never a fake resume button.
-923:    */
-924:   const dispatchAction = async (req: http.IncomingMessage, res: http.ServerResponse, runId: string): Promise<void> => {
-925:     const run = mustGetRun(runId);
-926:     if (executing.has(runId)) throw alreadyRunning(runId);
-927:     const body = await readJsonObject(req);
-928:     const actionType = typeof body['actionType'] === 'string' ? body['actionType'] : '';
-929:     const DISPATCHABLE = new Set([
-930:       'EXECUTE_PLANNED_EXPERIMENT', 'CONSUME_FEEDBACK_INTO_REVISION', 'RESUME_EVIDENCE_DEBT',
-931:     ]);
-932:     if (!DISPATCHABLE.has(actionType)) {
-933:       throw validation(
-934:         `actionType '${actionType}' has no automated dispatch path — ` +
-935:           'loop-unblocking actions only (EXECUTE_PLANNED_EXPERIMENT / CONSUME_FEEDBACK_INTO_REVISION / RESUME_EVIDENCE_DEBT); ' +
-936:           'RERUN_WITH_LIVE_ROUTE goes through POST /runs with the same question',
-937:       );
-938:     }
-939:     if (run.status === 'running') throw alreadyRunning(runId);
-940: 
-941:     if (actionType === 'EXECUTE_PLANNED_EXPERIMENT') {
-942:       const plan = app.store.listObjects('plan', runId).at(-1) ?? null;
-943:       const hypothesisIds = new Set(app.store.listObjects('hypothesis', runId).map((h) => h.id));
-944:       const executabilityPassed = plan !== null && checkPlanExecutability(plan, hypothesisIds).passed;
-945:       const leg = experimentLegStatus(app.store, runId);
-946:       if (!(leg.kind === 'unexecuted' || leg.kind === 'plan_revised_since_experiment') || !executabilityPassed) {
-947:         throw validation(
-948:           `cannot dispatch EXECUTE_PLANNED_EXPERIMENT: leg=${leg.kind}, executabilityPassed=${executabilityPassed} — the plan must be executable and unexecuted (or revised since the last experiment)`,
---- lines 1285..1320 (hit at 1299) ---
-1285:    * merge is validated through the domain schema (single owner) and audited.
-1286:    */
-1287:   const editRunQuestion = async (req: http.IncomingMessage, res: http.ServerResponse, runId: string): Promise<void> => {
-1288:     const run = mustGetRun(runId);
-1289:     if (run.status !== 'created' && run.status !== 'paused') {
-1290:       throw new HttpError(409, {
-1291:         code: 'already_launched',
-1292:         message: `the question is editable only before launch (status 'created' or 'paused'; got '${run.status}') — running/closed runs revise via the feedback chain`,
-1293:         retryable: false,
-1294:         runId,
-1295:       });
-1296:     }
-1297:     const question = app.store.getObject('question', run.questionId);
-1298:     if (question === null) throw notFound(`question not found for run ${runId}: ${run.questionId}`, runId);
-1299:     const body = await readJsonObject(req);
-1300: 
-1301:     const changedFields: string[] = [];
-1302:     const next: Record<string, unknown> = { ...question };
-1303: 
-1304:     if (body.text !== undefined) {
-1305:       if (typeof body.text !== 'string' || body.text.trim().length === 0) {
-1306:         throw validation('field "text" must be a non-empty string');
-1307:       }
-1308:       if (body.text !== question.text) changedFields.push('text');
-1309:       next.text = body.text;
-1310:     }
-1311:     if (body.goalType !== undefined) {
-1312:       const parsedGoal = ScientificGoalType.safeParse(body.goalType);
-1313:       if (!parsedGoal.success) {
-1314:         throw validation(`invalid goalType "${String(body.goalType)}" — must be one of: ${ScientificGoalType.options.join(', ')}`);
-1315:       }
-1316:       if (parsedGoal.data !== question.goalType) changedFields.push('goalType');
-1317:       next.goalType = parsedGoal.data;
-1318:     }
-1319:     if (body.scope !== undefined) {
-1320:       const s = body.scope as Record<string, unknown>;
---- lines 1351..1386 (hit at 1365) ---
-1351:     const edited = ResearchQuestion.parse(next);
-1352:     app.store.putObject('question', edited);
-1353:     app.store.appendEvent(runId, {
-1354:       type: 'note',
-1355:       detail: { reason: 'question_edited_human', questionId: edited.id, changedFields, actor: 'human' },
-1356:     });
-1357:     sendJson(res, 200, { questionId: edited.id, changedFields, question: edited });
-1358:   };
-1359: 
-1360:   const receiveFeedback = async (
-1361:     req: http.IncomingMessage,
-1362:     res: http.ServerResponse,
-1363:     runId: string,
-1364:   ): Promise<void> => {
-1365:     const body = await readJsonObject(req);
-1366:     const { source, content, targetKind, targetId } = body as {
-1367:       source?: unknown;
-1368:       content?: unknown;
-1369:       targetKind?: unknown;
-1370:       targetId?: unknown;
-1371:     };
-1372:     if (typeof source !== 'string') {
-1373:       throw validation(`field "source" is required — must be one of: ${FeedbackSourceKind.options.join(', ')}`);
-1374:     }
-1375:     const parsedSource = FeedbackSourceKind.safeParse(source);
-1376:     if (!parsedSource.success) {
-1377:       throw validation(`invalid source "${source}" — must be one of: ${FeedbackSourceKind.options.join(', ')}`);
-1378:     }
-1379:     if (typeof content !== 'string' || content.trim().length === 0) {
-1380:       throw validation('field "content" is required (non-empty string)');
-1381:     }
-1382:     if ((targetKind === undefined) !== (targetId === undefined)) {
-1383:       throw validation('targetKind and targetId must be given together');
-1384:     }
-1385:     mustGetRun(runId); // 404 before any persistence — same order as the CLI
-1386:     let target: { kind: string; id: string } | undefined;
---- lines 1447..1482 (hit at 1461) ---
-1447:     // the report — "what this bundle cannot reproduce" is part of the verdict.
-1448:     const bundle = app.store.getObject('bundle', bundleId);
-1449:     const limitations = bundle?.limitations.filter((l) => l.trim().length > 0) ?? [];
-1450:     sendJson(res, 200, { ...report, ...(limitations.length > 0 ? { limitations } : {}) });
-1451:   };
-1452: 
-1453:   // ---- MULTIMODAL ingest (2026-08-24): deterministic artifact understanding ----
-1454:   // POST /api/v1/ingest — one endpoint, two producer shapes:
-1455:   //   { kind: 'pdf_text', fileName, payload }  ← web pdfjs collector output
-1456:   //   { kind: 'text', fileName, text }         ← server-side parse by extension
-1457:   // Returns the SDM (or dataset profile), its immutable artifact ref, and the
-1458:   // seeds-pipeline text projection. Failures are 422 with precise field errors.
-1459: 
-1460:   const ingestRoute = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
-1461:     const body = await readJsonObject(req);
-1462:     const kind = body['kind'];
-1463:     const fileName = typeof body['fileName'] === 'string' ? body['fileName'] : '';
-1464:     if (typeof fileName !== 'string' || fileName.length === 0 || fileName.length > 300 || fileName.includes('/') || fileName.includes('\\') || fileName.includes('\0')) {
-1465:       throw validation('ingest: fileName must be a 1-300 char basename (no path separators)');
-1466:     }
-1467:     // Shared response for both producers of dataset profiles (text/csv|tsv and bytes/xlsx).
-1468:     const sendDatasetProfile = async (profile: DatasetProfileDoc): Promise<void> => {
-1469:       const artifactRef = await persistDatasetProfile(app.artifacts, profile);
-1470:       sendJson(res, 200, {
-1471:         artifactRef,
-1472:         type: 'dataset_profile',
-1473:         profile: {
-1474:           schemaVersion: profile.schemaVersion,
-1475:           format: profile.format,
-1476:           rowCount: profile.rowCount,
-1477:           columnCount: profile.columnCount,
-1478:           columns: profile.columns.map((c) => ({ name: c.name, inferredType: c.inferredType, missingCount: c.missingCount, ...(c.unitHint !== undefined ? { unitHint: c.unitHint } : {}), significanceNotation: c.significanceNotation })),
-1479:           quality: profile.quality,
-1480:           diagnostics: profile.diagnostics,
-1481:         },
-1482:       });
+occurrences: 33
+--- lines 362..397 (hit at 376) ---
+362:           return;
+363:         }
+364:         if (!overflowed) chunks.push(chunk);
+365:       });
+366:       req.on('end', () => {
+367:         if (overflowed) {
+368:           reject(validation(`request body exceeds the ${MAX_BODY_BYTES}-byte limit`));
+369:         } else {
+370:           resolve(Buffer.concat(chunks));
+371:         }
+372:       });
+373:       req.on('error', (e: Error) => reject(validation(`request body read failed: ${e.message}`)));
+374:     });
+375: 
+376:   const readJsonObject = async (req: http.IncomingMessage): Promise<Record<string, unknown>> => {
+377:     const body = (await readBody(req)).toString('utf8');
+378:     if (body.trim().length === 0) throw validation('request body required: a JSON object');
+379:     let parsed: unknown;
+380:     try {
+381:       parsed = JSON.parse(body);
+382:     } catch (e) {
+383:       throw validation(`request body is not valid JSON: ${e instanceof Error ? e.message : String(e)}`);
+384:     }
+385:     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+386:       throw validation('request body must be a JSON object');
+387:     }
+388:     return parsed as Record<string, unknown>;
+389:   };
+390: 
+391:   // ---- run lookups ----
+392: 
+393:   const mustGetRun = (runId: string) => {
+394:     const run = app.store.getRun(runId);
+395:     if (!run) throw notFound(`run not found: ${runId}`, runId);
+396:     return run;
+397:   };
+--- lines 664..699 (hit at 678) ---
+664:       }
+665:       year = rec.year;
+666:     }
+667:     let authors: string[] = [];
+668:     if (rec.authors !== undefined) {
+669:       if (!Array.isArray(rec.authors) || rec.authors.some((a) => typeof a !== 'string')) return `seeds[${i}].authors: string array`;
+670:       authors = (rec.authors as string[]).slice(0, 20).map((a) => a.slice(0, 200));
+671:     }
+672:     out.push({ title, identifiers, ...(text !== undefined ? { text } : {}), ...(year !== undefined ? { year } : {}), authors });
+673:   }
+674:   return out;
+675: }
+676: 
+677:   const createRun = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
+678:     const body = await readJsonObject(req);
+679:     const runId = await createRunWithSeeds(body);
+680:     sendJson(res, 202, { runId, ...(body.draft === true ? { draft: true } : {}) });
+681:   };
+682: 
+683:   /**
+684:    * Shared run-creation core (POST /runs and conversation launch): question
+685:    * validation, optional model route, seed ingestion and async start. With
+686:    * draft:true (§8.2) the run + seeds persist but execution does NOT start —
+687:    * scope-proposal / PATCH question / resume complete the pre-launch journey.
+688:    */
+689:   const createRunWithSeeds = async (body: Record<string, unknown>): Promise<string> => {
+690:     const { text, domain, goalType } = body as { text?: unknown; domain?: unknown; goalType?: unknown };
+691:     if (body.draft !== undefined && typeof body.draft !== 'boolean') {
+692:       throw validation('field "draft" must be a boolean when given');
+693:     }
+694:     if (typeof text !== 'string' || text.trim().length === 0) {
+695:       throw validation('field "text" is required (non-empty string: the research question)');
+696:     }
+697:     const dom = domain === undefined ? 'unspecified' : domain;
+698:     if (typeof dom !== 'string' || dom.trim().length === 0) {
+699:       throw validation('field "domain" must be a non-empty string when given');
+--- lines 914..949 (hit at 928) ---
+914:       unconsumedFeedbackCount,
+915:     });
+916:   };
+917: 
+918:   /**
+919:    * Product Spine action dispatch (2026-08-28): POST /runs/:id/dispatch maps a
+920:    * NextResearchAction onto a REAL orchestrator operation — targeted stage
+921:    * reopen + immediate execution. Only actions with genuine machinery are
+922:    * dispatchable (loop-unblocking legs); science actions with no automated
+923:    * affordance are REJECTED honestly (422) — never a fake resume button.
+924:    */
+925:   const dispatchAction = async (req: http.IncomingMessage, res: http.ServerResponse, runId: string): Promise<void> => {
+926:     const run = mustGetRun(runId);
+927:     if (executing.has(runId)) throw alreadyRunning(runId);
+928:     const body = await readJsonObject(req);
+929:     const actionType = typeof body['actionType'] === 'string' ? body['actionType'] : '';
+930:     const DISPATCHABLE = new Set([
+931:       'EXECUTE_PLANNED_EXPERIMENT', 'CONSUME_FEEDBACK_INTO_REVISION', 'RESUME_EVIDENCE_DEBT',
+932:     ]);
+933:     if (!DISPATCHABLE.has(actionType)) {
+934:       throw validation(
+935:         `actionType '${actionType}' has no automated dispatch path — ` +
+936:           'loop-unblocking actions only (EXECUTE_PLANNED_EXPERIMENT / CONSUME_FEEDBACK_INTO_REVISION / RESUME_EVIDENCE_DEBT); ' +
+937:           'RERUN_WITH_LIVE_ROUTE goes through POST /runs with the same question',
+938:       );
+939:     }
+940:     if (run.status === 'running') throw alreadyRunning(runId);
+941: 
+942:     if (actionType === 'EXECUTE_PLANNED_EXPERIMENT') {
+943:       const plan = app.store.listObjects('plan', runId).at(-1) ?? null;
+944:       const hypothesisIds = new Set(app.store.listObjects('hypothesis', runId).map((h) => h.id));
+945:       const executabilityPassed = plan !== null && checkPlanExecutability(plan, hypothesisIds).passed;
+946:       const leg = experimentLegStatus(app.store, runId);
+947:       if (!(leg.kind === 'unexecuted' || leg.kind === 'plan_revised_since_experiment') || !executabilityPassed) {
+948:         throw validation(
+949:           `cannot dispatch EXECUTE_PLANNED_EXPERIMENT: leg=${leg.kind}, executabilityPassed=${executabilityPassed} — the plan must be executable and unexecuted (or revised since the last experiment)`,
+--- lines 1286..1321 (hit at 1300) ---
+1286:    * merge is validated through the domain schema (single owner) and audited.
+1287:    */
+1288:   const editRunQuestion = async (req: http.IncomingMessage, res: http.ServerResponse, runId: string): Promise<void> => {
+1289:     const run = mustGetRun(runId);
+1290:     if (run.status !== 'created' && run.status !== 'paused') {
+1291:       throw new HttpError(409, {
+1292:         code: 'already_launched',
+1293:         message: `the question is editable only before launch (status 'created' or 'paused'; got '${run.status}') — running/closed runs revise via the feedback chain`,
+1294:         retryable: false,
+1295:         runId,
+1296:       });
+1297:     }
+1298:     const question = app.store.getObject('question', run.questionId);
+1299:     if (question === null) throw notFound(`question not found for run ${runId}: ${run.questionId}`, runId);
+1300:     const body = await readJsonObject(req);
+1301: 
+1302:     const changedFields: string[] = [];
+1303:     const next: Record<string, unknown> = { ...question };
+1304: 
+1305:     if (body.text !== undefined) {
+1306:       if (typeof body.text !== 'string' || body.text.trim().length === 0) {
+1307:         throw validation('field "text" must be a non-empty string');
+1308:       }
+1309:       if (body.text !== question.text) changedFields.push('text');
+1310:       next.text = body.text;
+1311:     }
+1312:     if (body.goalType !== undefined) {
+1313:       const parsedGoal = ScientificGoalType.safeParse(body.goalType);
+1314:       if (!parsedGoal.success) {
+1315:         throw validation(`invalid goalType "${String(body.goalType)}" — must be one of: ${ScientificGoalType.options.join(', ')}`);
+1316:       }
+1317:       if (parsedGoal.data !== question.goalType) changedFields.push('goalType');
+1318:       next.goalType = parsedGoal.data;
+1319:     }
+1320:     if (body.scope !== undefined) {
+1321:       const s = body.scope as Record<string, unknown>;
+--- lines 1352..1387 (hit at 1366) ---
+1352:     const edited = ResearchQuestion.parse(next);
+1353:     app.store.putObject('question', edited);
+1354:     app.store.appendEvent(runId, {
+1355:       type: 'note',
+1356:       detail: { reason: 'question_edited_human', questionId: edited.id, changedFields, actor: 'human' },
+1357:     });
+1358:     sendJson(res, 200, { questionId: edited.id, changedFields, question: edited });
+1359:   };
+1360: 
+1361:   const receiveFeedback = async (
+1362:     req: http.IncomingMessage,
+1363:     res: http.ServerResponse,
+1364:     runId: string,
+1365:   ): Promise<void> => {
+1366:     const body = await readJsonObject(req);
+1367:     const { source, content, targetKind, targetId } = body as {
+1368:       source?: unknown;
+1369:       content?: unknown;
+1370:       targetKind?: unknown;
+1371:       targetId?: unknown;
+1372:     };
+1373:     if (typeof source !== 'string') {
+1374:       throw validation(`field "source" is required — must be one of: ${FeedbackSourceKind.options.join(', ')}`);
+1375:     }
+1376:     const parsedSource = FeedbackSourceKind.safeParse(source);
+1377:     if (!parsedSource.success) {
+1378:       throw validation(`invalid source "${source}" — must be one of: ${FeedbackSourceKind.options.join(', ')}`);
+1379:     }
+1380:     if (typeof content !== 'string' || content.trim().length === 0) {
+1381:       throw validation('field "content" is required (non-empty string)');
+1382:     }
+1383:     if ((targetKind === undefined) !== (targetId === undefined)) {
+1384:       throw validation('targetKind and targetId must be given together');
+1385:     }
+1386:     mustGetRun(runId); // 404 before any persistence — same order as the CLI
+1387:     let target: { kind: string; id: string } | undefined;
+--- lines 1448..1483 (hit at 1462) ---
+1448:     // the report — "what this bundle cannot reproduce" is part of the verdict.
+1449:     const bundle = app.store.getObject('bundle', bundleId);
+1450:     const limitations = bundle?.limitations.filter((l) => l.trim().length > 0) ?? [];
+1451:     sendJson(res, 200, { ...report, ...(limitations.length > 0 ? { limitations } : {}) });
+1452:   };
+1453: 
+1454:   // ---- MULTIMODAL ingest (2026-08-24): deterministic artifact understanding ----
+1455:   // POST /api/v1/ingest — one endpoint, two producer shapes:
+1456:   //   { kind: 'pdf_text', fileName, payload }  ← web pdfjs collector output
+1457:   //   { kind: 'text', fileName, text }         ← server-side parse by extension
+1458:   // Returns the SDM (or dataset profile), its immutable artifact ref, and the
+1459:   // seeds-pipeline text projection. Failures are 422 with precise field errors.
+1460: 
+1461:   const ingestRoute = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
+1462:     const body = await readJsonObject(req);
+1463:     const kind = body['kind'];
+1464:     const fileName = typeof body['fileName'] === 'string' ? body['fileName'] : '';
+1465:     if (typeof fileName !== 'string' || fileName.length === 0 || fileName.length > 300 || fileName.includes('/') || fileName.includes('\\') || fileName.includes('\0')) {
+1466:       throw validation('ingest: fileName must be a 1-300 char basename (no path separators)');
+1467:     }
+1468:     // Shared response for both producers of dataset profiles (text/csv|tsv and bytes/xlsx).
+1469:     const sendDatasetProfile = async (profile: DatasetProfileDoc): Promise<void> => {
+1470:       const artifactRef = await persistDatasetProfile(app.artifacts, profile);
+1471:       sendJson(res, 200, {
+1472:         artifactRef,
+1473:         type: 'dataset_profile',
+1474:         profile: {
+1475:           schemaVersion: profile.schemaVersion,
+1476:           format: profile.format,
+1477:           rowCount: profile.rowCount,
+1478:           columnCount: profile.columnCount,
+1479:           columns: profile.columns.map((c) => ({ name: c.name, inferredType: c.inferredType, missingCount: c.missingCount, ...(c.unitHint !== undefined ? { unitHint: c.unitHint } : {}), significanceNotation: c.significanceNotation })),
+1480:           quality: profile.quality,
+1481:           diagnostics: profile.diagnostics,
+1482:         },
+1483:       });
 
 ===== context around every occurrence of "editHypothesis" =====
 occurrences: 2
---- lines 9..44 (hit at 23) ---
-9: import { PROVIDER_TEMPLATES } from '../providers/catalog.js';
+--- lines 10..45 (hit at 24) ---
 10: import {
 11:   BuiltinRoutePrice, builtinDefaultName, builtinModelIdFor, envModelIdFor,
 12:   readBuiltinOverrides, setBuiltinDefaultName, writeBuiltinOverrides,
@@ -424,219 +423,220 @@ occurrences: 2
 20: import { buildLineageGraph } from '../app/lineage.js';
 21: import { runEvaluators } from '../app/evaluators.js';
 22: import { runResearchAction, ActionError } from './actions.js';
-23: import { connectClaim, editHypothesis, forkHypothesis, HypothesisOpError, promoteHypothesis, rejectHypothesis } from './hypothesis-ops.js';
-24: import {
-25:   annotateClaim, ClaimOpError, excludeClaim, excludedClaimIdsOf, pinClaim, reclassifyClaim, reinstateClaim,
-26: } from './claim-ops.js';
-27: import { ACTIVE_MODEL_CONFIG_META_KEY, readCompetitionRouteMode, writeCompetitionRouteMode } from '../app/provider-resolver.js';
-28: import { discoverModels } from '../providers/discovery.js';
-29: import { ingestPdfTextPayload, ingestSdm, ingestTextToSdm, ingestBytes, persistDatasetProfile, loadSdmByRef, loadDatasetProfileByRef, ingestSvgPlot, loadPlotPointsByRef, jsonRefusalReason, type IngestOutcome } from '../ingest/service.js';
-30: import type { DatasetProfileDoc } from '../ingest/dataset.js';
-31: import { fetchZoteroAnnotations, fetchZoteroLibrary, ZoteroUnavailableError } from './zotero.js';
-32: import {
-33:   buildScreeningView,
-34:   getOrCreateScreeningSession,
-35:   recordScreeningDecision,
-36:   ScreeningError,
-37:   stopScreeningSession,
-38: } from './screening.js';
-39: import {
-40:   attachRunToConversation, collectConversationSeeds, createConversation, deleteConversation,
-41:   detachRunFromAllConversations, getConversation, listConversations, postConversationMessage,
-42:   renameConversation, resolveConversationProposal, resolveConversationReasoningRoute, retryConversationTurn,
-43:   setConversationReasoningGear, ConversationError, type ConversationDeps,
-44: } from './conversations.js';
---- lines 2224..2259 (hit at 2238) ---
-2224:           }
-2225:           throw e;
-2226:         }
-2227:         return;
-2228:       }
-2229:       if (segments.length === 7 && segments[4] === 'hypotheses') {
-2230:         const hypId = segments[5]!;
-2231:         const op = segments[6]!;
-2232:         if (method === 'POST' && (op === 'promote' || op === 'reject' || op === 'fork' || op === 'connect' || op === 'edit')) {
-2233:           const body = await readJsonObject(req);
-2234:           try {
-2235:             const result = op === 'promote' ? promoteHypothesis(app, runId, hypId, body)
-2236:               : op === 'reject' ? rejectHypothesis(app, runId, hypId, body)
-2237:               : op === 'fork' ? forkHypothesis(app, runId, hypId, body)
-2238:               : op === 'edit' ? await editHypothesis(app, runId, hypId, body)
-2239:               : connectClaim(app, runId, hypId, body);
-2240:             sendJson(res, 200, result);
-2241:             return;
-2242:           } catch (e) {
-2243:             if (e instanceof HypothesisOpError) {
-2244:               throw new HttpError(e.status, {
-2245:                 code: e.code,
-2246:                 message: e.message,
-2247:                 retryable: false,
-2248:                 ...(e.code === 'not_found' ? { runId } : {}),
-2249:               });
-2250:             }
-2251:             throw e;
-2252:           }
-2253:         }
-2254:         throw notFound(`no route: ${method} ${url.pathname}`);
-2255:       }
-2256: 
-2257:       // HX §15 evidence annotation/classification — researcher judgement ops on
-2258:       // claims, same ownership/audit discipline as hypothesis-ops above.
-2259:       if (segments.length === 7 && segments[4] === 'claims') {
+23: import { getProtocolState, recordProtocolEvent, ProtocolOpError } from './protocol-ops.js';
+24: import { connectClaim, editHypothesis, forkHypothesis, HypothesisOpError, promoteHypothesis, rejectHypothesis } from './hypothesis-ops.js';
+25: import {
+26:   annotateClaim, ClaimOpError, excludeClaim, excludedClaimIdsOf, pinClaim, reclassifyClaim, reinstateClaim,
+27: } from './claim-ops.js';
+28: import { ACTIVE_MODEL_CONFIG_META_KEY, readCompetitionRouteMode, writeCompetitionRouteMode } from '../app/provider-resolver.js';
+29: import { discoverModels } from '../providers/discovery.js';
+30: import { ingestPdfTextPayload, ingestSdm, ingestTextToSdm, ingestBytes, persistDatasetProfile, loadSdmByRef, loadDatasetProfileByRef, ingestSvgPlot, loadPlotPointsByRef, jsonRefusalReason, type IngestOutcome } from '../ingest/service.js';
+31: import type { DatasetProfileDoc } from '../ingest/dataset.js';
+32: import { fetchZoteroAnnotations, fetchZoteroLibrary, ZoteroUnavailableError } from './zotero.js';
+33: import {
+34:   buildScreeningView,
+35:   getOrCreateScreeningSession,
+36:   recordScreeningDecision,
+37:   ScreeningError,
+38:   stopScreeningSession,
+39: } from './screening.js';
+40: import {
+41:   attachRunToConversation, collectConversationSeeds, createConversation, deleteConversation,
+42:   detachRunFromAllConversations, getConversation, listConversations, postConversationMessage,
+43:   renameConversation, resolveConversationProposal, resolveConversationReasoningRoute, retryConversationTurn,
+44:   setConversationReasoningGear, ConversationError, type ConversationDeps,
+45: } from './conversations.js';
+--- lines 2225..2260 (hit at 2239) ---
+2225:           }
+2226:           throw e;
+2227:         }
+2228:         return;
+2229:       }
+2230:       if (segments.length === 7 && segments[4] === 'hypotheses') {
+2231:         const hypId = segments[5]!;
+2232:         const op = segments[6]!;
+2233:         if (method === 'POST' && (op === 'promote' || op === 'reject' || op === 'fork' || op === 'connect' || op === 'edit')) {
+2234:           const body = await readJsonObject(req);
+2235:           try {
+2236:             const result = op === 'promote' ? promoteHypothesis(app, runId, hypId, body)
+2237:               : op === 'reject' ? rejectHypothesis(app, runId, hypId, body)
+2238:               : op === 'fork' ? forkHypothesis(app, runId, hypId, body)
+2239:               : op === 'edit' ? await editHypothesis(app, runId, hypId, body)
+2240:               : connectClaim(app, runId, hypId, body);
+2241:             sendJson(res, 200, result);
+2242:             return;
+2243:           } catch (e) {
+2244:             if (e instanceof HypothesisOpError) {
+2245:               throw new HttpError(e.status, {
+2246:                 code: e.code,
+2247:                 message: e.message,
+2248:                 retryable: false,
+2249:                 ...(e.code === 'not_found' ? { runId } : {}),
+2250:               });
+2251:             }
+2252:             throw e;
+2253:           }
+2254:         }
+2255:         throw notFound(`no route: ${method} ${url.pathname}`);
+2256:       }
+2257: 
+2258:       // HX §15 evidence annotation/classification — researcher judgement ops on
+2259:       // claims, same ownership/audit discipline as hypothesis-ops above.
+2260:       if (segments.length === 7 && segments[4] === 'claims') {
 
 ===== context around every occurrence of "segments[4] === 'feedback'" =====
 occurrences: 0
 
 ===== context around every occurrence of "segments[4] === 'supervision'" =====
 occurrences: 1
---- lines 2296..2331 (hit at 2310) ---
-2296:         // AVO fusion G8 projection: the deterministic evaluator family over this
-2297:         // run's scientific state (multi-dimensional, no invented single score).
-2298:         mustGetRun(runId);
-2299:         sendJson(res, 200, { runId, evaluations: runEvaluators({ store: app.store, runId, now: new Date().toISOString() }) });
-2300:         return;
-2301:       }
-2302:       if (segments.length === 5 && segments[4] === 'lineage' && method === 'GET') {
-2303:         // AVO fusion G3 projection: the queryable research trajectory graph
-2304:         // (run revision family + hypotheses + evidence + causal revisions).
-2305:         // Read-only over the store; 404s honestly when the run does not exist.
-2306:         mustGetRun(runId);
-2307:         sendJson(res, 200, buildLineageGraph({ store: app.store, rootRunId: runId }));
-2308:         return;
-2309:       }
-2310:       if (segments.length === 5 && segments[4] === 'supervision' && method === 'GET') {
-2311:         // AVO fusion G2 projection: current supervisor analysis (fresh, not a
-2312:         // stored snapshot) so UX shows the live trajectory health. Read-only.
-2313:         mustGetRun(runId);
-2314:         sendJson(res, 200, analyzeTrajectory({ store: app.store, runId }));
-2315:         return;
-2316:       }
-2317:       if (segments.length === 5 && segments[4] === 'truth' && method === 'GET') {
-2318:         // Execution-truth projection (goal §5.5): deterministic receipt-derived
-2319:         // view of HOW this run executed (live / mixed / synthetic / recorded_replay),
-2320:         // incl. retrieval cache/replay composition. Read-only; receipts stay authoritative.
-2321:         mustGetRun(runId);
-2322:         sendJson(res, 200, runTruthProfile(app.store, runId));
-2323:         return;
-2324:       }
-2325:       if (segments.length === 5 && segments[4] === 'counter-search' && method === 'POST') {
-2326:         // §5.2 counter-evidence loop closure: execute ONE researcher-directed
-2327:         // counter-evidence search against the live source plane and grow the run
-2328:         // corpus (append-only snapshot versioning; receipts + events; lease-guarded).
-2329:         const body = await readJsonObject(req);
-2330:         try {
-2331:           sendJson(res, 201, await runCounterSearch(app, runId, body, opts.counterSearchSourceFor));
+--- lines 2297..2332 (hit at 2311) ---
+2297:         // AVO fusion G8 projection: the deterministic evaluator family over this
+2298:         // run's scientific state (multi-dimensional, no invented single score).
+2299:         mustGetRun(runId);
+2300:         sendJson(res, 200, { runId, evaluations: runEvaluators({ store: app.store, runId, now: new Date().toISOString() }) });
+2301:         return;
+2302:       }
+2303:       if (segments.length === 5 && segments[4] === 'lineage' && method === 'GET') {
+2304:         // AVO fusion G3 projection: the queryable research trajectory graph
+2305:         // (run revision family + hypotheses + evidence + causal revisions).
+2306:         // Read-only over the store; 404s honestly when the run does not exist.
+2307:         mustGetRun(runId);
+2308:         sendJson(res, 200, buildLineageGraph({ store: app.store, rootRunId: runId }));
+2309:         return;
+2310:       }
+2311:       if (segments.length === 5 && segments[4] === 'supervision' && method === 'GET') {
+2312:         // AVO fusion G2 projection: current supervisor analysis (fresh, not a
+2313:         // stored snapshot) so UX shows the live trajectory health. Read-only.
+2314:         mustGetRun(runId);
+2315:         sendJson(res, 200, analyzeTrajectory({ store: app.store, runId }));
+2316:         return;
+2317:       }
+2318:       if (segments.length === 5 && segments[4] === 'truth' && method === 'GET') {
+2319:         // Execution-truth projection (goal §5.5): deterministic receipt-derived
+2320:         // view of HOW this run executed (live / mixed / synthetic / recorded_replay),
+2321:         // incl. retrieval cache/replay composition. Read-only; receipts stay authoritative.
+2322:         mustGetRun(runId);
+2323:         sendJson(res, 200, runTruthProfile(app.store, runId));
+2324:         return;
+2325:       }
+2326:       if (segments.length === 5 && segments[4] === 'protocol' && method === 'GET') {
+2327:         // Protocol plane (convergence 2026-08-29): the frozen preregistration +
+2328:         // human-attested ledger for the plan's real-world legs (bench/field/human/
+2329:         // engineering/archive/theory). Read-only projection; the deterministic
+2330:         // state machine lives in protocol-ops/domain — never in the router.
+2331:         mustGetRun(runId);
+2332:         try {
 
 ===== context around every occurrence of "readBody" =====
 occurrences: 3
---- lines 337..372 (hit at 351) ---
-337:   const sendError = (res: http.ServerResponse, err: HttpError): void =>
-338:     sendJson(res, err.status, { error: err.payload });
-339: 
-340:   const sendText = (res: http.ServerResponse, status: number, contentType: string, body: string): void => {
-341:     if (res.writableEnded) return;
-342:     res.writeHead(status, {
-343:       'Content-Type': contentType,
-344:       'Content-Length': Buffer.byteLength(body),
-345:     });
-346:     res.end(body);
-347:   };
-348: 
-349:   // ---- request body (cap 1MB, drain-and-reject on overflow) ----
-350: 
-351:   const readBody = (req: http.IncomingMessage): Promise<Buffer> =>
-352:     new Promise((resolve, reject) => {
-353:       const chunks: Buffer[] = [];
-354:       let received = 0;
-355:       let overflowed = false;
-356:       req.on('data', (chunk: Buffer) => {
-357:         received += chunk.length;
-358:         if (received > MAX_BODY_BYTES) {
-359:           overflowed = true;
-360:           chunks.length = 0; // stop buffering but keep draining so the response is deliverable
-361:           return;
-362:         }
-363:         if (!overflowed) chunks.push(chunk);
-364:       });
-365:       req.on('end', () => {
-366:         if (overflowed) {
-367:           reject(validation(`request body exceeds the ${MAX_BODY_BYTES}-byte limit`));
-368:         } else {
-369:           resolve(Buffer.concat(chunks));
-370:         }
-371:       });
-372:       req.on('error', (e: Error) => reject(validation(`request body read failed: ${e.message}`)));
---- lines 362..397 (hit at 376) ---
-362:         }
-363:         if (!overflowed) chunks.push(chunk);
-364:       });
-365:       req.on('end', () => {
-366:         if (overflowed) {
-367:           reject(validation(`request body exceeds the ${MAX_BODY_BYTES}-byte limit`));
-368:         } else {
-369:           resolve(Buffer.concat(chunks));
-370:         }
-371:       });
-372:       req.on('error', (e: Error) => reject(validation(`request body read failed: ${e.message}`)));
-373:     });
-374: 
-375:   const readJsonObject = async (req: http.IncomingMessage): Promise<Record<string, unknown>> => {
-376:     const body = (await readBody(req)).toString('utf8');
-377:     if (body.trim().length === 0) throw validation('request body required: a JSON object');
-378:     let parsed: unknown;
-379:     try {
-380:       parsed = JSON.parse(body);
-381:     } catch (e) {
-382:       throw validation(`request body is not valid JSON: ${e instanceof Error ? e.message : String(e)}`);
-383:     }
-384:     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-385:       throw validation('request body must be a JSON object');
-386:     }
-387:     return parsed as Record<string, unknown>;
-388:   };
-389: 
-390:   // ---- run lookups ----
-391: 
-392:   const mustGetRun = (runId: string) => {
-393:     const run = app.store.getRun(runId);
-394:     if (!run) throw notFound(`run not found: ${runId}`, runId);
-395:     return run;
-396:   };
-397: 
---- lines 2841..2876 (hit at 2855) ---
-2841:         });
-2842:       }
-2843:       throw notFound(`no route: ${method} ${url.pathname}`);
-2844:     }
-2845: 
-2846:     if (segments[2] === 'competition-route' && segments.length === 3) {
-2847:       // 11→12 handoff 2026-08-25: competition route gate switch (settings surface).
-2848:       // GET → current mode; PUT {on:boolean} → idempotent write. Semantics live in
-2849:       // provider-resolver (ON holds every resolved route to the official Qwen-via-Bailian
-2850:       // rule, fail-closed on violation; re-read per resolution so edits hit live runs).
-2851:       if (method === 'GET') {
-2852:         return sendJson(res, 200, { competitionRouteMode: readCompetitionRouteMode(app.store) ? 'on' : 'off' });
-2853:       }
-2854:       if (method === 'PUT') {
-2855:         const raw = (await readBody(req)).toString('utf8');
-2856:         let body: unknown;
-2857:         try { body = JSON.parse(raw); } catch { body = undefined; }
-2858:         if (typeof body !== 'object' || body === null || typeof (body as { on?: unknown }).on !== 'boolean') {
-2859:           throw new HttpError(400, { code: 'validation', message: 'PUT /api/v1/competition-route expects {"on": boolean}', retryable: false });
-2860:         }
-2861:         writeCompetitionRouteMode(app.store, (body as { on: boolean }).on);
-2862:         return sendJson(res, 200, { competitionRouteMode: (body as { on: boolean }).on ? 'on' : 'off' });
-2863:       }
-2864:       throw notFound(`no route: ${method} ${url.pathname}`);
-2865:     }
-2866: 
-2867:         if (segments[2] === 'health' && segments.length === 3 && method === 'GET') {
-2868:       return health(res);
-2869:     }
-2870: 
-2871:     if (segments[2] === 'meta' && segments.length === 3 && method === 'GET') {
-2872:       // Server/workspace facts for the settings About section: version + data
-2873:       // location. Env var NAMES and paths only — secret values never leave.
-2874:       let version = 'unknown';
-2875:       try {
-2876:         const pkgPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'package.json');
+--- lines 338..373 (hit at 352) ---
+338:   const sendError = (res: http.ServerResponse, err: HttpError): void =>
+339:     sendJson(res, err.status, { error: err.payload });
+340: 
+341:   const sendText = (res: http.ServerResponse, status: number, contentType: string, body: string): void => {
+342:     if (res.writableEnded) return;
+343:     res.writeHead(status, {
+344:       'Content-Type': contentType,
+345:       'Content-Length': Buffer.byteLength(body),
+346:     });
+347:     res.end(body);
+348:   };
+349: 
+350:   // ---- request body (cap 1MB, drain-and-reject on overflow) ----
+351: 
+352:   const readBody = (req: http.IncomingMessage): Promise<Buffer> =>
+353:     new Promise((resolve, reject) => {
+354:       const chunks: Buffer[] = [];
+355:       let received = 0;
+356:       let overflowed = false;
+357:       req.on('data', (chunk: Buffer) => {
+358:         received += chunk.length;
+359:         if (received > MAX_BODY_BYTES) {
+360:           overflowed = true;
+361:           chunks.length = 0; // stop buffering but keep draining so the response is deliverable
+362:           return;
+363:         }
+364:         if (!overflowed) chunks.push(chunk);
+365:       });
+366:       req.on('end', () => {
+367:         if (overflowed) {
+368:           reject(validation(`request body exceeds the ${MAX_BODY_BYTES}-byte limit`));
+369:         } else {
+370:           resolve(Buffer.concat(chunks));
+371:         }
+372:       });
+373:       req.on('error', (e: Error) => reject(validation(`request body read failed: ${e.message}`)));
+--- lines 363..398 (hit at 377) ---
+363:         }
+364:         if (!overflowed) chunks.push(chunk);
+365:       });
+366:       req.on('end', () => {
+367:         if (overflowed) {
+368:           reject(validation(`request body exceeds the ${MAX_BODY_BYTES}-byte limit`));
+369:         } else {
+370:           resolve(Buffer.concat(chunks));
+371:         }
+372:       });
+373:       req.on('error', (e: Error) => reject(validation(`request body read failed: ${e.message}`)));
+374:     });
+375: 
+376:   const readJsonObject = async (req: http.IncomingMessage): Promise<Record<string, unknown>> => {
+377:     const body = (await readBody(req)).toString('utf8');
+378:     if (body.trim().length === 0) throw validation('request body required: a JSON object');
+379:     let parsed: unknown;
+380:     try {
+381:       parsed = JSON.parse(body);
+382:     } catch (e) {
+383:       throw validation(`request body is not valid JSON: ${e instanceof Error ? e.message : String(e)}`);
+384:     }
+385:     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+386:       throw validation('request body must be a JSON object');
+387:     }
+388:     return parsed as Record<string, unknown>;
+389:   };
+390: 
+391:   // ---- run lookups ----
+392: 
+393:   const mustGetRun = (runId: string) => {
+394:     const run = app.store.getRun(runId);
+395:     if (!run) throw notFound(`run not found: ${runId}`, runId);
+396:     return run;
+397:   };
+398: 
+--- lines 2885..2920 (hit at 2899) ---
+2885:         });
+2886:       }
+2887:       throw notFound(`no route: ${method} ${url.pathname}`);
+2888:     }
+2889: 
+2890:     if (segments[2] === 'competition-route' && segments.length === 3) {
+2891:       // 11→12 handoff 2026-08-25: competition route gate switch (settings surface).
+2892:       // GET → current mode; PUT {on:boolean} → idempotent write. Semantics live in
+2893:       // provider-resolver (ON holds every resolved route to the official Qwen-via-Bailian
+2894:       // rule, fail-closed on violation; re-read per resolution so edits hit live runs).
+2895:       if (method === 'GET') {
+2896:         return sendJson(res, 200, { competitionRouteMode: readCompetitionRouteMode(app.store) ? 'on' : 'off' });
+2897:       }
+2898:       if (method === 'PUT') {
+2899:         const raw = (await readBody(req)).toString('utf8');
+2900:         let body: unknown;
+2901:         try { body = JSON.parse(raw); } catch { body = undefined; }
+2902:         if (typeof body !== 'object' || body === null || typeof (body as { on?: unknown }).on !== 'boolean') {
+2903:           throw new HttpError(400, { code: 'validation', message: 'PUT /api/v1/competition-route expects {"on": boolean}', retryable: false });
+2904:         }
+2905:         writeCompetitionRouteMode(app.store, (body as { on: boolean }).on);
+2906:         return sendJson(res, 200, { competitionRouteMode: (body as { on: boolean }).on ? 'on' : 'off' });
+2907:       }
+2908:       throw notFound(`no route: ${method} ${url.pathname}`);
+2909:     }
+2910: 
+2911:         if (segments[2] === 'health' && segments.length === 3 && method === 'GET') {
+2912:       return health(res);
+2913:     }
+2914: 
+2915:     if (segments[2] === 'meta' && segments.length === 3 && method === 'GET') {
+2916:       // Server/workspace facts for the settings About section: version + data
+2917:       // location. Env var NAMES and paths only — secret values never leave.
+2918:       let version = 'unknown';
+2919:       try {
+2920:         const pkgPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'package.json');
