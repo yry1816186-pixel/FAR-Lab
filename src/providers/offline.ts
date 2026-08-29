@@ -534,8 +534,8 @@ const conversationTurn: Handler = (payload) => {
   const m = /「([^」]{6,2000})」/.exec(task);
   const question = m !== null ? m[1]! : '';
   const reply = question.length > 0
-    ? `（离线路线确定性回复）已收到你的消息：「${question}」。\n\n这条路线不联网、不调用真实模型——它用于演示与界面验收：对话式创建、研究运行与结果阅读的全流程可以走通，所有回执均标记为 test 模式。下面已把你的原话列为候选研究问题，可直接发起一次完整研究。`
-    : '（离线路线确定性回复）已收到你的消息。这条路线不联网、不调用真实模型——用于演示与界面验收；如需真实文献检索与模型推理，请在设置中切换到已配置密钥的路线。';
+    ? `（离线开发路线确定性回复）已收到你的消息：「${question}」。\n\n这条路线不联网、不调用真实模型——用于开发与界面验收：对话式创建、研究运行与结果阅读的全流程可以走通，所有回执均标记为 test 模式；模型判断内容会被如实拒绝，文献检索照常真实执行。下面已把你的原话列为候选研究问题，可直接发起一次完整研究。`
+    : '（离线开发路线确定性回复）已收到你的消息。这条路线不联网、不调用真实模型——用于开发与界面验收；如需真实文献检索与模型推理，请在设置中切换到已配置密钥的路线。';
   return {
     action: 'finish',
     reason: 'offline deterministic reply: the development route exercises the conversation flow without tools or network',

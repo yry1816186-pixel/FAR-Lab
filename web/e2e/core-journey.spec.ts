@@ -16,12 +16,13 @@ test('empty workspace shows the first-use zone (G1), not fabricated lists', asyn
   const runs = await (await request.get('/api/v1/runs')).json() as { runs: unknown[] };
   test.skip(runs.runs.length > 0, 'workspace already has runs (reused server) — G1 asserted on clean CI runners');
   await page.goto('/#/');
-  // Fresh scratch workspace: product positioning + readiness checks + ONE first
-  // step — the judgment/studies sections appear only with real content (the
-  // full journey test below asserts them after a run exists).
+  // Fresh scratch workspace: product positioning + readiness checks + the
+  // question box itself as the first step (no bare CTA — the researcher can
+  // type immediately; the judgment/studies sections appear only with content).
   await expect(page.locator('.fu-title, h1').first()).toBeVisible();
   await expect(page.getByRole('list', { name: /环境检查|Environment check/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /提出第一个研究问题|Pose your first research question/ })).toBeVisible();
+  await expect(page.locator('.qw-input')).toBeVisible();
+  await expect(page.locator('.qw-input')).toBeFocused();
 });
 
 test('full journey: formation -> launch -> study map -> inspector -> home', async ({ page }) => {

@@ -1082,3 +1082,46 @@ export const importPluginFromDir = async (dir: string, signal?: AbortSignal): Pr
   }
   return data as PluginImportResponse;
 };
+
+/* ---- terminal sessions (extensibility lane): persistent login shells ---- */
+
+export interface TerminalSessionView {
+  id: string;
+  shell: { program: string; displayName: string };
+  cwd: string;
+  createdAt: string;
+  lastActivityAt: string;
+  alive: boolean;
+  exited: boolean;
+  exitCode: number | null;
+}
+
+const terminalSessionOf = (data: unknown): TerminalSessionView => {
+  if (typeof data !== 'object' || data === null
+    || typeof (data as { id?: unknown }).id !== 'string'
+    || typeof (data as { alive?: unknown }).alive !== 'boolean') {
+    throw new ApiError({ code: 'terminal_malformed', message: 'terminal session: malformed response' });
+  }
+  return data as TerminalSessionView;
+};
+
+export const listTerminalSessions = async (signal?: AbortSignal): Promise<TerminalSessionView[]> => {
+  const data = await api.getJson(`${BASE}/terminal/sessions`, signal);
+  const sessions = (data as { sessions?: unknown }).sessions;
+  return Array.isArray(sessions) ? sessions.map(terminalSessionOf) : [];
+};
+
+export const createTerminalSession = async (signal?: AbortSignal): Promise<TerminalSessionView> =>
+  terminalSessionOf(await api.post(`${BASE}/terminal/sessions`, {}, signal));
+
+export const killTerminalSession = async (id: string, signal?: AbortSignal): Promise<void> => {
+  await api.del(`${BASE}/terminal/sessions/${encodeURIComponent(id)}`, signal);
+};
+
+export const writeTerminalInput = async (id: string, text: string, signal?: AbortSignal): Promise<void> => {
+  await api.post(`${BASE}/terminal/sessions/${encodeURIComponent(id)}/input`, { text }, signal);
+};
+
+/** SSE stream URL for one session's output (EventSource consumer in Terminal.tsx). */
+export const terminalEventsUrl = (id: string): string =>
+  `${BASE}/terminal/sessions/${encodeURIComponent(id)}/events`;

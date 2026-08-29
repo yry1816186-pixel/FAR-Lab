@@ -45,7 +45,9 @@ npm run build
 # Set model provider key (choose one)
 export ZAI_API_KEY=your_zhipu_api_key          # Zhipu GLM (default)
 # export DASHSCOPE_API_KEY=your_dashscope_key   # Alibaba Qwen (competition route)
-# No key yet? Run the deterministic offline route instead: append --route offline
+# No key yet? Append --route offline: retrieval and claim binding still run for
+# real (free public APIs); model-judgment stages (scope/hypotheses/ranking) are
+# honestly refused with the reason on the record — no fabricated demo content.
 
 # Run a minimal research pipeline.
 # In a fresh clone the CLI has no global `far` command — run it through the repo:

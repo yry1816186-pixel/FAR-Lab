@@ -614,9 +614,29 @@
 .nr-cite-acts { display: flex; align-items: center; gap: 10px; }
 
 /* First-use route readiness detail (P2): which routes, per-route mark */
-.fu-routes-detail { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 4px; }
-.fu-route { font-size: 11.5px; color: var(--v2-text-3); }
-.fu-route.is-ready { color: var(--v2-text-2); }
+.fu-routes-detail { display: flex; flex-wrap: wrap; gap: 4px 6px; margin-top: 4px; }
+/* One chip per route — the readiness mark lives INSIDE the chip, so it can
+   never read as a separator between two names ("✓ zai – dashscope" was
+   misread as "dashscope not ready"). */
+.fu-route {
+  padding: 2px 8px;
+  font-size: 11.5px; color: var(--v2-text-3);
+  background: var(--v2-surface-2);
+  border: 1px solid var(--v2-border); border-radius: 999px;
+}
+.fu-route.is-ready {
+  color: var(--v2-verified-on-tint);
+  background: var(--v2-verified-tint);
+  border-color: color-mix(in oklab, var(--v2-verified) 30%, var(--v2-border));
+}
+/* The embedded question box (first-use): no card of its own — the zone is
+   already a surface; only the input row + chips render. */
+.qwelcome--embedded {
+  background: none; border: none; padding: 18px 0 0; text-align: left; margin-bottom: 0;
+}
+.qwelcome--embedded .qw-quick { justify-content: flex-start; }
+/* Cost truth sits right under the question box, readable (11.5px floor). */
+.firstuse .fu-note { margin-top: 12px; font-size: 11.5px; line-height: 1.5; }
 
 /* ---- Product Spine: current scientific state / next action / delta (2026-08-28) ---- */
 .map-state {
@@ -968,3 +988,115 @@
 }
 .rail-group-add:hover { color: var(--v2-info-on-tint); background: var(--v2-info-tint); }
 .rail-group-add:focus-visible { outline: 2px solid var(--v2-info); outline-offset: 1px; }
+
+/* ---------- integrated terminal (extensibility lane) ---------- */
+.term-root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--v2-page-bg);
+  color: var(--v2-text-1);
+}
+.term-topline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 22px 10px;
+  border-bottom: 1px solid var(--v2-border);
+  background: var(--v2-surface);
+}
+.term-topline .term-title { font-size: 14px; font-weight: 700; }
+.term-shell-tag {
+  font-size: 11px;
+  color: var(--v2-text-3);
+  border: 1px solid var(--v2-border);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+.term-spacer { flex: 1; }
+.term-note {
+  margin: 8px 22px 0;
+  font-size: 11.5px;
+  color: var(--v2-text-3);
+}
+.term-error {
+  margin: 8px 22px 0;
+  font-size: 12px;
+  color: var(--v2-refuted);
+}
+.term-body {
+  flex: 1;
+  display: flex;
+  gap: 12px;
+  padding: 14px 22px 30px;
+  min-height: 0;
+}
+.term-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 170px;
+}
+.term-tab-row { display: flex; align-items: center; gap: 4px; }
+.term-tab {
+  flex: 1;
+  font-size: 12px;
+  text-align: left;
+  padding: 5px 9px;
+  border-radius: 7px;
+  border: 1px solid var(--v2-border);
+  background: var(--v2-surface);
+  color: var(--v2-text-2, inherit);
+  cursor: pointer;
+}
+.term-tab.is-active { border-color: var(--v2-info); color: var(--v2-text-1); font-weight: 600; }
+.term-tab-kill {
+  border: none;
+  background: transparent;
+  color: var(--v2-text-3);
+  cursor: pointer;
+  padding: 3px;
+  border-radius: 5px;
+}
+.term-tab-kill:hover { color: var(--v2-refuted); }
+.term-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--v2-border);
+  border-radius: 10px;
+  background: var(--code-bg);
+  min-height: 380px;
+  overflow: hidden;
+}
+.term-scroll {
+  flex: 1;
+  overflow: auto;
+  padding: 10px 12px;
+}
+.term-pre {
+  margin: 0;
+  font-family: var(--font-mono, ui-monospace, 'IBM Plex Mono', Consolas, monospace);
+  font-size: 12.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--v2-text-1);
+}
+.term-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid var(--v2-border);
+  padding: 8px 12px;
+}
+.term-prompt { color: var(--v2-info); font-weight: 700; }
+.term-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--v2-text-1);
+  font-family: var(--font-mono, ui-monospace, 'IBM Plex Mono', Consolas, monospace);
+  font-size: 12.5px;
+  outline: none;
+}

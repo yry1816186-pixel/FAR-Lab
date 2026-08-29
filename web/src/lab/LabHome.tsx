@@ -24,14 +24,13 @@ const STUDY_PREVIEW = 10;
  */
 export function LabHome({
   runs, runsLoading, runsError, conversations,
-  onOpenStudy, onNewResearch, onOpenConversation, onOpenSettings, onRetryRuns, onAskQuestion, onJudgmentCount,
+  onOpenStudy, onOpenConversation, onOpenSettings, onRetryRuns, onAskQuestion, onJudgmentCount,
 }: {
   runs: RunSummary[];
   runsLoading: boolean;
   runsError: ApiError | null;
   conversations: Conversation[];
   onOpenStudy: (runId: string) => void;
-  onNewResearch: () => void;
   onOpenConversation: (id: string) => void;
   onOpenSettings: () => void;
   onRetryRuns: () => void;
@@ -113,14 +112,9 @@ export function LabHome({
 
   return (
     <div className="lab-root">
-      <header className="lab-topline">
-        <span className="lab-title">{t('labhome.title')}</span>
-        <span className="lab-spacer" />
-        {/* No third "new research" button here: the rail entry and the
-            question box below ARE the paths — a third one only muddied which
-            action is primary. */}
-      </header>
-
+      {/* No topline on the home: the rail's 工作台 entry already names this
+          surface — a second header bar burned vertical space and doubled the
+          brand voice (fresh-zone review 2026-08-29). */}
       <main className="queue-canvas">
         {runsError !== null && <ErrorBox error={runsError} onRetry={onRetryRuns} />}
 
@@ -129,8 +123,8 @@ export function LabHome({
             health={health}
             healthError={healthError !== null}
             checking={checking}
-            onNewResearch={onNewResearch}
             onOpenSettings={onOpenSettings}
+            onAskQuestion={onAskQuestion}
           />
         ) : (
           <>
@@ -290,7 +284,7 @@ export function LabHome({
  *  that hands its text to research formation (route-carried prefill), plus
  *  quick-task templates that fill the box with a real question skeleton. The
  *  judgment queue below stays the operational heart of the home. */
-function QuestionWelcome({ onAsk }: { onAsk: (text: string) => void }): JSX.Element {
+function QuestionWelcome({ onAsk, embedded = false }: { onAsk: (text: string) => void; embedded?: boolean }): JSX.Element {
   const { t } = useI18n();
   const [text, setText] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -308,9 +302,9 @@ function QuestionWelcome({ onAsk }: { onAsk: (text: string) => void }): JSX.Elem
   };
 
   return (
-    <section className="qwelcome" aria-labelledby="qw-title">
-      <h1 className="qw-title" id="qw-title">{t('labhome.qwTitle')}</h1>
-      <p className="qw-sub">{t('labhome.qwSub')}</p>
+    <section className={`qwelcome${embedded ? ' qwelcome--embedded' : ''}`} aria-label={t('labhome.qwTitle')}>
+      {!embedded && <h1 className="qw-title" id="qw-title">{t('labhome.qwTitle')}</h1>}
+      {!embedded && <p className="qw-sub">{t('labhome.qwSub')}</p>}
       <div className="qw-box">
         <input
           ref={inputRef}
@@ -320,6 +314,9 @@ function QuestionWelcome({ onAsk }: { onAsk: (text: string) => void }): JSX.Elem
           placeholder={t('labhome.qwPlaceholder')}
           aria-label={t('labhome.qwPlaceholder')}
           maxLength={600}
+          /* Fresh workspace: this box IS the first step — cursor lands here
+             so typing can begin with zero navigation. */
+          autoFocus={embedded}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }}
         />
@@ -338,6 +335,7 @@ function QuestionWelcome({ onAsk }: { onAsk: (text: string) => void }): JSX.Elem
             type="button"
             key={q.key}
             className="qw-chip"
+            title={t('labhome.qkHint', { text: q.template })}
             onClick={() => {
               setText(q.template);
               inputRef.current?.focus();
@@ -353,13 +351,15 @@ function QuestionWelcome({ onAsk }: { onAsk: (text: string) => void }): JSX.Elem
   );
 }
 
-/** First-use zone (G1): what this is, is the engine ready, and the one first step. */
-function FirstUse({ health, healthError, checking, onNewResearch, onOpenSettings }: {
+/** First-use zone (G1): what this is, is the engine ready, and the question
+ *  box itself — the first-run researcher types their question HERE, not after
+ *  a navigation hop (the formation screen receives it prefilled). */
+function FirstUse({ health, healthError, checking, onOpenSettings, onAskQuestion }: {
   health: { status: string; db: string; providers: { name: string; kind: string; liveReady: boolean }[] } | null;
   healthError: boolean;
   checking: boolean;
-  onNewResearch: () => void;
   onOpenSettings: () => void;
+  onAskQuestion: (text: string) => void;
 }): JSX.Element {
   const { t } = useI18n();
   const liveProviders = health?.providers.filter((p) => p.kind === 'live') ?? [];
@@ -395,19 +395,22 @@ function FirstUse({ health, healthError, checking, onNewResearch, onOpenSettings
                     ? t('labhome.fuRoutesOk', { ready: ready.length, total: liveProviders.length })
                     : t('labhome.fuRoutesZero')}
             </span>
-            {/* Route detail (P2 fix): WHICH routes are ready — names are proper
-                nouns; the per-route mark is the same verified/unverified code
-                the evidence band uses. Disclosed always, not only at zero. */}
+            {/* Route detail (P2 fix): WHICH routes are ready — one CHIP per
+                route, the mark inside the chip so it cannot read as a
+                separator ("✓ zai – dashscope" was misread as "dashscope
+                not ready"). Unready chips say WHY via title. */}
             {!checking && !healthError && liveProviders.length > 0 && (
               <span className="fu-routes-detail">
                 {liveProviders.map((p) => (
-                  <span key={p.name} className={`fu-route${p.liveReady ? ' is-ready' : ''}`}>
-                    <span aria-hidden="true">{p.liveReady ? '✓' : '–'}</span> {p.name}
+                  <span key={p.name} className={`fu-route${p.liveReady ? ' is-ready' : ''}`} title={p.liveReady ? t('labhome.fuRouteReady') : t('labhome.fuRouteNotReady')}>
+                    {p.name}{p.liveReady ? ' ✓' : ` · ${t('labhome.fuRouteNotReadyShort')}`}
                   </span>
                 ))}
               </span>
             )}
-            {!routesOk && !checking && !healthError && (
+            {/* Repair path whenever ANY route is unready (not only at zero):
+                the chip names the gap; this link owns the next action. */}
+            {!checking && !healthError && ready.length < liveProviders.length && (
               <button type="button" className="fu-check-act" onClick={onOpenSettings}>{t('labhome.fuConfigure')}</button>
             )}
           </span>
@@ -418,9 +421,11 @@ function FirstUse({ health, healthError, checking, onNewResearch, onOpenSettings
         <p className="fu-hint">{t('labhome.fuRoutesHint')}</p>
       )}
 
-      <button type="button" className="fu-start" onClick={onNewResearch}>
-        {t('labhome.fuStart')}
-      </button>
+      {/* The question box IS the first step — the researcher types here, the
+          formation screen receives it prefilled (one hop less than a bare
+          CTA; the quick chips double as honest example questions). */}
+      <QuestionWelcome onAsk={onAskQuestion} embedded />
+
       <p className="fu-note">{t('labhome.fuNote')}</p>
     </section>
   );

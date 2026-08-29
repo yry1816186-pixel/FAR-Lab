@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   BookOpen, ChevronLeft, ChevronRight, FlaskConical, Home, MessageSquare,
-  Pencil, Plus, Settings, Trash2,
+  Pencil, Plus, Settings, TerminalSquare, Trash2,
 } from 'lucide-react';
 import { useI18n } from '../i18n/LanguageContext';
 import type { DictKey } from '../i18n/dict';
@@ -11,7 +11,7 @@ import type { RunSummary } from '../api/types';
 import './lab.css';
 
 /** Which primary surface the workspace is showing (rail active-state). */
-export type RailSurface = 'home' | 'new' | 'library' | 'study' | 'conv';
+export type RailSurface = 'home' | 'new' | 'library' | 'study' | 'conv' | 'terminal';
 
 const COLLAPSE_KEY = 'farlab.railCollapsed';
 
@@ -24,7 +24,7 @@ const COLLAPSE_KEY = 'farlab.railCollapsed';
 export function AppRail({
   surface, runs, conversations, judgmentCount,
   onHome, onNewResearch, onLibrary, onOpenStudy, onOpenConversation,
-  onDeleteConversation, onRenameConversation, onNewConversation, onOpenSettings,
+  onDeleteConversation, onRenameConversation, onNewConversation, onOpenSettings, onTerminal,
 }: {
   surface: RailSurface;
   runs: RunSummary[];
@@ -41,6 +41,7 @@ export function AppRail({
   onRenameConversation: (id: string, title: string) => void;
   onNewConversation: () => void;
   onOpenSettings: () => void;
+  onTerminal: () => void;
 }): JSX.Element | null {
   const { t } = useI18n();
   const [collapsed, setCollapsed] = useState<boolean>(() => {
@@ -97,6 +98,7 @@ export function AppRail({
         {navItem('rail.home', <Home size={15} aria-hidden="true" />, surface === 'home', onHome, { badge: judgmentCount })}
         {navItem('rail.newResearch', <Plus size={15} aria-hidden="true" />, surface === 'new', onNewResearch)}
         {navItem('rail.library', <BookOpen size={15} aria-hidden="true" />, surface === 'library', onLibrary)}
+        {navItem('rail.terminal', <TerminalSquare size={15} aria-hidden="true" />, surface === 'terminal', onTerminal)}
       </div>
 
       {recentStudies.length > 0 && (

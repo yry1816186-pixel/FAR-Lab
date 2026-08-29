@@ -4,6 +4,7 @@ import { Bell, BellOff, MonitorCog, Moon, Search, Settings, Sun, X } from 'lucid
 import { ApiError } from './api/client';
 import { getEvents, getRun, listRuns, listConversations, createConversation, deleteConversation, renameConversation, searchAll } from './api/endpoints';
 import { AppRail, type RailSurface } from './lab/AppRail';
+import { Terminal } from './lab/Terminal';
 import { Library } from './lab/Library';
 import type { Conversation, ResearchRun, RunEvent, RunSummary } from './api/types';
 import { useI18n } from './i18n/LanguageContext';
@@ -65,6 +66,8 @@ export function App(): JSX.Element {
   // Workspace literature library (#library) + welcome-box question prefill
   // (#lab/new?q=…). Prefill is consumed once by NewResearch on mount.
   const [libraryView, setLibraryView] = useState(false);
+  // Integrated terminal surface (#terminal) — real login-shell sessions.
+  const [terminalView, setTerminalView] = useState(false);
   const [prefilledQuestion, setPrefilledQuestion] = useState<string | null>(null);
   // Judgment-queue size lifted from LabHome (the one truth) for the rail badge.
   const [judgmentCount, setJudgmentCount] = useState(0);
@@ -88,6 +91,7 @@ export function App(): JSX.Element {
     setSelectedConvId(id);
     setLibraryView(false);
     setNewResearchView(false);
+    setTerminalView(false);
     if (selectedRunId !== null) setConvDocked(true); // objects stay primary; dialogue docks
     void refreshConversations();
   }, [refreshConversations, selectedRunId]);
@@ -279,6 +283,7 @@ export function App(): JSX.Element {
   const selectStudy = useCallback((runId: string): void => {
     setSelectedRunId(runId);
     setStudyView(true);
+    setTerminalView(false);
     setNewResearchView(false);
     setLibraryView(false);
     if (selectedConvId !== null) setConvDocked(true);
@@ -286,6 +291,7 @@ export function App(): JSX.Element {
   const openHome = useCallback((): void => {
     setSelectedRunId(null);
     setStudyView(false);
+    setTerminalView(false);
     setNewResearchView(false);
     setLibraryView(false);
     closeConversation();
@@ -294,6 +300,7 @@ export function App(): JSX.Element {
     setNewResearchView(true);
     setSelectedRunId(null);
     setStudyView(false);
+    setTerminalView(false);
     setLibraryView(false);
     setSelectedConvId(null);
     setConvDocked(false);
@@ -301,6 +308,15 @@ export function App(): JSX.Element {
   }, []);
   const openLibrary = useCallback((): void => {
     setLibraryView(true);
+    setNewResearchView(false);
+    setSelectedRunId(null);
+    setStudyView(false);
+    setTerminalView(false);
+    closeConversation();
+  }, [closeConversation]);
+  const openTerminal = useCallback((): void => {
+    setTerminalView(true);
+    setLibraryView(false);
     setNewResearchView(false);
     setSelectedRunId(null);
     setStudyView(false);
@@ -545,13 +561,15 @@ export function App(): JSX.Element {
   }, [refreshConversations]);
   const railSurface: RailSurface = libraryView
     ? 'library'
-    : newResearchView
-      ? 'new'
-      : selectedConvId !== null && selectedRunId === null
-        ? 'conv'
-        : selectedRunId !== null && studyView
-          ? 'study'
-          : 'home';
+    : terminalView
+      ? 'terminal'
+      : newResearchView
+        ? 'new'
+        : selectedConvId !== null && selectedRunId === null
+          ? 'conv'
+          : selectedRunId !== null && studyView
+            ? 'study'
+            : 'home';
 
   return (
     <div className="app">
@@ -653,6 +671,7 @@ export function App(): JSX.Element {
           onRenameConversation={renameConv}
           onNewConversation={newConversation}
           onOpenSettings={() => setSettingsOpen(true)}
+          onTerminal={openTerminal}
         />
         <main className="content content--full" aria-label={t('app.title')}>
           {convCreateError !== null && (
@@ -679,6 +698,8 @@ export function App(): JSX.Element {
             />
           ) : libraryView ? (
             <Library runs={runs} onOpenStudy={selectStudy} />
+          ) : terminalView ? (
+            <Terminal />
           ) : selectedConvId !== null && selectedRunId === null ? (
             <ConversationView
               conversationId={selectedConvId}
@@ -692,7 +713,6 @@ export function App(): JSX.Element {
               runsError={runsError}
               conversations={conversations}
               onOpenStudy={selectStudy}
-              onNewResearch={() => openNewResearch()}
               onOpenConversation={openConversation}
               onOpenSettings={() => setSettingsOpen(true)}
               onRetryRuns={() => void refreshRunsWithAbort()}
