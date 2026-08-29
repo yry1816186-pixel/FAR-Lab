@@ -4,14 +4,14 @@ name: surgery
 # patch scripts for large files that cannot be safely rewritten whole from a
 # remote work surface. Each patch is a committed .mjs script under
 # scripts/surgery/ — fail-loud anchors, idempotent re-runs, no shell inputs.
-# Scoped to converge/** branches only (never pull_request) so untrusted
-# patches cannot ride this workflow. The diagnose job gives the remote work
-# surface a read channel for verification output that otherwise lives only in
-# logs it cannot fetch.
+#
+# DORMANT since the convergence session merged: push triggers removed, this
+# workflow now runs only on explicit manual dispatch (workflow_dispatch).
+# On main the apply scripts no-op (their anchors are already applied) and a
+# manual dispatch would only refresh scripts/surgery/diag.txt. Mechanism and
+# history: scripts/surgery/README.md.
 on:
-  push:
-    branches: ['converge/**']
-    paths: ['scripts/surgery/**', '.github/workflows/surgery.yml']
+  workflow_dispatch:
 
 permissions:
   contents: write
