@@ -64,7 +64,9 @@ total lines: 2981
 
 ===== context around every occurrence of "createApiServer" =====
 occurrences: 1
---- lines 230..259 (hit at 242) ---
+--- lines 228..263 (hit at 242) ---
+228:   const segments = decodeSegments(pathname);
+229:   if (segments === null) return 'unsafe';
 230:   for (const seg of segments) {
 231:     if (seg === '..' || seg.includes('/') || seg.includes('\\') || seg.includes('\0') || /:/.test(seg)) return 'unsafe';
 232:   }
@@ -95,140 +97,14 @@ occurrences: 1
 257:         // out, so the run timeline is the only place this refusal is observable.
 258:         const msg = e instanceof Error ? e.message : String(e);
 259:         process.stderr.write(`far-api: execution of run ${runId} failed: ${msg}\n`);
+260:         if (e instanceof RunLeaseHeldError) {
+261:           app.store.appendEvent(runId, { type: 'note', detail: { reason: 'execution_refused_lease_held', error: msg } });
+262:         }
+263:         return undefined;
 
 ===== context around every occurrence of "experiment-ops" =====
 occurrences: 1
---- lines 2281..2310 (hit at 2293) ---
-2281:                 message: e.message,
-2282:                 retryable: false,
-2283:                 ...(e.code === 'not_found' ? { runId } : {}),
-2284:               });
-2285:             }
-2286:             throw e;
-2287:           }
-2288:         }
-2289:         throw notFound(`no route: ${method} ${url.pathname}`);
-2290:       }
-2291:       // (POST /runs/:id/experiments/:specId/approve removed 2026-08-29: zero
-2292:       // product callers — approval goes through `far experiment approve` /
-2293:       // experiment-ops directly; the route's untested HTTP surface carried
-2294:       // validation risk with no user.)
-2295:       if (segments.length === 5 && segments[4] === 'evaluations' && method === 'GET') {
-2296:         // AVO fusion G8 projection: the deterministic evaluator family over this
-2297:         // run's scientific state (multi-dimensional, no invented single score).
-2298:         mustGetRun(runId);
-2299:         sendJson(res, 200, { runId, evaluations: runEvaluators({ store: app.store, runId, now: new Date().toISOString() }) });
-2300:         return;
-2301:       }
-2302:       if (segments.length === 5 && segments[4] === 'lineage' && method === 'GET') {
-2303:         // AVO fusion G3 projection: the queryable research trajectory graph
-2304:         // (run revision family + hypotheses + evidence + causal revisions).
-2305:         // Read-only over the store; 404s honestly when the run does not exist.
-2306:         mustGetRun(runId);
-2307:         sendJson(res, 200, buildLineageGraph({ store: app.store, rootRunId: runId }));
-2308:         return;
-2309:       }
-2310:       if (segments.length === 5 && segments[4] === 'supervision' && method === 'GET') {
-
-===== context around every occurrence of "experimentLegStatus" =====
-occurrences: 3
---- lines 70..99 (hit at 82) ---
-70: import { ConstraintSet } from '../domain/question.js';
-71: import type { RunStageName } from '../domain/run.js';
-72: import { McpManager } from '../agent/mcp-manager.js';
-73: import { importPlugin, PluginImportError, PluginImportInputSchema } from '../plugins/import.js';
-74: import type { FeedbackSourceKind as FeedbackSource } from '../domain/index.js';
-75: import { toProvJsonLd } from '../domain/prov-o.js';
-76: import { consolidateConversationProfile } from '../app/memory.js';
-77: import { EvidenceRelation, EvidenceRelationType } from '../domain/evidence.js';
-78: import { diagnosticityScores, removalSensitivity } from '../domain/ach.js';
-79: import { canonicalSha256 } from '../shared/crypto.js';
-80: import { deriveNextActions, projectScientificState } from '../domain/index.js';
-81: import { projectStateDeltas } from '../domain/state-delta.js';
-82: import { experimentLegStatus } from '../app/iteration.js';
-83: import { checkPlanExecutability } from '../pipeline/stages/plan.js';
-84: 
-85: /**
-86:  * Versioned HTTP API over the single application kernel (zero framework: native http +
-87:  * hand-rolled routing, matching the workspace's zero-dependency style). Long-running runs
-88:  * follow the create-and-poll model: POST returns 202 immediately, progress is observable
-89:  * via GET /runs/:id and the append-only event stream — no fake progress, no SSE.
-90:  *
-91:  * Semantics mirror the CLI exactly (src/cli/main.ts is the behavioral reference):
-92:  * feedback validation, cancel, resume and report retrieval use the same domain rules.
-93:  * Errors always use the shared envelope: {error:{code, message, retryable, runId?}}.
-94:  */
-95: 
-96: export interface ApiServerError {
-97:   code: 'not_found' | 'validation' | 'already_running' | 'run_active' | 'not_started' | 'internal' | 'target_not_found' | 'question_required' | 'action_model_failed' | 'action_budget_exhausted' | 'invalid_action_request' | 'invalid_counter_search' | 'provider_unreachable' | 'conversation_model_failed' | 'conversation_full' | 'turn_in_flight' | 'no_corpus' | 'session_stopped' | 'src_not_in_pool' | 'run_not_found' | 'already_launched' | 'scope_proposal_failed' | 'scope_proposal_unavailable' | 'lease_held' | 'feature_disabled' | 'terminal_limit' | 'terminal_not_writable';
-98:   message: string;
-99:   retryable: boolean;
---- lines 854..883 (hit at 866) ---
-854:       relations,
-855:       hypotheses,
-856:       scorecards,
-857:       evidenceBodies: app.store.listObjects('evidence_body', runId),
-858:       tournament: app.store.listObjects('tournament', runId).at(-1) ?? null,
-859:       counterQueriesAttempted: corpus?.queries.filter((q) => q.purpose === 'counter_evidence').length ?? 0,
-860:       hypothesesStageConcluded: run.stages.some(
-861:         (st) => st.stage === 'generate_hypotheses' && st.state !== 'pending' && st.state !== 'running',
-862:       ),
-863:     });
-864: 
-865:     const plan = app.store.listObjects('plan', runId).at(-1) ?? null;
-866:     const leg = experimentLegStatus(app.store, runId);
-867:     const hypothesisIds = new Set(hypotheses.map((h) => h.id));
-868:     const executabilityPassed = plan !== null && checkPlanExecutability(plan, hypothesisIds).passed
-869:       // Structural executability is NOT enough for an actionable EXECUTE: the honest
-870:       // executor also requires a resolvable path (public dataset, or a literature/meta
-871:       // mapping). A wet-lab/private-data plan must not promise a runnable experiment.
-872:       && plan.dataRequirements.some((d) => d.availability === 'public');
-873:     const revisions = app.store.listObjects('revision', runId);
-874:     const consumed = new Set(revisions.map((r) => r.triggerFeedbackId));
-875:     const unconsumedFeedbackCount = app.store
-876:       .listObjects('feedback', runId)
-877:       .filter((s) => !consumed.has(s.id)).length;
-878:     const nextActions = deriveNextActions({
-879:       runId,
-880:       runStatus: run.status,
-881:       state,
-882:       leg: {
-883:         kind: leg.kind,
---- lines 933..962 (hit at 945) ---
-933:       throw validation(
-934:         `actionType '${actionType}' has no automated dispatch path — ` +
-935:           'loop-unblocking actions only (EXECUTE_PLANNED_EXPERIMENT / CONSUME_FEEDBACK_INTO_REVISION / RESUME_EVIDENCE_DEBT); ' +
-936:           'RERUN_WITH_LIVE_ROUTE goes through POST /runs with the same question',
-937:       );
-938:     }
-939:     if (run.status === 'running') throw alreadyRunning(runId);
-940: 
-941:     if (actionType === 'EXECUTE_PLANNED_EXPERIMENT') {
-942:       const plan = app.store.listObjects('plan', runId).at(-1) ?? null;
-943:       const hypothesisIds = new Set(app.store.listObjects('hypothesis', runId).map((h) => h.id));
-944:       const executabilityPassed = plan !== null && checkPlanExecutability(plan, hypothesisIds).passed;
-945:       const leg = experimentLegStatus(app.store, runId);
-946:       if (!(leg.kind === 'unexecuted' || leg.kind === 'plan_revised_since_experiment') || !executabilityPassed) {
-947:         throw validation(
-948:           `cannot dispatch EXECUTE_PLANNED_EXPERIMENT: leg=${leg.kind}, executabilityPassed=${executabilityPassed} — the plan must be executable and unexecuted (or revised since the last experiment)`,
-949:         );
-950:       }
-951:       await app.orchestrator.reopenStages(runId, ['execute', 'feedback', 'revise', 'export'], `action:${actionType}`);
-952:     } else if (actionType === 'CONSUME_FEEDBACK_INTO_REVISION') {
-953:       const revisions = app.store.listObjects('revision', runId);
-954:       const consumed = new Set(revisions.map((r) => r.triggerFeedbackId));
-955:       const unconsumed = app.store.listObjects('feedback', runId).filter((s) => !consumed.has(s.id)).length;
-956:       if (unconsumed === 0) throw validation('cannot dispatch CONSUME_FEEDBACK_INTO_REVISION: no unconsumed feedback signals');
-957:       await app.orchestrator.reopenStages(runId, ['feedback', 'revise', 'export'], `action:${actionType}`);
-958:     } else {
-959:       const hasDebt = app.store.listObjects('source_document', runId).some((d) => d.verification === undefined);
-960:       if (!hasDebt) throw validation('cannot dispatch RESUME_EVIDENCE_DEBT: every source document is already verified');
-961:       await app.orchestrator.reopenStages(runId, ['verify_sources', 'build_evidence', 'export'], `action:${actionType}`);
-962:     }
-
-===== context around every occurrence of "experiments/:specId/approve" =====
-occurrences: 1
---- lines 2279..2308 (hit at 2291) ---
+--- lines 2279..2314 (hit at 2293) ---
 2279:               throw new HttpError(e.status, {
 2280:                 code: e.code,
 2281:                 message: e.message,
@@ -259,10 +135,306 @@ occurrences: 1
 2306:         mustGetRun(runId);
 2307:         sendJson(res, 200, buildLineageGraph({ store: app.store, rootRunId: runId }));
 2308:         return;
+2309:       }
+2310:       if (segments.length === 5 && segments[4] === 'supervision' && method === 'GET') {
+2311:         // AVO fusion G2 projection: current supervisor analysis (fresh, not a
+2312:         // stored snapshot) so UX shows the live trajectory health. Read-only.
+2313:         mustGetRun(runId);
+2314:         sendJson(res, 200, analyzeTrajectory({ store: app.store, runId }));
 
-===== context around every occurrence of "terminal" =====
-occurrences: 23
---- lines 34..63 (hit at 46) ---
+===== context around every occurrence of "experiments/:specId/approve" =====
+occurrences: 1
+--- lines 2277..2312 (hit at 2291) ---
+2277:           } catch (e) {
+2278:             if (e instanceof ClaimOpError) {
+2279:               throw new HttpError(e.status, {
+2280:                 code: e.code,
+2281:                 message: e.message,
+2282:                 retryable: false,
+2283:                 ...(e.code === 'not_found' ? { runId } : {}),
+2284:               });
+2285:             }
+2286:             throw e;
+2287:           }
+2288:         }
+2289:         throw notFound(`no route: ${method} ${url.pathname}`);
+2290:       }
+2291:       // (POST /runs/:id/experiments/:specId/approve removed 2026-08-29: zero
+2292:       // product callers — approval goes through `far experiment approve` /
+2293:       // experiment-ops directly; the route's untested HTTP surface carried
+2294:       // validation risk with no user.)
+2295:       if (segments.length === 5 && segments[4] === 'evaluations' && method === 'GET') {
+2296:         // AVO fusion G8 projection: the deterministic evaluator family over this
+2297:         // run's scientific state (multi-dimensional, no invented single score).
+2298:         mustGetRun(runId);
+2299:         sendJson(res, 200, { runId, evaluations: runEvaluators({ store: app.store, runId, now: new Date().toISOString() }) });
+2300:         return;
+2301:       }
+2302:       if (segments.length === 5 && segments[4] === 'lineage' && method === 'GET') {
+2303:         // AVO fusion G3 projection: the queryable research trajectory graph
+2304:         // (run revision family + hypotheses + evidence + causal revisions).
+2305:         // Read-only over the store; 404s honestly when the run does not exist.
+2306:         mustGetRun(runId);
+2307:         sendJson(res, 200, buildLineageGraph({ store: app.store, rootRunId: runId }));
+2308:         return;
+2309:       }
+2310:       if (segments.length === 5 && segments[4] === 'supervision' && method === 'GET') {
+2311:         // AVO fusion G2 projection: current supervisor analysis (fresh, not a
+2312:         // stored snapshot) so UX shows the live trajectory health. Read-only.
+
+===== context around every occurrence of "readJson" =====
+occurrences: 32
+--- lines 361..396 (hit at 375) ---
+361:           return;
+362:         }
+363:         if (!overflowed) chunks.push(chunk);
+364:       });
+365:       req.on('end', () => {
+366:         if (overflowed) {
+367:           reject(validation(`request body exceeds the ${MAX_BODY_BYTES}-byte limit`));
+368:         } else {
+369:           resolve(Buffer.concat(chunks));
+370:         }
+371:       });
+372:       req.on('error', (e: Error) => reject(validation(`request body read failed: ${e.message}`)));
+373:     });
+374: 
+375:   const readJsonObject = async (req: http.IncomingMessage): Promise<Record<string, unknown>> => {
+376:     const body = (await readBody(req)).toString('utf8');
+377:     if (body.trim().length === 0) throw validation('request body required: a JSON object');
+378:     let parsed: unknown;
+379:     try {
+380:       parsed = JSON.parse(body);
+381:     } catch (e) {
+382:       throw validation(`request body is not valid JSON: ${e instanceof Error ? e.message : String(e)}`);
+383:     }
+384:     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+385:       throw validation('request body must be a JSON object');
+386:     }
+387:     return parsed as Record<string, unknown>;
+388:   };
+389: 
+390:   // ---- run lookups ----
+391: 
+392:   const mustGetRun = (runId: string) => {
+393:     const run = app.store.getRun(runId);
+394:     if (!run) throw notFound(`run not found: ${runId}`, runId);
+395:     return run;
+396:   };
+--- lines 663..698 (hit at 677) ---
+663:       }
+664:       year = rec.year;
+665:     }
+666:     let authors: string[] = [];
+667:     if (rec.authors !== undefined) {
+668:       if (!Array.isArray(rec.authors) || rec.authors.some((a) => typeof a !== 'string')) return `seeds[${i}].authors: string array`;
+669:       authors = (rec.authors as string[]).slice(0, 20).map((a) => a.slice(0, 200));
+670:     }
+671:     out.push({ title, identifiers, ...(text !== undefined ? { text } : {}), ...(year !== undefined ? { year } : {}), authors });
+672:   }
+673:   return out;
+674: }
+675: 
+676:   const createRun = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
+677:     const body = await readJsonObject(req);
+678:     const runId = await createRunWithSeeds(body);
+679:     sendJson(res, 202, { runId, ...(body.draft === true ? { draft: true } : {}) });
+680:   };
+681: 
+682:   /**
+683:    * Shared run-creation core (POST /runs and conversation launch): question
+684:    * validation, optional model route, seed ingestion and async start. With
+685:    * draft:true (§8.2) the run + seeds persist but execution does NOT start —
+686:    * scope-proposal / PATCH question / resume complete the pre-launch journey.
+687:    */
+688:   const createRunWithSeeds = async (body: Record<string, unknown>): Promise<string> => {
+689:     const { text, domain, goalType } = body as { text?: unknown; domain?: unknown; goalType?: unknown };
+690:     if (body.draft !== undefined && typeof body.draft !== 'boolean') {
+691:       throw validation('field "draft" must be a boolean when given');
+692:     }
+693:     if (typeof text !== 'string' || text.trim().length === 0) {
+694:       throw validation('field "text" is required (non-empty string: the research question)');
+695:     }
+696:     const dom = domain === undefined ? 'unspecified' : domain;
+697:     if (typeof dom !== 'string' || dom.trim().length === 0) {
+698:       throw validation('field "domain" must be a non-empty string when given');
+--- lines 913..948 (hit at 927) ---
+913:       unconsumedFeedbackCount,
+914:     });
+915:   };
+916: 
+917:   /**
+918:    * Product Spine action dispatch (2026-08-28): POST /runs/:id/dispatch maps a
+919:    * NextResearchAction onto a REAL orchestrator operation — targeted stage
+920:    * reopen + immediate execution. Only actions with genuine machinery are
+921:    * dispatchable (loop-unblocking legs); science actions with no automated
+922:    * affordance are REJECTED honestly (422) — never a fake resume button.
+923:    */
+924:   const dispatchAction = async (req: http.IncomingMessage, res: http.ServerResponse, runId: string): Promise<void> => {
+925:     const run = mustGetRun(runId);
+926:     if (executing.has(runId)) throw alreadyRunning(runId);
+927:     const body = await readJsonObject(req);
+928:     const actionType = typeof body['actionType'] === 'string' ? body['actionType'] : '';
+929:     const DISPATCHABLE = new Set([
+930:       'EXECUTE_PLANNED_EXPERIMENT', 'CONSUME_FEEDBACK_INTO_REVISION', 'RESUME_EVIDENCE_DEBT',
+931:     ]);
+932:     if (!DISPATCHABLE.has(actionType)) {
+933:       throw validation(
+934:         `actionType '${actionType}' has no automated dispatch path — ` +
+935:           'loop-unblocking actions only (EXECUTE_PLANNED_EXPERIMENT / CONSUME_FEEDBACK_INTO_REVISION / RESUME_EVIDENCE_DEBT); ' +
+936:           'RERUN_WITH_LIVE_ROUTE goes through POST /runs with the same question',
+937:       );
+938:     }
+939:     if (run.status === 'running') throw alreadyRunning(runId);
+940: 
+941:     if (actionType === 'EXECUTE_PLANNED_EXPERIMENT') {
+942:       const plan = app.store.listObjects('plan', runId).at(-1) ?? null;
+943:       const hypothesisIds = new Set(app.store.listObjects('hypothesis', runId).map((h) => h.id));
+944:       const executabilityPassed = plan !== null && checkPlanExecutability(plan, hypothesisIds).passed;
+945:       const leg = experimentLegStatus(app.store, runId);
+946:       if (!(leg.kind === 'unexecuted' || leg.kind === 'plan_revised_since_experiment') || !executabilityPassed) {
+947:         throw validation(
+948:           `cannot dispatch EXECUTE_PLANNED_EXPERIMENT: leg=${leg.kind}, executabilityPassed=${executabilityPassed} — the plan must be executable and unexecuted (or revised since the last experiment)`,
+--- lines 1285..1320 (hit at 1299) ---
+1285:    * merge is validated through the domain schema (single owner) and audited.
+1286:    */
+1287:   const editRunQuestion = async (req: http.IncomingMessage, res: http.ServerResponse, runId: string): Promise<void> => {
+1288:     const run = mustGetRun(runId);
+1289:     if (run.status !== 'created' && run.status !== 'paused') {
+1290:       throw new HttpError(409, {
+1291:         code: 'already_launched',
+1292:         message: `the question is editable only before launch (status 'created' or 'paused'; got '${run.status}') — running/closed runs revise via the feedback chain`,
+1293:         retryable: false,
+1294:         runId,
+1295:       });
+1296:     }
+1297:     const question = app.store.getObject('question', run.questionId);
+1298:     if (question === null) throw notFound(`question not found for run ${runId}: ${run.questionId}`, runId);
+1299:     const body = await readJsonObject(req);
+1300: 
+1301:     const changedFields: string[] = [];
+1302:     const next: Record<string, unknown> = { ...question };
+1303: 
+1304:     if (body.text !== undefined) {
+1305:       if (typeof body.text !== 'string' || body.text.trim().length === 0) {
+1306:         throw validation('field "text" must be a non-empty string');
+1307:       }
+1308:       if (body.text !== question.text) changedFields.push('text');
+1309:       next.text = body.text;
+1310:     }
+1311:     if (body.goalType !== undefined) {
+1312:       const parsedGoal = ScientificGoalType.safeParse(body.goalType);
+1313:       if (!parsedGoal.success) {
+1314:         throw validation(`invalid goalType "${String(body.goalType)}" — must be one of: ${ScientificGoalType.options.join(', ')}`);
+1315:       }
+1316:       if (parsedGoal.data !== question.goalType) changedFields.push('goalType');
+1317:       next.goalType = parsedGoal.data;
+1318:     }
+1319:     if (body.scope !== undefined) {
+1320:       const s = body.scope as Record<string, unknown>;
+--- lines 1351..1386 (hit at 1365) ---
+1351:     const edited = ResearchQuestion.parse(next);
+1352:     app.store.putObject('question', edited);
+1353:     app.store.appendEvent(runId, {
+1354:       type: 'note',
+1355:       detail: { reason: 'question_edited_human', questionId: edited.id, changedFields, actor: 'human' },
+1356:     });
+1357:     sendJson(res, 200, { questionId: edited.id, changedFields, question: edited });
+1358:   };
+1359: 
+1360:   const receiveFeedback = async (
+1361:     req: http.IncomingMessage,
+1362:     res: http.ServerResponse,
+1363:     runId: string,
+1364:   ): Promise<void> => {
+1365:     const body = await readJsonObject(req);
+1366:     const { source, content, targetKind, targetId } = body as {
+1367:       source?: unknown;
+1368:       content?: unknown;
+1369:       targetKind?: unknown;
+1370:       targetId?: unknown;
+1371:     };
+1372:     if (typeof source !== 'string') {
+1373:       throw validation(`field "source" is required — must be one of: ${FeedbackSourceKind.options.join(', ')}`);
+1374:     }
+1375:     const parsedSource = FeedbackSourceKind.safeParse(source);
+1376:     if (!parsedSource.success) {
+1377:       throw validation(`invalid source "${source}" — must be one of: ${FeedbackSourceKind.options.join(', ')}`);
+1378:     }
+1379:     if (typeof content !== 'string' || content.trim().length === 0) {
+1380:       throw validation('field "content" is required (non-empty string)');
+1381:     }
+1382:     if ((targetKind === undefined) !== (targetId === undefined)) {
+1383:       throw validation('targetKind and targetId must be given together');
+1384:     }
+1385:     mustGetRun(runId); // 404 before any persistence — same order as the CLI
+1386:     let target: { kind: string; id: string } | undefined;
+--- lines 1447..1482 (hit at 1461) ---
+1447:     // the report — "what this bundle cannot reproduce" is part of the verdict.
+1448:     const bundle = app.store.getObject('bundle', bundleId);
+1449:     const limitations = bundle?.limitations.filter((l) => l.trim().length > 0) ?? [];
+1450:     sendJson(res, 200, { ...report, ...(limitations.length > 0 ? { limitations } : {}) });
+1451:   };
+1452: 
+1453:   // ---- MULTIMODAL ingest (2026-08-24): deterministic artifact understanding ----
+1454:   // POST /api/v1/ingest — one endpoint, two producer shapes:
+1455:   //   { kind: 'pdf_text', fileName, payload }  ← web pdfjs collector output
+1456:   //   { kind: 'text', fileName, text }         ← server-side parse by extension
+1457:   // Returns the SDM (or dataset profile), its immutable artifact ref, and the
+1458:   // seeds-pipeline text projection. Failures are 422 with precise field errors.
+1459: 
+1460:   const ingestRoute = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
+1461:     const body = await readJsonObject(req);
+1462:     const kind = body['kind'];
+1463:     const fileName = typeof body['fileName'] === 'string' ? body['fileName'] : '';
+1464:     if (typeof fileName !== 'string' || fileName.length === 0 || fileName.length > 300 || fileName.includes('/') || fileName.includes('\\') || fileName.includes('\0')) {
+1465:       throw validation('ingest: fileName must be a 1-300 char basename (no path separators)');
+1466:     }
+1467:     // Shared response for both producers of dataset profiles (text/csv|tsv and bytes/xlsx).
+1468:     const sendDatasetProfile = async (profile: DatasetProfileDoc): Promise<void> => {
+1469:       const artifactRef = await persistDatasetProfile(app.artifacts, profile);
+1470:       sendJson(res, 200, {
+1471:         artifactRef,
+1472:         type: 'dataset_profile',
+1473:         profile: {
+1474:           schemaVersion: profile.schemaVersion,
+1475:           format: profile.format,
+1476:           rowCount: profile.rowCount,
+1477:           columnCount: profile.columnCount,
+1478:           columns: profile.columns.map((c) => ({ name: c.name, inferredType: c.inferredType, missingCount: c.missingCount, ...(c.unitHint !== undefined ? { unitHint: c.unitHint } : {}), significanceNotation: c.significanceNotation })),
+1479:           quality: profile.quality,
+1480:           diagnostics: profile.diagnostics,
+1481:         },
+1482:       });
+
+===== context around every occurrence of "editHypothesis" =====
+occurrences: 2
+--- lines 9..44 (hit at 23) ---
+9: import { PROVIDER_TEMPLATES } from '../providers/catalog.js';
+10: import {
+11:   BuiltinRoutePrice, builtinDefaultName, builtinModelIdFor, envModelIdFor,
+12:   readBuiltinOverrides, setBuiltinDefaultName, writeBuiltinOverrides,
+13: } from '../providers/builtin-overrides.js';
+14: import { createCustomProvider } from '../providers/custom.js';
+15: import { analyzeTrajectory } from '../app/supervisor.js';
+16: import { runTruthProfile } from '../app/truth-profile.js';
+17: import { RunLeaseHeldError } from '../app/orchestrator.js';
+18: import { runCounterSearch, CounterSearchError } from './counter-search.js';
+19: import { buildZip, type ZipEntry } from './zip.js';
+20: import { buildLineageGraph } from '../app/lineage.js';
+21: import { runEvaluators } from '../app/evaluators.js';
+22: import { runResearchAction, ActionError } from './actions.js';
+23: import { connectClaim, editHypothesis, forkHypothesis, HypothesisOpError, promoteHypothesis, rejectHypothesis } from './hypothesis-ops.js';
+24: import {
+25:   annotateClaim, ClaimOpError, excludeClaim, excludedClaimIdsOf, pinClaim, reclassifyClaim, reinstateClaim,
+26: } from './claim-ops.js';
+27: import { ACTIVE_MODEL_CONFIG_META_KEY, readCompetitionRouteMode, writeCompetitionRouteMode } from '../app/provider-resolver.js';
+28: import { discoverModels } from '../providers/discovery.js';
+29: import { ingestPdfTextPayload, ingestSdm, ingestTextToSdm, ingestBytes, persistDatasetProfile, loadSdmByRef, loadDatasetProfileByRef, ingestSvgPlot, loadPlotPointsByRef, jsonRefusalReason, type IngestOutcome } from '../ingest/service.js';
+30: import type { DatasetProfileDoc } from '../ingest/dataset.js';
+31: import { fetchZoteroAnnotations, fetchZoteroLibrary, ZoteroUnavailableError } from './zotero.js';
+32: import {
+33:   buildScreeningView,
 34:   getOrCreateScreeningSession,
 35:   recordScreeningDecision,
 36:   ScreeningError,
@@ -274,242 +446,197 @@ occurrences: 23
 42:   renameConversation, resolveConversationProposal, resolveConversationReasoningRoute, retryConversationTurn,
 43:   setConversationReasoningGear, ConversationError, type ConversationDeps,
 44: } from './conversations.js';
-45: import { startAutomationEngine, type AutomationEngine } from './automations.js';
-46: import { TerminalManager } from './terminal.js';
-47: import { resolveInsideRoot } from '../agent/capabilities/workspace-tools.js';
-48: import { aggregateRunUsage, aggregateWorkspaceUsage } from '../app/usage-ledger.js';
-49: import { workspaceSpendStatus, writeSpendLimit } from '../app/spend-limit.js';
-50: import {
-51:   ConversationSchema,
-52:   FeedbackSignal,
-53:   FeedbackSourceKind,
-54:   ModelProviderConfig,
-55:   ObjectRef,
-56:   ProviderWireProtocol,
-57:   ResearchQuestion,
-58:   ScientificGoalType,
-59:   SourceDocument,
-60:   ToolIntegrationSchema,
-61:   calibrationReport,
-62:   integrationSemanticIssues,
-63:   maskApiKey,
---- lines 85..114 (hit at 97) ---
-85: /**
-86:  * Versioned HTTP API over the single application kernel (zero framework: native http +
-87:  * hand-rolled routing, matching the workspace's zero-dependency style). Long-running runs
-88:  * follow the create-and-poll model: POST returns 202 immediately, progress is observable
-89:  * via GET /runs/:id and the append-only event stream — no fake progress, no SSE.
-90:  *
-91:  * Semantics mirror the CLI exactly (src/cli/main.ts is the behavioral reference):
-92:  * feedback validation, cancel, resume and report retrieval use the same domain rules.
-93:  * Errors always use the shared envelope: {error:{code, message, retryable, runId?}}.
-94:  */
-95: 
-96: export interface ApiServerError {
-97:   code: 'not_found' | 'validation' | 'already_running' | 'run_active' | 'not_started' | 'internal' | 'target_not_found' | 'question_required' | 'action_model_failed' | 'action_budget_exhausted' | 'invalid_action_request' | 'invalid_counter_search' | 'provider_unreachable' | 'conversation_model_failed' | 'conversation_full' | 'turn_in_flight' | 'no_corpus' | 'session_stopped' | 'src_not_in_pool' | 'run_not_found' | 'already_launched' | 'scope_proposal_failed' | 'scope_proposal_unavailable' | 'lease_held' | 'feature_disabled' | 'terminal_limit' | 'terminal_not_writable';
-98:   message: string;
-99:   retryable: boolean;
-100:   runId?: string;
-101: }
-102: 
-103: export interface ApiServerOptions {
-104:   port?: number;
-105:   host?: string;
-106:   /**
-107:    * Test seam (NOT a product mock): injected run execution. Product default is
-108:    * orchestrator.execute; tests inject an immediately-resolving executor so the
-109:    * HTTP layer is exercised without live model/source routes. opts carries the
-110:    * §8.2 draft journey's stopAfter (scope-proposal runs scope only).
-111:    */
-112:   executor?: (runId: string, opts?: { stopAfter?: RunStageName }) => Promise<unknown>;
-113:   /**
-114:    * Test seam (NOT a product mock): per-family source-adapter resolver for the
---- lines 271..300 (hit at 283) ---
-271: 
-272:   // W8 S1 watchdog: frozen runs (status='running', lease expired) are detected within one
-273:   // poll cycle and adopted — execute() reclaims the expired lease and resume semantics
-274:   // (stage skip + step checkpoints) continue the run instead of abandoning paid work.
-275:   // An in-memory per-run backoff prevents a hot adoption loop when an adopted run keeps
-276:   // failing fast (dbos recovery_attempts pattern, embedded form).
-277:   const watchdogIntervalMs = opts.watchdogIntervalMs ?? 30_000;
-278:   const adoptionBackoffMs = Math.max(watchdogIntervalMs * 10, 60_000);
-279:   const lastAdoptedAt = new Map<string, number>();
-280:   let watchdogTimer: NodeJS.Timeout | null = null;
-281:   let automationEngine: AutomationEngine | null = null;
-282:   // Terminal sessions (extensibility lane): persistent login shells behind
-283:   // /api/v1/terminal/* — loopback workbench surface, FARLAB_TERMINAL=off kills it.
-284:   const terminals = new TerminalManager();
-285:   // Sweep-health visibility (WP2 F-007): a persistent store error would otherwise
-286:   // silently stop adoptions forever with only a stderr line — /health reports it.
-287:   let consecutiveSweepFailures = 0;
-288:   const sweepExpiredLeases = (): void => {
-289:     try {
-290:       const now = Date.now();
-291:       for (const stale of app.store.listExpiredLeaseRuns(new Date().toISOString())) {
-292:         if (executing.has(stale.id)) continue;
-293:         // Parking-intent guard: a run tagged 'parking:*' is a deliberately-stopped
-294:         // draft (scope proposal / CLI --stop-after) whose worker died before parking.
-295:         // Adoption would run the FULL pipeline behind the user's back — the exact
-296:         // harm the park-on-stopAfter fix closes for the non-crash path. The tag is
-297:         // cleared by the park transition or by a user-initiated resume.
-298:         if (stale.tags.some((t) => t.startsWith('parking:'))) continue;
-299:         const last = lastAdoptedAt.get(stale.id) ?? 0;
-300:         if (now - last < adoptionBackoffMs) continue;
---- lines 272..301 (hit at 284) ---
-272:   // W8 S1 watchdog: frozen runs (status='running', lease expired) are detected within one
-273:   // poll cycle and adopted — execute() reclaims the expired lease and resume semantics
-274:   // (stage skip + step checkpoints) continue the run instead of abandoning paid work.
-275:   // An in-memory per-run backoff prevents a hot adoption loop when an adopted run keeps
-276:   // failing fast (dbos recovery_attempts pattern, embedded form).
-277:   const watchdogIntervalMs = opts.watchdogIntervalMs ?? 30_000;
-278:   const adoptionBackoffMs = Math.max(watchdogIntervalMs * 10, 60_000);
-279:   const lastAdoptedAt = new Map<string, number>();
-280:   let watchdogTimer: NodeJS.Timeout | null = null;
-281:   let automationEngine: AutomationEngine | null = null;
-282:   // Terminal sessions (extensibility lane): persistent login shells behind
-283:   // /api/v1/terminal/* — loopback workbench surface, FARLAB_TERMINAL=off kills it.
-284:   const terminals = new TerminalManager();
-285:   // Sweep-health visibility (WP2 F-007): a persistent store error would otherwise
-286:   // silently stop adoptions forever with only a stderr line — /health reports it.
-287:   let consecutiveSweepFailures = 0;
-288:   const sweepExpiredLeases = (): void => {
-289:     try {
-290:       const now = Date.now();
-291:       for (const stale of app.store.listExpiredLeaseRuns(new Date().toISOString())) {
-292:         if (executing.has(stale.id)) continue;
-293:         // Parking-intent guard: a run tagged 'parking:*' is a deliberately-stopped
-294:         // draft (scope proposal / CLI --stop-after) whose worker died before parking.
-295:         // Adoption would run the FULL pipeline behind the user's back — the exact
-296:         // harm the park-on-stopAfter fix closes for the non-crash path. The tag is
-297:         // cleared by the park transition or by a user-initiated resume.
-298:         if (stale.tags.some((t) => t.startsWith('parking:'))) continue;
-299:         const last = lastAdoptedAt.get(stale.id) ?? 0;
-300:         if (now - last < adoptionBackoffMs) continue;
-301:         lastAdoptedAt.set(stale.id, now);
---- lines 447..476 (hit at 459) ---
-447:         close();
-448:       }
-449:     }, 1_000);
-450:     req.on('close', close);
-451:     res.on('error', close);
-452:   };
-453: 
-454:   /**
-455:    * Terminal SSE (extensibility lane): ring-buffer replay then live shell output.
-456:    * Same framing/lifetime contract as runEventStream; no cursor — the replay IS
-457:    * the resume (bounded ring, droppedChars disclosed on the first comment line).
-458:    */
-459:   const terminalEventStream = (req: http.IncomingMessage, res: http.ServerResponse, id: string): void => {
-460:     const onEvent = (event: { type: 'out'; data: string } | { type: 'exit'; code: number | null }): void => {
-461:       if (event.type === 'out') res.write(`event: terminal-out\ndata: ${JSON.stringify({ data: event.data })}\n\n`);
-462:       else {
-463:         res.write(`event: terminal-exit\ndata: ${JSON.stringify({ code: event.code })}\n\n`);
-464:         close();
-465:       }
-466:     };
-467:     res.writeHead(200, {
-468:       'Content-Type': 'text/event-stream; charset=utf-8',
-469:       'Cache-Control': 'no-cache',
-470:       Connection: 'keep-alive',
-471:       'X-Accel-Buffering': 'no',
-472:     });
-473:     res.write(': stream open\n\n');
-474:     let closed = false;
-475:     const close = (): void => {
-476:       if (closed) return;
---- lines 449..478 (hit at 461) ---
-449:     }, 1_000);
-450:     req.on('close', close);
-451:     res.on('error', close);
-452:   };
-453: 
-454:   /**
-455:    * Terminal SSE (extensibility lane): ring-buffer replay then live shell output.
-456:    * Same framing/lifetime contract as runEventStream; no cursor — the replay IS
-457:    * the resume (bounded ring, droppedChars disclosed on the first comment line).
-458:    */
-459:   const terminalEventStream = (req: http.IncomingMessage, res: http.ServerResponse, id: string): void => {
-460:     const onEvent = (event: { type: 'out'; data: string } | { type: 'exit'; code: number | null }): void => {
-461:       if (event.type === 'out') res.write(`event: terminal-out\ndata: ${JSON.stringify({ data: event.data })}\n\n`);
-462:       else {
-463:         res.write(`event: terminal-exit\ndata: ${JSON.stringify({ code: event.code })}\n\n`);
-464:         close();
-465:       }
-466:     };
-467:     res.writeHead(200, {
-468:       'Content-Type': 'text/event-stream; charset=utf-8',
-469:       'Cache-Control': 'no-cache',
-470:       Connection: 'keep-alive',
-471:       'X-Accel-Buffering': 'no',
-472:     });
-473:     res.write(': stream open\n\n');
-474:     let closed = false;
-475:     const close = (): void => {
-476:       if (closed) return;
-477:       closed = true;
-478:       clearInterval(timer);
---- lines 451..480 (hit at 463) ---
-451:     res.on('error', close);
-452:   };
-453: 
-454:   /**
-455:    * Terminal SSE (extensibility lane): ring-buffer replay then live shell output.
-456:    * Same framing/lifetime contract as runEventStream; no cursor — the replay IS
-457:    * the resume (bounded ring, droppedChars disclosed on the first comment line).
-458:    */
-459:   const terminalEventStream = (req: http.IncomingMessage, res: http.ServerResponse, id: string): void => {
-460:     const onEvent = (event: { type: 'out'; data: string } | { type: 'exit'; code: number | null }): void => {
-461:       if (event.type === 'out') res.write(`event: terminal-out\ndata: ${JSON.stringify({ data: event.data })}\n\n`);
-462:       else {
-463:         res.write(`event: terminal-exit\ndata: ${JSON.stringify({ code: event.code })}\n\n`);
-464:         close();
-465:       }
-466:     };
-467:     res.writeHead(200, {
-468:       'Content-Type': 'text/event-stream; charset=utf-8',
-469:       'Cache-Control': 'no-cache',
-470:       Connection: 'keep-alive',
-471:       'X-Accel-Buffering': 'no',
-472:     });
-473:     res.write(': stream open\n\n');
-474:     let closed = false;
-475:     const close = (): void => {
-476:       if (closed) return;
-477:       closed = true;
-478:       clearInterval(timer);
-479:       clearTimeout(lifetime);
-480:       terminals.unsubscribe(id, onEvent);
---- lines 468..497 (hit at 480) ---
-468:       'Content-Type': 'text/event-stream; charset=utf-8',
-469:       'Cache-Control': 'no-cache',
-470:       Connection: 'keep-alive',
-471:       'X-Accel-Buffering': 'no',
-472:     });
-473:     res.write(': stream open\n\n');
-474:     let closed = false;
-475:     const close = (): void => {
-476:       if (closed) return;
-477:       closed = true;
-478:       clearInterval(timer);
-479:       clearTimeout(lifetime);
-480:       terminals.unsubscribe(id, onEvent);
-481:       res.end();
-482:     };
-483:     const timer = setInterval(() => { if (!closed) res.write(': ping\n\n'); }, 5_000);
-484:     const lifetime = setTimeout(close, 30 * 60_000);
-485:     const sub = terminals.subscribe(id, onEvent);
-486:     if (sub === null) {
-487:       res.write(`event: terminal-exit\ndata: ${JSON.stringify({ code: null, reason: 'session not found (expired or killed)' })}\n\n`);
-488:       close();
-489:       return;
-490:     }
-491:     if (sub.droppedChars > 0) res.write(`: ring evicted ${sub.droppedChars} older chars\n\n`);
-492:     req.on('close', close);
-493:     res.on('error', close);
-494:   };
-495: 
-496:   /** B2 universal search: cross-run lookup by researcher-meaningful text (question/hypothesis/claim). */
-497:   const search = (res: http.ServerResponse, url: URL): void => {
+--- lines 2224..2259 (hit at 2238) ---
+2224:           }
+2225:           throw e;
+2226:         }
+2227:         return;
+2228:       }
+2229:       if (segments.length === 7 && segments[4] === 'hypotheses') {
+2230:         const hypId = segments[5]!;
+2231:         const op = segments[6]!;
+2232:         if (method === 'POST' && (op === 'promote' || op === 'reject' || op === 'fork' || op === 'connect' || op === 'edit')) {
+2233:           const body = await readJsonObject(req);
+2234:           try {
+2235:             const result = op === 'promote' ? promoteHypothesis(app, runId, hypId, body)
+2236:               : op === 'reject' ? rejectHypothesis(app, runId, hypId, body)
+2237:               : op === 'fork' ? forkHypothesis(app, runId, hypId, body)
+2238:               : op === 'edit' ? await editHypothesis(app, runId, hypId, body)
+2239:               : connectClaim(app, runId, hypId, body);
+2240:             sendJson(res, 200, result);
+2241:             return;
+2242:           } catch (e) {
+2243:             if (e instanceof HypothesisOpError) {
+2244:               throw new HttpError(e.status, {
+2245:                 code: e.code,
+2246:                 message: e.message,
+2247:                 retryable: false,
+2248:                 ...(e.code === 'not_found' ? { runId } : {}),
+2249:               });
+2250:             }
+2251:             throw e;
+2252:           }
+2253:         }
+2254:         throw notFound(`no route: ${method} ${url.pathname}`);
+2255:       }
+2256: 
+2257:       // HX §15 evidence annotation/classification — researcher judgement ops on
+2258:       // claims, same ownership/audit discipline as hypothesis-ops above.
+2259:       if (segments.length === 7 && segments[4] === 'claims') {
 
-===== context around every occurrence of "handle(" =====
+===== context around every occurrence of "segments[4] === 'feedback'" =====
 occurrences: 0
+
+===== context around every occurrence of "segments[4] === 'supervision'" =====
+occurrences: 1
+--- lines 2296..2331 (hit at 2310) ---
+2296:         // AVO fusion G8 projection: the deterministic evaluator family over this
+2297:         // run's scientific state (multi-dimensional, no invented single score).
+2298:         mustGetRun(runId);
+2299:         sendJson(res, 200, { runId, evaluations: runEvaluators({ store: app.store, runId, now: new Date().toISOString() }) });
+2300:         return;
+2301:       }
+2302:       if (segments.length === 5 && segments[4] === 'lineage' && method === 'GET') {
+2303:         // AVO fusion G3 projection: the queryable research trajectory graph
+2304:         // (run revision family + hypotheses + evidence + causal revisions).
+2305:         // Read-only over the store; 404s honestly when the run does not exist.
+2306:         mustGetRun(runId);
+2307:         sendJson(res, 200, buildLineageGraph({ store: app.store, rootRunId: runId }));
+2308:         return;
+2309:       }
+2310:       if (segments.length === 5 && segments[4] === 'supervision' && method === 'GET') {
+2311:         // AVO fusion G2 projection: current supervisor analysis (fresh, not a
+2312:         // stored snapshot) so UX shows the live trajectory health. Read-only.
+2313:         mustGetRun(runId);
+2314:         sendJson(res, 200, analyzeTrajectory({ store: app.store, runId }));
+2315:         return;
+2316:       }
+2317:       if (segments.length === 5 && segments[4] === 'truth' && method === 'GET') {
+2318:         // Execution-truth projection (goal §5.5): deterministic receipt-derived
+2319:         // view of HOW this run executed (live / mixed / synthetic / recorded_replay),
+2320:         // incl. retrieval cache/replay composition. Read-only; receipts stay authoritative.
+2321:         mustGetRun(runId);
+2322:         sendJson(res, 200, runTruthProfile(app.store, runId));
+2323:         return;
+2324:       }
+2325:       if (segments.length === 5 && segments[4] === 'counter-search' && method === 'POST') {
+2326:         // §5.2 counter-evidence loop closure: execute ONE researcher-directed
+2327:         // counter-evidence search against the live source plane and grow the run
+2328:         // corpus (append-only snapshot versioning; receipts + events; lease-guarded).
+2329:         const body = await readJsonObject(req);
+2330:         try {
+2331:           sendJson(res, 201, await runCounterSearch(app, runId, body, opts.counterSearchSourceFor));
+
+===== context around every occurrence of "readBody" =====
+occurrences: 3
+--- lines 337..372 (hit at 351) ---
+337:   const sendError = (res: http.ServerResponse, err: HttpError): void =>
+338:     sendJson(res, err.status, { error: err.payload });
+339: 
+340:   const sendText = (res: http.ServerResponse, status: number, contentType: string, body: string): void => {
+341:     if (res.writableEnded) return;
+342:     res.writeHead(status, {
+343:       'Content-Type': contentType,
+344:       'Content-Length': Buffer.byteLength(body),
+345:     });
+346:     res.end(body);
+347:   };
+348: 
+349:   // ---- request body (cap 1MB, drain-and-reject on overflow) ----
+350: 
+351:   const readBody = (req: http.IncomingMessage): Promise<Buffer> =>
+352:     new Promise((resolve, reject) => {
+353:       const chunks: Buffer[] = [];
+354:       let received = 0;
+355:       let overflowed = false;
+356:       req.on('data', (chunk: Buffer) => {
+357:         received += chunk.length;
+358:         if (received > MAX_BODY_BYTES) {
+359:           overflowed = true;
+360:           chunks.length = 0; // stop buffering but keep draining so the response is deliverable
+361:           return;
+362:         }
+363:         if (!overflowed) chunks.push(chunk);
+364:       });
+365:       req.on('end', () => {
+366:         if (overflowed) {
+367:           reject(validation(`request body exceeds the ${MAX_BODY_BYTES}-byte limit`));
+368:         } else {
+369:           resolve(Buffer.concat(chunks));
+370:         }
+371:       });
+372:       req.on('error', (e: Error) => reject(validation(`request body read failed: ${e.message}`)));
+--- lines 362..397 (hit at 376) ---
+362:         }
+363:         if (!overflowed) chunks.push(chunk);
+364:       });
+365:       req.on('end', () => {
+366:         if (overflowed) {
+367:           reject(validation(`request body exceeds the ${MAX_BODY_BYTES}-byte limit`));
+368:         } else {
+369:           resolve(Buffer.concat(chunks));
+370:         }
+371:       });
+372:       req.on('error', (e: Error) => reject(validation(`request body read failed: ${e.message}`)));
+373:     });
+374: 
+375:   const readJsonObject = async (req: http.IncomingMessage): Promise<Record<string, unknown>> => {
+376:     const body = (await readBody(req)).toString('utf8');
+377:     if (body.trim().length === 0) throw validation('request body required: a JSON object');
+378:     let parsed: unknown;
+379:     try {
+380:       parsed = JSON.parse(body);
+381:     } catch (e) {
+382:       throw validation(`request body is not valid JSON: ${e instanceof Error ? e.message : String(e)}`);
+383:     }
+384:     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+385:       throw validation('request body must be a JSON object');
+386:     }
+387:     return parsed as Record<string, unknown>;
+388:   };
+389: 
+390:   // ---- run lookups ----
+391: 
+392:   const mustGetRun = (runId: string) => {
+393:     const run = app.store.getRun(runId);
+394:     if (!run) throw notFound(`run not found: ${runId}`, runId);
+395:     return run;
+396:   };
+397: 
+--- lines 2841..2876 (hit at 2855) ---
+2841:         });
+2842:       }
+2843:       throw notFound(`no route: ${method} ${url.pathname}`);
+2844:     }
+2845: 
+2846:     if (segments[2] === 'competition-route' && segments.length === 3) {
+2847:       // 11→12 handoff 2026-08-25: competition route gate switch (settings surface).
+2848:       // GET → current mode; PUT {on:boolean} → idempotent write. Semantics live in
+2849:       // provider-resolver (ON holds every resolved route to the official Qwen-via-Bailian
+2850:       // rule, fail-closed on violation; re-read per resolution so edits hit live runs).
+2851:       if (method === 'GET') {
+2852:         return sendJson(res, 200, { competitionRouteMode: readCompetitionRouteMode(app.store) ? 'on' : 'off' });
+2853:       }
+2854:       if (method === 'PUT') {
+2855:         const raw = (await readBody(req)).toString('utf8');
+2856:         let body: unknown;
+2857:         try { body = JSON.parse(raw); } catch { body = undefined; }
+2858:         if (typeof body !== 'object' || body === null || typeof (body as { on?: unknown }).on !== 'boolean') {
+2859:           throw new HttpError(400, { code: 'validation', message: 'PUT /api/v1/competition-route expects {"on": boolean}', retryable: false });
+2860:         }
+2861:         writeCompetitionRouteMode(app.store, (body as { on: boolean }).on);
+2862:         return sendJson(res, 200, { competitionRouteMode: (body as { on: boolean }).on ? 'on' : 'off' });
+2863:       }
+2864:       throw notFound(`no route: ${method} ${url.pathname}`);
+2865:     }
+2866: 
+2867:         if (segments[2] === 'health' && segments.length === 3 && method === 'GET') {
+2868:       return health(res);
+2869:     }
+2870: 
+2871:     if (segments[2] === 'meta' && segments.length === 3 && method === 'GET') {
+2872:       // Server/workspace facts for the settings About section: version + data
+2873:       // location. Env var NAMES and paths only — secret values never leave.
+2874:       let version = 'unknown';
+2875:       try {
+2876:         const pkgPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'package.json');
