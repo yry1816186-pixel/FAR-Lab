@@ -86,6 +86,9 @@ const setup = () => {
   return { store, run, plan };
 };
 
+// A VALID protocol draft the stub serves on purpose 'protocol-draft' — validity
+// matters for both paths: asLive registers it; without asLive a product run must
+// REFUSE it as template content (not fail it as garbage).
 const protocolDraftPayload = (plan: ResearchPlan): string =>
   JSON.stringify({
     feasible: true,
@@ -146,8 +149,7 @@ const protocolDraftPayload = (plan: ResearchPlan): string =>
     stopConditions: [{ kind: 'safety', detail: 'stop on cell venting' }],
   });
 
-// The tabular/meta drafters must ALSO skip for the protocol path to engage:
-// script them as infeasible first, then the protocol draft.
+// Both computational drafters are scripted infeasible so the protocol path engages.
 const infeasibleTabular = JSON.stringify({
   feasible: false,
   skipReason: 'Requires wet-lab impedance data; no public tabular dataset maps to this plan',
@@ -157,12 +159,13 @@ const infeasibleMeta = JSON.stringify({
   skipReason: 'No published exposure-vs-outcome contrast to pool for a bench-cycling question',
 });
 
-const makeCtx = (store: Store, run: ResearchRun, asLive: boolean, productRun: boolean): StageContext => ({
+const makeCtx = (store: Store, run: ResearchRun, plan: ResearchPlan, asLive: boolean, productRun: boolean): StageContext => ({
   run,
   store,
   artifacts: {
     async put(payload: string | Uint8Array) {
-      return { ref: 'sha256:' + '0'.repeat(64), hash: '0'.repeat(64), size: String(payload).length };
+      const s = typeof payload === 'string' ? payload : new TextDecoder().decode(payload);
+      return { ref: 'sha256:' + '0'.repeat(64), hash: '0'.repeat(64), size: s.length };
     },
     async get() {
       return null;
@@ -173,7 +176,7 @@ const makeCtx = (store: Store, run: ResearchRun, asLive: boolean, productRun: bo
     [
       { rawOutput: infeasibleTabular, forPurpose: 'experiment-spec-draft' },
       { rawOutput: infeasibleMeta, forPurpose: 'meta-spec-draft' },
-      { rawOutput: '__PROTOCOL__', forPurpose: 'protocol-draft' },
+      { rawOutput: protocolDraftPayload(plan), forPurpose: 'protocol-draft' },
     ],
     { asLive },
   ),
@@ -188,16 +191,7 @@ const makeCtx = (store: Store, run: ResearchRun, asLive: boolean, productRun: bo
 describe('execute stage: protocol fallback (paradigm-honest execution)', () => {
   it('registers a frozen protocol + empty awaiting-human ledger when both computational legs skip (live)', async () => {
     const { store, run, plan } = setup();
-    const provider = createTestStubProvider(
-      [
-        { rawOutput: infeasibleTabular, forPurpose: 'experiment-spec-draft' },
-        { rawOutput: infeasibleMeta, forPurpose: 'meta-spec-draft' },
-        { rawOutput: protocolDraftPayload(plan), forPurpose: 'protocol-draft' },
-      ],
-      { asLive: true },
-    );
-    const ctx = { ...makeCtx(store, run, true, true), provider };
-    const out = await executeStage.execute(ctx);
+    const out = await executeStage.execute(makeCtx(store, run, plan, true, true));
     expect(out.kind).toBe('done');
     expect(out.kind === 'done' && out.summary).toContain('no machine execution claimed');
     const protocols = store.listObjects('protocol', run.id);
@@ -210,8 +204,8 @@ describe('execute stage: protocol fallback (paradigm-honest execution)', () => {
   });
 
   it('a product run on the deterministic development wire is refused (template protocol is not science)', async () => {
-    const { store, run } = setup();
-    const out = await executeStage.execute(makeCtx(store, run, false, true));
+    const { store, run, plan } = setup();
+    const out = await executeStage.execute(makeCtx(store, run, plan, false, true));
     expect(out.kind).toBe('skipped');
     expect(out.kind === 'skipped' && out.reason.startsWith(TEMPLATE_REFUSAL_REASON)).toBe(true);
     expect(store.listObjects('protocol', run.id)).toHaveLength(0);
@@ -220,15 +214,7 @@ describe('execute stage: protocol fallback (paradigm-honest execution)', () => {
 
   it('registration is idempotent per plan hash — a second pass reports, never re-drafts', async () => {
     const { store, run, plan } = setup();
-    const provider = createTestStubProvider(
-      [
-        { rawOutput: infeasibleTabular, forPurpose: 'experiment-spec-draft' },
-        { rawOutput: infeasibleMeta, forPurpose: 'meta-spec-draft' },
-        { rawOutput: protocolDraftPayload(plan), forPurpose: 'protocol-draft' },
-      ],
-      { asLive: true },
-    );
-    const ctx = { ...makeCtx(store, run, true, true), provider };
+    const ctx = makeCtx(store, run, plan, true, true);
     await executeStage.execute(ctx);
     const second = await executeStage.execute(ctx);
     expect(second.kind).toBe('done');
@@ -238,15 +224,7 @@ describe('execute stage: protocol fallback (paradigm-honest execution)', () => {
 
   it('iteration: a registered protocol stops machine rounds and surfaces the human unblock path', async () => {
     const { store, run, plan } = setup();
-    const provider = createTestStubProvider(
-      [
-        { rawOutput: infeasibleTabular, forPurpose: 'experiment-spec-draft' },
-        { rawOutput: infeasibleMeta, forPurpose: 'meta-spec-draft' },
-        { rawOutput: protocolDraftPayload(plan), forPurpose: 'protocol-draft' },
-      ],
-      { asLive: true },
-    );
-    await executeStage.execute({ ...makeCtx(store, run, true, true), provider });
+    await executeStage.execute(makeCtx(store, run, plan, true, true));
 
     const leg = experimentLegStatus(store, run.id);
     expect(leg.kind).toBe('unexecuted'); // union unchanged — protocol awareness lives in the controller
@@ -260,8 +238,6 @@ describe('execute stage: protocol fallback (paradigm-honest execution)', () => {
   it('without a protocol the unexecuted leg still re-arms (compatibility control)', () => {
     const { store, run } = setup();
     const decision = evaluateIteration({ store, runId: run.id, round: 1, budget: makeRunBudget(store, run.id) });
-    // the fixture plan fails no checks the controller honors differently — the
-    // executable_plan_unexecuted trigger fires exactly as before this change
     expect(decision.decision).toBe('continue');
     expect(decision.record.continueTrigger?.kind).toBe('executable_plan_unexecuted');
   });
