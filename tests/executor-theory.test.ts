@@ -262,9 +262,11 @@ describe('theory executor (real sidecar)', () => {
 describe('execute stage routing: ML and literature infeasible fall through to the theory leg', () => {
   it('runs a theory identity experiment end-to-end (exploratory, real sidecar)', async () => {
     const { store, runId, artifacts } = makeEnv();
+    const hyp = makeHyp(runId);
+    store.putObject('hypothesis', hyp);
     const plan = ResearchPlan.parse({
       id: newId('pln'), runId, objective: 'Verify the derived closed-form identity for the transfer function.',
-      hypothesisIds: [],
+      hypothesisIds: [hyp.id],
       steps: [{
         id: newId('task'), title: 'check the derived identity', kind: 'data_analysis',
         method: 'evaluate both sides of the claimed identity numerically and compare',
