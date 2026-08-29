@@ -2571,8 +2571,14 @@ select option { color: var(--text); background: var(--surface); }
 }
 .prov-quick-label { font-size: var(--fs-aux); color: var(--muted); }
 .prov-filter { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+/* Long-table orientation: the COLUMN header stays pinned while scrolling
+   (verify review P2); group rows stay static (one sticky layer, no overlap). */
+.data-table thead th {
+  position: sticky; top: 0; z-index: 3;
+  background: var(--surface);
+  box-shadow: inset 0 -1px 0 var(--border);
+}
 .receipt-group-row th {
-  position: sticky; top: 0;
   background: var(--surface-2); color: var(--text);
   font-size: var(--fs-aux); text-align: left; padding: 5px 10px;
   border-top: 1px solid var(--border);

@@ -298,10 +298,15 @@ function ReceiptRow({
         >
           {(() => { const k = r.stage !== undefined ? STAGE_KEYS[r.stage] : undefined; return k !== undefined ? t(k) : (r.stage ?? '—'); })()}
         </td>
-        <td className="mono small">
+        <td className="mono small" title={usageText ?? undefined}>
           {r.modelCall !== undefined ? `${r.modelCall.provider}/${r.modelCall.modelId}` : r.sourceRetrieval !== undefined ? r.sourceRetrieval.family : r.toolExec !== undefined ? r.toolExec.tool : '—'}
         </td>
-        <td className="mono">{r.modelCall?.latencyMs !== undefined ? `${r.modelCall.latencyMs}ms` : r.toolExec?.durationMs !== undefined ? `${r.toolExec.durationMs}ms` : '—'}</td>
+        <td
+          className="mono"
+          title={r.modelCall?.latencyMs === undefined && r.toolExec?.durationMs === undefined ? t('prov.noLatencyHint') : undefined}
+        >
+          {r.modelCall?.latencyMs !== undefined ? `${r.modelCall.latencyMs}ms` : r.toolExec?.durationMs !== undefined ? `${r.toolExec.durationMs}ms` : '—'}
+        </td>
         <td>{hashNode}</td>
         <td><TimeText iso={r.at} /></td>
         <td>
