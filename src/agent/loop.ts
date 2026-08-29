@@ -321,6 +321,7 @@ export async function runAgentLoop(cfg: AgentLoopConfig, deps: AgentLoopDeps): P
     deps.emit({
       type: 'model_call_done', sessionId: deps.sessionId, turn, latencyMs: res.receipt.latencyMs,
       ...(res.receipt.usage.totalTokens !== undefined ? { usage: res.receipt.usage } : {}), at: at(),
+      ...(res.thinking !== undefined ? { thinking: res.thinking } : {}),
     });
     // Step timeout (cooperative): the model call itself is bounded by the provider plane;
     // an over-deadline turn ends HERE instead of paying for a tool call it cannot finish.

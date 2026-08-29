@@ -48,6 +48,13 @@ export interface StructuredCallRequest {
 export interface StructuredCallResult<T> {
   ok: boolean;
   data?: T;
+  /**
+   * Thinking display (extensibility lane): the model's reasoning text when the
+   * wire carried it (OpenAI-compat reasoning_content, Anthropic thinking blocks,
+   * Gemini thought parts), capped at 8000 chars. Display-only — never fed back
+   * into prompts or receipts. Absent when the model/wire produced none.
+   */
+  thinking?: string;
   /** Structured failure — never silently converted to success. */
   error?: {
     kind: 'provider_error' | 'rate_limited' | 'invalid_output' | 'timeout' | 'auth_error' | 'quota_exceeded';

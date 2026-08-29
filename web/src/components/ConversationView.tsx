@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowUp, BookMarked, Brain, Check, Clock, Copy, Link2, Loader2, Paperclip, RotateCcw, Wrench, X, Zap } from 'lucide-react';
+import { ArrowUp, BookMarked, Brain, BrainCircuit, Check, Clock, Copy, Link2, Loader2, Paperclip, RotateCcw, Wrench, X, Zap } from 'lucide-react';
 import { useI18n } from '../i18n/LanguageContext';
 import type { DictKey } from '../i18n/dict';
 import { AttachIcon, DISPLAY_KIND, type AttachKind } from './common';
@@ -736,6 +736,14 @@ function MessageBubble({
           </>
         ) : (
           <div className="conv-md"><MarkdownDoc markdown={message.content} withOutline={false} /></div>
+        )}
+        {message.thinking !== undefined && message.thinking.length > 0 && (
+          <details className="conv-thinking">
+            <summary>
+              <BrainCircuit size={11} aria-hidden="true" /> {t('conv.thinking')}
+            </summary>
+            <pre className="conv-thinking-body mono">{message.thinking}</pre>
+          </details>
         )}
         {message.toolTrace !== undefined && message.toolTrace.length > 0 && (
           <details className="conv-tooltrace">

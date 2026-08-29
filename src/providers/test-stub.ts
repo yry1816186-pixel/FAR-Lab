@@ -21,6 +21,8 @@ import { computeRequestHash, extractJsonText, type ModelCallErrorKind, type Slee
 export interface StubStep {
   /** Raw model-output string the stub returns (JSON text, may include fences). */
   rawOutput?: string;
+  /** Thinking display (S4 test seam): reasoning text surfaced on the result. */
+  thinking?: string;
   /** Deterministic scripted latency (also reported as receipt.latencyMs). */
   delayMs?: number;
   /** Scripted structured failure (injected, never a real provider state). */
@@ -125,6 +127,7 @@ export function createTestStubProvider(steps: StubStep[], opts: TestStubOptions 
       return {
         ok: true,
         data: parsed,
+        ...(step.thinking !== undefined ? { thinking: step.thinking } : {}),
         receipt: {
           provider: name,
           modelId: 'test-stub',

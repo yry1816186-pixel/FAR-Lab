@@ -2398,6 +2398,11 @@ select option { color: var(--text); background: var(--surface); }
 
 /* ---- resident agent: tool trace, proposals, automations ---- */
 .conv-tooltrace { margin: var(--sp-1) 0 0; border-top: 1px dashed var(--v2-border); padding-top: var(--sp-1); }
+/* Thinking process accordion (extensibility lane): raw model reasoning, display-only */
+.conv-thinking { margin: var(--sp-1) 0 0; border-top: 1px dashed var(--v2-border); padding-top: var(--sp-1); }
+.conv-thinking summary { cursor: pointer; font-size: var(--fs-aux); color: var(--muted); display: inline-flex; align-items: center; gap: 4px; list-style: none; }
+.conv-thinking summary::-webkit-details-marker { display: none; }
+.conv-thinking-body { margin: var(--sp-1) 0 0; font-size: var(--fs-aux); white-space: pre-wrap; word-break: break-word; color: var(--v2-text-2); max-height: 260px; overflow: auto; background: var(--code-bg); border-radius: 6px; padding: 8px 10px; }
 .conv-tooltrace summary { cursor: pointer; font-size: var(--fs-aux); color: var(--muted); display: inline-flex; align-items: center; gap: 4px; list-style: none; }
 .conv-tooltrace summary::-webkit-details-marker { display: none; }
 .conv-tooltrace ul { list-style: none; margin: var(--sp-1) 0 0; padding: 0; display: grid; gap: 2px; font-size: var(--fs-aux); }

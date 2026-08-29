@@ -102,6 +102,12 @@ export const ConversationMessageSchema = z.object({
   /** Honest per-turn model usage summary (receipts stay run-scoped). */
   usage: MessageUsageSchema.optional(),
   /**
+   * Thinking display (extensibility lane): the model's reasoning text for this
+   * agent reply when the wire carried it (reasoning_content / thinking blocks).
+   * Display-only; never fed back into prompts. Absent = model/wire produced none.
+   */
+  thinking: z.string().max(12_000).optional(),
+  /**
    * researcher-message-only: why this message's agent reply failed (provider/
    * model error). The researcher's words are history — they persist even when
    * the turn fails; landing a reply (post-retry or re-run) clears this. Absent

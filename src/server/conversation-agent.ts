@@ -165,6 +165,8 @@ export interface ConversationTurnGeneration {
   toolTrace: ToolTrace[];
   usage?: ConversationTurnUsage;
   proposals: ConversationProposal[];
+  /** Thinking display (S4): the turn's model reasoning, joined and capped. */
+  thinking?: string;
   error?: string;
 }
 
@@ -482,6 +484,7 @@ export async function generateConversationTurn(
 ): Promise<ConversationTurnGeneration> {
   const proposals: ConversationProposal[] = [];
   const toolTrace: ToolTrace[] = [];
+  const thinkingParts: string[] = [];
   // 09→08 handoff 2026-08-25: the resident agent composes through the ONE
   // authoritative session assembly — researcher-enabled MCP servers, skills and
   // hook rules now join conversation sessions (read-class admission; refused or
@@ -542,6 +545,11 @@ export async function generateConversationTurn(
         ...(ev.summary !== undefined ? { summary: ev.summary.slice(0, 300) } : {}),
         durationMs: ev.durationMs,
       });
+    }
+    if (ev.type === 'model_call_done' && ev.thinking !== undefined) {
+      // Thinking display (S4): concatenate the turn's model reasoning for the
+      // message-level accordion (cap 12k; per-call cap is 8k in the provider).
+      thinkingParts.push(ev.thinking);
     }
   };
 
@@ -652,5 +660,8 @@ export async function generateConversationTurn(
     toolTrace,
     ...(usage !== undefined ? { usage } : {}),
     proposals,
+    ...(thinkingParts.length > 0
+      ? { thinking: thinkingParts.join('\n\n—\n\n').slice(0, 12_000) }
+      : {}),
   };
 }

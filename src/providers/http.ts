@@ -244,6 +244,8 @@ interface ClassifiedFailure {
 interface ChatSuccess {
   ok: true;
   rawContent: string;
+  /** Model reasoning text when the wire carries it (reasoning_content / thinking blocks / thought parts). */
+  reasoningText?: string;
   respondedModel?: string;
   finishReason?: string;
   usage: { promptTokens?: number; completionTokens?: number; totalTokens?: number };
@@ -876,9 +878,16 @@ const parseAnthropicSuccessBody = (bodyText: string, providerName: string): Chat
   const finishReason =
     stopReason === 'max_tokens' ? 'length' : stopReason === 'end_turn' || stopReason === 'stop_sequence' ? 'stop' : stopReason;
   const respondedModel = typeof record?.model === 'string' ? record.model : undefined;
+  // Thinking display (S4): Anthropic Messages thinking blocks (type 'thinking',
+  // field 'thinking') — the SAME blocks the thinking-only failure detector keys on.
+  const reasoningText = blocks
+    .filter((b): b is Record<string, unknown> => isRecord(b) && b['type'] === 'thinking')
+    .map((b) => (typeof b['thinking'] === 'string' ? b['thinking'] : ''))
+    .join('');
   return {
     ok: true,
     rawContent: text,
+    ...(reasoningText.length > 0 ? { reasoningText } : {}),
     ...(respondedModel !== undefined && respondedModel.length > 0 ? { respondedModel } : {}),
     ...(finishReason !== undefined ? { finishReason } : {}),
     usage,
@@ -987,9 +996,15 @@ const parseGeminiSuccessBody = (bodyText: string, providerName: string): ChatAtt
   const finishReason =
     finishReasonRaw === 'MAX_TOKENS' ? 'length' : finishReasonRaw === 'STOP' ? 'stop' : finishReasonRaw;
   const respondedModel = typeof record?.modelVersion === 'string' ? record.modelVersion : undefined;
+  // Thinking display (S4): Gemini 2.5 thought parts carry thought:true.
+  const reasoningText = parts
+    .filter((p): p is Record<string, unknown> => isRecord(p) && p['thought'] === true && typeof p['text'] === 'string')
+    .map((p) => p['text'] as string)
+    .join('');
   return {
     ok: true,
     rawContent: text,
+    ...(reasoningText.length > 0 ? { reasoningText } : {}),
     ...(respondedModel !== undefined && respondedModel.length > 0 ? { respondedModel } : {}),
     ...(finishReason !== undefined ? { finishReason } : {}),
     usage,
@@ -1037,9 +1052,15 @@ const parseSuccessBody = (bodyText: string, providerName: string): ChatAttempt =
   const usage = parseOpenAIUsage(record?.usage);
   const respondedModel = record?.model;
   const finishReason = choice0?.finish_reason;
+  // Thinking display (S4): GLM/Qwen/DeepSeek chat-completions expose the chain
+  // as message.reasoning_content (some gateways: message.reasoning). Captured
+  // verbatim, capped downstream — display-only, never fed back into prompts.
+  const reasoningRaw = message?.reasoning_content ?? message?.reasoning;
+  const reasoningText = typeof reasoningRaw === 'string' && reasoningRaw.length > 0 ? reasoningRaw : undefined;
   return {
     ok: true,
     rawContent,
+    ...(reasoningText !== undefined ? { reasoningText } : {}),
     ...(typeof respondedModel === 'string' && respondedModel.length > 0 ? { respondedModel } : {}),
     ...(typeof finishReason === 'string' ? { finishReason } : {}),
     usage,
@@ -1257,6 +1278,11 @@ export async function runOpenAICompatStructuredCall<T>(
           return {
             ok: true,
             data: parsed,
+            // Thinking display (S4): last attempt's reasoning, capped; absent when
+            // the model/wire did not produce any.
+            ...(attempt.reasoningText !== undefined && attempt.reasoningText.length > 0
+              ? { thinking: truncate(attempt.reasoningText, 8000) }
+              : {}),
             receipt: {
               provider: cfg.providerName,
               modelId: cfg.modelId,

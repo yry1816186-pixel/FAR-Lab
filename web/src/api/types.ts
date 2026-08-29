@@ -953,6 +953,8 @@ export interface ConversationMessage {
   seeds?: ConversationSeed[];
   candidates?: CandidateQuestion[];
   toolTrace?: ToolTraceEntry[];
+  /** Agent thinking text for this reply when the wire carried it (display-only). */
+  thinking?: string;
   proposals?: ConversationProposal[];
   usage?: {
     provider: string; modelId: string; latencyMs: number;

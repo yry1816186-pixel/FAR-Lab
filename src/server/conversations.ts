@@ -362,6 +362,7 @@ const runAndLandTurn = async (
         ...(generation.toolTrace.length > 0 ? { toolTrace: generation.toolTrace } : {}),
         ...(generation.proposals.length > 0 ? { proposals: generation.proposals } : {}),
         ...(generation.usage !== undefined ? { usage: generation.usage } : {}),
+        ...(generation.thinking !== undefined && generation.thinking.length > 0 ? { thinking: generation.thinking } : {}),
         createdAt: new Date().toISOString(),
       }),
       ...fresh.messages.slice(at + 1),
