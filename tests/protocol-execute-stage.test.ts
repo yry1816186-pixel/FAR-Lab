@@ -5,7 +5,7 @@ import { executeStage } from '../src/pipeline/stages/execute.js';
 import { TEMPLATE_REFUSAL_REASON } from '../src/pipeline/stages/shared.js';
 import { evaluateIteration, experimentLegStatus } from '../src/app/iteration.js';
 import { makeRunBudget } from '../src/app/run-budget.js';
-import { ResearchQuestion, ResearchRun, ResearchPlan, newId } from '../src/domain/index.js';
+import { HypothesisCandidate, ResearchQuestion, ResearchRun, ResearchPlan, newId } from '../src/domain/index.js';
 import { createTestStubProvider } from '../src/providers/test-stub.js';
 import type { StageContext } from '../src/pipeline/types.js';
 
@@ -43,11 +43,12 @@ const setup = () => {
     updatedAt: T0,
     tags: [],
   });
+  const hypId = newId('hyp');
   const plan = ResearchPlan.parse({
     id: newId('pln'),
     runId: run.id,
     objective: 'Discriminate anion-redistribution-driven impedance growth',
-    hypothesisIds: [newId('hyp')],
+    hypothesisIds: [hypId],
     variables: ['impedance growth rate'],
     controls: ['inert-additive control cells'],
     steps: [
@@ -83,7 +84,17 @@ const setup = () => {
     createdAt: T0,
   });
   store.putObject('plan', plan);
-  return { store, run, plan };
+  const persistHypothesis = (): void => {
+    store.putObject('hypothesis', HypothesisCandidate.parse({
+      id: hypId,
+      runId: run.id,
+      statement: 'Anion redistribution concentrated at degraded sites drives impedance growth',
+      mechanism: 'redistribution creates depletion zones raising the interfacial charge-transfer barrier',
+      createdAt: T0,
+      derivation: { strategy: 'mechanism_driven', rationale: 'fixture', inputClaimIds: [] },
+    }));
+  };
+  return { store, run, plan, persistHypothesis };
 };
 
 // A VALID protocol draft the stub serves on purpose 'protocol-draft' — validity
@@ -236,7 +247,8 @@ describe('execute stage: protocol fallback (paradigm-honest execution)', () => {
   });
 
   it('without a protocol the unexecuted leg still re-arms (compatibility control)', () => {
-    const { store, run } = setup();
+    const { store, run, persistHypothesis } = setup();
+    persistHypothesis(); // the executability check resolves plan hypotheses against real objects
     const decision = evaluateIteration({ store, runId: run.id, round: 1, budget: makeRunBudget(store, run.id) });
     expect(decision.decision).toBe('continue');
     expect(decision.record.continueTrigger?.kind).toBe('executable_plan_unexecuted');
