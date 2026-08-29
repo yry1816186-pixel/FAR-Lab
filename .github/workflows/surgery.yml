@@ -1,17 +1,15 @@
 name: surgery
 
-# Remote-surgery patch plane (2026-08-29 convergence): anchored, reviewable
-# patch scripts for large files that cannot be safely rewritten whole from a
-# remote work surface. Each patch is a committed .mjs script under
-# scripts/surgery/ — fail-loud anchors, idempotent re-runs, no shell inputs.
-#
-# DORMANT: re-neutralized after web slice 2 (same discipline as slice 1).
-# Push triggers removed — this workflow runs only on explicit manual
-# dispatch (workflow_dispatch). On main the apply scripts no-op (anchors
-# already applied); a manual dispatch only refreshes diagnostics. Mechanism,
-# per-slice branch lifecycle and history: scripts/surgery/README.md.
+# Remote-surgery patch plane. Diagnostics mode while slice 2 iterates:
+# triggers ONLY on the dedicated marker file below (not on workflow edits,
+# not on source pushes) so the diagnose job has a quiet window to commit its
+# snapshot without push races. Neutralized to workflow_dispatch-only before
+# the merge (see scripts/surgery/README.md).
 on:
   workflow_dispatch:
+  push:
+    branches: ['converge/web-protocol']
+    paths: ['scripts/surgery/.diag-trigger']
 
 permissions:
   contents: write
@@ -83,7 +81,9 @@ jobs:
           if git diff --cached --quiet; then
             echo "no diagnostics change"
           else
-            git pull --rebase || true
+            git stash
+            git pull --rebase
+            git stash pop
             git commit -m "chore(surgery): diagnostics snapshot (full suite)"
             git push
           fi
