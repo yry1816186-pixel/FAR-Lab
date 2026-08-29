@@ -525,6 +525,54 @@ const causalRevisionAnalysis: Handler = (p) => {
   };
 };
 
+/**
+ * Problem-model formation (AOSSA): honest filler for the mechanics routes —
+ * on product runs the scope stage refuses test-stamped formation output
+ * outright; this only lets automated tests / browser E2E walk the mechanics.
+ */
+const problemModelFormation: Handler = (p) => {
+  const question = questionTextOf(p);
+  const zh = /[一-鿿]/.test(question);
+  const tag = zh ? '离线模板' : 'offline template';
+  return {
+    objectives: [
+      { statement: zh ? `${tag}目标：界定「${question}」的研究范围` : `${tag} objective: scope the research question: ${question}` },
+    ],
+    variables: [],
+    formalization: {
+      problemClass: 'none_stated',
+      governingRelations: [],
+      boundaryConditions: [],
+      wellPosednessNotes: [],
+    },
+    dataInventory: [],
+    statisticalPremises: { assumptions: [], causalClaims: [] },
+    metrics: [],
+    stopConditions: [zh ? `${tag}停止条件：单轮执行即停` : `${tag} stop condition: single pass then stop`],
+    unknowns: [
+      { statement: zh ? `${tag}：问题结构未经真实分析` : `${tag}: problem structure not really analyzed`, blocking: false },
+    ],
+    methodSelections: [
+      {
+        forObjective: 1,
+        candidates: [
+          {
+            family: 'retrieval_synthesis',
+            assessment: 'selected',
+            rationale: `${tag} rationale: the development route exercises the mechanics of method selection`,
+            validationPlan: zh ? `${tag}：开发路线无真实验证计划；真实路线必须命名真实检查` : `${tag}: no real validation plan on the development route; a live route must name a real check`,
+          },
+          {
+            family: 'llm_reasoning',
+            assessment: 'viable_alternative',
+            rationale: `${tag} rationale: deterministic filler candidate for coverage of a second family`,
+          },
+        ],
+      },
+    ],
+  };
+};
+
 const modelConfigTest: Handler = () => ({ ok: true });
 
 /**
@@ -580,6 +628,7 @@ const theorySpecDraft: Handler = () => ({
 /** Exact-purpose table (schema authority: the stage modules' zod schemas). */
 const HANDLERS: Readonly<Record<string, Handler>> = {
   'scope-refinement': scopeRefinement,
+  'problem-model-formation': problemModelFormation,
   'query-planning': queryPlanning,
   'listwise-rerank': listwiseRerank,
   'claim-extraction': claimExtraction,
@@ -740,3 +789,4 @@ export const createTestDoubleProvider = (cfg: ModelProviderConfig): ModelProvide
     },
   };
 };
+

@@ -35,6 +35,8 @@ const ID_PREFIX = {
   tool_integration: 'tint',
   protocol: 'prt',
   protocol_execution: 'pex',
+  problem_model: 'pmod',
+  method_selection: 'msel',
 } as const;
 
 /** The single id-shape grammar: _[0-9a-z]{20,32} (26-char ULID-style body from newId). */
@@ -73,6 +75,8 @@ export const IterationId = idOf(ID_PREFIX.iteration);
 export const ToolIntegrationId = idOf(ID_PREFIX.tool_integration);
 export const ProtocolId = idOf(ID_PREFIX.protocol);
 export const ProtocolExecutionId = idOf(ID_PREFIX.protocol_execution);
+export const ProblemModelId = idOf(ID_PREFIX.problem_model);
+export const MethodSelectionId = idOf(ID_PREFIX.method_selection);
 
 export type RunId = z.infer<typeof RunId>;
 export type QuestionId = z.infer<typeof QuestionId>;
@@ -103,6 +107,8 @@ export type IterationId = z.infer<typeof IterationId>;
 export type ToolIntegrationId = z.infer<typeof ToolIntegrationId>;
 export type ProtocolId = z.infer<typeof ProtocolId>;
 export type ProtocolExecutionId = z.infer<typeof ProtocolExecutionId>;
+export type ProblemModelId = z.infer<typeof ProblemModelId>;
+export type MethodSelectionId = z.infer<typeof MethodSelectionId>;
 
 /** Kinds an ObjectRef may point at (the referenceable subset of id-bearing kinds). */
 const OBJECT_REF_KINDS = [
@@ -111,7 +117,7 @@ const OBJECT_REF_KINDS = [
   'receipt', 'bundle', 'artifact',
   'experiment_spec', 'experiment_run', 'dataset_record', 'result_set', 'stat_report',
   'evidence_body', 'ach_analysis', 'prediction',
-  'protocol', 'protocol_execution',
+  'protocol', 'protocol_execution', 'problem_model', 'method_selection',
 ] as const;
 
 /**
@@ -144,3 +150,4 @@ export const newId = (prefix: string): string => {
   for (const b of bytes) s += alphabet[b % 32];
   return `${prefix}_${s}`;
 };
+

@@ -8,6 +8,7 @@ export * from './hypothesis.js';
 export * from './scorecard.js';
 export * from './plan.js';
 export * from './protocol.js';
+export * from './problem-model.js';
 export * from './feedback.js';
 export * from './provenance.js';
 export * from './experiment.js';
@@ -29,3 +30,4 @@ export * from './screening.js';
 export * from './scientific-state.js';
 export * from './next-action.js';
 export * from './state-delta.js';
+

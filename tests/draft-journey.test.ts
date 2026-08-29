@@ -45,6 +45,26 @@ const SCOPE_JSON = JSON.stringify({
     methodologicalConstraints: [],
   },
 });
+const PROBLEM_MODEL_JSON = JSON.stringify({
+  objectives: [{ statement: 'Quantify insulin-sensitivity adaptation to resistance training in older adults' }],
+  variables: [
+    { name: 'insulin sensitivity', role: 'dependent', unit: 'mg/(mL·min)', valueType: 'numeric' },
+    { name: 'resistance training dose', role: 'independent', valueType: 'ordinal' },
+  ],
+  formalization: { problemClass: 'none_stated', governingRelations: [], boundaryConditions: [], wellPosednessNotes: [] },
+  dataInventory: [{ name: 'human trials', kind: 'retrieved_literature', accessState: 'available' }],
+  statisticalPremises: { assumptions: [], causalClaims: [] },
+  metrics: [],
+  stopConditions: ['decision rule evaluated once on the assembled trials'],
+  unknowns: [{ statement: 'dose-response shape beyond binary trained/untrained', blocking: false }],
+  methodSelections: [{
+    forObjective: 1,
+    candidates: [
+      { family: 'retrieval_synthesis', assessment: 'selected', rationale: 'the objective is trial-evidence synthesis', validationPlan: 'verbatim claim binding with counter-evidence search' },
+      { family: 'machine_learning', assessment: 'rejected_inappropriate', rationale: 'no labeled tabular dataset covering the population' },
+    ],
+  }],
+});
 
 let tmp: string;
 let app: App;
@@ -60,7 +80,10 @@ beforeAll(async () => {
     // journey rides the real orchestrator, where test-stamped scientific output
     // is refused by the real-content discipline — the offline wire's template
     // refusal is asserted in offline-dev-run.test.ts instead).
-    providerOverride: createTestStubProvider([{ rawOutput: SCOPE_JSON, forPurpose: 'scope-refinement' }], { asLive: true }),
+    providerOverride: createTestStubProvider([
+      { rawOutput: SCOPE_JSON, forPurpose: 'scope-refinement' },
+      { rawOutput: PROBLEM_MODEL_JSON, forPurpose: 'problem-model-formation' },
+    ], { asLive: true }),
   });
   // Real orchestrator for the scoped proposal pass (receipt-backed scope stage
   // over the scripted provider); the full-launch branch completes the run like
@@ -243,3 +266,4 @@ describe('§8.2 draft journey', () => {
     expect(() => ResearchQuestion.parse({ ...q, id: newId('q'), createdAt: new Date().toISOString() })).not.toThrow();
   });
 });
+

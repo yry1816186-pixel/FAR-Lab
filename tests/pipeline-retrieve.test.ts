@@ -216,9 +216,51 @@ describe('scope stage', () => {
       methodologicalConstraints: ['prefer studies of at least 8 weeks duration'],
     },
   };
-
-  it('refines the question via one structured call and persists the full updated question', async () => {
-    const env = makeEnv([{ rawOutput: JSON.stringify(refinement) }], {});
+  const problemModelDraft = {
+    objectives: [
+      { statement: 'Determine how intermittent fasting changes insulin sensitivity in adults' },
+    ],
+    variables: [
+      { name: 'fasting glucose', role: 'dependent', unit: 'mg/dL', valueType: 'numeric' },
+      { name: 'fasting regimen', role: 'independent', valueType: 'categorical' },
+    ],
+    formalization: {
+      problemClass: 'none_stated',
+      governingRelations: [],
+      boundaryConditions: [],
+      wellPosednessNotes: [],
+    },
+    dataInventory: [
+      { name: 'retrieved literature', kind: 'retrieved_literature', accessState: 'available' },
+    ],
+    statisticalPremises: { assumptions: [], causalClaims: [] },
+    metrics: [],
+    stopConditions: ['the comparison is decided once by the preregistered rule'],
+    unknowns: [{ statement: 'adherence measurement error distribution', blocking: false }],
+    methodSelections: [
+      {
+        forObjective: 1,
+        candidates: [
+          {
+            family: 'retrieval_synthesis',
+            assessment: 'selected',
+            rationale: 'the objective is evidential synthesis across retrieved trials',
+            validationPlan: 'claim verbatim binding plus counter-evidence search coverage',
+          },
+          {
+            family: 'machine_learning',
+            assessment: 'rejected_inappropriate',
+            rationale: 'no tabular dataset with the required labels is available',
+          },
+        ],
+      },
+    ],
+  };
+  it('refines the question and forms the problem model + method selection (two structured calls)', async () => {
+    const env = makeEnv([
+      { rawOutput: JSON.stringify(refinement) },
+      { rawOutput: JSON.stringify(problemModelDraft) },
+    ], {});
     const out = await scopeStage.execute(env.ctx);
     expect(out.kind).toBe('done');
 
@@ -233,12 +275,40 @@ describe('scope stage', () => {
     // 原意保留：用户原文与 id 不被改写
     expect(q?.text).toBe(QUESTION_TEXT);
     expect(q?.id).toBe(env.run.questionId);
-    // 恰好一次 model_call，且 receipt 已持久化
+    // AOSSA: problem model + method selection 铸成并持久化（确定性 id）
+    const models = env.store.listObjects('problem_model', env.run.id);
+    expect(models).toHaveLength(1);
+    const pm = defined(models[0], 'problem model');
+    expect(pm.objectives.map((o) => o.id)).toEqual(['obj1']);
+    expect(pm.formalization.problemClass).toBe('none_stated');
+    expect(pm.provenance.formedBy).toBe('model_proposed');
+    const selections = env.store.listObjects('method_selection', env.run.id);
+    expect(selections).toHaveLength(1);
+    const sel = defined(selections[0], 'method selection');
+    expect(sel.forObjectiveId).toBe('obj1');
+    expect(sel.candidates.filter((cd) => cd.assessment === 'selected').map((cd) => cd.family))
+      .toEqual(['retrieval_synthesis']);
+    const notes = env.store.listEvents(env.run.id).filter((e) => e.type === 'note');
+    expect(notes.filter((e) => (e.detail as Record<string, unknown>).subject === 'problem_model_formed')).toHaveLength(1);
+    expect(notes.filter((e) => (e.detail as Record<string, unknown>).subject === 'method_selection_formed')).toHaveLength(1);
+    // 恰好两次 model_call（refinement + formation），receipt 已持久化
     const modelReceipts = env.store
       .listObjects('receipt', env.run.id)
       .filter((r) => r.kind === 'model_call');
-    expect(modelReceipts).toHaveLength(1);
-    expect(modelReceipts[0]?.stage).toBe('scope');
+    expect(modelReceipts).toHaveLength(2);
+    for (const rec of modelReceipts) expect(rec.stage).toBe('scope');
+  });
+  it('refuses test-stamped output on a product run — no template problem model as science', async () => {
+    const env = makeEnv([
+      { rawOutput: JSON.stringify(refinement) },
+      { rawOutput: JSON.stringify(problemModelDraft) },
+    ], {});
+    (env.ctx as { productRun?: boolean }).productRun = true;
+    const out = await scopeStage.execute(env.ctx);
+    // refinement 是 test 模式 → 第一条拒绝路径先触发（skipped，未存任何内容）
+    expect(out.kind).toBe('skipped');
+    expect(JSON.stringify(out)).toContain('test double');
+    expect(env.store.listObjects('problem_model', env.run.id)).toHaveLength(0);
   });
 
   it('fails visibly when the provider fails — never a silent empty scope', async () => {
@@ -1388,3 +1458,5 @@ describe('RU-10 GO2 minhash second-chance merge', () => {
     expect(env.store.listObjects('source_document', env.run.id)).toHaveLength(1);
   });
 });
+
+
