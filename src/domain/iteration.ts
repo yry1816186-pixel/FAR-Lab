@@ -74,6 +74,13 @@ export const IterationSnapshot = z.object({
   feedbackSignals: z.number().int(),
   feedbackConsumed: z.number().int(),
   effectEstimates: z.number().int(),
+  /**
+   * Convergence 2026-08-29: registered research protocols for the plan's
+   * real-world legs. Default 0 so legacy snapshots (pre-protocol records)
+   * still parse. Part of the material fingerprint — a newly registered
+   * protocol is a material change.
+   */
+  protocolsRegistered: z.number().int().default(0),
   /** sha256 over canonical material counts — identical fingerprint = no material delta. */
   fingerprint: z.string().min(8),
 });
