@@ -1,17 +1,14 @@
 name: surgery
 
-# Remote-surgery patch plane (2026-08-29 convergence): anchored, reviewable
-# patch scripts for large files that cannot be safely rewritten whole from a
-# remote work surface. Each patch is a committed .mjs script under
-# scripts/surgery/ — fail-loud anchors, idempotent re-runs, no shell inputs.
-#
-# DORMANT since the convergence session merged: push triggers removed, this
-# workflow now runs only on explicit manual dispatch (workflow_dispatch).
-# On main the apply scripts no-op (their anchors are already applied) and a
-# manual dispatch would only refresh scripts/surgery/diag.txt. Mechanism and
-# history: scripts/surgery/README.md.
+# Remote-surgery patch plane — web slice 2 (2026-08-29): re-enabled for
+# THIS branch only while the web protocol surface lands. Same discipline as
+# slice 1: committed .mjs anchor scripts, fail-loud unique anchors, idempotent
+# re-runs, no shell inputs, never pull_request. Neutralized back to
+# workflow_dispatch-only before the merge (see scripts/surgery/README.md).
 on:
-  workflow_dispatch:
+  push:
+    branches: ['converge/web-protocol']
+    paths: ['scripts/surgery/**', '.github/workflows/surgery.yml']
 
 permissions:
   contents: write
@@ -33,16 +30,17 @@ jobs:
           node scripts/surgery/apply-store-protocol.mjs
           node scripts/surgery/apply-api-protocol.mjs
           node scripts/surgery/apply-readme-protocol.mjs
+          node scripts/surgery/apply-web-protocol.mjs
           node scripts/surgery/dump-api-context.mjs
       - name: Commit applied patches / refreshed context
         run: |
           git config user.name "farlab-surgery-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/persistence/store.ts src/server/api.ts README.md scripts/surgery/api-context.txt
+          git add src/persistence/store.ts src/server/api.ts README.md scripts/surgery/api-context.txt web/src/lab/StudyMap.tsx web/src/i18n/dict.ts web/src/lab/lab.css
           if git diff --cached --quiet; then
             echo "nothing to apply — tree already current"
           else
-            git commit -m "chore(surgery): store kinds + api protocol routes + readme bullet + context refresh"
+            git commit -m "chore(surgery): web protocol surface — StudyMap band + dict keys + lab.css"
             git push
           fi
 
