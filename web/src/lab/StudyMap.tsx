@@ -575,7 +575,6 @@ export function StudyMap({
             )}
         </section>
 
-        {settled && science === null && (
         {(protocol !== null || protocolError !== null) && (
           <ProtocolPanel
             runId={run.id}
@@ -584,7 +583,7 @@ export function StudyMap({
             onMutated={() => { onMutated(); loadScience(run.id); }}
           />
         )}
-
+        {settled && science === null && (
           <section className="map-node">
             <p className="map-node-label">{t('map.verdictLabel')}</p>
             <div className="map-verdict map-verdict--empty">
