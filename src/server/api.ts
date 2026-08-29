@@ -64,6 +64,8 @@ import {
   newId,
   runProgress,
 } from '../domain/index.js';
+import { isTemplateHypothesis } from '../domain/scientific-state.js';
+import { latestBundleTemplateTainted } from '../pipeline/stages/export.js';
 import { ConstraintSet } from '../domain/question.js';
 import type { RunStageName } from '../domain/run.js';
 import { McpManager } from '../agent/mcp-manager.js';
@@ -91,7 +93,7 @@ import { checkPlanExecutability } from '../pipeline/stages/plan.js';
  */
 
 export interface ApiServerError {
-  code: 'not_found' | 'validation' | 'already_running' | 'run_active' | 'not_started' | 'internal' | 'target_not_found' | 'question_required' | 'action_model_failed' | 'action_budget_exhausted' | 'invalid_action_request' | 'invalid_counter_search' | 'provider_unreachable' | 'conversation_model_failed' | 'conversation_full' | 'turn_in_flight' | 'no_corpus' | 'session_stopped' | 'src_not_in_pool' | 'run_not_found' | 'already_launched' | 'scope_proposal_failed' | 'lease_held';
+  code: 'not_found' | 'validation' | 'already_running' | 'run_active' | 'not_started' | 'internal' | 'target_not_found' | 'question_required' | 'action_model_failed' | 'action_budget_exhausted' | 'invalid_action_request' | 'invalid_counter_search' | 'provider_unreachable' | 'conversation_model_failed' | 'conversation_full' | 'turn_in_flight' | 'no_corpus' | 'session_stopped' | 'src_not_in_pool' | 'run_not_found' | 'already_launched' | 'scope_proposal_failed' | 'scope_proposal_unavailable' | 'lease_held';
   message: string;
   retryable: boolean;
   runId?: string;
@@ -284,6 +286,12 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
       const now = Date.now();
       for (const stale of app.store.listExpiredLeaseRuns(new Date().toISOString())) {
         if (executing.has(stale.id)) continue;
+        // Parking-intent guard: a run tagged 'parking:*' is a deliberately-stopped
+        // draft (scope proposal / CLI --stop-after) whose worker died before parking.
+        // Adoption would run the FULL pipeline behind the user's back — the exact
+        // harm the park-on-stopAfter fix closes for the non-crash path. The tag is
+        // cleared by the park transition or by a user-initiated resume.
+        if (stale.tags.some((t) => t.startsWith('parking:'))) continue;
         const last = lastAdoptedAt.get(stale.id) ?? 0;
         if (now - last < adoptionBackoffMs) continue;
         lastAdoptedAt.set(stale.id, now);
@@ -1163,6 +1171,13 @@ function parseSeedSources(raw: unknown): string | {
       });
     }
     if (executing.has(runId)) throw alreadyRunning(runId);
+    // Crash guard: tag the draft as deliberately-parked-intent BEFORE execution.
+    // If the worker dies mid-scope-proposal (before the park transition), the
+    // watchdog must not adopt this 'running' run and run the full pipeline —
+    // it skips 'parking:*' runs; the park clears the tag, a resume strips it.
+    if (!run.tags.includes('parking:scope-proposal')) {
+      app.store.updateRun({ ...run, tags: [...run.tags, 'parking:scope-proposal'] });
+    }
     const execution = Promise.resolve()
       .then(() => executor(runId, { stopAfter: 'retrieve' }))
       .catch((e: unknown) => {
@@ -1182,6 +1197,17 @@ function parseSeedSources(raw: unknown): string | {
         code: 'scope_proposal_failed',
         message: `scope refinement failed: ${scopeRec.error ?? 'unknown error'}`,
         retryable: true,
+        runId,
+      });
+    }
+    if (scopeRec?.state === 'skipped') {
+      // Honest refusal (e.g. the deterministic development wire: template scope
+      // is not analysis of the user's question) — the reason rides the stage
+      // record; the researcher is told WHY no proposal exists, not a 502.
+      throw new HttpError(422, {
+        code: 'scope_proposal_unavailable',
+        message: `no scope proposal from this route: ${scopeRec.error ?? 'stage skipped'}`,
+        retryable: false,
         runId,
       });
     }
@@ -1341,7 +1367,7 @@ function parseSeedSources(raw: unknown): string | {
     sendJson(res, 201, { feedbackId: signal.id });
   };
 
-  const reexport = (res: http.ServerResponse, runId: string): void => {
+  const reexport = async (res: http.ServerResponse, runId: string): Promise<void> => {
     mustGetRun(runId);
     if (executing.has(runId)) throw alreadyRunning(runId); // busy first: state may still change mid-flight
     const bundles = app.store.listObjects('bundle', runId);
@@ -1352,8 +1378,16 @@ function parseSeedSources(raw: unknown): string | {
     // independent listObjects inside the check could observe a different latest bundle
     // than the id we report, or return undefined mid-concurrent-write.
     const latest = bundles.at(-1);
-    if (!latest || !revisionNewerThanBundle(runId, latest)) {
-      throw validation(`no revision newer than the latest bundle (${latest?.id ?? 'unknown'}) — nothing to re-export`);
+    // Real-content remediation (2026-08-29): a latest bundle that still PROJECTS
+    // offline-template hypotheses is re-exportable WITHOUT a new revision — the
+    // filtered re-render mints a clean bundle (same predicate as the export stage).
+    const templateTainted = latest !== undefined && (await latestBundleTemplateTainted(app.artifacts, latest));
+    if (!latest || (!revisionNewerThanBundle(runId, latest) && !templateTainted)) {
+      throw validation(
+        templateTainted
+          ? `latest bundle (${latest?.id ?? 'unknown'}) is template-tainted but re-export was refused — report this`
+          : `no revision newer than the latest bundle (${latest?.id ?? 'unknown'}) and it is not template-tainted — nothing to re-export`,
+      );
     }
     startRun(runId);
     sendJson(res, 202, { runId });
@@ -2318,6 +2352,13 @@ function parseSeedSources(raw: unknown): string | {
         if (leaf === 'hypotheses' && method === 'GET') {
           mustGetRun(runId);
           const achAnalysis = app.store.listObjects('ach_analysis', runId).at(-1) ?? null;
+          // Real-content discipline (owner directive 2026-08-29): template
+          // hypotheses minted by legacy offline runs stay in the store (audit
+          // truth plane) but are NEVER served as scientific objects. Scorecards,
+          // evidence bodies, and tournament standings follow their hypotheses.
+          const allHyps = app.store.listObjects('hypothesis', runId);
+          const realHyps = allHyps.filter((h) => !isTemplateHypothesis(h));
+          const realHypIds = new Set(realHyps.map((h) => h.id));
           // HX §15 downstream semantics of claim exclusion: a read-time
           // researcher-adjusted PROJECTION recomputed with the same pure
           // functions the pipeline used (stored AchAnalysis stays untouched;
@@ -2347,13 +2388,20 @@ function parseSeedSources(raw: unknown): string | {
             };
           }
           return sendJson(res, 200, {
-            hypotheses: app.store.listObjects('hypothesis', runId),
-            scorecards: app.store.listObjects('scorecard', runId),
-            // D-016: pairwise tournament evidence behind the final ordering (uncertainty included)
-            tournament: app.store.listObjects('tournament', runId).at(-1) ?? null,
+            hypotheses: realHyps,
+            scorecards: app.store.listObjects('scorecard', runId).filter((s) => realHypIds.has(s.hypothesisId)),
+            // D-016: pairwise tournament evidence behind the final ordering (uncertainty included).
+            // Real-content discipline: standings won against template-only participants are
+            // not evidence about real ranking — the tournament object serves only when at
+            // least one real hypothesis took part (stored object itself stays untouched).
+            tournament: (() => {
+              const t = app.store.listObjects('tournament', runId).at(-1) ?? null;
+              if (t === null) return null;
+              return t.standings.some((s) => realHypIds.has(s.hypothesisId)) ? t : null;
+            })(),
             // Wave-S g8/g9: hypothesis-level evidence bodies (floor certainty, independent
             // sources, Σlog-LR band, QBAF+Carneades, orthogonal promotion) + ACH audit
-            evidenceBodies: app.store.listObjects('evidence_body', runId),
+            evidenceBodies: app.store.listObjects('evidence_body', runId).filter((b) => realHypIds.has(b.hypothesisId)),
             achAnalysis,
             achResearcherAdjusted,
           });

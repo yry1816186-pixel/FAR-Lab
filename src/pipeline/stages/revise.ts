@@ -20,7 +20,7 @@ import type {
   ResearchPlan as Plan,
   VersionDiffEntry,
 } from '../../domain/index.js';
-import { assertNotCancelled, isRepresentative } from './shared.js';
+import { assertNotCancelled, isRepresentative, refuseTemplateMode, TemplateModeRefusal } from './shared.js';
 import { checkPlanExecutability } from './plan.js';
 import { alphaSpendLedger, checkStructuredPreregistration, freezePlan } from './plan-formal.js';
 
@@ -239,6 +239,9 @@ const reviseHypothesis = async (
     // SCIENCE lane: judgment-stage decoding pinned (was provider default).
     temperature: 0,
   });
+  // Real-content discipline: a template revision must never overwrite a real
+  // hypothesis — the archive below would lie about what changed and why.
+  refuseTemplateMode(ctx, out.executionMode, `hypothesis revision for ${hyp.id}`);
 
   // version history is evidence: archive the exact pre-revision object before mutating
   const before = HypothesisCandidate.parse({ ...hyp });
@@ -356,6 +359,9 @@ const revisePlan = async (
     // SCIENCE lane: judgment-stage decoding pinned (was provider default).
     temperature: 0,
   });
+  // Real-content discipline: a template plan revision must never overwrite a
+  // real (frozen, preregistered) plan — same refusal class as hypothesis revision.
+  refuseTemplateMode(ctx, out.executionMode, `plan revision for ${plan.id}`);
 
   const before = ResearchPlan.parse({ ...plan });
   const archive = await ctx.artifacts.put(JSON.stringify(before, null, 2));
@@ -419,6 +425,19 @@ export const reviseStage: StageHandler = {
   },
 
   async execute(ctx: StageContext): Promise<StageOutcome> {
+    try {
+      return await reviseExecute(ctx);
+    } catch (e) {
+      // Real-content discipline (2026-08-29): template revisions never mint; the
+      // feedback signals stay unconsumed and are re-processed on resume under a
+      // live route.
+      if (e instanceof TemplateModeRefusal) return { kind: 'skipped', reason: e.message };
+      throw e;
+    }
+  },
+};
+
+async function reviseExecute(ctx: StageContext): Promise<StageOutcome> {
     const runId = ctx.run.id;
     const pending = unconsumedSignals(ctx);
     if (pending.length === 0) {
@@ -469,6 +488,11 @@ export const reviseStage: StageHandler = {
         // SCIENCE lane: judgment-stage decoding pinned (was provider default).
         temperature: 0,
       });
+      // Real-content discipline (2026-08-29): the causal analysis decides what
+      // this feedback FORCES to change — a deterministic development wire's
+      // verdict is template. Refuse before any revision mints; the signal stays
+      // unconsumed and is re-analyzed on resume under a live route.
+      refuseTemplateMode(ctx, analysis.executionMode, 'causal revision analysis');
 
       const targets = validateAffected(analysis.data.affected, {
         hypotheses: new Map(representatives.map((h) => [h.id, h] as const)),
@@ -621,5 +645,4 @@ export const reviseStage: StageHandler = {
     if (warnings.length > 0) parts.push(`warnings: ${warnings.join(' | ')}`);
     if (unhandled.length > 0) parts.push(`not executed: ${unhandled.join(' | ')}`);
     return { kind: 'done', summary: parts.join(' '), ...(artifactRefs.length > 0 ? { artifacts: artifactRefs } : {}) };
-  },
-};
+}

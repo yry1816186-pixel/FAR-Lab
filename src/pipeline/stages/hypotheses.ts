@@ -27,6 +27,7 @@ import {
   DUPLICATE_MARKER,
   isRepresentative,
   partitionClaimRefs,
+  refuseTemplateMode,
   runClaimIds,
   verifiedClaims,
 } from './shared.js';
@@ -379,6 +380,9 @@ export const translateHypothesesZh = async (
       schema: HypothesisZhOut,
       temperature: 0,
     });
+    // Real-content discipline: a template zh rendering must not be written onto
+    // real hypotheses — the surrounding catch records the skip visibly.
+    refuseTemplateMode(ctx, res.executionMode, 'zh hypothesis statements');
     let filled = 0;
     for (const t of res.data.translations) {
       const stored = ctx.store.getObject('hypothesis', t.hypothesisId);
@@ -582,8 +586,20 @@ export const generateHypothesesStage: StageHandler = {
           // distribution; anti-dup is enforced deterministically post-hoc (clustering
           // + pre-merge + paraphrase guard), not by decoding temperature.
           temperature: 0.7,
-        }).then((r) => ({ provider: r.provider, modelId: r.modelId, data: r.data })));
+        }).then((r) => ({ provider: r.provider, modelId: r.modelId, executionMode: r.executionMode, data: r.data })));
       const modelRef = `${res.provider}/${res.modelId}`;
+      // Real-content discipline (owner directive 2026-08-29): the deterministic
+      // development wire emits template statements ("Offline hypothesis N"),
+      // never analysis of this question's evidence. Refuse them at birth —
+      // they must not enter the truth plane as scientific objects. Every
+      // strategy rides the same run route, so the first receipt decides.
+      if (ctx.productRun === true && res.executionMode === 'test') {
+        return {
+          kind: 'skipped',
+          reason:
+            'model route is the deterministic development wire — template hypotheses are refused as scientific content; the evidence base (real retrieved claims) stands, and hypotheses require a live model route (rerun via 研究地图 or CLI)',
+        };
+      }
       const inputIds = (payload.supportingClaims ?? payload.counterDirectionClaims ?? payload.claims ?? []) as {
         id: string;
       }[];
@@ -662,7 +678,13 @@ export const generateHypothesesStage: StageHandler = {
         // strategy calls; the re-cluster + paraphrase guard bound the noise.
         temperature: 0.7,
       });
-      if (res.data.candidates.length > 4) {
+      // Real-content discipline: supplement candidates are minted hypotheses —
+      // the deterministic wire's operators produce template shapes. Skip the
+      // supplement (visible note) rather than adopt them; the set stays short
+      // and honest instead of padded with template diversity.
+      if (ctx.productRun === true && res.executionMode === 'test') {
+        warnings.push('diversity-supplement SKIPPED — development wire (template supplement candidates refused as scientific content)');
+      } else if (res.data.candidates.length > 4) {
         warnings.push(`diversity-supplement: model returned ${res.data.candidates.length}; keeping first 4`);
         res.data.candidates = res.data.candidates.slice(0, 4);
       }
@@ -706,8 +728,14 @@ export const generateHypothesesStage: StageHandler = {
       // Lane-06: classification judgment — pinned low, corpus-relative label only.
       temperature: 0.2,
     });
+    // Real-content discipline: novelty labels are judgment minted onto real
+    // candidates — template labels (uniform defaults) would mislead ranking
+    // inputs. Refuse; the honest 'mixed' default below already covers
+    // unmentioned candidates, so an unlabeled set degrades visibly but safely.
     const noveltyByIndex = new Map<number, z.infer<typeof NoveltyLabel>>();
-    for (const l of noveltyRes.data.labels) {
+    if (ctx.productRun === true && noveltyRes.executionMode === 'test') {
+      warnings.push('novelty labels SKIPPED — development wire (template labels refused as scientific content; all candidates default to mixed)');
+    } else for (const l of noveltyRes.data.labels) {
       if (l.index >= 0 && l.index < raws.length && !noveltyByIndex.has(l.index)) noveltyByIndex.set(l.index, l.noveltyLabel);
     }
     const noveltyOf = (i: number): z.infer<typeof NoveltyLabel> => noveltyByIndex.get(i) ?? 'mixed'; // unmentioned => honest default
@@ -953,6 +981,10 @@ export const generateHypothesesStage: StageHandler = {
               schema: LitVerdictOut,
               temperature: 0.1,
             });
+            // Real-content discipline: novelty verdicts are judgment minted onto
+            // real hypotheses — the surrounding catch degrades each to an honest
+            // 'unclear' with retrieved neighbors, the designed failure vocabulary.
+            refuseTemplateMode(ctx, verdictRes.executionMode, 'literature novelty verdicts');
             for (const v of verdictRes.data.verdicts) {
               if (toJudge.some((t) => t.id === v.hypothesisId) && !verdictByHyp.has(v.hypothesisId)) {
                 verdictByHyp.set(v.hypothesisId, v);

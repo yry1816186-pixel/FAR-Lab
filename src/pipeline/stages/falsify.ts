@@ -10,7 +10,7 @@ import {
   newId,
 } from '../../domain/index.js';
 import type { HypothesisCandidate as Hypothesis, ScientificClaim } from '../../domain/index.js';
-import { assertNotCancelled, isRepresentative, mapBounded, partitionClaimRefs, runClaimIds, STAGE_CONCURRENCY } from './shared.js';
+import { assertNotCancelled, isRepresentative, mapBounded, partitionClaimRefs, refuseTemplateMode, runClaimIds, TemplateModeRefusal, STAGE_CONCURRENCY } from './shared.js';
 import { contentTokens, topicalOverlap } from './evidence.js';
 import { hasExplicitQuantity } from '../../domain/claim.js';
 import { relationStrength } from '../../domain/evidence-strength.js';
@@ -281,7 +281,9 @@ export const falsifyStage: StageHandler = {
     // cross-iteration coupling), so bounded overlap (WP4) cuts wall-clock on this
     // model-bound stage; per-item warnings/results are collected locally and merged
     // in INPUT order below, keeping stage aggregates deterministic.
-    const outs = await mapBounded(targets, STAGE_CONCURRENCY, async (hyp): Promise<{ warnings: string[]; result: string; relations: number }> => {
+    let outs: { warnings: string[]; result: string; relations: number }[];
+    try {
+      outs = await mapBounded(targets, STAGE_CONCURRENCY, async (hyp): Promise<{ warnings: string[]; result: string; relations: number }> => {
       assertNotCancelled(ctx, 'critique_falsify');
       const warnings: string[] = [];
       let relations = 0;
@@ -337,6 +339,13 @@ export const falsifyStage: StageHandler = {
         temperature: 0.2,
       });
       const out = res.data;
+
+      // Real-content discipline (2026-08-29): the spec is scientific JUDGMENT —
+      // a deterministic development wire's spec is template. Refuse at birth,
+      // before anything is persisted; the existing try/catch below already maps
+      // a template link-audit to "audit failed, gated links kept" (fail-open
+      // enrichment), so only the spec call needs an explicit guard.
+      refuseTemplateMode(ctx, res.executionMode, 'falsification spec');
 
       // ---- deterministic completeness gate (mission §29) ----
       const completeness = checkFalsificationCompleteness(out);
@@ -588,7 +597,11 @@ export const falsifyStage: StageHandler = {
       }
       for (const id of finalSupporting) {
         const decision = audit.get(id);
-        ctx.store.putObject('evidence_relation', mkRelation(decision?.relation ?? 'supports', id, proposalFamilyOf.get(id) ?? 'supporting', decision?.note ?? (unauditedIds.has(id) ? 'kept as proposed — NOT covered by the link audit (coverage miss)' : undefined)));
+        // anchorNote parity with the counter loop (adversarial round-2 S-P1-4):
+        // confirmed supporting links previously discarded their audit anchors —
+        // only counter-side anchors survived, leaving supporting relabels without
+        // the predicted/observed sentences that let a human check the audit.
+        ctx.store.putObject('evidence_relation', mkRelation(decision?.relation ?? 'supports', id, proposalFamilyOf.get(id) ?? 'supporting', decision?.note ?? (unauditedIds.has(id) ? 'kept as proposed — NOT covered by the link audit (coverage miss)' : undefined) ?? anchorNoteById.get(id)));
         relations += 1;
       }
 
@@ -659,7 +672,13 @@ export const falsifyStage: StageHandler = {
           ? `${hyp.id}: falsification spec passed deterministic completeness (testability=${testability}; counter links ${finalCounter.length}${gatedCounter.dropped.length > 0 ? ` (${gatedCounter.dropped.length} dropped by topical gate)` : ''}, supporting links ${finalSupporting.length}${gatedSupporting.dropped.length > 0 ? ` (${gatedSupporting.dropped.length} dropped by topical gate)` : ''}${auditDropped.length > 0 ? `, ${auditDropped.length} dropped by link audit` : ''})`
           : `${hyp.id}: falsification spec REJECTED by deterministic completeness — missing: ${completeness.missing.join('; ')}; testability=untestable_currently`,
       };
-    });
+      });
+    } catch (e) {
+      if (!(e instanceof TemplateModeRefusal)) throw e;
+      // Real-content discipline: template specs never minted; hypotheses without
+      // a spec are re-targeted on resume once a live route serves the run.
+      return { kind: 'skipped', reason: e.message };
+    }
     for (const o of outs) {
       warnings.push(...o.warnings);
       results.push(o.result);

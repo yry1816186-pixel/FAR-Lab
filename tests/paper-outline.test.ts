@@ -438,10 +438,12 @@ describe('buildPaperOutline (BP-3 projection)', () => {
     const outline = buildPaperOutline(store, g.runId, { now: NOW });
     const byCat = new Map(outline.limitations.map((l) => [l.category, l] as const));
     expect([...byCat.keys()].sort()).toEqual([
-      'evidence_ceiling', 'experiment_coverage', 'single_source_evidence_bodies',
+      'evidence_ceiling', 'execution_truth', 'experiment_coverage', 'single_source_evidence_bodies',
       'stipulated_thresholds', 'uncalibrated_judgment_density', 'uncertainty_inventory',
       'unresolved_source_verification',
     ]);
+    // The fixture seeds zero receipts, so the paper's execution-truth disclosure
+    // names the empty class with zero counts (not a live run — must be disclosed).
 
     expect(byCat.get('evidence_ceiling')!.counts).toEqual({ sources: 3, metadataOnly: 1, abstractOnly: 2, fullTextOrData: 0 });
     expect(byCat.get('uncalibrated_judgment_density')!.counts).toEqual({ dimensions: 6, uncalibratedLlmJudgment: 5 });
@@ -536,7 +538,7 @@ describe('buildPaperOutline (BP-3 projection)', () => {
     expect(outline.methods.stepsSummary).toEqual([]);
     expect(outline.methods.preregistration).toEqual({ frozen: false });
     expect(outline.references).toEqual([]);
-    expect(outline.limitations).toHaveLength(7); // all categories present with zero counts
+    expect(outline.limitations).toHaveLength(8); // all categories present with zero counts (execution_truth: zero receipts => class 'empty')
     expect(outline.limitations.every((l) => Object.values(l.counts).every((v) => v === 0))).toBe(true);
     const md = renderPaperMarkdown(outline);
     expect(md).toContain('## 3 Results');

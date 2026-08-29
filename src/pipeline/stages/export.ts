@@ -19,6 +19,40 @@ import {
   ReproducibilityBundle,
   toSwanJsonLd,
 } from '../../domain/index.js';
+import { isTemplateHypothesis, isTemplatePlan } from '../../domain/scientific-state.js';
+
+/** Template-content marker for the remediation re-export trigger (see below). */
+const TEMPLATE_JSONLD = /Offline hypothesis|A deterministic offline mechanism/i;
+
+/**
+ * Real-content remediation predicate (2026-08-29): does the LATEST bundle's
+ * scientific layer still PROJECT offline-template hypotheses? Shared by the
+ * export stage's applicable(), the orchestrator's completed-run reopen, and the
+ * API's reexport gate — one owner, three triggers. Unreadable artifacts read as
+ * tainted: re-export is the safe direction (deterministic, append-only).
+ */
+export const latestBundleTemplateTainted = async (
+  artifacts: { get(ref: string): Promise<string | null> },
+  latest: { hypothesisJsonLd?: unknown[]; finalArtifactHashes: string[] },
+): Promise<boolean> => {
+  const jld = latest.hypothesisJsonLd ?? [];
+  if (jld.some((j) => TEMPLATE_JSONLD.test(JSON.stringify(j)))) return true;
+  try {
+    const reportHash = latest.finalArtifactHashes[0];
+    if (reportHash !== undefined) {
+      const report = await artifacts.get(reportHash);
+      // Not line-anchored: the template plan's objective embeds "Offline
+      // hypothesis N" mid-line ("Offline development plan: … for: Offline
+      // hypothesis 2 …"), and a remediation that cleaned only part of the
+      // projection must still read as tainted.
+      if (report !== null && TEMPLATE_JSONLD.test(report)) return true;
+    }
+  } catch {
+    return true;
+  }
+  return false;
+};
+
 import type {
   CitationBindingStatus,
   CorpusSnapshot,
@@ -117,9 +151,15 @@ const truncate = (s: string, max: number): string => {
 /** Material missing/incomplete items shared by report §9 and bundle limitations — one owner. */
 const collectMissing = (
   inputs: ExportInputs,
-  facts: { lockMissing: boolean; receipts: ProvenanceReceipt[] },
+  facts: { lockMissing: boolean; receipts: ProvenanceReceipt[]; templateHypCount: number; templatePlanCount: number },
 ): string[] => {
   const out: string[] = [];
+  if (facts.templateHypCount > 0) {
+    out.push(`${facts.templateHypCount} 条假设为离线路由模板内容，未作为科学内容投影（留存于存储审计层）`);
+  }
+  if (facts.templatePlanCount > 0) {
+    out.push(`${facts.templatePlanCount} 条研究计划为离线路由模板内容，未作为科学内容投影（留存于存储审计层）`);
+  }
   if (!inputs.question) out.push('question 对象缺失');
   if (!inputs.corpus) out.push('corpus_snapshot 缺失');
   if (inputs.sources.length === 0) out.push('无任何 source_document');
@@ -622,7 +662,13 @@ export const exportStage: StageHandler = {
       .find((r) => r.createdAt > latestBundle.createdAt);
     if (newerRevision !== undefined) return true;
     const sourceCount = ctx.store.listObjects('source_document', ctx.run.id).length;
-    return sourceCount > latestBundle.sourceArtifactHashes.length;
+    if (sourceCount > latestBundle.sourceArtifactHashes.length) return true;
+    // Real-content remediation (2026-08-29): a bundle minted by a build that
+    // still PROJECTED offline-template hypotheses carries them in its scientific
+    // layer — re-export under the filtering discipline mints a clean bundle
+    // (legacy objects stay in the audit store; the OLD bundle stays hash-stable
+    // for provenance).
+    return latestBundleTemplateTainted(ctx.artifacts, latestBundle);
   },
 
   execute: async (ctx) => {
@@ -634,11 +680,23 @@ export const exportStage: StageHandler = {
     const sources = ctx.store.listObjects('source_document', run.id);
     const claims = ctx.store.listObjects('claim', run.id);
     const relations = ctx.store.listObjects('evidence_relation', run.id);
-    const hypotheses = ctx.store.listObjects('hypothesis', run.id);
+    // Real-content discipline (owner directive 2026-08-29): legacy offline runs
+    // minted template hypotheses ("Offline hypothesis N") into the store. They
+    // stay stored (audit truth plane) but NEVER project into the scientific
+    // export — report, paper, bundle JSON-LD, tables and figures all read this
+    // filtered list. One owner: the export stage's store read.
+    const allHypotheses = ctx.store.listObjects('hypothesis', run.id);
+    const templateHypCount = allHypotheses.filter((h) => isTemplateHypothesis(h)).length;
+    const hypotheses = allHypotheses.filter((h) => !isTemplateHypothesis(h));
+    const realHypIds = new Set(hypotheses.map((h) => h.id));
+    // Template plans ("Offline development plan: …") follow the same rule.
+    const templatePlanCount = ctx.store.listObjects('plan', run.id).filter(isTemplatePlan).length;
+    const planObjects = ctx.store.listObjects('plan', run.id).filter((p) => !isTemplatePlan(p));
+    const plan = planObjects.at(-1) ?? null;
     const scorecards = ctx.store
       .listObjects('scorecard', run.id)
+      .filter((s) => realHypIds.has(s.hypothesisId))
       .sort((a, b) => a.rank - b.rank);
-    const plan = ctx.store.listObjects('plan', run.id).at(-1) ?? null;
     const receipts = ctx.store.listObjects('receipt', run.id);
     const feedbacks = ctx.store.listObjects('feedback', run.id);
     const revisions = ctx.store.listObjects('revision', run.id);
@@ -682,7 +740,7 @@ export const exportStage: StageHandler = {
       resultSets: ctx.store.listObjects('result_set', run.id),
       statReports: ctx.store.listObjects('stat_report', run.id),
     };
-    const missingItems = collectMissing(inputs, { lockMissing, receipts });
+    const missingItems = collectMissing(inputs, { lockMissing, receipts, templateHypCount, templatePlanCount });
     // §5.5 execution truth: one deterministic projection over the SAME receipt window
     // the report §9 summarizes (pre-export). Local export receipts never affect the class.
     const truth = truthProfileFromReceipts(run.id, receipts);
@@ -767,7 +825,7 @@ export const exportStage: StageHandler = {
     const limitations = [
       '模型环节为 LLM 生成、具有非确定性：bundle 可复放的是输入快照、模型元数据、receipts 与工件哈希，不保证重新生成逐字节一致的输出。',
       ...(truthAll.klass !== 'live' ? [truthDisclosureLine(truthAll)] : []),
-      ...collectMissing(inputs, { lockMissing, receipts: allReceipts }),
+      ...collectMissing(inputs, { lockMissing, receipts: allReceipts, templateHypCount, templatePlanCount }),
     ];
 
     const bundleId = newId('bnd');

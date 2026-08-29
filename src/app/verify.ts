@@ -12,7 +12,7 @@ import type { ArtifactStore } from '../shared/ports.js';
  * Third-party bundle verification (ACC-14, mission §56 Inspect/Validate/Re-execute/
  * Compare). Every check is really executed against the store, the artifact store and
  * the local environment — no check may assume or fabricate a pass. Invariant: a
- * report always carries the same 11 checks in the same order (VERIFY_CHECK_NAMES);
+ * report always carries the same 12 checks in the same order (VERIFY_CHECK_NAMES);
  * checks that cannot run fail closed with passed=false, never silently skipped.
  */
 
@@ -28,6 +28,7 @@ export const VERIFY_CHECK_NAMES = [
   'dependency_lock_hash_matches',
   'declared_evidence_level_valid',
   'claim_taint_labels_present',
+  'hypothesis_template_content_absent',
 ] as const;
 export type VerifyCheckName = (typeof VERIFY_CHECK_NAMES)[number];
 
@@ -59,10 +60,27 @@ export interface VerifyDeps {
 
 const LOCK_CHECK: VerifyCheckName = 'dependency_lock_hash_matches';
 
+/** Walk up from THIS module's directory (same basis as the export stage's lock read,
+ * WP2 F2): `far verify` may run from any cwd, and a cwd-relative read would compare
+ * the user's unrelated lockfile against the bundle's declared hash. */
+const findUp = (name: string, fromDir: string): string | null => {
+  let dir = path.resolve(fromDir);
+  for (;;) {
+    const candidate = path.join(dir, name);
+    if (fs.existsSync(candidate)) return candidate;
+    const parent = path.dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+};
+
 /** Same basis as the export stage: hash the real file, or the documented placeholder when unreadable. */
 const readDependencyLock = (): { hash: string; missing: boolean } => {
+  const lockPath = process.env.FARLAB_LOCKFILE_PATH
+    ?? findUp('package-lock.json', import.meta.dirname ?? process.cwd());
   try {
-    return { hash: sha256Hex(fs.readFileSync(path.join(process.cwd(), 'package-lock.json'))), missing: false };
+    if (lockPath === null) throw new Error('not found');
+    return { hash: sha256Hex(fs.readFileSync(lockPath)), missing: false };
   } catch {
     return { hash: sha256Hex('missing'), missing: true };
   }
@@ -317,6 +335,27 @@ export async function verifyBundle(bundleId: string, deps: VerifyDeps): Promise<
         : unlabeled === 0
           ? `${labeled.length} 条 claim 全部携带 taint 标签（derived_untrusted 不得无标导出）`
           : `${unlabeled}/${runClaims.length} 条 claim 缺少 taint 标签 — 无标 derived_untrusted 禁止导出（T2 硬不变量）`,
+    });
+
+    // ---- check 12 (real-content discipline): template hypotheses must not ride a bundle ----
+    // The export chain excludes offline-wire template hypotheses from every
+    // scientific projection; a bundle whose hypothesisJsonLd (or whose run's
+    // stored hypotheses) still carries them was minted by a build that dropped
+    // that discipline. Same predicate as domain/scientific-state.ts
+    // isTemplateHypothesis, inlined here because the bundle layer stores the
+    // SWAN projection, not HypothesisCandidate objects.
+    const templateStatement = /^Offline hypothesis/i;
+    const templateMechanism = /A deterministic offline mechanism/i;
+    const jsonLdTemplate = (bundle.hypothesisJsonLd ?? []).filter((j) => {
+      const s = typeof (j as { statement?: unknown }).statement === 'string' ? (j as { statement: string }).statement : JSON.stringify(j);
+      return templateStatement.test(s) || templateMechanism.test(s);
+    }).length;
+    checks.push({
+      name: 'hypothesis_template_content_absent',
+      passed: jsonLdTemplate === 0,
+      detail: jsonLdTemplate === 0
+        ? `${(bundle.hypothesisJsonLd ?? []).length} 条 hypothesisJsonLd 无模板内容（real-content 投影干净）`
+        : `${jsonLdTemplate}/${(bundle.hypothesisJsonLd ?? []).length} 条 hypothesisJsonLd 为离线模板内容 — 模板内容不得作为科学产物入 bundle`,
     });
   }
 

@@ -141,6 +141,9 @@ export type ScientificState = z.infer<typeof ScientificState>;
 export const isTemplateHypothesis = (h: HypothesisCandidate): boolean =>
   /^Offline hypothesis/i.test(h.statement) || /^A deterministic offline mechanism/i.test(h.mechanism ?? '');
 
+/** Plan-object marker: the offline wire's research-plan-design objective (see offline.ts researchPlanDesign). */
+export const isTemplatePlan = (p: { objective: string }): boolean => /^Offline development plan:/i.test(p.objective);
+
 const isTemplateScopeDomain = (domain: string | undefined): boolean =>
   domain !== undefined && domain.includes('offline scope template');
 

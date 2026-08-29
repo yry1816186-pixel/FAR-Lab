@@ -4,7 +4,7 @@ import { callStructured } from '../llm.js';
 import { HypothesisComparison, HypothesisScorecard, HypothesisTournament, ScoreDimension, newId, buildAchAnalysis, buildEvidenceBody, countExperimentalAxes } from '../../domain/index.js';
 import type { EvidenceBody, LogLrBand, RankWeightSensitivity, TournamentMatch } from '../../domain/index.js';
 import type { HypothesisCandidate } from '../../domain/index.js';
-import { assertNotCancelled, isRepresentative, mapBounded, partitionClaimRefs, runClaimIds, STAGE_CONCURRENCY } from './shared.js';
+import { assertNotCancelled, isRepresentative, mapBounded, partitionClaimRefs, refuseTemplateMode, runClaimIds, TemplateModeRefusal, STAGE_CONCURRENCY } from './shared.js';
 import { canonicalSha256 } from '../../shared/crypto.js';
 import { deterministicId } from '../../app/quality-gate.js';
 
@@ -534,6 +534,18 @@ export const rankStage: StageHandler = {
   },
 
   async execute(ctx: StageContext): Promise<StageOutcome> {
+    try {
+      return await rankExecute(ctx);
+    } catch (e) {
+      // Real-content discipline (2026-08-29): template scores/judgments never
+      // mint; unranked hypotheses are re-scored on resume under a live route.
+      if (e instanceof TemplateModeRefusal) return { kind: 'skipped', reason: e.message };
+      throw e;
+    }
+  },
+};
+
+async function rankExecute(ctx: StageContext): Promise<StageOutcome> {
     const runId = ctx.run.id;
     const reps = ctx.store.listObjects('hypothesis', runId).filter(isRepresentative);
     if (reps.length === 0) return { kind: 'skipped', reason: 'no representative hypotheses to rank' };
@@ -656,8 +668,16 @@ export const rankStage: StageHandler = {
           // ran at provider-default temperature while every other judgment stage
           // pinned its decoding. Deterministic-style scoring wants 0.
           temperature: 0,
-        }).then((r) => ({ provider: r.provider, modelId: r.modelId, data: r.data })));
+        }).then((r) => ({ provider: r.provider, modelId: r.modelId, executionMode: r.executionMode, data: r.data })));
     });
+    // Real-content discipline (2026-08-29): dimension scores are scientific
+    // JUDGMENT — a deterministic development wire's scores are template. Refuse
+    // BEFORE any scorecard is persisted (evidence bodies above are pure
+    // functions of stored objects and stand). Unscored hypotheses are re-scored
+    // on resume once a live route serves the run.
+    for (const b of batchResults) {
+      refuseTemplateMode(ctx, b.executionMode, 'ranking scorecard');
+    }
     const merged: z.infer<typeof RankOut> = { assessments: batchResults.flatMap((b) => b.data.assessments) };
     const firstProvider = batchResults[0]?.provider ?? 'unknown';
     const firstModel = batchResults[0]?.modelId ?? 'unknown';
@@ -876,7 +896,13 @@ export const rankStage: StageHandler = {
                 schema: PairJudgeOut,
                 temperature: 0.1,
                 maxTokens: 1024,
-              }).then((r) => ({ data: r.data as z.infer<typeof PairJudgeOut> })));
+              }).then((r) => {
+                // Real-content discipline: a template pairwise verdict is refused —
+                // the surrounding catch records the refusal and the match lands as
+                // fail-visible no_contest, the same vocabulary as a failed judge call.
+                refuseTemplateMode(ctx, r.executionMode, 'pairwise tournament judgment');
+                return { data: r.data as z.infer<typeof PairJudgeOut> };
+              }));
             judged = cached.data;
           } catch (e) {
             failure = e instanceof Error ? e.message : String(e);
@@ -1139,5 +1165,4 @@ export const rankStage: StageHandler = {
     if (unscored.length > 0) parts.push(`not scored this round (no usable assessment): ${unscored.join(', ')}`);
     if (warnings.length > 0) parts.push(`warnings: ${warnings.join(' | ')}`);
     return { kind: 'done', summary: parts.join(' '), artifacts };
-  },
-};
+}

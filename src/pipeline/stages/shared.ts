@@ -34,6 +34,38 @@ export const claimsForPrompt = (claims: readonly ScientificClaim[]): { id: strin
   claims.map((c) => ({ id: c.id, text: c.text }));
 
 // ---------------------------------------------------------------------------
+// Real-content discipline (owner directive 2026-08-29)
+// ---------------------------------------------------------------------------
+
+/**
+ * Thrown by judgment call sites when a PRODUCT run's receipt is test-mode: the
+ * deterministic offline development wire answers purposes with template
+ * payloads, which must never be stored as scientific content. Stage handlers
+ * catch this and record an honest skip (resumable once a live route serves).
+ */
+export class TemplateModeRefusal extends Error {
+  constructor(readonly what: string) {
+    super(
+      `model route is the deterministic development wire — template ${what} refused as scientific content ` +
+        `in a product run; restore a live model route and resume (unconsumed work is re-targeted automatically)`,
+    );
+    this.name = 'TemplateModeRefusal';
+  }
+}
+
+/**
+ * Guard one receipt: refuse test-mode output in a product run. Direct
+ * stage-level tests leave ctx.productRun unset and are unaffected.
+ */
+export const refuseTemplateMode = (
+  ctx: StageContext,
+  executionMode: 'live' | 'test' | undefined,
+  what: string,
+): void => {
+  if (ctx.productRun === true && executionMode === 'test') throw new TemplateModeRefusal(what);
+};
+
+// ---------------------------------------------------------------------------
 // RU-9 GO4 — minimal context compiler (deterministic, zero LLM)
 // ---------------------------------------------------------------------------
 

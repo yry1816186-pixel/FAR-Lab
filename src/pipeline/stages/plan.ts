@@ -6,6 +6,7 @@ import type { StageHandler } from '../types.js';
 import { memoryNegativeConditioning, recordMemoryConditioning } from '../../app/memory.js';
 import { checkStructuredPreregistration, freezePlan } from './plan-formal.js';
 import { isCancellationError } from './guard.js';
+import { refuseTemplateMode, TemplateModeRefusal } from './shared.js';
 
 /** W-C bilingual display layer: zh rendering of the plan objective (one temp-0 call). */
 const ObjectiveZhOut = z.object({ objectiveZh: z.string().min(1) });
@@ -219,6 +220,18 @@ export const planStage: StageHandler = {
   applicable: async (ctx) => ctx.store.listObjects('plan', ctx.run.id).length === 0,
 
   execute: async (ctx) => {
+    try {
+      return await planExecute(ctx);
+    } catch (e) {
+      // Real-content discipline (2026-08-29): a template plan never persists;
+      // the stage re-runs on resume once a live route serves the run.
+      if (e instanceof TemplateModeRefusal) return { kind: 'skipped', reason: e.message };
+      throw e;
+    }
+  },
+};
+
+async function planExecute(ctx: Parameters<NonNullable<StageHandler['execute']>>[0]): Promise<ReturnType<NonNullable<StageHandler['execute']>>> {
     if (ctx.cancelled()) throw new Error('cancelled by user');
     const runId = ctx.run.id;
 
@@ -321,6 +334,12 @@ export const planStage: StageHandler = {
       schema: PlanDraftSchema,
       temperature: 0.2,
     });
+
+    // Real-content discipline (2026-08-29): the plan is scientific JUDGMENT — a
+    // deterministic development wire's plan ("Offline development plan: …") is
+    // template. Refuse before anything persists; the stage re-runs on resume
+    // once a live route serves the run.
+    refuseTemplateMode(ctx, res.executionMode, 'research plan');
 
     // The server owns canonical step ids: remap model ids (any shape) deterministically.
     canonicalizeStepIds(res.data);
@@ -427,6 +446,9 @@ export const planStage: StageHandler = {
           schema: ObjectiveZhOut,
           temperature: 0,
         });
+        // Real-content discipline: a template zh rendering must not be written
+        // onto a real plan — the surrounding catch records the skip visibly.
+        refuseTemplateMode(ctx, zh.executionMode, 'zh objective translation');
         if (zh.data.objectiveZh.trim().length > 0) {
           const stored = ctx.store.getObject('plan', plan.id);
           if (stored !== null && stored.objectiveZh === undefined) {
@@ -448,5 +470,4 @@ export const planStage: StageHandler = {
       (zhNote !== null ? `; zh display: ${zhNote}` : '');
     ctx.log(summary);
     return { kind: 'done', summary };
-  },
-};
+}

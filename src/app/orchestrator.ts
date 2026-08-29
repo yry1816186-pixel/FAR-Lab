@@ -8,6 +8,7 @@ import { totalBudgetFromEnv } from '../providers/http.js';
 import type { ArtifactStore, ModelProvider, SourceAdapter } from '../shared/ports.js';
 import type { SourceFamily } from '../domain/source.js';
 import { RunBudgetExhaustedError, makeRunBudget, type RunBudgetView } from './run-budget.js';
+import { latestBundleTemplateTainted } from '../pipeline/stages/export.js';
 import { evaluateQualityGate, MAX_QUALITY_ROUNDS } from './quality-gate.js';
 import { evaluateIteration, iterationRoundKey, iterationFingerprintKey } from './iteration.js';
 import { analyzeTrajectory } from './supervisor.js';
@@ -138,6 +139,10 @@ export class Orchestrator {
       store,
       artifacts: this.deps.artifacts,
       provider: this.deps.providerFor?.(run) ?? this.deps.provider,
+      // Real-content discipline: every researcher-facing execution (web/CLI/
+      // desktop, and the E2E servers that ride the real orchestrator) refuses
+      // deterministic-wire scientific output (see StageContext.productRun).
+      productRun: true,
       // RU-9 GO2 effort plane: declared-capability routes derive per-stage gears
       // (table + model clamps) inside invokeStructured; absent = legacy zero-field.
       ...(resolveRunReasoningRoute(store, run) ?? {}),
@@ -164,6 +169,10 @@ export class Orchestrator {
         // milestone note. Reads a FRESH run doc first (B3-critique P0-2): the
         // stage closure's `run` can be stale relative to other writers
         // (adoption, watchdog), and updateRun must never roll the row back.
+        // Lease fence (adversarial round-2 REL-4): the design invariant says a
+        // disowned worker must never write run state — an unfenced updateRun
+        // here could roll back the adopter's transition after mid-call adoption.
+        if (lease !== undefined && this.deps.store.getRunLease(run.id).holder !== lease) return;
         if (total > 0) {
           const fresh = store.getRun(run.id);
           if (fresh !== null) {
@@ -289,6 +298,29 @@ export class Orchestrator {
       }
     }
 
+    // Real-content remediation reopen (2026-08-29): a COMPLETED run whose LATEST
+    // bundle still PROJECTS offline-template hypotheses ("Offline hypothesis N"
+    // riding the scientific layer) reopens export only — the filtered re-render
+    // mints a clean bundle while every legacy object stays in the audit store
+    // and the old bundle stays hash-stable for provenance. Same predicate as the
+    // export stage's applicable() (single owner: export.ts).
+    if (wasCompleted && run.status === 'completed') {
+      const latest = this.deps.store.listObjects('bundle', runId).at(-1);
+      if (latest !== undefined && (await latestBundleTemplateTainted(this.deps.artifacts, latest))) {
+        run = await this.transition(runId, (r) => {
+          const rec = r.stages.find((x) => x.stage === 'export');
+          if (rec && (rec.state === 'done' || rec.state === 'skipped')) {
+            rec.state = 'pending';
+            delete rec.endedAt;
+            delete rec.error;
+          }
+          r.status = 'running';
+          return r;
+        }, lease);
+        this.deps.store.appendEvent(runId, { type: 'run_resumed', status: 'running', detail: { reopened: 'template_content_remediation' } });
+      }
+    }
+
     const signal = this.deps.signals.get(runId) ?? { cancelled: false };
     this.deps.signals.set(runId, signal);
 
@@ -313,6 +345,21 @@ export class Orchestrator {
       this.deps.store.appendEvent(runId, { type: 'note', detail: { reason: 'budget_skip_reopened', stages: exhaustedSkips.map((s) => s.stage) } });
     }
     let budgetWarned = budget.nearLimit();
+
+    // Parking-intent lifecycle: a full (non-stopAfter) execution takes ownership of
+    // the run — any stale 'parking:*' tag (crash guard left behind by a crashed
+    // scope-proposal/stop-after worker) must be cleared HERE, even when the run is
+    // already 'running' (a crashed draft resumes from that status); otherwise a
+    // later crash of THIS execution would freeze the run (watchdog exempt forever).
+    // NOT cleared under opts.stopAfter — the limited execution keeps the tag as its
+    // own crash guard; the park transition clears it on success.
+    if (!opts?.stopAfter && run.tags.some((t) => t.startsWith('parking:'))) {
+      run = await this.transition(runId, (r) => {
+        r.tags = r.tags.filter((t) => !t.startsWith('parking:'));
+        return r;
+      }, lease);
+      this.deps.store.appendEvent(runId, { type: 'note', detail: { reason: 'parking_intent_cleared' } });
+    }
 
     if (run.status !== 'running') {
       const prev = run.status;
@@ -496,10 +543,15 @@ export class Orchestrator {
     // watchdog (30s tick) or a process restart adopts lease-less 'running' runs and
     // would continue the full pipeline behind the user's back — exactly what the
     // scope-proposal draft flow must never allow. 'paused' is the only safe resting
-    // state for a deliberately stopped run (covers CLI --stop-after too).
+    // state for a deliberately stopped run (covers CLI --stop-after too). The park
+    // also clears any 'parking:*' intent tag (see scopeProposal/CLI) so a crashed
+    // worker's draft stops being watchdog-exempt once it is properly parked.
     if (opts?.stopAfter && run.status === 'running') {
       run = await this.transition(runId, (r) => {
         r.status = 'paused' satisfies RunStatus;
+        if (r.tags.some((t) => t.startsWith('parking:'))) {
+          r.tags = r.tags.filter((t) => !t.startsWith('parking:'));
+        }
         return r;
       }, lease);
       this.deps.store.appendEvent(runId, {

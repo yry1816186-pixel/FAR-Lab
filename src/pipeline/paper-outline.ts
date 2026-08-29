@@ -1,5 +1,7 @@
 import { PaperOutline, RELATION_POLARITY } from '../domain/index.js';
 import type { EvidenceRelation, ScientificClaim, SourceDocument } from '../domain/index.js';
+import { isTemplateHypothesis, isTemplatePlan } from '../domain/scientific-state.js';
+import { runTruthProfile, truthDisclosureLine } from '../app/truth-profile.js';
 import type { Store } from '../persistence/store.js';
 
 /**
@@ -141,12 +143,22 @@ export const buildPaperOutline = (store: Store, runId: string, opts: BuildPaperO
   const sources = store.listObjects('source_document', runId);
   const claims = store.listObjects('claim', runId);
   const relations = store.listObjects('evidence_relation', runId);
-  const hypotheses = store.listObjects('hypothesis', runId);
-  const scorecards = store.listObjects('scorecard', runId).sort(byRankThenId);
+  // Real-content discipline (owner directive 2026-08-29): template hypotheses
+  // from legacy offline runs stay stored for audit but never project into the
+  // scientific paper — the abstract/headline must not be "Offline hypothesis 1".
+  // Single owner shared with the export stage's store read (same predicate).
+  const allHypotheses = store.listObjects('hypothesis', runId);
+  const templateHypCount = allHypotheses.filter((h) => isTemplateHypothesis(h)).length;
+  const hypotheses = allHypotheses.filter((h) => !isTemplateHypothesis(h));
+  const realHypIds = new Set(hypotheses.map((h) => h.id as string));
+  const scorecards = store.listObjects('scorecard', runId)
+    .filter((s) => realHypIds.has(s.hypothesisId))
+    .sort(byRankThenId);
   const tournament = store.listObjects('tournament', runId).at(-1) ?? null;
   const evidenceBodies = store.listObjects('evidence_body', runId);
   const ach = store.listObjects('ach_analysis', runId).at(-1) ?? null;
-  const plan = store.listObjects('plan', runId).at(-1) ?? null;
+  // Template plans ("Offline development plan: …") follow the same exclusion rule.
+  const plan = store.listObjects('plan', runId).filter((p) => !isTemplatePlan(p)).at(-1) ?? null;
   const experimentRuns = store.listObjects('experiment_run', runId);
   const statReports = store.listObjects('stat_report', runId).sort(byCreatedAtThenId);
   const experimentSpecs = store.listObjects('experiment_spec', runId);
@@ -284,6 +296,32 @@ export const buildPaperOutline = (store: Store, runId: string, opts: BuildPaperO
 
   // ---- limitations: deterministic synthesis, every line citing real counts ----
   const limitations: PaperOutline['limitations'] = [];
+  if (templateHypCount > 0) {
+    limitations.push({
+      category: 'template_content_excluded',
+      detail: `${templateHypCount} stored hypothesis statements are deterministic-wire template content from the offline development route; they are retained in the audit store but excluded from every section of this paper as scientific content.`,
+      counts: { templateHypothesesExcluded: templateHypCount, hypothesesProjected: hypotheses.length },
+    });
+  }
+  {
+    // Execution truth (export-audit P1, 2026-08-29): the report §9 and bundle
+    // limitations carry this line; the PAPER — the primary scientific
+    // communication artifact — must not be the one surface where a non-live
+    // run's numbers look unqualifiedly real. Same basis as export §9.
+    const truth = runTruthProfile(store, runId);
+    if (truth.klass !== 'live') {
+      limitations.push({
+        category: 'execution_truth',
+        detail: `${truthDisclosureLine(truth)} — deterministic test calls are not real model judgment; treat the affected rankings and analyses accordingly.`,
+        counts: {
+          totalReceipts: truth.totalReceipts,
+          liveModelCalls: truth.modelCalls.live,
+          testModelCalls: truth.modelCalls.test,
+          liveRetrievals: truth.retrieval.live,
+        },
+      });
+    }
+  }
   {
     const metadataOnly = sources.filter((s) => s.contentDepth === 'metadata_only').length;
     const abstractOnly = sources.filter((s) => s.contentDepth === 'abstract').length;
