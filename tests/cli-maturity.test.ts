@@ -70,7 +70,7 @@ describe('far completion: generators cover the real command tree', () => {
 
   it('tree mirrors the router dispatch surface (guards completion drift)', () => {
     expect(FAR_COMMANDS.map((c) => c.name)).toEqual(
-      ['research', 'runs', 'experiment', 'campaign', 'agent', 'probe', 'serve', 'mcp', 'plugin', 'probe-custom', 'memory', 'backup', 'gc', 'data', 'ingest', 'inspect', 'verify', 'new', 'completion'],
+      ['research', 'runs', 'experiment', 'protocol', 'campaign', 'agent', 'probe', 'serve', 'mcp', 'plugin', 'probe-custom', 'memory', 'backup', 'gc', 'data', 'ingest', 'inspect', 'verify', 'new', 'completion'],
     );
     expect(FAR_COMMANDS.find((c) => c.name === 'mcp')!.subs.map((s) => s.name)).toEqual(['list', 'add', 'enable', 'disable', 'probe']);
     expect(FAR_COMMANDS.find((c) => c.name === 'plugin')!.subs.map((s) => s.name)).toEqual(['install', 'list']);
@@ -80,6 +80,7 @@ describe('far completion: generators cover the real command tree', () => {
     expect(FAR_COMMANDS.find((c) => c.name === 'experiment')!.subs.map((s) => s.name)).toEqual(
       ['run', 'enqueue', 'simulate', 'worker', 'status', 'dead-list', 'requeue', 'cancel', 'logs', 'approve', 'rerun'],
     );
+    expect(FAR_COMMANDS.find((c) => c.name === 'protocol')!.subs.map((s) => s.name)).toEqual(['show', 'record']);
     expect(FAR_COMMANDS.find((c) => c.name === 'agent')!.subs.map((s) => s.name)).toEqual(['refine']);
     expect(FAR_COMMANDS.find((c) => c.name === 'campaign')!.subs.map((s) => s.name)).toEqual(['run']);
     expect(FAR_COMMANDS.find((c) => c.name === 'data')!.subs.map((s) => s.name)).toEqual(['info', 'obs']);

@@ -1,20 +1,27 @@
 name: surgery
 
-# Remote-surgery patch plane — DORMANT (pre-merge neutralization, slice 2
-# final, 2026-08-29). During the web-protocol slice this workflow ran two
-# jobs, triggered only by the scripts/surgery/.diag-trigger marker:
-#   apply    — anchored patch scripts (fail-loud, idempotent), every script's
-#              output teed into scripts/surgery/apply-log.txt, committed with
-#              `if: always()` (run #19 proved a silent apply failure otherwise
-#              leaves no trace; run #20's log then exposed the pipefail gap:
-#              GitHub's default bash without an explicit `shell: bash` runs
-#              WITHOUT pipefail, so `node | tee` masked exit codes).
-#   diagnose — every ci.yml verify gate mirrored with tee'd logs committed to
-#              scripts/surgery/diag.txt.
-# The slice is complete (dict.ts zh key landed via 1b76aca; full evidence in
-# apply-log.txt / diag.txt on this branch). Both jobs are retired and no push
-# triggers remain. To reactivate on a future converge/** slice, restore the
-# branch-scoped push trigger + the two jobs (see scripts/surgery/README.md
-# for the mechanism and the pipefail lesson).
+# Remote-surgery patch plane — DORMANT (post-slice-3 neutralization,
+# 2026-08-29). Reactivated twice, always branch-scoped to one converge/**
+# slice and triggered only by the scripts/surgery/.diag-trigger marker:
+#   slice 2 (converge/web-protocol, PR #133) — apply-web-protocol.mjs
+#   slice 3 (converge/protocol-cli, PR #134) — apply-cli-protocol.mjs:
+#     anchored insertion of the `far protocol` route into src/cli/main.ts
+#     (~68KB, unwritable whole over the API) before the unique anchor
+#     `  if (cmd === 'campaign') {` (bot commit 52bb932; evidence in
+#     scripts/surgery/apply-log.txt).
+# Mechanism + hardening (unique fail-loud anchors, idempotent done-markers,
+# `set -o pipefail` on every tee'd step because GitHub's default bash runs
+# WITHOUT pipefail, per-script apply-log committed with `if: always()`):
+# see scripts/surgery/README.md.
+# Validity: a workflow must declare at least one job. The earlier dormant
+# form (`workflow_dispatch:` with zero jobs) was an INVALID workflow, and
+# every push of a branch carrying it registered a phantom failure run
+# (runs #22-#25, including two on main). This dormant form carries a single
+# no-op job: no push triggers exist, and a manual dispatch only echoes.
 on:
   workflow_dispatch:
+jobs:
+  dormant:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'surgery patch plane dormant — see scripts/surgery/README.md'

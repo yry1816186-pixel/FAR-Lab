@@ -100,16 +100,56 @@
 - 中途 lint 解析错误（手术脚本语法、band 错位）已修；诊断提交竞态已由
   stash 后重 add 修复（ff1aaad）
 
+## 切片 3（converge/protocol-cli，PR #134）——终端表面
+
+1. **src/cli/protocol.ts + tests/protocol-cli.test.ts**（6c29a24，自包含先行）：
+   进程内同引擎（createApp + protocol-ops，非 HTTP 客户端）；show 渲染冻结协议
+   真相（范式/planHash 截断/步骤态/QC 汇总/伦理闭锁提示+解锁命令）；record
+   --kind 8 类背书，--actor 必填存档，数值测量本地收敛；UsageError→exit 2、
+   ProtocolOpError→exit 1 诚实呈现；状态机裁决权全在 domain，CLI 绝不自行推进执行。
+   测试：seed 镜像 protocol-api（HTTP 建 run + 直写 store，命令自开 app）、
+   依赖序拒绝/使用错误 exit2/QC 失败值保留可见全覆盖
+2. **main.ts 接线**（68KB 无法整写，锚点脚本 apply-cli-protocol.mjs → bot 52bb932）：
+   在唯一锚 `  if (cmd === 'campaign') {` 前拼接与 experiment 块同构的 17 行路由；
+   done 标记幂等（#27/#28 apply-log 铁证 "already routes protocol — nothing to do"）
+3. **一致性三件套**（b2d0fcc）：completion FAR_COMMANDS + HELP 两行（2 空格缩进
+   满足双向正则）+ cli-maturity 期望数组与 subs 断言同步
+4. **根因六（bump-2 diag 423af9d 铁证）**：protocolCommand 的
+   `return record(o, runId, kind)` 返回**未 await 的 promise**——record() 内抛的
+   UsageError 拒绝绕过 try/catch 直达调用方，"enforces usage (missing --actor…)"
+   用例红（217 文件中唯一失败；其余 2208 用例全绿）。修复 fb5dd7a：两个分发点
+   加 await（show 同病同修）。**bump-3 终裁（3549990 快照）**：217 文件 216 通过
+   1 跳过；2216 用例 2209 通过 7 跳过 0 失败（+1 恰为该用例转绿）；
+   typecheck 0 错/lint 0 错 3 既有 cosmetic/tui 49/49/web build ✓/license PASS，
+   全快照无任何 _FAILED 标记。protocol.ts（8.4KB）经 base64 contents API 字节
+   忠实整写（web 读取器剥 <> 是显示层伪影，非文件实况）
+5. **休眠形态根因（runs #22-25 现象）**：`on: workflow_dispatch:` 零 job 的 workflow
+   是无效定义——每个携带它建分支/推 heads 的 push 都登记幽灵 Failure run（含
+   main 上 #23/#24 两条）。本切片末位改为 workflow_dispatch + 单 no-op job 的合法
+   休眠：无 push 触发、手动派发亦零作用，main Actions 历史不再被污染
+6. **侦察/取证教训**：68KB main.ts 直读不可行 → 派生代理字节级锚点侦察（含 agent
+   块 4 空格缩进陷阱）后一次命中；子代理若无本地 Read 会自作主张改走网络并可能
+   误取旧快照误导裁决（曾误读 main 上切片 2 旧 diag）——委派须显式指定 Read 工具
+   与本地路径。#27 diagnose 与 #26 字节同快照（无 diff 不提交）曾致“无提交”误判——
+   同内容无 diff 是正常静默，非丢失
+
+## 切片 3 验证状态（诚实）
+
+- bump-2 诊断（423af9d）：唯一失败 protocol-cli usage 用例，根因六定位
+- bump-3 诊断（3549990）：全绿（217 文件/2209+7 跳过/0 失败；无任何 _FAILED）
+- **最终合并门 = 本末位提交（surgery 合法休眠 + 控制面补记）head 上的 ci 全绿，
+  此后无任何推送**（bot 推送不触发 ci，不作为门）
+
 ## 登记未做（后续切片，非本 PR 声称范围）
 
-- CLI：`far protocol show/record`（HTTP 已可用；CLI 命令面待加，模式已侦察：
-  experiment.ts 的 CliResult/openWorld/UsageError 结构）
 - 导出链：协议+台账入 bundle（verify 项）与论文 limitations 投影
 - 范式覆盖深化：theory（CAS 集成）、archive（登记库检索接口）
-- 手术 workflow 在 main 保持休眠（workflow_dispatch-only，零 job）；
-  apply-log.txt / diag.txt 留树内作为切片 2 取证记录（path-hygiene 允许）
+- 手术 workflow 在 main 保持休眠（workflow_dispatch + 单 no-op job 合法形态——
+  零 job 版会被 GitHub 判为无效 workflow，每次携带 push 登记幽灵 Failure run）；
+  apply-log.txt / diag.txt 留树内作为切片取证记录（path-hygiene 允许）
 - 既有 cosmetic：tests/memory-live-check.test.ts 三条 unused eslint-disable 警告
-  （main 上既有，非本切片引入）
+  （main 上既有，非本切片引入）；secret-scan 对 tests/thinking-display.test.ts
+  测试假凭据的 MEDIUM 发现与 path-hygiene WARN 亦为 main 既有状态
 
 ## 用户侧不变
 

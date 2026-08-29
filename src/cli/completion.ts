@@ -49,6 +49,14 @@ export const FAR_COMMANDS: readonly CompletionCommand[] = [
     ],
   },
   {
+    name: 'protocol',
+    help: 'paradigm-honest execution ledger (human-attested)',
+    subs: [
+      { name: 'show', help: 'read the frozen protocol + ledger state' },
+      { name: 'record', help: 'append one human-attested record' },
+    ],
+  },
+  {
     name: 'campaign',
     help: 'RU-8 preregistered experiment campaigns',
     subs: [{ name: 'run', help: 'drive a CampaignSpec to a stop rule' }],
