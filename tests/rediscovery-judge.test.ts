@@ -225,12 +225,12 @@ describe('judgeRediscovery pipeline v2.1', () => {
       return v instanceof Error ? { ok: false, error: { message: v.message } } : { ok: true, data: v };
     };
     const res = await judgeRediscovery({ agentText: 'text', gtClaims: gt, call });
-    expect(decomposeUsed).toBe(3);
+    expect(decomposeUsed).toBe(5);
     expect(res.ok).toBe(true);
     if (res.ok) {
       expect(res.counts.agentMatched).toBe(1); // majority yes
       expect(res.counts.gtMatched).toBe(1);
-      expect(res.matcher.version).toBe('v2.2-fixed-gt+tfidf+5vote');
+      expect(res.matcher.version).toBe('v2.3-fixed-gt+tfidf+5p5v');
     }
   });
 });

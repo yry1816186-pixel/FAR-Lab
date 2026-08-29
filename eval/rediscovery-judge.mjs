@@ -15,9 +15,11 @@
  * Variance budget after v2.1 (measured offline in eval/judge-variance.mjs --replay):
  *   matching layer   -> 0 (pure function, same inputs -> same F1)
  *   GT decomposition -> 0 (fixed claims; only the agent side is decomposed)
- *   agent decomposition -> 3-pass median (residual LLM variance, live-measured
- *                          by eval/judge-variance.mjs --live; BLOCKED while model
- *                          routes are down per D-036)
+ *   agent decomposition -> 5-pass median (raised from 3 on 2026-08-29 with the
+ *                          variance diagnosis: a 3-pass median let ONE decomposition
+ *                          drift drop the mechanistic claims carrying a task's
+ *                          matches — crispr swung 0.267 F1 between identical re-judges;
+ *                          median-of-5 needs 3 drifted passes to lose the claims)
  *   borderline adjudication -> 5-vote majority (raised from 3 on 2026-08-29 with the
  *                          gold-v21 recalibration: the wider band carries more pairs,
  *                          and W9's vote-count experiment showed 3 votes are the
@@ -94,7 +96,7 @@ export const medianPass = (passes) => {
  * adapter: async (req, validate) -> { ok, data } | { ok:false, error }. Returns
  * fail-visible errors instead of throwing so variance harnesses can record them.
  */
-export const judgeRediscovery = async ({ agentText, gtClaims, call, passes = 3, votes = 5 }) => {
+export const judgeRediscovery = async ({ agentText, gtClaims, call, passes = 5, votes = 5 }) => {
   const validateDecompose = (raw) => {
     if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return new Error('not an object');
     if (!Array.isArray(raw.agentClaims) || raw.agentClaims.length === 0) return new Error('agentClaims empty');
@@ -175,7 +177,7 @@ export const judgeRediscovery = async ({ agentText, gtClaims, call, passes = 3, 
     ok: true,
     agentClaims,
     decomposition: { passes: decPasses.map((p) => p.length), selected: agentClaims.length },
-    matcher: { version: 'v2.2-fixed-gt+tfidf+5vote', ...MATCH, borderline: m.borderline.length },
+    matcher: { version: 'v2.3-fixed-gt+tfidf+5p5v', ...MATCH, borderline: m.borderline.length },
     adjudications,
     adjudicationVotes,
     scoredUnscored: { votesRequested, votesOk: votesRequested - votesFailed, votesFailed, note: 'failed votes are excluded from the decision, never counted as no (inspect_ai unscored semantics)' },

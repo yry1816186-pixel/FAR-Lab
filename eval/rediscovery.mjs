@@ -14,8 +14,8 @@
  * falsification expectation) of a real research start run — rediscovery at hypothesis
  * level. NOT comparable to official FIRE-Bench agent scores (full-cycle, executed).
  *
- * Judge v2.2 (2026-08-29 recalibration): FIXED ground-truth claims (rediscovery-tasks.mjs,
- * GT_REV) + agent-side fixed-granularity 3-pass-median decomposition + deterministic
+ * Judge v2.3 (2026-08-29 variance-stabilization): FIXED ground-truth claims (rediscovery-tasks.mjs,
+ * GT_REV) + agent-side fixed-granularity 5-pass-median decomposition + deterministic
  * TF-IDF threshold matching (low recalibrated 0.12→0.10 on a new below-floor gold batch)
  * + 5-vote LLM adjudication ONLY for the borderline band (pipeline single-sourced in
  * rediscovery-judge.mjs). Variance budget and offline/live measurement: eval/judge-variance.mjs.
