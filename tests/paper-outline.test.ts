@@ -546,6 +546,43 @@ describe('buildPaperOutline (BP-3 projection)', () => {
     expect(md).not.toContain('question object missing'); // question EXISTS here — no false degradation
     expect(outline.title).toBe('Bare question');
   });
+  it('projects the Scientific Problem Model into methods when one is stored (audit-product residual)', () => {
+    const g = seedFixture();
+    store.putObjectEvented('problem_model', {
+      id: 'pmod_test0000000000000000000000000' as never,
+      runId: g.runId, questionId: 'q_test0000000000000000000000000' as never,
+      objectives: [{ id: 'obj1', statement: 'Determine the optimal P1 convergence order under mixed boundary conditions' }],
+      variables: [],
+      formalization: { problemClass: 'well_posed_computational', governingRelations: [{ id: 'rel1', kind: 'pde', statement: 'Poisson equation with mixed Dirichlet/Neumann boundary conditions on the unit square', assumptions: [] }], boundaryConditions: [], wellPosednessNotes: [] },
+      dataInventory: [], statisticalPremises: { assumptions: [], causalClaims: [] },
+      metrics: [], stopConditions: ['ladder evaluated once'],
+      unknowns: [{ statement: 'behavior beyond the tested split is unmeasured', blocking: false }],
+      provenance: { formedBy: 'model_proposed' },
+      createdAt: NOW, updatedAt: NOW,
+    } as never, { type: 'note', detail: { subject: 'fixture' } }, NOW);
+    store.putObjectEvented('method_selection', {
+      id: 'msel_test00000000000000000000000' as never,
+      runId: g.runId, questionId: 'q_test0000000000000000000000000' as never,
+      forObjectiveId: 'obj1',
+      candidates: [
+        { family: 'numerical_simulation', assessment: 'selected', rationale: 'well-posed elliptic verification question', validationPlan: 'convergence order vs theory-fixed rates' },
+        { family: 'machine_learning', assessment: 'rejected_inappropriate', rationale: 'no labeled tabular dataset' },
+      ],
+      decidedBy: 'model_proposed', createdAt: NOW,
+    } as never, { type: 'note', detail: { subject: 'fixture' } }, NOW);
+    const outline = buildPaperOutline(store, g.runId, { now: NOW });
+    expect(outline.methods.problemModel?.problemClass).toBe('well_posed_computational');
+    expect(outline.methods.problemModel?.selectedFamilies).toEqual(['numerical_simulation']);
+    expect(outline.methods.problemModel?.objectives).toHaveLength(1);
+    const md = renderPaperMarkdown(outline);
+    expect(md).toContain('### Problem model and method selection');
+    expect(md).toContain('numerical_simulation');
+    expect(md).toContain('behavior beyond the tested split is unmeasured');
+    const g2 = seedFixture();
+    const bare = buildPaperOutline(store, g2.runId, { now: NOW });
+    expect(bare.methods.problemModel).toBeUndefined();
+    expect(renderPaperMarkdown(bare)).not.toContain('### Problem model and method selection');
+  });
 });
 
 describe('export stage paper artifact (BP-3 wiring)', () => {

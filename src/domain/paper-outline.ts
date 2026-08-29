@@ -84,6 +84,15 @@ export const PaperOutline = z.object({
   methods: z.object({
     /** Null when no plan object is stored (honest degradation). */
     planRef: PlanId.nullable(),
+    /** AOSSA pre-hypothesis layer (audit-product residual): the Scientific Problem
+     * Model that disciplined hypothesis generation and method routing, projected
+     * whole from the stored object — absent on pre-AOSSA runs, never fabricated. */
+    problemModel: z.object({
+      problemClass: z.string(),
+      objectives: z.array(z.string()).default([]),
+      selectedFamilies: z.array(z.string()).default([]),
+      unknowns: z.array(z.string()).default([]),
+    }).optional(),
     stepsSummary: z.array(z.object({
       stepTitle: z.string().min(1),
       description: z.string(),

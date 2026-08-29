@@ -161,6 +161,8 @@ export const buildPaperOutline = (store: Store, runId: string, opts: BuildPaperO
   const plan = store.listObjects('plan', runId).filter((p) => !isTemplatePlan(p)).at(-1) ?? null;
   const experimentRuns = store.listObjects('experiment_run', runId);
   const statReports = store.listObjects('stat_report', runId).sort(byCreatedAtThenId);
+const storedProblemModel = store.listObjects('problem_model', runId)[0] ?? null;
+const storedSelections = store.listObjects('method_selection', runId);
   const experimentSpecs = store.listObjects('experiment_spec', runId);  // Slice-4 protocol chain: pre-registered protocols + their ledgers project into the
   // paper's limitations — the physical-world legs must be visible in the scientific
   // communication artifact, deviations and QC failures included.
@@ -258,6 +260,14 @@ export const buildPaperOutline = (store: Store, runId: string, opts: BuildPaperO
 
   // ---- methods: plan projection ----
   const methods: PaperOutline['methods'] = {
+  ...(storedProblemModel !== null ? {
+    problemModel: {
+      problemClass: storedProblemModel.formalization.problemClass,
+      objectives: storedProblemModel.objectives.map((o) => o.statement),
+      selectedFamilies: storedSelections.flatMap((s) => s.candidates.filter((c) => c.assessment === 'selected').map((c) => c.family)).filter((f, i, a) => a.indexOf(f) === i),
+      unknowns: storedProblemModel.unknowns.map((u) => u.statement),
+    },
+  } : {}),
     planRef: plan?.id ?? null,
     stepsSummary: plan !== null
       ? plan.steps.map((s) => ({ stepTitle: s.title, description: s.method }))
@@ -587,6 +597,14 @@ export const renderPaperMarkdown = (outline: PaperOutline): string => {
 
   // ---- 2 Methods ----
   push('## 2 Methods', '');
+  if (outline.methods.problemModel !== undefined) {
+    const pm = outline.methods.problemModel;
+    push('### Problem model and method selection', '');
+    push(`Formalized as ${pm.problemClass} before hypothesis generation; selected method families: ${pm.selectedFamilies.join(', ') || 'undecided'}.`, '');
+    for (const o of pm.objectives) push(`- Objective: ${o}`);
+    for (const u of pm.unknowns) push(`- Open unknown: ${u}`);
+    push('', 'Discipline: hypotheses were generated under this model; the model itself is stored verbatim in far.db (problem_model/method_selection objects).', '');
+  }
   if (outline.methods.planRef !== null) {
     push(`- Research plan: \`${outline.methods.planRef}\``);
   } else {
