@@ -21,8 +21,17 @@ import {
 } from '../../domain/index.js';
 import { isTemplateHypothesis, isTemplatePlan } from '../../domain/scientific-state.js';
 
-/** Template-content marker for the remediation re-export trigger (see below). */
-const TEMPLATE_JSONLD = /Offline hypothesis|A deterministic offline mechanism/i;
+/**
+ * Template-content marker for the remediation re-export trigger (see below).
+ * Digit-anchored, unanchored-position (red-team P2-3): matches the wire's exact
+ * shapes ("Offline hypothesis <n> …", "Offline development plan: …",
+ * "A deterministic offline mechanism chain <n> …") wherever they appear —
+ * embedded mid-line inside a JSON-LD serialization or a legacy plan objective —
+ * while a real hypothesis ABOUT offline systems ("Offline hypothesis
+ * evaluation…") never matches. Case-sensitive: prose citing "offline
+ * hypothesis 3" lowercase does not flag.
+ */
+const TEMPLATE_MARKER = /Offline hypothesis \d|Offline development plan:|A deterministic offline mechanism chain \d/;
 
 /**
  * Real-content remediation predicate (2026-08-29): does the LATEST bundle's
@@ -36,7 +45,7 @@ export const latestBundleTemplateTainted = async (
   latest: { hypothesisJsonLd?: unknown[]; finalArtifactHashes: string[] },
 ): Promise<boolean> => {
   const jld = latest.hypothesisJsonLd ?? [];
-  if (jld.some((j) => TEMPLATE_JSONLD.test(JSON.stringify(j)))) return true;
+  if (jld.some((j) => TEMPLATE_MARKER.test(JSON.stringify(j)))) return true;
   try {
     const reportHash = latest.finalArtifactHashes[0];
     if (reportHash !== undefined) {
@@ -45,7 +54,7 @@ export const latestBundleTemplateTainted = async (
       // hypothesis N" mid-line ("Offline development plan: … for: Offline
       // hypothesis 2 …"), and a remediation that cleaned only part of the
       // projection must still read as tainted.
-      if (report !== null && TEMPLATE_JSONLD.test(report)) return true;
+      if (report !== null && TEMPLATE_MARKER.test(report)) return true;
     }
   } catch {
     return true;

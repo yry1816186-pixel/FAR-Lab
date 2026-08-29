@@ -364,11 +364,14 @@ export const buildPaperOutline = (store: Store, runId: string, opts: BuildPaperO
     });
   }
   {
-    const singleSource = evidenceBodies.filter((b) => b.independentSources < 2).length;
+    // Real-content discipline: bodies of excluded (template) hypotheses do not
+    // count (red-team P2-2) — the counts describe the PROJECTED science.
+    const projectedBodies = evidenceBodies.filter((b) => realHypIds.has(b.hypothesisId as string));
+    const singleSource = projectedBodies.filter((b) => b.independentSources < 2).length;
     limitations.push({
       category: 'single_source_evidence_bodies',
-      detail: `${singleSource}/${evidenceBodies.length} evidence bodies rest on fewer than 2 independent sources; single-source evidence is explicitly downgraded, never presented as independent confirmation.`,
-      counts: { evidenceBodies: evidenceBodies.length, singleSource },
+      detail: `${singleSource}/${projectedBodies.length} evidence bodies rest on fewer than 2 independent sources; single-source evidence is explicitly downgraded, never presented as independent confirmation.`,
+      counts: { evidenceBodies: projectedBodies.length, singleSource },
     });
   }
   {

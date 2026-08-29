@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { openDb } from '../src/persistence/db.js';
 import { Store } from '../src/persistence/store.js';
 import { falsifyStage } from '../src/pipeline/stages/falsify.js';
-import { rankStage } from '../src/pipeline/stages/rank.js';
+import { rankStage, SCORE_DIMENSIONS } from '../src/pipeline/stages/rank.js';
+import { TEMPLATE_REFUSAL_REASON } from '../src/pipeline/stages/shared.js';
 import { planStage } from '../src/pipeline/stages/plan.js';
 import { reviseStage } from '../src/pipeline/stages/revise.js';
 import type { StageContext } from '../src/pipeline/types.js';
@@ -118,7 +119,13 @@ const offlineProvider = () => {
   return createOfflineDevProvider(cfg);
 };
 
-const makeCtx = (store: Store, run: ResearchRun, provider: StageContext['provider'], productRun: boolean) => {
+const makeCtx = (
+  store: Store,
+  run: ResearchRun,
+  provider: StageContext['provider'],
+  productRun: boolean,
+  cache?: Map<string, unknown>,
+) => {
   const ctx: StageContext = {
     run,
     store,
@@ -129,7 +136,17 @@ const makeCtx = (store: Store, run: ResearchRun, provider: StageContext['provide
     disowned: () => false,
     log: () => {},
     recordReceipt: () => {},
-    checkpointed: async <T>(_s: string, _f: string, _k: string, _fp: string | undefined, fn: () => Promise<T>) => fn(),
+    // Mirrors the orchestrator's success-only caching: a REFUSED fn (thrown
+    // TemplateModeRefusal inside the checkpointed fn) is never cached.
+    checkpointed: cache === undefined
+      ? async <T>(_s: string, _f: string, _k: string, _fp: string | undefined, fn: () => Promise<T>) => fn()
+      : async <T>(_s: string, family: string, key: string, _fp: string | undefined, fn: () => Promise<T>) => {
+          const k = `${family}:${key}`;
+          if (cache.has(k)) return cache.get(k) as T;
+          const v = await fn();
+          cache.set(k, v);
+          return v;
+        },
   };
   return ctx;
 };
@@ -179,8 +196,7 @@ describe('real-content discipline: mixed route (product run on the offline wire 
     expect(store.listObjects('feedback', run.id)).toHaveLength(1); // signal still pending, resumable
   });
 
-  it('control: the same product run under a LIVE receipt passes the guard and mints (falsify spec)', async () => {
-    const { store, run, hyp } = setup();
+  it('control: the same product run under a LIVE receipt passes the guard and mints (falsify spec)', async () => {    const { store, run, hyp } = setup();
     // A scripted LIVE double (asLive) playing a live route's falsification
     // analysis: full, decidable spec; no links, so the link audit is skipped.
     const spec = {
@@ -205,5 +221,34 @@ describe('real-content discipline: mixed route (product run on the offline wire 
     expect(out.kind).toBe('done');
     const stored = store.listObjects('hypothesis', run.id).find((h) => h.id === hyp.id);
     expect(stored?.falsification?.decisionRule).toBe(spec.decisionRule);
+  });
+
+  it('red-team P1-2: a refused rank batch is never cached — a later LIVE route mints (no poison loop)', async () => {
+    const { store, run, hyp } = setup();
+    const cache = new Map<string, unknown>();
+    // Execution 1: the offline wire under a product run — the refusal must fire
+    // INSIDE the checkpointed fn so the template batch is NOT cached as a
+    // successful step output.
+    const out1 = await rankStage.execute(makeCtx(store, run, offlineProvider(), true, cache));
+    expect(out1.kind).toBe('skipped');
+    expect(out1.kind === 'skipped' && out1.reason).toContain(TEMPLATE_REFUSAL_REASON);
+    expect([...cache.keys()].filter((k) => k.includes('scoring'))).toHaveLength(0);
+    expect(store.listObjects('scorecard', run.id)).toHaveLength(0);
+    // Execution 2: a LIVE route with a full, valid RankOut — a fresh call must
+    // run (no poisoned cache replay) and mint the real scorecard.
+    const dims = SCORE_DIMENSIONS.map((d) => ({ dimension: d, value: 0.7, rationale: 'fixture rationale for the dimension' }));
+    const live = createTestStubProvider(
+      [{ rawOutput: JSON.stringify({ assessments: [{ hypothesisId: hyp.id, dimensions: dims }] }) }],
+      { asLive: true },
+    );
+    const out2 = await rankStage.execute(makeCtx(store, run, live, true, cache));
+    expect(out2.kind).toBe('done');
+    expect(store.listObjects('scorecard', run.id).some((s) => s.hypothesisId === hyp.id)).toBe(true);
+  });
+
+  it('red-team P1-1: refusal skips carry the resume-reopen marker', async () => {
+    const { store, run } = setup();
+    const out = await rankStage.execute(makeCtx(store, run, offlineProvider(), true));
+    expect(out.kind === 'skipped' && out.reason.startsWith(TEMPLATE_REFUSAL_REASON)).toBe(true);
   });
 });

@@ -9,6 +9,7 @@ import type { ArtifactStore, ModelProvider, SourceAdapter } from '../shared/port
 import type { SourceFamily } from '../domain/source.js';
 import { RunBudgetExhaustedError, makeRunBudget, type RunBudgetView } from './run-budget.js';
 import { latestBundleTemplateTainted } from '../pipeline/stages/export.js';
+import { TEMPLATE_REFUSAL_REASON } from '../pipeline/stages/shared.js';
 import { evaluateQualityGate, MAX_QUALITY_ROUNDS } from './quality-gate.js';
 import { evaluateIteration, iterationRoundKey, iterationFingerprintKey } from './iteration.js';
 import { analyzeTrajectory } from './supervisor.js';
@@ -367,6 +368,26 @@ export class Orchestrator {
         return r;
       }, lease);
       this.deps.store.appendEvent(runId, { type: 'note', detail: { reason: 'budget_skip_reopened', stages: exhaustedSkips.map((s) => s.stage) } });
+    }
+    // Real-content refusals (red-team P1-1): a stage skipped with the
+    // TEMPLATE_REFUSAL_REASON marker promised "restore a live model route and
+    // resume" — reopen marker skips exactly like budget pauses so the promise
+    // is true. Under a still-offline route the stages re-refuse (cheap,
+    // deterministic, zero network); under a restored live route the work mints.
+    const templateRefused = run.stages.filter((s) => s.state === 'skipped' && (s.error ?? '').startsWith(TEMPLATE_REFUSAL_REASON));
+    if (templateRefused.length > 0) {
+      run = await this.transition(runId, (r) => {
+        for (const s of templateRefused) {
+          const rec = r.stages.find((x) => x.stage === s.stage);
+          if (rec !== undefined) {
+            rec.state = 'pending';
+            delete rec.endedAt;
+            delete rec.error;
+          }
+        }
+        return r;
+      }, lease);
+      this.deps.store.appendEvent(runId, { type: 'note', detail: { reason: 'template_refusal_reopened', stages: templateRefused.map((s) => s.stage) } });
     }
     let budgetWarned = budget.nearLimit();
 

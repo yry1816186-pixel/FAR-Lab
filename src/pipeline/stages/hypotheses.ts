@@ -29,6 +29,8 @@ import {
   partitionClaimRefs,
   refuseTemplateMode,
   runClaimIds,
+  TEMPLATE_REFUSAL_REASON,
+  TemplateModeRefusal,
   verifiedClaims,
 } from './shared.js';
 import { evaluateQualityGate, type QualityGateSignal } from '../../app/quality-gate.js';
@@ -539,7 +541,12 @@ export const generateHypothesesStage: StageHandler = {
         ? { regenerationCritique: { reasons: critique.reasons, weakDimensions: critique.weakDimensions, priorStatements } }
         : {}),
     });
-    const res = await ctx.checkpointed('generate_hypotheses', 'strategies', `strategy:${def.strategy}:r${round}`, strategyInputs, () =>
+    // Family key rc2 (2026-08-29): pre-guard caches carry no executionMode and
+    // would replay template-era generations unguarded (red-team P2-1); the bump
+    // orphans them — in-flight generation re-runs once, honestly.
+    let res: { provider: string; modelId: string; executionMode: 'live' | 'test'; data: z.infer<typeof StrategyOut> };
+    try {
+      res = await ctx.checkpointed('generate_hypotheses', 'strategies-rc2', `strategy:${def.strategy}:r${round}`, strategyInputs, () =>
         callStructured<z.infer<typeof StrategyOut>>(ctx, {
           stage: 'generate_hypotheses',
           purpose: def.purpose,
@@ -586,18 +593,34 @@ export const generateHypothesesStage: StageHandler = {
           // distribution; anti-dup is enforced deterministically post-hoc (clustering
           // + pre-merge + paraphrase guard), not by decoding temperature.
           temperature: 0.7,
-        }).then((r) => ({ provider: r.provider, modelId: r.modelId, executionMode: r.executionMode, data: r.data })));
+        }).then((r) => {
+          // Red-team P1-2: refuse INSIDE the checkpointed fn — a template answer
+          // cached as a successful step output would poison every later resume
+          // (even under a restored live route). Thrown refusals are never cached.
+          refuseTemplateMode(ctx, r.executionMode, 'hypothesis candidates');
+          return { provider: r.provider, modelId: r.modelId, executionMode: r.executionMode, data: r.data };
+        }));
+    } catch (e) {
+      // Red-team P1-2/P1-1: the in-fn refusal converts to the marker-carrying
+      // strategy skip (resume-reopenable); the throw must escape the checkpoint
+      // so the template answer is never cached.
+      if (e instanceof TemplateModeRefusal) {
+        return { kind: 'skipped', reason: e.message };
+      }
+      throw e;
+    }
       const modelRef = `${res.provider}/${res.modelId}`;
       // Real-content discipline (owner directive 2026-08-29): the deterministic
       // development wire emits template statements ("Offline hypothesis N"),
       // never analysis of this question's evidence. Refuse them at birth —
-      // they must not enter the truth plane as scientific objects. Every
-      // strategy rides the same run route, so the first receipt decides.
+      // they must not enter the truth plane as scientific objects. The
+      // TEMPLATE_REFUSAL_REASON marker makes the stage skip resume-reopenable.
       if (ctx.productRun === true && res.executionMode === 'test') {
         return {
           kind: 'skipped',
           reason:
-            'model route is the deterministic development wire — template hypotheses are refused as scientific content; the evidence base (real retrieved claims) stands, and hypotheses require a live model route (rerun via 研究地图 or CLI)',
+            `${TEMPLATE_REFUSAL_REASON}: model route is the deterministic development wire — template hypotheses are refused as scientific content; ` +
+            'the evidence base (real retrieved claims) stands, and hypotheses require a live model route (restore the route and resume, or rerun via 研究地图 or CLI)',
         };
       }
       const inputIds = (payload.supportingClaims ?? payload.counterDirectionClaims ?? payload.claims ?? []) as {

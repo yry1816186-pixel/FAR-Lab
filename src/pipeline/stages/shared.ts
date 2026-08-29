@@ -38,16 +38,26 @@ export const claimsForPrompt = (claims: readonly ScientificClaim[]): { id: strin
 // ---------------------------------------------------------------------------
 
 /**
+ * Skip-reason marker persisted on stages skipped by the real-content discipline
+ * (red-team P1-1): resume REOPENS these exactly like budget-exhaustion pauses —
+ * the promised recovery ("restore a live model route and resume") must be true.
+ */
+export const TEMPLATE_REFUSAL_REASON = 'template_mode_refused';
+
+/**
  * Thrown by judgment call sites when a PRODUCT run's receipt is test-mode: the
  * deterministic offline development wire answers purposes with template
  * payloads, which must never be stored as scientific content. Stage handlers
- * catch this and record an honest skip (resumable once a live route serves).
+ * catch this and record an honest skip carrying TEMPLATE_REFUSAL_REASON
+ * (resumable once a live route serves — the orchestrator reopens marker skips).
+ * Throw it INSIDE ctx.checkpointed fns: a refusal must never be cached as a
+ * successful step output (red-team P1-2 poison loop).
  */
 export class TemplateModeRefusal extends Error {
   constructor(readonly what: string) {
     super(
-      `model route is the deterministic development wire — template ${what} refused as scientific content ` +
-        `in a product run; restore a live model route and resume (unconsumed work is re-targeted automatically)`,
+      `${TEMPLATE_REFUSAL_REASON}: model route is the deterministic development wire — template ${what} refused as scientific content ` +
+        `in a product run; restore a live model route and resume (marker-skipped stages are reopened automatically)`,
     );
     this.name = 'TemplateModeRefusal';
   }

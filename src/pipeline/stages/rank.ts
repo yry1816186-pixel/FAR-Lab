@@ -673,16 +673,18 @@ async function rankExecute(ctx: StageContext): Promise<StageOutcome> {
           // ran at provider-default temperature while every other judgment stage
           // pinned its decoding. Deterministic-style scoring wants 0.
           temperature: 0,
-        }).then((r) => ({ provider: r.provider, modelId: r.modelId, executionMode: r.executionMode, data: r.data })));
+        }).then((r) => {
+          // Real-content discipline + red-team P1-2: dimension scores are
+          // scientific JUDGMENT, and the refusal must fire INSIDE the
+          // checkpointed fn so a template batch is never cached as a successful
+          // step output (which would brick every later resume). Nothing has
+          // been persisted at this point; evidence bodies above are pure
+          // functions of stored objects and stand. The stage-level catch
+          // converts the throw to a marker skip (resume-reopenable).
+          refuseTemplateMode(ctx, r.executionMode, 'ranking scorecard');
+          return { provider: r.provider, modelId: r.modelId, executionMode: r.executionMode, data: r.data };
+        }));
     });
-    // Real-content discipline (2026-08-29): dimension scores are scientific
-    // JUDGMENT — a deterministic development wire's scores are template. Refuse
-    // BEFORE any scorecard is persisted (evidence bodies above are pure
-    // functions of stored objects and stand). Unscored hypotheses are re-scored
-    // on resume once a live route serves the run.
-    for (const b of batchResults) {
-      refuseTemplateMode(ctx, b.executionMode, 'ranking scorecard');
-    }
     const merged: z.infer<typeof RankOut> = { assessments: batchResults.flatMap((b) => b.data.assessments) };
     const firstProvider = batchResults[0]?.provider ?? 'unknown';
     const firstModel = batchResults[0]?.modelId ?? 'unknown';

@@ -3,6 +3,7 @@ import { ConstraintSet, ResearchQuestion, ScientificGoalType } from '../../domai
 import { callStructured } from '../llm.js';
 import type { StageContext, StageHandler, StageOutcome } from '../types.js';
 import { throwIfCancelled } from './guard.js';
+import { TEMPLATE_REFUSAL_REASON } from './shared.js';
 
 /**
  * Refinement contract — a strict subset of the domain ResearchQuestion fields.
@@ -69,7 +70,8 @@ export const scopeStage: StageHandler = {
       return {
         kind: 'skipped',
         reason:
-          'model route is the deterministic development wire — template scope output is refused as scientific content; configure a live model route to obtain a real scope refinement',
+          `${TEMPLATE_REFUSAL_REASON}: model route is the deterministic development wire — template scope output is refused as scientific content; ` +
+          'configure a live model route and resume to obtain a real scope refinement',
       };
     }
 

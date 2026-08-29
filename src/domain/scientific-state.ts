@@ -137,9 +137,15 @@ export const ScientificState = z.object({
 });
 export type ScientificState = z.infer<typeof ScientificState>;
 
-/** Offline-template content markers (observed shapes of the deterministic offline route). */
+/**
+ * Offline-template content markers (observed shapes of the deterministic offline
+ * route). Digit-anchored (red-team P2-3): a REAL live hypothesis about offline
+ * systems ("Offline hypothesis evaluation improves …") must never be excluded —
+ * the wire's shapes are always "Offline hypothesis <n> (…)" and
+ * "A deterministic offline mechanism chain <n>: …".
+ */
 export const isTemplateHypothesis = (h: HypothesisCandidate): boolean =>
-  /^Offline hypothesis/i.test(h.statement) || /^A deterministic offline mechanism/i.test(h.mechanism ?? '');
+  /^Offline hypothesis \d/i.test(h.statement) || /^A deterministic offline mechanism chain \d/i.test(h.mechanism ?? '');
 
 /** Plan-object marker: the offline wire's research-plan-design objective (see offline.ts researchPlanDesign). */
 export const isTemplatePlan = (p: { objective: string }): boolean => /^Offline development plan:/i.test(p.objective);
