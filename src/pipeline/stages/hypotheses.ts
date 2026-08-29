@@ -563,6 +563,7 @@ export const generateHypothesesStage: StageHandler = {
       relations: relations.map((r) => ({ id: r.id, relation: r.relation })),
       instructions: STRATEGY_DEFS.map((d) => d.instruction),
       discipline: DIVERSITY_DISCIPLINE,
+      problemModelDiscipline: PROBLEM_MODEL_DISCIPLINE, // W2 audit: the prompt constant must ride the fingerprint
       ...(priorMemory.length > 0 ? { priorMemoryIds: priorMemory.map((m) => m.id) } : {}),
       ...(regeneration && critique !== null
         ? { regenerationCritique: { reasons: critique.reasons, weakDimensions: critique.weakDimensions, priorStatements } }
@@ -1118,4 +1119,5 @@ export const generateHypothesesStage: StageHandler = {
     return { kind: 'done', summary: parts.join(' ') };
   },
 };
+
 

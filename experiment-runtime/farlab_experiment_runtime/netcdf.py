@@ -170,22 +170,25 @@ def op_netcdf_extract_features(payload: dict[str, Any]) -> dict[str, Any]:
             monthly = v.resample(time="1MS").mean(skipna=True)
             spatial_dims = [d for d in monthly.dims if d != "time"]
             stacked = monthly.stack(cell=tuple(spatial_dims)) if spatial_dims else monthly.expand_dims(cell=[0])
+            # stack(cell=(lat, lon)) flattens row-major over the SPATIAL dims in
+            # the variable's dim order -> ci = lat_idx * lon_size + lon_idx.
+            lat = ds["lat"].values if "lat" in ds.coords else None
+            lon = ds["lon"].values if "lon" in ds.coords else None
+            lon_size = int(lon.size) if lon is not None else (stacked.shape[1] if lat is not None else 1)
             rows = ["time,lat,lon,value"]
             count = 0
             tvals = monthly["time"].values
-            lat = ds["lat"].values if "lat" in ds.coords else None
-            lon = ds["lon"].values if "lon" in ds.coords else None
             for ti in range(stacked.shape[0]):
+                ts = str(np.datetime64(tvals[ti], "D"))
                 for ci in range(stacked.shape[1]):
                     val = float(stacked.values[ti, ci])
                     if not np.isfinite(val):
                         continue
                     if count >= max_rows:
                         break
-                    t = str(np.datetime64(tvals[ti], "D"))
-                    la = float(lat.flat[ci]) if lat is not None and ci < lat.size else ci
-                    lo = float(lon.flat[ci]) if lon is not None and ci < lon.size else 0.0
-                    rows.append(f"{t},{la:.5g},{lo:.5g},{val:.6g}")
+                    la = float(lat[ci // lon_size]) if lat is not None else float(ci)
+                    lo = float(lon[ci % lon_size]) if lon is not None else 0.0
+                    rows.append(f"{ts},{la:.5g},{lo:.5g},{val:.6g}")
                     count += 1
                 if count >= max_rows:
                     break

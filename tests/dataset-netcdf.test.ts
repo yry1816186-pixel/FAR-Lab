@@ -81,3 +81,28 @@ describe.skipIf(!fs.existsSync(REAL_NC))('netcdf data plane (real NCEP file, rea
     expect(derived).toBe(csv);
   }, 180_000);
 });
+
+describe('audit C1 regression: monthly gridpoint coordinates are physical, never index-fabricated', () => {
+  it('monthly_mean_per_gridpoint emits lat in the file coordinate range and lon likewise', async () => {
+    const { createSidecar } = await import('../src/experiment/python.js');
+    const sidecar = createSidecar();
+    try {
+      const r = await sidecar.call<{ csv: string; nRows: number }>('netcdf_extract_features', {
+        path: REAL_NC, variable: 'air', feature: 'monthly_mean_per_gridpoint', maxRows: 4000,
+      }, 180_000);
+      expect(r.ok).toBe(true);
+      const lines = (r.result?.csv ?? '').trim().split('\n');
+      expect(lines[0]).toBe('time,lat,lon,value');
+      const lats = new Set<number>(); const lons = new Set<number>();
+      for (const ln of lines.slice(1)) {
+        const p = ln.split(',');
+        lats.add(parseFloat(p[1]!)); lons.add(parseFloat(p[2]!));
+      }
+      // NCEP grid: lat 15..75 (25 values), lon 200..330 (53 values)
+      for (const v of lats) { expect(v).toBeGreaterThanOrEqual(15); expect(v).toBeLessThanOrEqual(75); }
+      for (const v of lons) { expect(v).toBeGreaterThanOrEqual(200); expect(v).toBeLessThanOrEqual(330); }
+      expect(lats.size).toBeGreaterThan(10);
+      expect(lons.size).toBeGreaterThan(20);
+    } finally { sidecar.close(); }
+  }, 180_000);
+});

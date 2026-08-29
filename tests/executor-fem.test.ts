@@ -103,6 +103,24 @@ const measurement = (over: Partial<FemMeasurement> = {}): FemMeasurement => ({
   ...over,
 });
 
+const fakeSidecarAdaptive = (script: FemAdaptiveMeasurement[]): Sidecar => {
+  let i = 0;
+  return {
+    call: async <T>(op: string, _payload: unknown, _timeoutMs: number): Promise<SidecarCallResult<T>> => {
+      if (op !== 'fem_poisson_2d_adaptive') return { ok: false, error: { kind: 'test_double', message: `unexpected op ${op}` } };
+      const next = script[i];
+      i += 1;
+      if (next === undefined) return { ok: false, error: { kind: 'test_double', message: 'fake sidecar script exhausted' } };
+      return { ok: true, result: next as T };
+    },
+    logs: () => [],
+    envInfo: () => null,
+    lockfileHash: () => null,
+    warmup: async () => ({ pythonVersion: 'test-double', versions: {} }),
+    close: () => {},
+  };
+};
+
 afterEach(() => {
   for (const db of dbs.splice(0)) db.close();
   for (const d of dirs.splice(0)) fs.rmSync(d, { recursive: true, force: true });
@@ -354,5 +372,37 @@ describe('adaptive FEM (slice 6b): verdict mechanics + real sidecar', () => {
     expect(lastH1).toBeLessThan(0.8); // r^0.7 theory: ~0.7, clearly below the smooth rate 1
     expect(lastH1).toBeGreaterThan(0.4);
   }, 120_000);
+});
+
+
+describe('audit C2 regression: non-finite measurements never mint a stat_report (no store poisoning)', () => {
+  it('all-nonFinite adaptive history completes the run with ZERO stat_reports and a readable store afterwards', async () => {
+    const { store, runId, artifacts } = makeEnv();
+    const spec = makeSpec(runId, {
+      mode: 'adaptive',
+      levels: undefined,
+      adaptive: { markingTheta: 0.5, baseGrid: 4, iterations: 5 },
+      exploratoryNote: 'exploratory — nonfinite probe',
+    });
+    const nanMeasurement: FemAdaptiveMeasurement = {
+      mode: 'adaptive',
+      manufactured: spec.manufacturedSolution,
+      forcing: 'x', edges: { bottom: 'dirichlet', top: 'neumann', left: 'dirichlet', right: 'neumann' },
+      markingTheta: 0.5, baseGrid: 4, iterations: 5,
+      history: [{ ndof: 25, nonFinite: true }, { ndof: 35, nonFinite: true }, { ndof: 45, nonFinite: true }, { ndof: 60, nonFinite: true }],
+      h1Rates: [], h1SlopeVsNdof: null, expectedOptimalSlope: -0.5, effectivities: [],
+    };
+    const out = await executeFemAnalysis(store, artifacts, spec, {
+      sidecar: () => fakeSidecarAdaptive([nanMeasurement]),
+      now: () => T0,
+    });
+    expect(out.run.status).toBe('completed');
+    expect(out.statReports).toHaveLength(0);
+    // the poison test: reading stat_reports for the run still works
+    expect(() => store.listObjects('stat_report', runId)).not.toThrow();
+    expect(store.listObjects('stat_report', runId)).toHaveLength(0);
+    const note = store.listEvents(runId).find((e) => (e.detail as Record<string, unknown>).kind === 'fem_stat_report_skipped_nonfinite');
+    expect(note).toBeDefined();
+  });
 });
 

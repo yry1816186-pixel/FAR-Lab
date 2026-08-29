@@ -176,7 +176,28 @@ export const executeFemAnalysis = async (
     const ruleLine = mU !== null
       ? 'errors strictly decrease AND final L2 order >= 2 - 0.25, final H1 order >= 1 - 0.25'
       : 'H1 strictly decreases AND log-log slope <= -0.5 + 0.1 AND final effectivity <= 10';
-    const report: StatReport = {
+    // Audit C2 (engineering, 2026-08-30): a non-finite pointEstimate/effect would
+    // persist as null and poison every later stat_report read for the run
+    // (zod fail-closed). Non-finite measurements get an honest note instead of a
+    // report; the measurement table artifact keeps the evidence.
+    if (!Number.isFinite(pointEstimate) || !Number.isFinite(effectValue)) {
+      store.appendEvent(spec.runId, {
+        type: 'note',
+        detail: {
+          kind: 'fem_stat_report_skipped_nonfinite',
+          experimentRun: expRun.id,
+          mode: m.mode,
+          verdict: verdict ?? 'insufficient_data',
+          reason: 'measured quantities are non-finite (all-nonFinite levels or too few usable rounds) — no numeric report minted',
+        },
+      }, now());
+      const completedNoReport: ExperimentRun = {
+        ...expRun, status: 'completed', endedAt: now(),
+        statReportIds: [],
+      };
+      persist(completedNoReport, 'experiment_completed', { id: expRun.id, experimentType: 'numerical_pde', verdict: undefined, feedback: 0, statReports: 0, nonFinite: true });
+      return { run: completedNoReport, statReports: [], feedback: [], measurement: m };
+    }    const report: StatReport = {
       id: newId('srep') as StatReport['id'],
       experimentRunId: expRun.id,
       runId: spec.runId,
@@ -246,5 +267,6 @@ export const executeFemAnalysis = async (
     sidecar.close();
   }
 };
+
 
 
