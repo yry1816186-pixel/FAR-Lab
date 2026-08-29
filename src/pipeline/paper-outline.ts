@@ -27,7 +27,7 @@ const TOP_N_HYPOTHESES = 3;
 
 const PROVENANCE_NOTE =
   'Deterministic projection of stored run objects (question, sources, claims, evidence relations, ' +
-  'hypotheses, scorecards, tournament, evidence bodies, ACH analysis, plan, experiment stat reports); ' +
+  'hypotheses, scorecards, tournament, evidence bodies, ACH analysis, plan, experiment stat reports, protocols and their execution ledgers); ' +
   'zero LLM/network calls; missing objects degrade to null refs and disclosed counts.';
 
 // ---------------------------------------------------------------------------
@@ -161,7 +161,11 @@ export const buildPaperOutline = (store: Store, runId: string, opts: BuildPaperO
   const plan = store.listObjects('plan', runId).filter((p) => !isTemplatePlan(p)).at(-1) ?? null;
   const experimentRuns = store.listObjects('experiment_run', runId);
   const statReports = store.listObjects('stat_report', runId).sort(byCreatedAtThenId);
-  const experimentSpecs = store.listObjects('experiment_spec', runId);
+  const experimentSpecs = store.listObjects('experiment_spec', runId);  // Slice-4 protocol chain: pre-registered protocols + their ledgers project into the
+  // paper's limitations — the physical-world legs must be visible in the scientific
+  // communication artifact, deviations and QC failures included.
+  const protocols = store.listObjects('protocol', runId);
+  const protocolExecutions = store.listObjects('protocol_execution', runId);
 
   const hypById = new Map(hypotheses.map((h) => [h.id as string, h] as const));
   const claimById = new Map(claims.map((c) => [c.id as string, c] as const));
@@ -397,6 +401,20 @@ export const buildPaperOutline = (store: Store, runId: string, opts: BuildPaperO
     });
   }
 
+  {
+    // Slice-4: deviations/QC failures from the human-attested ledgers (only LEDGER
+    // entries count — declared plan risks are not protocol facts). Ledgers ship
+    // verbatim in the reproducibility bundle (protocolEvidence).
+    if (protocols.length > 0) {
+      const deviations = protocolExecutions.reduce((a, ex) => a + ex.deviations.length, 0);
+      const qcFailed = protocolExecutions.reduce((a, ex) => a + ex.measurements.filter((m) => !m.qcPassed).length, 0);
+      limitations.push({
+        category: 'protocol_deviations',
+        detail: `${protocols.length} pre-registered protocol(s) with ${protocolExecutions.length} human-attested ledger(s): ${deviations} recorded deviation(s) and ${qcFailed} QC-failed measurement(s). Physical-world execution is attested by named actors, not machine-verified; the ledgers and frozen specs ship verbatim in the reproducibility bundle.`,
+        counts: { protocols: protocols.length, ledgers: protocolExecutions.length, deviations, qcFailedMeasurements: qcFailed },
+      });
+    }
+  }
   // ---- references: cited sources (top hypotheses' claim grounding + counter-evidence
   // highlights' claims), BibTeX from stored metadata ----
   const citedClaimIds = new Set<string>();

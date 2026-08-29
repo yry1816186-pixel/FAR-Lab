@@ -33,14 +33,16 @@ const ID_PREFIX = {
   effect_estimate: 'efx',
   iteration: 'itr',
   tool_integration: 'tint',
+  protocol: 'prt',
+  protocol_execution: 'pex',
 } as const;
 
-/** The single id-shape grammar: <prefix>_[0-9a-z]{20,32} (26-char ULID-style body from newId). */
+/** The single id-shape grammar: _[0-9a-z]{20,32} (26-char ULID-style body from newId). */
 const idShape = (prefix: string): RegExp => new RegExp(`^${prefix}_[0-9a-z]{20,32}$`);
 
 /** Branded entity IDs. Prefix encodes the entity kind; body is opaque. */
 export const idOf = (prefix: string) =>
-  z.string().regex(idShape(prefix), `must be ${prefix}_<random>`);
+  z.string().regex(idShape(prefix), `must be ${prefix}_`);
 
 export const RunId = idOf(ID_PREFIX.run);
 export const QuestionId = idOf(ID_PREFIX.question);
@@ -69,6 +71,8 @@ export const PredictionId = idOf(ID_PREFIX.prediction);
 export const EffectEstimateId = idOf(ID_PREFIX.effect_estimate);
 export const IterationId = idOf(ID_PREFIX.iteration);
 export const ToolIntegrationId = idOf(ID_PREFIX.tool_integration);
+export const ProtocolId = idOf(ID_PREFIX.protocol);
+export const ProtocolExecutionId = idOf(ID_PREFIX.protocol_execution);
 
 export type RunId = z.infer<typeof RunId>;
 export type QuestionId = z.infer<typeof QuestionId>;
@@ -97,6 +101,8 @@ export type PredictionId = z.infer<typeof PredictionId>;
 export type EffectEstimateId = z.infer<typeof EffectEstimateId>;
 export type IterationId = z.infer<typeof IterationId>;
 export type ToolIntegrationId = z.infer<typeof ToolIntegrationId>;
+export type ProtocolId = z.infer<typeof ProtocolId>;
+export type ProtocolExecutionId = z.infer<typeof ProtocolExecutionId>;
 
 /** Kinds an ObjectRef may point at (the referenceable subset of id-bearing kinds). */
 const OBJECT_REF_KINDS = [
@@ -105,6 +111,7 @@ const OBJECT_REF_KINDS = [
   'receipt', 'bundle', 'artifact',
   'experiment_spec', 'experiment_run', 'dataset_record', 'result_set', 'stat_report',
   'evidence_body', 'ach_analysis', 'prediction',
+  'protocol', 'protocol_execution',
 ] as const;
 
 /**

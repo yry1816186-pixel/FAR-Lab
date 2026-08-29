@@ -13,6 +13,7 @@ ResearchQuestion + ResearchScope + ConstraintSet
      -> HypothesisScorecard / Comparison
      -> ResearchPlan -> ValidationTask/DatasetRequirement/ToolRequirement
      -> ExperimentSpec -> ExperimentRun (DatasetRecord / ModelSpec) -> ResultSet -> StatReport
+     -> ProtocolSpec -> ProtocolExecution (Measurements / Deviations / Approvals)
      -> FeedbackSignal -> Revision -> VersionDiff
      -> ProvenanceReceipt -> ReproducibilityBundle
 ```
@@ -59,6 +60,22 @@ A **ResearchPlan** encodes what is needed to test/discriminate candidates: objec
 
 Each step has inspectable inputs/outputs/failure conditions. The experiment execution subsystem (D-081, user-mandated) makes selected plan steps machine-executable: dataset acquisition/splitting/preprocessing, domain-model building/training/evaluation, experiment matrices and statistical analysis. It is a first-class subsystem with its own acceptance criteria, but its authority is subordinate: it exists to test hypotheses, and the Direction-A loop (question → hypotheses → plan) remains the orchestrating core.
 
+## 7.5 Research protocol (paradigm-honest execution; 2026-08-29 convergence)
+
+A **ProtocolSpec** is the PREREGISTERED operationalization of a plan's real-world legs — bench, field, human-subjects, engineering, archive or theoretical work the software cannot execute itself: materials with hazards, instruments with calibration requirements, arms, a sampling plan, a code-committed randomization sequence (deterministic in the frozen plan hash — regenerated, never re-randomized), steps with explicit human-confirmation requirements, measurement variables with declarative QC, ethics gates and stop conditions. It freezes against the plan hash; a causally revised plan deserves a new registration.
+
+A **ProtocolExecution** is the append-only, human-attested ledger of what actually happened. Semantics:
+
+- every state transition comes from a HUMAN-recorded event; the software never advances, completes or fabricates execution;
+- the ethics gate is fail-closed (no execution records until the declared approval is recorded);
+- dependency order between steps is enforced deterministically;
+- measurements are recorded values with deterministic QC verdicts — a failing value is kept and flagged, never silently dropped;
+- recorded measurements are DATA, never hypothesis verdicts (StatReport semantics stay with the experiment subsystem);
+- deviations are first-class (what/why/consequence), mirroring the plan's preregistration-deviation discipline;
+- when the ledger completes (or the researcher publishes a partial outcome), it projects into a **FeedbackSignal** with source `experiment` — the physical world's evidence enters the SAME feedback → revise causal chain as every other executed result.
+
+The model may propose inside a closed declarative space when drafting a protocol; ids, seeds, allocation sequences, collection forms and every validation verdict are owned by deterministic code. Adjustments the code makes to a draft are disclosed, never silent. A product run on the deterministic development wire is refused (template protocol ≠ preregistered science).
+
 ## 8. Feedback and revision
 
 **FeedbackSignal** identifies source/type (human, evidence, tool/validation), target object, content and provenance.
@@ -90,4 +107,5 @@ Improvement is a claim requiring evaluation evidence; some revisions may be neut
 - LLM output is never a scientific source by itself.
 - Evidence graph is not a generic knowledge-graph product.
 - The experiment execution subsystem serves falsification of Direction-A hypotheses (D-081); it does not turn FAR-Lab into a Direction-B instrument-control product, a general ML platform, or a foundation-model training system.
+- The protocol layer does not turn FAR-Lab into an ELN/LIMS replacement: it represents real-world work honestly (preregistration + human-attested ledger + outcome feedback), it does not claim to run it.
 - Software green tests do not prove scientific validity.

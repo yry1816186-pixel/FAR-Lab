@@ -7,6 +7,7 @@ export * from './evidence.js';
 export * from './hypothesis.js';
 export * from './scorecard.js';
 export * from './plan.js';
+export * from './protocol.js';
 export * from './feedback.js';
 export * from './provenance.js';
 export * from './experiment.js';

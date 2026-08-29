@@ -16,6 +16,7 @@ import {
   IterationRecord,
   ScreeningSession,
   ScreeningDecision,
+  ProtocolSpec, ProtocolExecution,
 } from '../domain/index.js';
 import { z } from 'zod';
 import { STAGE_ORDER } from '../domain/run.js';
@@ -35,6 +36,8 @@ const KIND_SCHEMAS = {
   scorecard: HypothesisScorecard,
   tournament: HypothesisTournament,
   plan: ResearchPlan,
+  protocol: ProtocolSpec,
+  protocol_execution: ProtocolExecution,
   feedback: FeedbackSignal,
   revision: Revision,
   version_diff: VersionDiff,

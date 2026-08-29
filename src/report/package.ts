@@ -145,6 +145,30 @@ export const buildReproducibilityPackage = async (
   // ---- bundle.json (canonical serialization of the stored bundle object) ----
   written.push({ path: 'bundle.json', content: Buffer.from(canonicalJson(bundle), 'utf8'), encodingFormat: 'application/json', name: 'Reproducibility bundle (machine contract)', crate: true });
 
+  // ---- protocol chain (slice 4): frozen specs + human-attested ledgers on disk ----
+  for (const pe of bundle.protocolEvidence ?? []) {
+    const proto = deps.store.getObject('protocol', pe.protocolId);
+    if (proto === null) {
+      throw new Error(`bundle ${bundle.id} declares protocol ${pe.protocolId} but the store has no such object — re-export first; a package must project exactly the bundled evidence`);
+    }
+    const protoBytes = canonicalJson(proto);
+    if (sha256Hex(protoBytes) !== pe.protocolArtifactHash) {
+      throw new Error(`protocol ${pe.protocolId} bytes drifted from the bundle's declared artifact hash — re-export first`);
+    }
+    written.push({ path: `protocol/${pe.protocolId}.json`, content: Buffer.from(protoBytes, 'utf8'), encodingFormat: 'application/json', name: `Pre-registered research protocol (${proto.paradigm})`, crate: true });
+    if (pe.executionId !== null) {
+      const ledger = deps.store.getObject('protocol_execution', pe.executionId);
+      if (ledger === null) {
+        throw new Error(`bundle ${bundle.id} declares ledger ${pe.executionId} but the store has no such object — re-export first`);
+      }
+      const ledgerBytes = canonicalJson(ledger);
+      if (pe.ledgerArtifactHash !== null && sha256Hex(ledgerBytes) !== pe.ledgerArtifactHash) {
+        throw new Error(`ledger ${pe.executionId} bytes drifted from the bundle's declared artifact hash — re-export first`);
+      }
+      written.push({ path: `protocol/${pe.executionId}.ledger.json`, content: Buffer.from(ledgerBytes, 'utf8'), encodingFormat: 'application/json', name: `Human-attested execution ledger (${pe.deviations} deviations, ${pe.qcFailedMeasurements} QC-failed measurements)`, crate: true });
+    }
+  }
+
   // ---- pandoc conversion (best-effort, honestly reported) ----
   const produced: PandocFormat[] = [];
   const unavailable: Array<{ format: string; reason: string }> = [];

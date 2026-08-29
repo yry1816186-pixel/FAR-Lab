@@ -20,6 +20,7 @@ import { buildZip, type ZipEntry } from './zip.js';
 import { buildLineageGraph } from '../app/lineage.js';
 import { runEvaluators } from '../app/evaluators.js';
 import { runResearchAction, ActionError } from './actions.js';
+import { getProtocolState, recordProtocolEvent, ProtocolOpError } from './protocol-ops.js';
 import { connectClaim, editHypothesis, forkHypothesis, HypothesisOpError, promoteHypothesis, rejectHypothesis } from './hypothesis-ops.js';
 import {
   annotateClaim, ClaimOpError, excludeClaim, excludedClaimIdsOf, pinClaim, reclassifyClaim, reinstateClaim,
@@ -2356,6 +2357,49 @@ function parseSeedSources(raw: unknown): string | {
         mustGetRun(runId);
         sendJson(res, 200, runTruthProfile(app.store, runId));
         return;
+      }
+      if (segments.length === 5 && segments[4] === 'protocol' && method === 'GET') {
+        // Protocol plane (convergence 2026-08-29): the frozen preregistration +
+        // human-attested ledger for the plan's real-world legs (bench/field/human/
+        // engineering/archive/theory). Read-only projection; the deterministic
+        // state machine lives in protocol-ops/domain — never in the router.
+        mustGetRun(runId);
+        try {
+          sendJson(res, 200, getProtocolState(app, runId));
+          return;
+        } catch (e) {
+          if (e instanceof ProtocolOpError) {
+            throw new HttpError(e.status, {
+              code: e.code === 'state_conflict' ? 'validation' : e.code,
+              message: e.message,
+              retryable: false,
+              ...(e.code === 'not_found' ? { runId } : {}),
+            });
+          }
+          throw e;
+        }
+      }
+      if (segments.length === 6 && segments[4] === 'protocol' && segments[5] === 'records' && method === 'POST') {
+        // One human-attested protocol record: step start/complete, measurement,
+        // deviation, approval, block/unblock, abort. Deterministic validation
+        // (ethics gate, dependency order, typing, QC); completion publishes the
+        // outcome as an experiment FeedbackSignal exactly once.
+        mustGetRun(runId);
+        const body = await readJsonObject(req);
+        try {
+          sendJson(res, 200, recordProtocolEvent(app, runId, body));
+          return;
+        } catch (e) {
+          if (e instanceof ProtocolOpError) {
+            throw new HttpError(e.status, {
+              code: e.code === 'state_conflict' ? 'validation' : e.code,
+              message: e.message,
+              retryable: false,
+              ...(e.code === 'not_found' ? { runId } : {}),
+            });
+          }
+          throw e;
+        }
       }
       if (segments.length === 5 && segments[4] === 'counter-search' && method === 'POST') {
         // §5.2 counter-evidence loop closure: execute ONE researcher-directed

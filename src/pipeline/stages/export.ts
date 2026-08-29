@@ -680,7 +680,18 @@ export const exportStage: StageHandler = {
       .find((r) => r.createdAt > latestBundle.createdAt);
     if (newerRevision !== undefined) return true;
     const sourceCount = ctx.store.listObjects('source_document', ctx.run.id).length;
-    if (sourceCount > latestBundle.sourceArtifactHashes.length) return true;
+    if (sourceCount > latestBundle.sourceArtifactHashes.length) return true;    // Slice-4 (count-based like the source rule): a protocol ledger that grew past
+    // what the latest bundle recorded, or a protocol registered after the bundle,
+    // forces re-export — the bundle must never omit ledger truth the store holds.
+    const coveredProtocols = new Map((latestBundle.protocolEvidence ?? []).map((e) => [e.protocolId, e]));
+    for (const p of ctx.store.listObjects('protocol', ctx.run.id)) {
+      const covered = coveredProtocols.get(p.id);
+      if (covered === undefined) return true;
+      const ex = ctx.store.listObjects('protocol_execution', ctx.run.id).find((e) => e.protocolId === p.id) ?? null;
+      const coveredRecords = covered.executionId !== null ? covered.recordCount : 0;
+      if ((ex?.records.length ?? 0) > coveredRecords) return true;
+    }
+
     // Real-content remediation (2026-08-29): a bundle minted by a build that
     // still PROJECTED offline-template hypotheses carries them in its scientific
     // layer — re-export under the filtering discipline mints a clean bundle
@@ -723,7 +734,10 @@ export const exportStage: StageHandler = {
     const resultSets = ctx.store.listObjects('result_set', run.id);
     // Collected for bundle completeness accounting; report rendering reads experiment runs
     // directly — underscore keeps the unused-name honest instead of deleting the read.
-    const _statReports = ctx.store.listObjects('stat_report', run.id);
+    const _statReports = ctx.store.listObjects('stat_report', run.id);    // Slice-4 protocol chain: pre-registered protocols + human-attested ledgers ride the export.
+    const protocols = ctx.store.listObjects('protocol', run.id);
+    const protocolExecutions = ctx.store.listObjects('protocol_execution', run.id);
+
 
     // Hash of what is actually on disk; a marked placeholder when missing (never invented).
     // Resolved from THIS module's location (WP2 F2), not process.cwd(): `far research`
@@ -840,10 +854,45 @@ export const exportStage: StageHandler = {
     // fully live (synthetic / replayed / mixed external evidence must not be able
     // to hide inside a bundle that looks reproducible-live).
     const truthAll = truthProfileFromReceipts(run.id, allReceipts);
+    // Slice-4 protocol evidence: content-address the frozen spec and the ledger; the
+    // ledger's honesty counts ride the bundle and its limitations line is verbatim-
+    // checkable (verify re-derives counts and requires the disclosure line).
+    const protocolEvidenceEntries: Array<{
+      protocolId: string;
+      executionId: string | null;
+      protocolArtifactHash: string;
+      ledgerArtifactHash: string | null;
+      recordCount: number;
+      deviations: number;
+      qcFailedMeasurements: number;
+    }> = [];
+    const protocolLimitationLines: string[] = [];
+    for (const p of protocols) {
+      const specPut = await ctx.artifacts.put(canonicalJson(p));
+      const ex = protocolExecutions.find((e) => e.protocolId === p.id) ?? null;
+      const ledgerPut = ex !== null ? await ctx.artifacts.put(canonicalJson(ex)) : null;
+      const deviations = ex !== null ? ex.deviations.length : 0;
+      const qcFailed = ex !== null ? ex.measurements.filter((m) => !m.qcPassed).length : 0;
+      protocolEvidenceEntries.push({
+        protocolId: p.id,
+        executionId: ex !== null ? ex.id : null,
+        protocolArtifactHash: specPut.hash,
+        ledgerArtifactHash: ledgerPut !== null ? ledgerPut.hash : null,
+        recordCount: ex !== null ? ex.records.length : 0,
+        deviations,
+        qcFailedMeasurements: qcFailed,
+      });
+      protocolLimitationLines.push(
+        `协议 ${p.id}（${p.paradigm}）：${ex !== null ? `台账 ${ex.id} 状态 ${ex.status}；` : '台账未开始；'}`
+          + `${deviations} 项偏差、${qcFailed} 项 QC 失败测量如实留存；物理环节复现需人工按采集表重做`,
+      );
+    }
+
     const limitations = [
       '模型环节为 LLM 生成、具有非确定性：bundle 可复放的是输入快照、模型元数据、receipts 与工件哈希，不保证重新生成逐字节一致的输出。',
       ...(truthAll.klass !== 'live' ? [truthDisclosureLine(truthAll)] : []),
-      ...collectMissing(inputs, { lockMissing, receipts: allReceipts, templateHypCount, templatePlanCount }),
+      ...collectMissing(inputs, { lockMissing, receipts: allReceipts, templateHypCount, templatePlanCount }),      ...protocolLimitationLines,
+
     ];
 
     const bundleId = newId('bnd');
@@ -870,6 +919,7 @@ export const exportStage: StageHandler = {
       limitations,
       // SWAN interchange (W-G follow-up): surviving hypotheses as JSON-LD ResearchStatements.
       ...(hypotheses.length > 0 ? { hypothesisJsonLd: hypotheses.map((h) => toSwanJsonLd(h)) } : {}),
+      ...(protocolEvidenceEntries.length > 0 ? { protocolEvidence: protocolEvidenceEntries } : {}),
       // EEL evidence (D-081): experiment object ids + content-addressed artifact hashes.
       ...(experimentRuns.length > 0 ? {
         experimentEvidence: experimentRuns.map((xr) => ({

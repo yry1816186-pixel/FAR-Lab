@@ -12,7 +12,7 @@ import type { ArtifactStore } from '../shared/ports.js';
  * Third-party bundle verification (ACC-14, mission §56 Inspect/Validate/Re-execute/
  * Compare). Every check is really executed against the store, the artifact store and
  * the local environment — no check may assume or fabricate a pass. Invariant: a
- * report always carries the same 14 checks in the same order (VERIFY_CHECK_NAMES);
+ * report always carries the same 15 checks in the same order (VERIFY_CHECK_NAMES);
  * checks that cannot run fail closed with passed=false, never silently skipped.
  */
 
@@ -30,7 +30,8 @@ export const VERIFY_CHECK_NAMES = [
   'claim_taint_labels_present',
   'hypothesis_template_content_absent',
   'paper_outline_ref_resolvable',
-  'figures_tables_refs_resolvable',
+  'figures_tables_refs_resolvable',  'protocol_evidence_resolvable',
+
 ] as const;
 export type VerifyCheckName = (typeof VERIFY_CHECK_NAMES)[number];
 
@@ -403,6 +404,56 @@ export async function verifyBundle(bundleId: string, deps: VerifyDeps): Promise<
         : refProblems.length === 0
           ? `${figures.length} figure(s) + ${tables.length} table(s) 引用全部解析且哈希一致`
           : `${refProblems.length}/${figures.length + tables.length} 个引用校验失败：${refProblems.join('；')}`,
+    });
+
+    // ---- check 15 (slice-4 protocol chain): declared protocol evidence resolves ----
+    // Optional field: absent on pre-protocol bundles → pass with a note (same rule as
+    // paperOutlineRef/figures/tables — legacy bundles must not start failing on fields
+    // that did not exist when they were minted).
+    const protoEvidence = bundle.protocolEvidence ?? [];
+    const protoProblems: string[] = [];
+    for (const pe of protoEvidence) {
+      const proto = tryGetObject(store, 'protocol', pe.protocolId);
+      if (!proto.ok) protoProblems.push(proto.msg);
+      if (pe.executionId !== null) {
+        const ledger = tryGetObject(store, 'protocol_execution', pe.executionId);
+        if (!ledger.ok) {
+          protoProblems.push(ledger.msg);
+        } else {
+          if (ledger.obj.protocolId !== pe.protocolId) {
+            protoProblems.push(`台账 ${pe.executionId} 属于协议 ${ledger.obj.protocolId}，bundle 声明的是 ${pe.protocolId}`);
+          }
+          if (ledger.obj.records.length !== pe.recordCount) {
+            protoProblems.push(`台账 ${pe.executionId} 现有 ${ledger.obj.records.length} 条记录，bundle 铸造时为 ${pe.recordCount} — store 已越过 bundle，需重导出`);
+          }
+          if (ledger.obj.deviations.length !== pe.deviations
+            || ledger.obj.measurements.filter((m) => !m.qcPassed).length !== pe.qcFailedMeasurements) {
+            protoProblems.push(`台账 ${pe.executionId} 的偏差/QC 计数与 bundle 声明不符 — 需重导出`);
+          }
+        }
+      }
+      const specProblem = await probeArtifact(artifacts, pe.protocolArtifactHash);
+      if (specProblem !== null) protoProblems.push(`协议 ${pe.protocolId} 工件：${specProblem}`);
+      if (pe.ledgerArtifactHash !== null) {
+        const ledgerProblem = await probeArtifact(artifacts, pe.ledgerArtifactHash);
+        if (ledgerProblem !== null) protoProblems.push(`台账 ${pe.executionId} 工件：${ledgerProblem}`);
+      }
+      // laundering guard (truth-klass pattern): deviations/QC failures MUST carry a
+      // limitations line naming the protocol id — evidence without disclosure is
+      // not exportable.
+      if ((pe.deviations > 0 || pe.qcFailedMeasurements > 0)
+        && !bundle.limitations.some((l) => l.includes(pe.protocolId))) {
+        protoProblems.push(`协议 ${pe.protocolId} 声明 ${pe.deviations} 项偏差/${pe.qcFailedMeasurements} 项 QC 失败，但 limitations 中没有点名该协议的披露行`);
+      }
+    }
+    checks.push({
+      name: 'protocol_evidence_resolvable',
+      passed: protoProblems.length === 0,
+      detail: protoEvidence.length === 0
+        ? '（pre-protocol bundle：未声明 protocolEvidence — 检查空转通过）'
+        : protoProblems.length === 0
+          ? `${protoEvidence.length} 条 protocolEvidence 全部解析：对象可读、归属/记录数/偏差/QC 计数一致、工件哈希核验通过、披露行在册`
+          : protoProblems.join('；'),
     });
   }
 

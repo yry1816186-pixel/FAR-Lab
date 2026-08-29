@@ -55,6 +55,13 @@ Usage:
                                                   (bounded) requeue after a crash loop
   far experiment approve <specId> --by <name>     Approve a draft experiment spec (preregistration
   far experiment rerun <specId>                   gate); rerun re-executes an approved spec
+  far protocol show <run-id> [--json]             Read the frozen protocol + its human-attested ledger
+                                                  (paradigm, planHash, steps, QC, ethics gate)
+  far protocol record <run-id> --kind <k> --actor <name>
+                                                  Append ONE human-attested record (k: approval|
+                                                  step_started|step_completed|measurement|deviation|
+                                                  block|unblock|abort; completion auto-publishes
+                                                  the outcome as experiment feedback)
   far agent refine <run-id> [--turns N] [--top-k N] [--max-concurrent N] [--json]
                                                   Iterative evidence-gap refinement on a
                                                   completed run: parallel pro/contra literature

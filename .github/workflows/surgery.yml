@@ -1,0 +1,25 @@
+name: surgery
+
+# Dormant (slice 4 closed — converge/export-protocol). Remote-surgery patch plane:
+# anchored .mjs scripts applied inside CI for large files this repo cannot rewrite
+# wholesale from the remote plane. Re-activate per slice by restoring the push
+# trigger (branches + paths: ['scripts/surgery/.diag-trigger']) and the apply/diagnose
+# jobs from the slice history (git log .github/workflows/surgery.yml).
+#
+# LEGAL dormant form (runs #22-#25 lesson): workflow_dispatch + ONE no-op job.
+# A workflow_dispatch-only file with zero jobs is invalid YAML and registers a
+# phantom Failure run on every carrying push.
+on: workflow_dispatch
+
+permissions:
+  contents: write
+
+concurrency:
+  group: surgery-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  noop:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "surgery dormant — slice records live in .control/ and scripts/surgery/"
