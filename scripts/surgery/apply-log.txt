@@ -1,8 +1,10 @@
 ===== node scripts/surgery/apply-theory-executor.mjs =====
-EDITED src/domain/index.ts
-EDITED src/domain/experiment.ts
-EDITED experiment-runtime/farlab_experiment_runtime/ops.py
-EDITED src/experiment/spec-from-plan.ts
-APPLY-THEORY-FAILED: src/experiment/spec-from-plan.ts: drafter symbol count != 2 (export + return)
+SKIP src/domain/index.ts: theory export present
+SKIP src/domain/experiment.ts: both contract members present
+SKIP experiment-runtime/farlab_experiment_runtime/ops.py: op_identity_check present
+SKIP src/experiment/spec-from-plan.ts: theory drafter present
+EDITED src/pipeline/stages/execute.ts
+EDITED src/providers/offline.ts
+APPLY-THEORY-FAILED: src/persistence/store.ts: post-condition line 42: expected "};", got "  feedback: FeedbackSignal,"
 SCRIPT FAILED: apply-theory-executor
 APPLY_RC=1

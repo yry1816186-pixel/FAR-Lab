@@ -565,6 +565,11 @@ const metaSpecDraft: Handler = () => ({
   skipReason: 'offline development route: synthetic plans are not pooled into meta-analysis (no fabricated effect estimates)',
 });
 
+const theorySpecDraft: Handler = () => ({
+  feasible: false,
+  skipReason: 'offline development route: synthetic plans are not verified as numerical identities (no fabricated theory experiments)',
+});
+
 /** Exact-purpose table (schema authority: the stage modules' zod schemas). */
 const HANDLERS: Readonly<Record<string, Handler>> = {
   'scope-refinement': scopeRefinement,
@@ -590,6 +595,7 @@ const HANDLERS: Readonly<Record<string, Handler>> = {
   'causal-revision-analysis': causalRevisionAnalysis,
   'experiment-spec-draft': experimentSpecDraft,
   'meta-spec-draft': metaSpecDraft,
+  'theory-spec-draft': theorySpecDraft,
   'model-config-test': modelConfigTest,
   'conversation:turn:turn': conversationTurn,
 };

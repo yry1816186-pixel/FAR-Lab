@@ -2,9 +2,11 @@ import type { StageContext, StageHandler, StageOutcome } from '../types.js';
 import { ExperimentSpec, newId, newProtocolExecution, ProtocolSpec } from '../../domain/index.js';
 import type { ResearchPlan } from '../../domain/plan.js';
 import { draftSpecFromPlan, draftMetaSpecFromPlan } from '../../experiment/spec-from-plan.js';
+import { draftTheorySpecFromPlan } from '../../experiment/spec-from-plan.js';
 import { draftProtocolFromPlan, planHashOf, protocolForPlan } from '../../experiment/protocol-from-plan.js';
 import { executeExperiment } from '../../experiment/executor.js';
 import { executeMetaAnalysis } from '../../experiment/executor-meta.js';
+import { executeTheoryAnalysis } from '../../experiment/executor-theory.js';
 import { RunBudgetExhaustedError } from '../../app/run-budget.js';
 import { experimentLegStatus } from '../../app/iteration.js';
 import { TemplateModeRefusal, refuseTemplateMode } from './shared.js';
@@ -121,6 +123,34 @@ export const executeStage: StageHandler = {
         }
       }
 
+      // Slice-5 theory leg: plans whose falsifiable content is a claimed
+      // closed-form identity get a NUMERICAL verification experiment on a
+      // preregistered grid (spec -> hash binding -> sidecar identity_check ->
+      // mechanical verdict), instead of falling straight to the human protocol.
+      // Honestly disclosed as a numerical spot-check, never a symbolic proof.
+      const theoryDraft = await draftTheorySpecFromPlan(plan, question.text, plane);
+      if (theoryDraft.kind === 'theory') {
+        try {
+          refuseTemplateMode(ctx, theoryDraft.executionMode, 'theory draft');
+          const executed = await executeTheoryAnalysis(ctx.store, ctx.artifacts, theoryDraft.spec, {
+            shouldCancel: () => ctx.cancelled() || ctx.disowned(),
+          });
+          const verdicts = executed.statReports.map((r) => r.verdict ?? 'exploratory').join(', ');
+          return {
+            kind: 'done',
+            summary:
+              `theory identity experiment ${executed.run.id}: ${executed.statReports.length} claim(s) checked on the preregistered grid ` +
+              `(residual verdicts: ${verdicts || 'none'}) — numerical spot-check, not a symbolic proof — ` +
+              'plan-drafted, exploratory (tolerance model-stipulated; binding needs operator approval)',
+          };
+        } catch (e) {
+          if (e instanceof RunBudgetExhaustedError) throw e;
+          if (e instanceof TemplateModeRefusal) return { kind: 'skipped', reason: e.message };
+          const msg = e instanceof Error ? e.message : String(e);
+          return { kind: 'skipped', reason: `theory identity execution failed (run continues): ${msg.slice(0, 240)}` };
+        }
+      }
+
       // Protocol fallback (paradigm-honest execution): the computational legs are
       // unavailable, so the real-world legs get their frozen preregistration.
       const existing = protocolForPlan(ctx.store, ctx.run.id, plan);
@@ -144,12 +174,12 @@ export const executeStage: StageHandler = {
       } catch (e) {
         if (e instanceof TemplateModeRefusal) return { kind: 'skipped', reason: e.message };
         if (e instanceof ProtocolDraftSkipped) {
-          return { kind: 'skipped', reason: `tabular: ${draft.reason}; literature-pool: ${metaDraft.reason}; protocol: ${e.reason}` };
+          return { kind: 'skipped', reason: `tabular: ${draft.reason}; literature-pool: ${metaDraft.reason}; theory: ${theoryDraft.reason}; protocol: ${e.reason}` };
         }
         if (e instanceof RunBudgetExhaustedError) throw e;
         return {
           kind: 'skipped',
-          reason: `tabular: ${draft.reason}; literature-pool: ${metaDraft.reason}; protocol: drafting failed (${(e instanceof Error ? e.message : String(e)).slice(0, 180)})`,
+          reason: `tabular: ${draft.reason}; literature-pool: ${metaDraft.reason}; theory: ${theoryDraft.reason}; protocol: drafting failed (${(e instanceof Error ? e.message : String(e)).slice(0, 180)})`,
         };
       }
       const registered = ProtocolSpec.parse({
