@@ -5,8 +5,9 @@ SKIP experiment-runtime/farlab_experiment_runtime/ops.py: op_identity_check pres
 SKIP src/experiment/spec-from-plan.ts: theory drafter present
 SKIP src/pipeline/stages/execute.ts: theory leg present
 SKIP src/providers/offline.ts: theory handler present
-APPLY-THEORY-FAILED: src/persistence/store.ts: post-condition line 42: expected "};", got "  feedback: FeedbackSignal,"
+store.ts kind registration: delegated to apply-theory-store.mjs
+APPLY-THEORY-FAILED: invariant: ops.py identity_check wiring != def+registry
 SCRIPT FAILED: apply-theory-executor
 ===== node scripts/surgery/apply-theory-store.mjs =====
-EDITED src/persistence/store.ts: theory_spec registered (67071 bytes)
+SKIP src/persistence/store.ts: theory_spec registered
 APPLY_RC=1
