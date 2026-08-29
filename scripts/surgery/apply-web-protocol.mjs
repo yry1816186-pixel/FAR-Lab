@@ -10,6 +10,10 @@
  * the conditional's parentheses — producing adjacent JSX roots (parse
  * error). This revision removes a mispasted band and re-inserts it BEFORE
  * the `{settled && science === null && (` conditional line, as a sibling.
+ *
+ * Rev3: fix the idempotency check direction — "already placed" means the
+ * band is IMMEDIATELY BEFORE the conditional line (rev2 checked after,
+ * which would duplicate the band on a re-run over a correctly-patched tree).
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 
@@ -91,9 +95,9 @@ const STUDYMAP = 'web/src/lab/StudyMap.tsx';
     },
   ]);
 
-  // Band placement (rev2). The band is a SIBLING of the verdict fallback:
-  // it must sit BEFORE the `{settled && science === null && (` conditional
-  // line, never inside its parentheses.
+  // Band placement (rev2/rev3). The band is a SIBLING of the verdict
+  // fallback: it must sit BEFORE the `{settled && science === null && (`
+  // conditional line, never inside its parentheses.
   const BAND = [
     '        {(protocol !== null || protocolError !== null) && (',
     '          <ProtocolPanel',
@@ -123,11 +127,12 @@ const STUDYMAP = 'web/src/lab/StudyMap.tsx';
   }
 
   const lines2 = src.split('\n');
+  // Correctly placed = band block IMMEDIATELY BEFORE the conditional line.
   const alreadyPlaced = lines2.some((l, i) =>
     l.trim() === BAND[0].trim()
-    && i > 0
-    && lines2[i - 1] !== undefined
-    && /\{settled && science === null && \(/.test(lines2[i - 1]));
+    && i + BAND.length < lines2.length
+    && lines2[i + BAND.length] !== undefined
+    && lines2[i + BAND.length].trim() === '{settled && science === null && (');
   if (alreadyPlaced) {
     console.log('[surgery:web] protocol band already correctly placed');
   } else {
