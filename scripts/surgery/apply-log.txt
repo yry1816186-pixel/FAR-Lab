@@ -1,3 +1,3 @@
 ===== node scripts/surgery/apply-cli-protocol.mjs =====
-[surgery:cli-protocol] protocol route inserted before the campaign route (was line 327)
+[surgery:cli-protocol] main.ts already routes protocol — nothing to do
 APPLY_RC=0
