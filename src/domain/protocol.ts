@@ -38,9 +38,10 @@ import type { FeedbackSignal } from './feedback.js';
 
 /**
  * Execution modality — NOT a discipline taxonomy. It selects what the protocol
- * must make explicit (randomization/blinding for human_subjects, hazards for
- * bench, calibration for engineering) so different research paradigms walk
- * different paths over one shared object model.
+ * must make explicit (consent for human_subjects, hazards for bench,
+ * calibration for engineering) so different research paradigms walk different
+ * paths over one shared object model instead of being forced into the
+ * computational template.
  */
 export const ResearchParadigm = z.enum([
   'bench',          // wet lab / materials / chemistry bench work
@@ -104,33 +105,30 @@ export const ProtocolStep = z.object({
 });
 export type ProtocolStep = z.infer<typeof ProtocolStep>;
 
-export const MeasurementRole = z.enum(['independent', 'dependent', 'control', 'covariate', 'context']);
-export type MeasurementRole = z.infer<typeof MeasurementRole>;
-
-export const MeasurementValueType = z.enum(['numeric', 'categorical', 'ordinal', 'text', 'date', 'image', 'other']);
-export type MeasurementValueType = z.infer<typeof MeasurementValueType>;
+export const ProtocolMeasurementVariable = z.object({
+  name: z.string().min(1).max(120),
+  role: z.enum(['independent', 'dependent', 'control', 'covariate', 'context']),
+  /** How it is measured (instrument + procedure reference). */
+  method: z.string().min(3).max(500),
+  unit: z.string().max(60).optional(),
+  valueType: z.enum(['numeric', 'categorical', 'ordinal', 'text', 'date', 'image', 'other']),
+  /** When it is captured ("baseline", "after 200 cycles", "at each visit"). */
+  timepoints: z.array(z.string().min(1).max(120)).min(1).max(12),
+  qcRule: z.lazy((): z.ZodType<ProtocolQcRule> => ProtocolQcRule).optional(),
+});
+export type ProtocolMeasurementVariable = z.infer<typeof ProtocolMeasurementVariable>;
 
 /** Declarative QC checked by deterministic code at record time. */
 export const ProtocolQcRule = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('range'), min: z.number().optional(), max: z.number().optional() }),
-    .refine((r) => r.min !== undefined || r.max !== undefined, { message: 'range rule needs min or max' }),
   z.object({ kind: z.literal('required') }),
   z.object({ kind: z.literal('enum'), allowed: z.array(z.string().min(1)).min(1).max(32) }),
-]);
-export type ProtocolQcRule = z.infer<typeof ProtocolQcRule>;
-
-export const ProtocolMeasurementVariable = z.object({
-  name: z.string().min(1).max(120),
-  role: MeasurementRole,
-  /** How it is measured (instrument + procedure reference). */
-  method: z.string().min(3).max(500),
-  unit: z.string().max(60).optional(),
-  valueType: MeasurementValueType,
-  /** When it is captured ("baseline", "after 200 cycles", "at each visit"). */
-  timepoints: z.array(z.string().min(1).max(120)).min(1).max(12),
-  qcRule: ProtocolQcRule.optional(),
+]).superRefine((rule, ctx) => {
+  if (rule.kind === 'range' && rule.min === undefined && rule.max === undefined) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'range rule needs min or max' });
+  }
 });
-export type ProtocolMeasurementVariable = z.infer<typeof ProtocolMeasurementVariable>;
+export type ProtocolQcRule = z.infer<typeof ProtocolQcRule>;
 
 export const ProtocolArm = z.object({
   label: z.string().min(1).max(80),
@@ -138,6 +136,12 @@ export const ProtocolArm = z.object({
   isControl: z.boolean().default(false),
 });
 export type ProtocolArm = z.infer<typeof ProtocolArm>;
+
+export const ProtocolAllocationAssignment = z.object({
+  unitIndex: z.number().int().nonnegative(),
+  arm: z.string().min(1).max(80),
+});
+export type ProtocolAllocationAssignment = z.infer<typeof ProtocolAllocationAssignment>;
 
 /**
  * Allocation v1 is deliberately restricted to schemes deterministic code can
@@ -151,13 +155,13 @@ export const ProtocolAllocation = z.discriminatedUnion('scheme', [
   z.object({
     scheme: z.literal('complete_randomization'),
     seed: z.number().int().nonnegative(),
-    sequence: z.array(z.object({ unitIndex: z.number().int().nonnegative(), arm: z.string().min(1).max(80) })).min(1),
+    sequence: z.array(ProtocolAllocationAssignment).min(1),
   }),
   z.object({
     scheme: z.literal('blocked'),
     blockVariable: z.string().min(1).max(120),
     seed: z.number().int().nonnegative(),
-    sequence: z.array(z.object({ unitIndex: z.number().int().nonnegative(), arm: z.string().min(1).max(80) })).min(1),
+    sequence: z.array(ProtocolAllocationAssignment).min(1),
   }),
 ]);
 export type ProtocolAllocation = z.infer<typeof ProtocolAllocation>;
@@ -252,7 +256,12 @@ export const ProtocolSpec = z.object({
       state.set(id, 2);
       return true;
     };
-    for (const s of p.steps) if (!visit(s.id)) { issue(`step dependencies must be acyclic (cycle through ${s.id})`); break; }
+    for (const s of p.steps) {
+      if (!visit(s.id)) {
+        issue(`step dependencies must be acyclic (cycle through ${s.id})`);
+        break;
+      }
+    }
     // allocation consistency: randomized schemes need >=2 arms, a full-plannedN
     // sequence, and assignments only to declared arms.
     if (p.allocation.scheme !== 'none') {
@@ -339,8 +348,16 @@ export const ProtocolRecord = z.object({
     timepoint: z.string().max(120).optional(),
     value: z.union([z.number(), z.string().min(1).max(2000)]),
   }).optional(),
-  deviation: z.object({ what: z.string().min(3).max(1000), why: z.string().min(3).max(1000), consequence: z.string().min(3).max(1000) }).optional(),
-  approval: ProtocolApprovalEntry.omit({ at: true }).optional(),
+  deviation: z.object({
+    what: z.string().min(3).max(1000),
+    why: z.string().min(3).max(1000),
+    consequence: z.string().min(3).max(1000),
+  }).optional(),
+  approval: z.object({
+    approvalBody: z.string().min(1).max(200),
+    approvalId: z.string().min(1).max(200),
+    approvedBy: z.string().min(1).max(120),
+  }).optional(),
   note: z.string().max(2000).optional(),
 })
   .superRefine((r, ctx) => {
@@ -402,7 +419,10 @@ const shuffledIndices = (n: number, rng: () => number): number[] => {
 /** Seed derived from the frozen plan hash — same plan, same sequence, forever. */
 export const seedFromPlanHash = (planHash: string): number => Number.parseInt(planHash.slice(0, 8), 16) >>> 0;
 
-export interface AllocationAssignment { unitIndex: number; arm: string }
+export interface AllocationAssignment {
+  unitIndex: number;
+  arm: string;
+}
 
 /**
  * Commit the randomization sequence: complete_randomization assigns an even
@@ -435,7 +455,8 @@ export const generateAllocationSequence = (
   for (let b = 0; b < fullBlocks; b += 1) {
     const order = shuffledIndices(blockSize, rng);
     for (let rank = 0; rank < blockSize; rank += 1) {
-      assignments.push({ unitIndex: unit++, arm: armLabels[order[rank]!]! });
+      assignments.push({ unitIndex: unit, arm: armLabels[order[rank]!]! });
+      unit += 1;
     }
   }
   if (remainder > 0) {
@@ -443,7 +464,8 @@ export const generateAllocationSequence = (
     // balance degrades honestly rather than by a biased fixed prefix.
     const order = shuffledIndices(blockSize, rng);
     for (let rank = 0; rank < remainder; rank += 1) {
-      assignments.push({ unitIndex: unit++, arm: armLabels[order[rank]!]! });
+      assignments.push({ unitIndex: unit, arm: armLabels[order[rank]!]! });
+      unit += 1;
     }
   }
   return assignments;
@@ -455,5 +477,312 @@ export const generateAllocationSequence = (
 
 export interface CollectionFormField {
   variableName: string;
-  role: MeasurementRole extends z.ZodType<infer R> ? never : string;
+  role: ProtocolMeasurementVariable['role'];
+  valueType: ProtocolMeasurementVariable['valueType'];
+  unit: string | undefined;
+  timepoints: string[];
+  qcSummary: string;
 }
+
+export interface CollectionForm {
+  fields: CollectionFormField[];
+}
+
+const qcSummaryOf = (rule: ProtocolQcRule | undefined): string => {
+  if (rule === undefined) return 'none declared';
+  if (rule.kind === 'required') return 'required (non-empty)';
+  if (rule.kind === 'enum') return `one of: ${rule.allowed.join(' | ')}`;
+  const lo = rule.min !== undefined ? String(rule.min) : '-inf';
+  const hi = rule.max !== undefined ? String(rule.max) : '+inf';
+  return `range [${lo}, ${hi}]`;
+};
+
+/** The data-collection form a researcher fills in the field/lab — derived, never drafted. */
+export const buildCollectionForm = (variables: readonly ProtocolMeasurementVariable[]): CollectionForm => ({
+  fields: variables.map((v) => ({
+    variableName: v.name,
+    role: v.role,
+    valueType: v.valueType,
+    unit: v.unit,
+    timepoints: [...v.timepoints],
+    qcSummary: qcSummaryOf(v.qcRule),
+  })),
+});
+
+// ---------------------------------------------------------------------------
+// Execution state machine (deterministic, human-attested transitions only)
+// ---------------------------------------------------------------------------
+
+export type ProtocolStepState = 'pending' | 'in_progress' | 'done';
+
+/** Step states derived from the ledger — the projection, never stored separately. */
+export const protocolStepStates = (
+  protocol: ProtocolSpec,
+  execution: ProtocolExecution,
+): Record<string, ProtocolStepState> => {
+  const states: Record<string, ProtocolStepState> = {};
+  for (const s of protocol.steps) states[s.id] = 'pending';
+  for (const r of execution.records) {
+    if (r.kind === 'step_started' && r.stepId !== undefined && states[r.stepId] === 'pending') states[r.stepId] = 'in_progress';
+    if (r.kind === 'step_completed' && r.stepId !== undefined && states[r.stepId] === 'in_progress') states[r.stepId] = 'done';
+  }
+  return states;
+};
+
+const valueMatchesType = (
+  valueType: ProtocolMeasurementVariable['valueType'],
+  value: number | string,
+): boolean => {
+  switch (valueType) {
+    case 'numeric':
+      return typeof value === 'number' && Number.isFinite(value);
+    case 'date':
+      return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value);
+    default:
+      return typeof value === 'string' && value.length > 0;
+  }
+};
+
+/**
+ * Declarative QC verdict: a failing value is RECORDED with its verdict — QC
+ * flags data quality; it never silently drops the researcher's observation.
+ */
+const checkMeasurementQc = (
+  variable: ProtocolMeasurementVariable,
+  value: number | string,
+): { passed: boolean; detail?: string } => {
+  const rule = variable.qcRule;
+  if (rule === undefined) return { passed: true };
+  if (rule.kind === 'required') {
+    const empty = typeof value === 'string' ? value.trim().length === 0 : Number.isNaN(value);
+    return empty ? { passed: false, detail: 'required value is empty' } : { passed: true };
+  }
+  if (rule.kind === 'enum') {
+    const passed = typeof value === 'string' && rule.allowed.includes(value);
+    return { passed, detail: passed ? undefined : 'value not in allowed set' };
+  }
+  if (typeof value !== 'number') {
+    return { passed: false, detail: 'range rule requires a numeric value' };
+  }
+  const tooLow = rule.min !== undefined && value < rule.min;
+  const tooHigh = rule.max !== undefined && value > rule.max;
+  if (!tooLow && !tooHigh) return { passed: true };
+  return { passed: false, detail: `outside declared range [${rule.min ?? '-inf'}, ${rule.max ?? '+inf'}]` };
+};
+
+export const initialExecutionStatus = (protocol: ProtocolSpec): ProtocolStatus =>
+  protocol.ethics.requiresApproval ? 'awaiting_approval' : 'awaiting_human';
+
+export const newProtocolExecution = (protocol: ProtocolSpec, id: string, at: string): ProtocolExecution =>
+  ProtocolExecution.parse({
+    id,
+    protocolId: protocol.id,
+    runId: protocol.runId,
+    status: initialExecutionStatus(protocol),
+    records: [],
+    measurements: [],
+    approvals: [],
+    deviations: [],
+    createdAt: at,
+    updatedAt: at,
+  });
+
+export type ProtocolRecordOutcome =
+  | { ok: true; execution: ProtocolExecution }
+  | { ok: false; error: string };
+
+const TERMINAL_STATUSES: ReadonlySet<string> = new Set(['completed', 'aborted']);
+
+/**
+ * Apply one human-attested record to the ledger. Deterministic validation:
+ * ethics gate (fail-closed), dependency order, per-state transitions, value
+ * typing and QC. Returns a NEW execution object (immutable append) or an error
+ * — never a silent mutation, never an invented transition.
+ */
+export const applyProtocolRecord = (
+  protocol: ProtocolSpec,
+  execution: ProtocolExecution,
+  record: ProtocolRecord,
+): ProtocolRecordOutcome => {
+  if (TERMINAL_STATUSES.has(execution.status)) {
+    return { ok: false, error: `protocol execution is terminal (${execution.status}) — no further records accepted` };
+  }
+  const parsed = ProtocolRecord.safeParse(record);
+  if (!parsed.success) {
+    return { ok: false, error: `invalid record: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).slice(0, 3).join('; ')}` };
+  }
+  const r = parsed.data;
+  const ethicsOpen = protocol.ethics.requiresApproval && execution.approvals.length === 0;
+  if (ethicsOpen && r.kind !== 'approval' && r.kind !== 'abort' && r.kind !== 'deviation') {
+    return { ok: false, error: 'ethics approval pending — execution records are blocked (fail-closed); record the approval first' };
+  }
+  const states = protocolStepStates(protocol, execution);
+  const next: ProtocolExecution = { ...execution, records: [...execution.records, r], updatedAt: r.at };
+  switch (r.kind) {
+    case 'approval': {
+      if (r.approval === undefined) return { ok: false, error: 'approval payload missing' };
+      if (!protocol.ethics.requiresApproval) {
+        return { ok: false, error: 'protocol does not declare a required approval — nothing to approve' };
+      }
+      next.approvals = [...execution.approvals, { ...r.approval, at: r.at }];
+      if (execution.status === 'awaiting_approval') next.status = 'awaiting_human';
+      break;
+    }
+    case 'step_started': {
+      const step = protocol.steps.find((s) => s.id === r.stepId);
+      if (step === undefined) return { ok: false, error: `unknown step '${r.stepId ?? ''}'` };
+      if (states[step.id] !== 'pending') return { ok: false, error: `step ${step.id} is ${states[step.id]} — cannot start again` };
+      for (const dep of step.dependsOn) {
+        if (states[dep] !== 'done') return { ok: false, error: `step ${step.id} depends on ${dep} (${states[dep]}) — dependency order enforced` };
+      }
+      if (next.startedAt === undefined) next.startedAt = r.at;
+      next.status = 'in_progress';
+      break;
+    }
+    case 'step_completed': {
+      const step = protocol.steps.find((s) => s.id === r.stepId);
+      if (step === undefined) return { ok: false, error: `unknown step '${r.stepId ?? ''}'` };
+      if (states[step.id] !== 'in_progress') return { ok: false, error: `step ${step.id} is ${states[step.id]} — completion requires an open start` };
+      const after: Record<string, ProtocolStepState> = { ...states, [step.id]: 'done' };
+      if (protocol.steps.every((s) => after[s.id] === 'done')) {
+        next.status = 'completed';
+        next.endedAt = r.at;
+      }
+      break;
+    }
+    case 'measurement': {
+      if (r.measurement === undefined) return { ok: false, error: 'measurement payload missing' };
+      const m = r.measurement;
+      const variable = protocol.variables.find((v) => v.name === m.variableName);
+      if (variable === undefined) return { ok: false, error: `unknown measurement variable '${m.variableName}'` };
+      if (!valueMatchesType(variable.valueType, m.value)) {
+        return { ok: false, error: `value for '${m.variableName}' does not match declared type ${variable.valueType}` };
+      }
+      const qc = checkMeasurementQc(variable, m.value);
+      next.measurements = [...execution.measurements, {
+        variableName: m.variableName,
+        ...(m.unitIndex !== undefined ? { unitIndex: m.unitIndex } : {}),
+        ...(m.timepoint !== undefined ? { timepoint: m.timepoint } : {}),
+        value: m.value,
+        qcPassed: qc.passed,
+        ...(qc.detail !== undefined ? { qcDetail: qc.detail } : {}),
+        at: r.at,
+        ...(r.stepId !== undefined ? { stepId: r.stepId } : {}),
+      }];
+      if (execution.status === 'awaiting_human') next.status = 'in_progress';
+      break;
+    }
+    case 'deviation': {
+      if (r.deviation === undefined) return { ok: false, error: 'deviation payload missing' };
+      next.deviations = [...execution.deviations, {
+        id: newId('pdd'),
+        at: r.at,
+        ...(r.stepId !== undefined ? { stepId: r.stepId } : {}),
+        what: r.deviation.what,
+        why: r.deviation.why,
+        consequence: r.deviation.consequence,
+      }];
+      break;
+    }
+    case 'block': {
+      next.status = 'paused';
+      break;
+    }
+    case 'unblock': {
+      next.status = execution.startedAt !== undefined ? 'in_progress' : 'awaiting_human';
+      break;
+    }
+    case 'abort': {
+      next.status = 'aborted';
+      next.endedAt = r.at;
+      break;
+    }
+  }
+  return { ok: true, execution: ProtocolExecution.parse(next) };
+};
+
+// ---------------------------------------------------------------------------
+// Plan cross-validation (deterministic)
+// ---------------------------------------------------------------------------
+
+export interface ProtocolPlanValidation {
+  passed: boolean;
+  errors: string[];
+  advisories: string[];
+}
+
+/**
+ * Cross-object validation the schema cannot express: the protocol must bind
+ * THIS plan's steps and hypotheses; coverage gaps (plan variables with no
+ * measurement variable, plan controls with no visible control arm) are
+ * ADVISORIES — surfaced, never silently dropped, never hard failures.
+ */
+export const validateProtocolAgainstPlan = (protocol: ProtocolSpec, plan: ResearchPlan): ProtocolPlanValidation => {
+  const errors: string[] = [];
+  const advisories: string[] = [];
+  if (protocol.planId !== plan.id) {
+    errors.push(`protocol binds plan ${protocol.planId}, validation ran against ${plan.id}`);
+  }
+  const planHypIds = new Set(plan.hypothesisIds);
+  for (const h of protocol.hypothesisIds) {
+    if (!planHypIds.has(h)) errors.push(`hypothesis ${h} not part of the plan`);
+  }
+  const planStepIds = new Set(plan.steps.map((s) => s.id));
+  for (const s of protocol.steps) {
+    if (!planStepIds.has(s.planStepId)) errors.push(`step ${s.id} references unknown plan step ${s.planStepId}`);
+  }
+  const varNames = new Set(protocol.variables.map((v) => v.name));
+  for (const pv of plan.variables) {
+    if (!varNames.has(pv)) advisories.push(`plan variable '${pv}' has no matching protocol measurement variable`);
+  }
+  const lower = (s: string): string => s.toLowerCase();
+  const controlArms = protocol.arms.filter((a) => a.isControl);
+  for (const c of plan.controls) {
+    const represented = controlArms.some(
+      (a) => lower(a.label).includes(lower(c).slice(0, 12)) || lower(c).includes(lower(a.label).slice(0, 12)),
+    );
+    if (!represented) {
+      advisories.push(`plan control '${c}' not visibly represented among control arms (${controlArms.map((a) => a.label).join(', ') || 'none'})`);
+    }
+  }
+  return { passed: errors.length === 0, errors, advisories };
+};
+
+// ---------------------------------------------------------------------------
+// Feedback bridge — protocol outcomes re-enter the causal loop
+// ---------------------------------------------------------------------------
+
+/**
+ * Project the ledger into a FeedbackSignal body (source 'experiment'): the
+ * physical world's evidence enters the SAME feedback -> revise chain every
+ * other executed result uses. The caller mints id/receivedAt.
+ */
+export const protocolOutcomeFeedback = (
+  protocol: ProtocolSpec,
+  execution: ProtocolExecution,
+): Omit<FeedbackSignal, 'id' | 'receivedAt'> => {
+  const states = protocolStepStates(protocol, execution);
+  const done = Object.values(states).filter((s) => s === 'done').length;
+  const qcFailures = execution.measurements.filter((m) => !m.qcPassed).length;
+  const content =
+    `Protocol ${protocol.id} (${protocol.paradigm}, ${protocol.title}) execution ledger: ` +
+    `${done}/${protocol.steps.length} steps completed, ${execution.measurements.length} measurement(s) recorded ` +
+    `(${qcFailures} failed QC), ${execution.deviations.length} deviation(s), status ${execution.status}.`;
+  return {
+    runId: protocol.runId,
+    source: 'experiment',
+    content,
+    structured: {
+      protocolId: protocol.id,
+      executionId: execution.id,
+      status: execution.status,
+      stepsDone: done,
+      stepsTotal: protocol.steps.length,
+      measurements: execution.measurements.length,
+      qcFailures,
+      deviations: execution.deviations.length,
+    },
+    target: { kind: 'protocol', id: protocol.id },
+    provenance: `protocol-execution:${execution.id}`,
+  };
+};
