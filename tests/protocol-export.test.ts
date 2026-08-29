@@ -366,7 +366,7 @@ describe('protocol chain in the export plane (slice 4)', () => {
     expect(protoLim.counts).toEqual({ protocols: 1, ledgers: 1, deviations: 1, qcFailedMeasurements: 1 });
     const paperMd = renderPaperMarkdown(outline);
     expect(paperMd).toContain('**protocol_deviations**');
-    expect(paperMd).toContain('Human-attested ledger');
+    expect(paperMd).toContain('human-attested ledger');
     expect(paperMd).toContain('1 recorded deviation(s)');
 
     // ---- package: protocol/ spec + ledger files, manifest + README projections ----
