@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { BundleId, ReceiptId, RunId, ExperimentRunId, ResultSetId, StatReportId } from './ids.js';
+import { BundleId, ReceiptId, RunId, ExperimentRunId, ResultSetId, StatReportId, ProtocolId, ProtocolExecutionId } from './ids.js';
 
 /**
  * Execution facts captured AS THEY HAPPEN (mission §36/§55). Missing data stays missing —
@@ -134,6 +134,25 @@ export const ReproducibilityBundle = z.object({
     statReportIds: z.array(StatReportId),
     artifactHashes: z.array(z.string().length(64)),
     lockfileHash: z.string().length(64).optional(),
+  })).optional(),
+  /**
+   * Protocol chain (slice 4, 2026-08-29): pre-registered research protocols and their
+   * human-attested execution ledgers as first-class bundle evidence — object ids plus
+   * content-addressed artifact hashes, with the ledger's honesty counts. Deviations and
+   * QC-failed measurements are ALSO projected into `limitations` verbatim; verify
+   * re-derives these counts from the store and fails on drift or missing disclosure.
+   * Absent on pre-protocol bundles (optional, like figures/tables).
+   */
+  protocolEvidence: z.array(z.object({
+    protocolId: ProtocolId,
+    /** Null when the protocol is registered but no execution ledger exists yet. */
+    executionId: ProtocolExecutionId.nullable(),
+    protocolArtifactHash: z.string().length(64),
+    ledgerArtifactHash: z.string().nullable(),
+    /** Ledger size at mint time — count-based re-export trigger and drift probe. */
+    recordCount: z.number().int().nonnegative(),
+    deviations: z.number().int().nonnegative(),
+    qcFailedMeasurements: z.number().int().nonnegative(),
   })).optional(),
   /**
    * Lane-07 scientific-communication artifacts: deterministic figures/tables rendered from

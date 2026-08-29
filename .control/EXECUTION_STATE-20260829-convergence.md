@@ -126,7 +126,9 @@
 5. **休眠形态根因（runs #22-25 现象）**：`on: workflow_dispatch:` 零 job 的 workflow
    是无效定义——每个携带它建分支/推 heads 的 push 都登记幽灵 Failure run（含
    main 上 #23/#24 两条）。本切片末位改为 workflow_dispatch + 单 no-op job 的合法
-   休眠：无 push 触发、手动派发亦零作用，main Actions 历史不再被污染
+   休眠：无 push 触发、手动派发亦零作用，main Actions 历史不再被污染。
+   **合并实证**：#134 squash 到 main（4ee0aab）后 surgery 无新 run——对比 #133
+   合并时的两条幽灵 Failure，根治生效
 6. **侦察/取证教训**：68KB main.ts 直读不可行 → 派生代理字节级锚点侦察（含 agent
    块 4 空格缩进陷阱）后一次命中；子代理若无本地 Read 会自作主张改走网络并可能
    误取旧快照误导裁决（曾误读 main 上切片 2 旧 diag）——委派须显式指定 Read 工具
@@ -137,19 +139,107 @@
 
 - bump-2 诊断（423af9d）：唯一失败 protocol-cli usage 用例，根因六定位
 - bump-3 诊断（3549990）：全绿（217 文件/2209+7 跳过/0 失败；无任何 _FAILED）
-- **最终合并门 = 本末位提交（surgery 合法休眠 + 控制面补记）head 上的 ci 全绿，
-  此后无任何推送**（bot 推送不触发 ci，不作为门）
+- **合并门兑现**：末位提交 c19ffed head ci #647 8m1s 全绿 + PR sync #648 7m49s 绿，
+  此后无推送；PR #134 squash → main 4ee0aab，main ci #649 8m15s 绿
+
+## 切片 4（converge/export-protocol，PR #135）——导出链
+
+1. **Schema**（provenance.ts）：ReproducibilityBundle + protocolEvidence（可选；
+   protocolId/executionId 可空/protocolArtifactHash/ledgerArtifactHash 可空/
+   recordCount/deviations/qcFailedMeasurements——镜像 experimentEvidence 形态）
+2. **铸造**（export.ts）：execute() 读 protocol/protocol_execution；规格与台账
+   canonical bytes 入 artifact store（内容寻址）；逐协议 limitations 披露行
+   （含偏差/QC 计数，点名协议 id）；applicable() 增 count-based 台账增长重导出
+   触发（records 数越过 bundle 记录值即重导——镜像 source-count 规则）
+3. **验证**（verify.ts）：第 15 检查 protocol_evidence_resolvable——对象可解析、
+   台账归属、records/偏差/QC 计数与 store 一致（漂移→点名重导出）、
+   工件哈希核验、**披露 laundering 守卫**（有偏差/QC 失败而无点名披露行=红）；
+   缺席=空转通过（旧 bundle 不因新字段回溯变红）
+4. **论文**（paper-outline.ts）：protocol_deviations 第 10 类确定性限制（仅台账
+   条目计数；计划风险不是协议事实）；PROVENANCE_NOTE 同步披露
+5. **打包**（package.ts）：protocol/<prt>.json + protocol/<pex>.ledger.json 入包、
+   MANIFEST、RO-Crate；README Limitations 逐字回放自动覆盖协议行；
+   字节漂移 fail-closed（报错要求重导出）
+6. **落地机制**：全部六处源码编辑经 apply-protocol-export.mjs 锚点脚本
+   （insert-only，五文件，每编辑独立 done 标记；apply 一次全中，bot df7f5b7）；
+   tests/protocol-export.test.ts 端到端契约（种子图+协议+QC 失败测量+偏差→
+   export→protocolEvidence 计数/工件哈希→verify 绿→paper 限制类→package
+   文件/MANIFEST/README→台账漂移触发重导出+verify 红→旧 bundle 缺席空转通过）
+
+## 切片 4 迭代史（诚实）
+
+1. **根因七（bump-1 diag f89db40 铁证）**：PlanId 前缀是 pln_ 而非 plan_——夹具
+   newId('plan') 在 ProtocolSpec.parse 即抛 ZodError（与切片 2 根因一 tsk/task
+   同型：id 前缀凭直觉写而不是查 ids.ts）。修复 a807768：newId('pln')
+2. **我的一次提交信息失真（0db9d9d）**：单文件调用只改了触发标记却挂了
+   fix(test) 信息——真实修复在下一提交 a807768 并在信息中显式纠正。教训：
+   多文件修复一律用 push_files 单提交，不用 create_or_update_file 拆分
+3. **根因九（a807768 checks 页注解铁证）**：v1 锚点把 protocolEvidence 声明块
+   插在 `const bundleId`（limitations 数组**之后**），使用点在数组内——
+   TS2448/TS2454 先使用后声明，ci `Build backend dist` 步 ~40s 真红。
+   **连带纠正两处我此前的误判**：①#30/#31 诊断 48s 早崩并非瞬时故障——
+   diagnose 的 build 步同因真红，快照步无 if:always() 故无证据落库；
+   ②本分支 ci 37-45s 短 run 并非并发取消干扰——就是 build 真红。
+   （另：b39bf77 我曾收尾过早——在未验证的树上推了休眠+控制面记录，其 ci
+   如预期红；已由后续提交以真实修复与诚实记录取代）
+4. **教训（锚点手术的顺序约束）**：insert-only 锚点补丁只验证锚唯一，不验证
+   声明-使用相对位置——跨多锚点的补丁必须把声明块锚在**最早使用点之前**
+5. **根因十（bump-5 apply-log 铁证）**：修复脚本自身的幂等守卫比较方向写反——
+   `i > k`（块偏移在 limitations 之后=坏树）反而命中“已修好”跳过分支，移动
+   分支永不可达，树仍坏（日志却报 already sits above）。修复 cd45403：
+   守卫反转为 i<k（块已在上才跳过）+ 移动前 k>i 防护 + 落盘前
+   block<limitations<bundleId 严格有序与唯一性终局断言。教训：**写“位置比较”
+   守卫时先用文件偏移语义自证一遍（above = offset 更小）**
+6. **根因十一/十二（bump-7 快照 b02b7fe 裁决）**：BUILD/typecheck/lint 全过
+   （根因九/十修复生效）但 vitest 2218 用例 2 败，均测试侧：
+   ①根因十一：api.test.ts:1310 钉死 checks=14，verify 新增第 15 检查
+   protocol_evidence_resolvable（本切片功能）后计数契约更新——15 为新真值
+   （全仓搜索确认仅此一处计数耦合）；15th 检查对无协议夹具空转通过，
+   首项/全过断言不受影响 ②根因十二：protocol-export.test.ts:369 断言
+   'Human-attested ledger'（大写 H）vs 实现渲染 'human-attested ledger(s)'
+   （句中小写）——断言文案凭记忆写未对照实现输出。修复走
+   apply-protocol-export-tests.mjs（远端整行替换保字节，全仓唯一锚点
+   fail-loud + 幂等；bot e7b91bd，apply-log 9df65d2 逐字证据）。教训：**新检查
+   计数是公开契约，全链测试计数断言必须同 PR 同步；断言文案从实现渲染
+   输出复制，不凭记忆写**
+7. **取证通道教训**：no_cache 也会命中读取服务对 GitHub 页面的缓存渲染
+   （同一 request-id）；GitHub Actions 列表页 CDN 滞后依旧；本轮可靠通道=
+   API 直读（diag/apply-log blob sha + list_commits/PR status）+ commit checks
+   页一次性裁决 + raw.githubusercontent 全文。
+ci (pull_request) 于 29e3f56 全绿（verify success 8m13s，零失败注解）——
+   与 diagnose 同构的全门禁、独立 runner
+
+## 切片 4 验证状态（诚实）
+
+- bump-1 诊断（f89db40，树=补丁前）：唯一红=夹具 pln 前缀（根因七）
+- a807768 checks：根因九定位（TS2448/TS2454 export.ts:860）
+- bump-6 diag（4ac79d4/d6e82f0 前身，blob 598f5c7→b02b7fe 前）：build 红铁证
+  （同时证明 if:always() 快照修复生效——早崩也有证据落库）
+- bump-7 诊断（b02b7fe）：BUILD/typecheck/lint 全绿 + 2218 用例 2209 过 7 跳
+  2 败（根因十一/十二，均测试侧）
+- **修复树终裁：29e3f56 ci (pull_request) verify success 8m13s 零注解**
+  （含 e7b91bd 两处测试同步的全门禁绿；run-b9 diagnose 快照作为补充证据
+  落库后不再另行解读，其内容与该 ci 绿互证）
+- **最终合并门 = 本末位提交（surgery 休眠 + 控制面终稿）head 上的 ci 单次
+  全绿，此后无任何推送**
 
 ## 登记未做（后续切片，非本 PR 声称范围）
 
-- 导出链：协议+台账入 bundle（verify 项）与论文 limitations 投影
-- 范式覆盖深化：theory（CAS 集成）、archive（登记库检索接口）
-- 手术 workflow 在 main 保持休眠（workflow_dispatch + 单 no-op job 合法形态——
-  零 job 版会被 GitHub 判为无效 workflow，每次携带 push 登记幽灵 Failure run）；
+- 范式覆盖深化：theory（数值验证腿——ops.py 新增 identity_check：JSON DSL
+  两条表达式+变量网格→numpy 格点残差，TS 机械判决；执行器镜像 executor-meta
+  的 LLM 提议+确定性准入模式；诚实披露“数值抽查验证，非符号证明”；
+  加新依赖需重生成 uv.lock，远程不可行，故限定既有 numpy 栈）、archive
+  （登记库检索接口）——侦察完成（python.ts sidecar 契约/ops.py 注册表/
+  executor-meta.ts 模式/devices.ts=计算目标而非仪器面）
+- 手术面改进：apply no-op 时提交信息应区分（当前硬编码修复文案，57cb00a/
+  cbc410a 均为误导性 no-op 日志提交）；apply-log/diag 保留策略
+- 手术 workflow 在 main 保持休眠（workflow_dispatch + 单 no-op job 合法形态）；
   apply-log.txt / diag.txt 留树内作为切片取证记录（path-hygiene 允许）
 - 既有 cosmetic：tests/memory-live-check.test.ts 三条 unused eslint-disable 警告
   （main 上既有，非本切片引入）；secret-scan 对 tests/thinking-display.test.ts
   测试假凭据的 MEDIUM 发现与 path-hygiene WARN 亦为 main 既有状态
+- 子代理配额限流（2026-08-29 触发，8-31 21:01 重置）：大文件侦察/裁决解析回退
+  主线程直读
 
 ## 用户侧不变
 

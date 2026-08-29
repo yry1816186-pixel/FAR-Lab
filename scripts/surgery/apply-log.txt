@@ -1,3 +1,13 @@
-===== node scripts/surgery/apply-cli-protocol.mjs =====
-[surgery:cli-protocol] main.ts already routes protocol — nothing to do
+===== node scripts/surgery/apply-protocol-export.mjs =====
+[surgery:protocol-export] provenance.ts already carries protocolEvidence — nothing to do
+[surgery:protocol-export] verify.ts already carries the protocol check — nothing to do
+[surgery:protocol-export] export.ts already carries the protocol chain — nothing to do
+[surgery:protocol-export] paper-outline.ts already carries the protocol category — nothing to do
+[surgery:protocol-export] package.ts already writes protocol files — nothing to do
+[surgery:protocol-export] all edits done
+===== node scripts/surgery/apply-protocol-export-fix.mjs =====
+[surgery:protocol-export-fix] declaration block already sits above the limitations array — nothing to do
+===== node scripts/surgery/apply-protocol-export-tests.mjs =====
+[surgery:protocol-export-tests] api count assertion already 15 — nothing to do
+[surgery:protocol-export-tests] paper assertion already lowercase — nothing to do
 APPLY_RC=0
