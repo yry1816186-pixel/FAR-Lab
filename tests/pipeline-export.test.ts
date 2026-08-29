@@ -728,8 +728,10 @@ describe('plan + export — RU-1 memory conditioning', () => {
     expect(exportOutcome.kind).toBe('done');
     const report = await artifacts.get(exportOutcome.kind === 'done' ? exportOutcome.artifacts[0]! : 'sha256:0');
     expect(report).toContain('工作区记忆调节');
-    // full-line assertion: the stage attribution renders (envelope stage, not 'unknown')
-    expect(report).toMatch(/作为数据注入 plan 生成——非本轮证据/);
+    // full-line assertion: the stage attribution renders (envelope stage, not
+    // 'unknown') — researcher-language label WITH the raw enum in parentheses
+    // (2026-08-29 localization; audit parity kept).
+    expect(report).toMatch(/作为数据注入 研究计划\(plan\) 生成——非本轮证据/);
   });
 
   it('control: no memory -> plan payload lacks the block; no event; no export line', async () => {
