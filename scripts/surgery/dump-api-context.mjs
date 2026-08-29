@@ -15,15 +15,24 @@ dump.push(`total lines: ${lines.length}`);
 dump.push('\n===== first 60 lines =====');
 dump.push(lines.slice(0, 60).map((l, i) => `${i + 1}: ${l}`).join('\n'));
 
-const markers = ['createApiServer', 'experiment-ops', 'experimentLegStatus', 'experiments/:specId/approve', 'terminal', 'handle('];
+const markers = [
+  'createApiServer',
+  'experiment-ops',
+  'experiments/:specId/approve',
+  'readJson',
+  'editHypothesis',
+  "segments[4] === 'feedback'",
+  "segments[4] === 'supervision'",
+  'readBody',
+];
 for (const marker of markers) {
   dump.push(`\n===== context around every occurrence of "${marker}" =====`);
   const idxs = [];
   lines.forEach((l, i) => { if (l.includes(marker)) idxs.push(i); });
   dump.push(`occurrences: ${idxs.length}`);
-  for (const i of idxs.slice(0, 8)) {
-    const from = Math.max(0, i - 12);
-    const to = Math.min(lines.length, i + 18);
+  for (const i of idxs.slice(0, 6)) {
+    const from = Math.max(0, i - 14);
+    const to = Math.min(lines.length, i + 22);
     dump.push(`--- lines ${from + 1}..${to} (hit at ${i + 1}) ---`);
     dump.push(lines.slice(from, to).map((l, j) => `${from + j + 1}: ${l}`).join('\n'));
   }
