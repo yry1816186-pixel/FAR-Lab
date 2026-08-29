@@ -167,6 +167,8 @@ export const MetricKey = z.enum([
   'identity_max_abs_residual',
   // Slice-6 FEM verification: L2 error at the finest preregistered level.
   'fem_l2_error_final_level',
+  // Slice-6b adaptive FEM: H1 error at the final AFEM round.
+  'fem_h1_error_final_round',
 ]);
 export type MetricKey = z.infer<typeof MetricKey>;
 
@@ -873,4 +875,5 @@ export const SidecarStatsResult = z.object({
   effect: z.object({ kind: z.string().min(1), value: z.number() }),
 });
 export type SidecarStatsResult = z.infer<typeof SidecarStatsResult>;
+
 

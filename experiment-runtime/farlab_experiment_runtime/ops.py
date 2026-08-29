@@ -11,7 +11,7 @@ from sklearn.metrics import accuracy_score, balanced_accuracy_score, f1_score, l
 
 from . import builders
 from .exploration import op_run_exploration
-from .fem import op_fem_poisson_2d
+from .fem import op_fem_poisson_2d, op_fem_poisson_2d_adaptive
 
 CLASSIFICATION_METRICS = ("accuracy", "balanced_accuracy", "f1_macro", "roc_auc", "log_loss")
 REGRESSION_METRICS = ("mean_squared_error", "r2")
@@ -484,6 +484,7 @@ OPS = {
     "identity_check": op_identity_check,
     # Slice-6: FEM verification (2D Poisson, mixed BCs, convergence orders).
     "fem_poisson_2d": op_fem_poisson_2d,
+    "fem_poisson_2d_adaptive": op_fem_poisson_2d_adaptive,
 }
 
 

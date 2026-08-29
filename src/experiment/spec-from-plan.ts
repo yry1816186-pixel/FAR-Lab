@@ -399,7 +399,9 @@ const FemDraftOut = z.object({
   feasible: z.boolean(),
   skipReason: z.string().min(10).optional(),
   manufacturedSolution: z.string().min(1).max(300).optional(),
-  /** Boundary split — every edge must be named; >= 1 Dirichlet edge. */
+  /** Refinement mode (optional; default uniform). adaptive = residual-estimator NVB AFEM. */
+  mode: z.enum(['uniform', 'adaptive']).optional(),
+  /** Boundary split - every edge must be named; >= 1 Dirichlet edge. */
   boundary: z.object({
     bottom: z.enum(['dirichlet', 'neumann']),
     top: z.enum(['dirichlet', 'neumann']),
@@ -421,7 +423,9 @@ const FEM_SYSTEM_PROMPT =
   'arcsin arccos arctan arctan2 abs floor ceil min max, and the constants pi e. ' +
   'It must be smooth on [0,1]^2 and exercise BOTH boundary kinds when the plan names them. ' +
   'boundary: exactly one dirichlet|neumann value for each of bottom/top/left/right; at least one edge dirichlet ' +
+  'boundary: exactly one dirichlet|neumann value for each of bottom/top/left/right; at least one edge dirichlet ' +
   '(pure-Neumann Poisson is ill-posed). ' +
+  'mode: uniform (fixed refinement ladder) or adaptive (residual-estimator-marked newest-vertex bisection; choose adaptive when the plan demands adaptivity or the solution has singularities). ' +
   'If the plan needs datasets, literature pooling, physical experiments, or symbolic identities instead, set ' +
   'feasible=false with a skipReason naming the mismatch. Output JSON only.';
 
@@ -479,7 +483,8 @@ export const draftFemSpecFromPlan = async (
     domain: 'unit_square',
     manufacturedSolution: draft.manufacturedSolution,
     boundary: draft.boundary,
-    levels: [...FEM_DRAFT_LEVELS],
+    mode: draft.mode ?? 'uniform',
+    ...(draft.mode === 'adaptive' ? { adaptive: {} } : { levels: [...FEM_DRAFT_LEVELS] }),
     errorNorms: ['l2', 'h1'],
     thresholdProvenance: 'community-standard',
     compute: { device: 'local', maxParallel: 1, timeoutMs: 300_000 },
@@ -490,5 +495,7 @@ export const draftFemSpecFromPlan = async (
   });
   return { kind: 'fem', spec, executionMode };
 };
+
+
 
 

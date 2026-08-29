@@ -167,17 +167,17 @@ export const executeStage: StageHandler = {
           });
           const rep = executed.statReports[0];
           const m = executed.measurement;
-          const lastL2 = m.l2Orders[m.l2Orders.length - 1];
-          const lastH1 = m.h1Orders[m.h1Orders.length - 1];
+          const rateLine = m.mode === 'adaptive'
+            ? 'H1 slope ' + (m.h1SlopeVsNdof?.toFixed(3) ?? '?') + ' vs ndof (optimal ' + m.expectedOptimalSlope + '), ' + m.history.length + ' AFEM rounds'
+            : 'L2 order ' + (m.l2Orders[m.l2Orders.length - 1]?.toFixed(3) ?? '?') + ', H1 order ' + (m.h1Orders[m.h1Orders.length - 1]?.toFixed(3) ?? '?');
           return {
             kind: 'done',
             summary:
-              'numerical PDE experiment ' + executed.run.id + ': P1 FEM convergence verified for u=' +
+              'numerical PDE experiment ' + executed.run.id + ': P1 FEM (' + m.mode + ' refinement) convergence verified for u=' +
               m.manufactured.slice(0, 60) +
-              ' (L2 order ' + (lastL2 !== undefined ? lastL2.toFixed(3) : '?') +
-              ', H1 order ' + (lastH1 !== undefined ? lastH1.toFixed(3) : '?') +
+              ' (' + rateLine +
               ', verdict=' + (rep?.verdict ?? 'exploratory') +
-              ') - uniform refinement on the unit square - ' +
+              ') - unit square - ' +
               'plan-drafted, exploratory (theory-fixed rates; binding needs operator approval)',
           };
         } catch (e) {

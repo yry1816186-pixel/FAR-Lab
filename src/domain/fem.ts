@@ -71,8 +71,16 @@ export const FemSpec = z.object({
   /** Manufactured solution u — closed-space expression DATA over {x, y}. */
   manufacturedSolution: z.string().min(1).max(300),
   boundary: FemBoundarySplit,
-  /** Uniform refinement ladder: element counts per side (n x n squares, 2n triangles). */
-  levels: z.array(z.number().int().min(FEM_N_MIN).max(FEM_N_MAX)).min(FEM_LEVELS_MIN).max(FEM_LEVELS_MAX),
+  /** Refinement mode: uniform ladder (6a) or adaptive NVB (6b). */
+  mode: z.enum(['uniform', 'adaptive']).default('uniform'),
+  /** Uniform refinement ladder (required in uniform mode): element counts per side. */
+  levels: z.array(z.number().int().min(FEM_N_MIN).max(FEM_N_MAX)).min(FEM_LEVELS_MIN).max(FEM_LEVELS_MAX).optional(),
+  /** Adaptive parameters (defaults applied when absent in adaptive mode). */
+  adaptive: z.object({
+    markingTheta: z.number().min(0.1).max(0.9).default(0.5),
+    baseGrid: z.number().int().min(2).max(64).default(4),
+    iterations: z.number().int().min(3).max(30).default(10),
+  }).optional(),
   errorNorms: z.array(z.enum(['l2', 'h1'])).default(['l2', 'h1']),
   /** Optional hypothesis binding (methodological verification claims). */
   hypothesisId: HypothesisId.optional(),
@@ -96,7 +104,11 @@ export const FemSpec = z.object({
       message: `manufactured solution: ${err} (variables are x and y; whitelisted functions: ${THEORY_FUNCTION_WHITELIST.join(', ')})`,
     });
   }
-  if (s.levels.some((n, i) => i > 0 && n <= s.levels[i - 1]!)) {
+  if (s.mode === 'uniform' && s.levels === undefined) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['levels'], message: 'uniform mode requires the refinement ladder' });
+  }
+  const ladder = s.levels;
+  if (ladder !== undefined && ladder.some((n, i) => i > 0 && n <= ladder[i - 1]!)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['levels'],
@@ -134,6 +146,7 @@ export const checkFemSpec = (
 
 /** Sidecar measurement shape (op fem_poisson_2d). */
 export interface FemMeasurement {
+  mode: 'uniform';
   manufactured: string;
   forcing: string;
   edges: Record<string, string>;
@@ -181,3 +194,76 @@ export const femConvergenceVerdict = (m: FemMeasurement): Extract<ExperimentVerd
   }
   return 'supports';
 };
+
+// ---------------------------------------------------------------------------
+// adaptive mode (slice 6b): AFEM verification semantics
+// ---------------------------------------------------------------------------
+
+/** Refinement mode: uniform ladder (6a) or adaptive NVB (6b). */
+export const FemMode = z.enum(['uniform', 'adaptive']);
+export type FemMode = z.infer<typeof FemMode>;
+
+/** Preregistered adaptive parameters (deterministic defaults; the model never picks them). */
+export const FEM_ADAPTIVE_DEFAULTS = {
+  markingTheta: 0.5,   // Doerfler bulk fraction
+  baseGrid: 4,         // initial structured mesh n
+  iterations: 10,      // AFEM rounds
+} as const;
+
+/** Tolerance band for the optimal-rate check in adaptive mode. */
+export const FEM_ADAPTIVE_RATE_TOLERANCE = 0.1;
+/** Effectivity upper bound for a trustworthy estimator (disclosed band). */
+export const FEM_EFFECTIVITY_MAX = 10.0;
+
+/** Sidecar measurement shape for op fem_poisson_2d_adaptive. */
+export interface FemAdaptiveMeasurement {
+  manufactured: string;
+  forcing: string;
+  edges: Record<string, string>;
+  mode: 'adaptive';
+  markingTheta: number;
+  baseGrid: number;
+  iterations: number;
+  history: Array<{
+    ndof: number;
+    nTris?: number;
+    solveMs?: number;
+    nonFinite?: boolean;
+    l2Err?: number;
+    h1Err?: number;
+    etaTotal?: number;
+    effectivity?: number;
+  }>;
+  h1Rates: number[];
+  h1SlopeVsNdof: number | null;
+  expectedOptimalSlope: number;
+  effectivities: Array<number | null>;
+}
+
+/**
+ * Mechanical verdict for the adaptive claim: "residual-estimator-marked NVB
+ * refinement attains the optimal energy-norm decay rate N^{-1/2}".
+ *
+ *  - supports: H1 strictly decreasing across ALL rounds AND the log-log slope
+ *    of H1 vs ndof <= -(0.5 - tolerance) AND the final effectivity bounded;
+ *  - falsifies: slope collapsed to the un-refined rate (>= -0.25) or any
+ *    non-monotone round;
+ *  - insufficient_data: too few rounds, non-finite values or missing slope.
+ */
+export const femAdaptiveVerdict = (
+  m: FemAdaptiveMeasurement,
+): Extract<ExperimentVerdict, 'supports' | 'falsifies' | 'insufficient_data'> => {
+  const usable = m.history.filter((h) => h.nonFinite !== true && h.h1Err !== undefined);
+  if (usable.length < 3 || m.h1SlopeVsNdof === null) return 'insufficient_data';
+  const monotone = usable.every((h, i) => i === 0 || (h.h1Err as number) < (usable[i - 1]!.h1Err as number));
+  if (!monotone) return 'falsifies';
+  const finiteEff = m.effectivities.filter((e): e is number => e !== null && Number.isFinite(e));
+  const lastEff = finiteEff[finiteEff.length - 1];
+  if (lastEff === undefined || lastEff > FEM_EFFECTIVITY_MAX) return 'insufficient_data';
+  const optimal = m.expectedOptimalSlope; // -0.5
+  if (m.h1SlopeVsNdof <= optimal + FEM_ADAPTIVE_RATE_TOLERANCE) return 'supports';
+  if (m.h1SlopeVsNdof > -0.25) return 'falsifies';
+  return 'insufficient_data';
+};
+
+

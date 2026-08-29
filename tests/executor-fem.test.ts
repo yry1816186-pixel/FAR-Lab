@@ -7,7 +7,7 @@ import { Store } from '../src/persistence/store.js';
 import { openArtifactStore } from '../src/persistence/artifacts.js';
 import { FemSpec, HypothesisCandidate, newId, ResearchQuestion, type FemMeasurement } from '../src/domain/index.js';
 import { executeFemAnalysis } from '../src/experiment/executor-fem.js';
-import { femConvergenceVerdict, checkFemSpec } from '../src/domain/fem.js';
+import { femConvergenceVerdict, femAdaptiveVerdict, checkFemSpec, type FemAdaptiveMeasurement } from '../src/domain/fem.js';
 import { ResearchPlan } from '../src/domain/index.js';
 import { executeStage } from '../src/pipeline/stages/execute.js';
 import { createTestStubProvider } from '../src/providers/test-stub.js';
@@ -87,6 +87,7 @@ const fakeSidecar = (script: FemMeasurement[]): Sidecar => {
 };
 
 const measurement = (over: Partial<FemMeasurement> = {}): FemMeasurement => ({
+  mode: 'uniform',
   manufactured: 'sin(pi*x)*sin(pi*y) + x*x*y + 0.5*x',
   forcing: '-2*y + 2*pi**2*sin(pi*x)*sin(pi*y)',
   edges: { bottom: 'dirichlet', top: 'neumann', left: 'dirichlet', right: 'neumann' },
@@ -280,4 +281,78 @@ describe('execute stage routing: the numerical-PDE leg', () => {
   }, 120_000);
 });
 
+
+
+
+describe('adaptive FEM (slice 6b): verdict mechanics + real sidecar', () => {
+  const adaptiveMeasurement = (over: Partial<FemAdaptiveMeasurement> = {}): FemAdaptiveMeasurement => ({
+    mode: 'adaptive',
+    manufactured: '(x*x + y*y)**0.35',
+    forcing: 'symbolic',
+    edges: { bottom: 'dirichlet', top: 'neumann', left: 'dirichlet', right: 'neumann' },
+    markingTheta: 0.5, baseGrid: 4, iterations: 10,
+    history: [
+      { ndof: 25, h1Err: 0.8, effectivity: 4.5 },
+      { ndof: 40, h1Err: 0.5, effectivity: 4.6 },
+      { ndof: 70, h1Err: 0.3, effectivity: 4.4 },
+      { ndof: 120, h1Err: 0.18, effectivity: 4.3 },
+    ],
+    h1Rates: [0.7, 0.6],
+    h1SlopeVsNdof: -0.55,
+    expectedOptimalSlope: -0.5,
+    effectivities: [4.5, 4.6, 4.4, 4.3],
+    ...over,
+  });
+
+  it('verdict: optimal slope + monotone + bounded effectivity supports; collapsed rate falsifies', () => {
+    expect(femAdaptiveVerdict(adaptiveMeasurement())).toBe('supports');
+    expect(femAdaptiveVerdict(adaptiveMeasurement({ h1SlopeVsNdof: -0.1 }))).toBe('falsifies');
+    expect(femAdaptiveVerdict(adaptiveMeasurement({ h1SlopeVsNdof: -0.35 }))).toBe('insufficient_data');
+    expect(femAdaptiveVerdict(adaptiveMeasurement({
+      history: [
+        { ndof: 25, h1Err: 0.5 },
+        { ndof: 60, h1Err: 0.52 },
+        { ndof: 100, h1Err: 0.3 },
+      ],
+    }))).toBe('falsifies');
+    expect(femAdaptiveVerdict(adaptiveMeasurement({ h1SlopeVsNdof: null }))).toBe('insufficient_data');
+  });
+
+  it('executes adaptive end-to-end on the real sidecar: corner singularity attains the optimal rate', async () => {
+    const { store, runId, artifacts } = makeEnv();
+    const spec = makeSpec(runId, {
+      mode: 'adaptive',
+      levels: undefined,
+      manufacturedSolution: '(x*x + y*y)**0.35',
+      adaptive: { markingTheta: 0.5, baseGrid: 4, iterations: 10 },
+      exploratoryNote: 'exploratory adaptive verification — binding requires operator approval',
+    });
+    const out = await executeFemAnalysis(store, artifacts, spec, { now: () => T0 });
+    expect(out.run.status).toBe('completed');
+    const m = out.measurement as FemAdaptiveMeasurement;
+    expect(m.mode).toBe('adaptive');
+    expect(m.h1SlopeVsNdof).not.toBeNull();
+    expect(m.h1SlopeVsNdof!).toBeLessThanOrEqual(-0.4); // optimal-rate band
+    const report = out.statReports[0];
+    expect(report?.metricKey).toBe('fem_h1_error_final_round');
+    expect(report?.verdict).toBe('supports');
+    // effectivity bounded and stable (a correct residual estimator)
+    const effs = m.effectivities.filter((e): e is number => e !== null);
+    expect(Math.max(...effs)).toBeLessThan(10);
+  }, 180_000);
+
+  it('the uniform ladder on the same singular solution degrades to the sub-optimal rate (contrast evidence)', async () => {
+    const { store, runId, artifacts } = makeEnv();
+    const spec = makeSpec(runId, {
+      manufacturedSolution: '(x*x + y*y)**0.35',
+      levels: [8, 16, 32],
+      exploratoryNote: 'exploratory uniform verification — binding requires operator approval',
+    });
+    const out = await executeFemAnalysis(store, artifacts, spec, { now: () => T0 });
+    const m = out.measurement as FemMeasurement;
+    const lastH1 = m.h1Orders[m.h1Orders.length - 1] ?? 0;
+    expect(lastH1).toBeLessThan(0.8); // r^0.7 theory: ~0.7, clearly below the smooth rate 1
+    expect(lastH1).toBeGreaterThan(0.4);
+  }, 120_000);
+});
 

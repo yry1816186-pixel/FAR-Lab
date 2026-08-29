@@ -7,7 +7,10 @@ import {
   FemSpec,
   checkFemSpec,
   femConvergenceVerdict,
+  femAdaptiveVerdict,
+  FEM_ADAPTIVE_DEFAULTS,
   type FemMeasurement,
+  type FemAdaptiveMeasurement,
   FeedbackSignal,
   type ExperimentRun,
   type StatReport,
@@ -41,7 +44,7 @@ export interface ExecutedFem {
   run: ExperimentRun;
   statReports: StatReport[];
   feedback: FeedbackSignal[];
-  measurement: FemMeasurement;
+  measurement: FemMeasurement | FemAdaptiveMeasurement;
 }
 
 export const femSpecHash = (spec: FemSpec): string =>
@@ -103,18 +106,25 @@ export const executeFemAnalysis = async (
     }, 'experiment_started', { id: expRun.id, experimentType: 'numerical_pde', python: env.pythonVersion, versions: env.versions });
 
     if (opts.shouldCancel?.()) throw new Error('canceled');
-    const r = await sidecar.call<FemMeasurement>('fem_poisson_2d', {
-      manufacturedSolution: validated.manufacturedSolution,
-      edges: validated.boundary,
-      levels: validated.levels,
-    }, spec.compute.timeoutMs);
-    if (!r.ok || r.result === undefined) fail(r.error?.message ?? 'fem_poisson_2d returned no result');
+    const adaptive = validated.mode === 'adaptive';
+    const r = adaptive
+      ? await sidecar.call<FemAdaptiveMeasurement>('fem_poisson_2d_adaptive', {
+          manufacturedSolution: validated.manufacturedSolution,
+          edges: validated.boundary,
+          ...(validated.adaptive ?? FEM_ADAPTIVE_DEFAULTS),
+        }, spec.compute.timeoutMs)
+      : await sidecar.call<FemMeasurement>('fem_poisson_2d', {
+          manufacturedSolution: validated.manufacturedSolution,
+          edges: validated.boundary,
+          levels: validated.levels ?? [],
+        }, spec.compute.timeoutMs);
+    if (!r.ok || r.result === undefined) fail(r.error?.message ?? 'fem sidecar op returned no result');
     const m = r.result;
     if (m.manufactured !== validated.manufacturedSolution) {
       fail(`sidecar measurement names a different manufactured solution: ${m.manufactured}`);
     }
 
-    // Per-level error table + forcing derivation = content-addressed artifacts.
+    // Measurement table + forcing derivation = content-addressed artifacts.
     const tableRef = (await artifacts.put(JSON.stringify(m, null, 2))).ref;
     store.appendEvent(spec.runId, {
       type: 'note',
@@ -124,9 +134,10 @@ export const executeFemAnalysis = async (
         manufactured: m.manufactured,
         forcing: m.forcing,
         edges: m.edges,
-        levels: m.levels,
-        l2Orders: m.l2Orders,
-        h1Orders: m.h1Orders,
+        mode: m.mode,
+        ...(m.mode === 'adaptive'
+          ? { history: m.history, h1SlopeVsNdof: m.h1SlopeVsNdof, effectivities: m.effectivities }
+          : { levels: m.levels, l2Orders: m.l2Orders, h1Orders: m.h1Orders }),
         tableRef,
       },
     }, now());
@@ -140,26 +151,42 @@ export const executeFemAnalysis = async (
     }
     const sequential = priorSameSpec > 0;
 
-    const verdict = sequential ? undefined : femConvergenceVerdict(m);
-    const finalLevel = [...m.levels].reverse().find((lv) => !lv.nonFinite && lv.l2Err !== undefined);
     const hyp = validated.hypothesisId !== undefined
       ? hypotheses.find((h) => h.id === validated.hypothesisId)
       : undefined;
     const bound = validated.hypothesisId !== undefined && hyp !== undefined;
 
-    const lastL2 = m.l2Orders[m.l2Orders.length - 1];
-    const lastH1 = m.h1Orders[m.h1Orders.length - 1];
+    // Mode-aware mechanical verdict + reported quantities.
+    const mA = m.mode === 'adaptive' ? m : null;
+    const mU = m.mode === 'uniform' ? m : null;
+    const verdict = sequential ? undefined
+      : mA !== null ? femAdaptiveVerdict(mA)
+      : mU !== null ? femConvergenceVerdict(mU)
+      : undefined;
+    const finalLevel = mU !== null
+      ? [...mU.levels].reverse().find((lv) => !lv.nonFinite && lv.l2Err !== undefined)
+      : undefined;
+    const lastRound = mA !== null ? [...mA.history].reverse().find((h) => h.nonFinite !== true && h.h1Err !== undefined) : undefined;
+    const pointEstimate = mU !== null ? (finalLevel?.l2Err ?? Number.NaN) : (lastRound?.h1Err ?? Number.NaN);
+    const effectValue = mU !== null ? (mU.l2Orders[mU.l2Orders.length - 1] ?? Number.NaN) : (mA?.h1SlopeVsNdof ?? Number.NaN);
+    const lastEff = [...(mA?.effectivities ?? [])].reverse().find((e): e is number => e !== null && e !== undefined);
+    const measuredLine = mU !== null
+      ? `L2 orders [${mU.l2Orders.map((o) => o.toFixed(3)).join(', ')}], H1 orders [${mU.h1Orders.map((o) => o.toFixed(3)).join(', ')}] on levels [${mU.levels.map((lv) => lv.n).join(', ')}]`
+      : `H1 slope vs ndof ${mA?.h1SlopeVsNdof?.toFixed(3) ?? '?'} (optimal ${mA?.expectedOptimalSlope}), final effectivity ${lastEff?.toFixed(2) ?? '?'}, ${mA?.history.length ?? 0} rounds`;
+    const ruleLine = mU !== null
+      ? 'errors strictly decrease AND final L2 order >= 2 - 0.25, final H1 order >= 1 - 0.25'
+      : 'H1 strictly decreases AND log-log slope <= -0.5 + 0.1 AND final effectivity <= 10';
     const report: StatReport = {
       id: newId('srep') as StatReport['id'],
       experimentRunId: expRun.id,
       runId: spec.runId,
       comparisonId: 'fem_convergence',
-      metricKey: 'fem_l2_error_final_level',
+      metricKey: mU !== null ? 'fem_l2_error_final_level' : 'fem_h1_error_final_round',
       primary: true,
-      pointEstimate: finalLevel?.l2Err ?? Number.NaN,
-      ci: { level: 1, low: finalLevel?.l2Err ?? Number.NaN, high: finalLevel?.l2Err ?? Number.NaN },
+      pointEstimate,
+      ci: { level: 1, low: pointEstimate, high: pointEstimate },
       test: { kind: 'fem_convergence_order', alpha: 1 },
-      effect: { kind: 'observed_order', value: lastL2 ?? Number.NaN },
+      effect: { kind: 'observed_order', value: effectValue },
       ...(bound ? { hypothesisId: validated.hypothesisId, hypothesisVersion: hyp!.version } : {}),
       thresholdProvenance: validated.thresholdProvenance,
       ...(verdict !== undefined ? { verdict } : {}),
@@ -167,9 +194,9 @@ export const executeFemAnalysis = async (
       exploratory: !bound || sequential,
       ...(bound || sequential ? {
         verdictDerivation: [
-          `rule: errors strictly decrease AND final L2 order >= ${m.expectedL2Order} - 0.25, final H1 order >= ${m.expectedH1Order} - 0.25 [threshold source: ${validated.thresholdProvenance}; rates are theory-fixed, not model-chosen]`,
-          `measured: L2 orders [${m.l2Orders.map((o) => o.toFixed(3)).join(', ')}], H1 orders [${m.h1Orders.map((o) => o.toFixed(3)).join(', ')}] on levels [${m.levels.map((lv) => lv.n).join(', ')}] (forcing derived exactly: ${m.forcing})`,
-          `verdict: ${verdict ?? 'none'}${sequential ? ' (sequential re-run labelled exploratory)' : ''} — uniform P1 refinement on the unit square; not a certification for other geometries/elements`,
+          `rule: ${ruleLine} [threshold source: ${validated.thresholdProvenance}; rates are theory-fixed, not model-chosen]`,
+          `measured: ${measuredLine} (forcing derived exactly: ${m.forcing})`,
+          `verdict: ${verdict ?? 'none'}${sequential ? ' (sequential re-run labelled exploratory)' : ''} - ${m.mode} P1 refinement on the unit square; not a certification for other geometries/elements`,
         ].join('; '),
       } : {}),
       analysisIteration: priorSameSpec + 1,
@@ -183,7 +210,7 @@ export const executeFemAnalysis = async (
         id: newId('fbk') as FeedbackSignal['id'],
         runId: spec.runId,
         source: 'experiment',
-        content: `numerical PDE verification (u = ${m.manufactured}, edges ${JSON.stringify(m.edges)}): verdict=${verdict} (L2 order ${lastL2?.toFixed(3) ?? '?'}, H1 order ${lastH1?.toFixed(3) ?? '?'} on levels ${m.levels.map((lv) => lv.n).join('/')}; threshold source=${validated.thresholdProvenance})`,
+        content: `numerical PDE verification (${m.mode}; u = ${m.manufactured}, edges ${JSON.stringify(m.edges)}): verdict=${verdict} (${measuredLine}; threshold source=${validated.thresholdProvenance})`,
         structured: {
           kind: 'numerical_pde',
           experimentRunId: expRun.id,
@@ -219,3 +246,5 @@ export const executeFemAnalysis = async (
     sidecar.close();
   }
 };
+
+
