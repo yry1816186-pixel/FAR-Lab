@@ -153,3 +153,31 @@ tests/real-content-mixed-route.test.ts（混合路由 5 例：四 stage 拒 + as
 - 门禁终态：typecheck + lint(0 err) + vitest 2148/207 + web tsc/build + cargo 6/6 + playwright 15 项。
 - 本窗口共 7 个提交：03f1c66, 2f41545, c89792a, 15ad84a, 9e78f18, (ACH 随 fe9f41d), 4b7d508。
 - BLOCKED（用户侧）：DASHSCOPE key（比赛路线 live receipt）、比赛技术 PDF。
+
+# 扩展能力补全会话（extensibility goal，2026-08-29 午后）
+
+计划与缺口矩阵：`.control/EXTENSIBILITY-PLAN-20260829.md`（gitignored，运行态）。用户点名的 18 项扩展能力逐项处置完毕，全部真实可用、无演示态：
+
+| commit | 内容 |
+|---|---|
+| fe9f41d | S1/S2：工作台文件工具（read_file/find_files/grep_content）+ 登录 shell 平面（profile 继承、Windows stdin 脚本化根治 argv 双层引号退出码 bug）+ 终端会话 API/管理器 + run_command 审批提案 + web 终端面板（web 层由并发会话 3d7eb71 携带入库） |
+| 7722ac7 | S3：网络平面——FARLAB_HTTP(S)_PROXY/NO_PROXY/FARLAB_CA_CERT → Node 原生 fetch 契约（实测定论 NODE_USE_ENV_PROXY/NODE_EXTRA_CA_CERTS 仅启动期生效，见 scripts/probe-net-env.mjs）+ 启动一次性 re-exec + far probe net 真实环回隧道自检 |
+| 567a26b | S3 修复：自检证书材料 fresh-clone 自愈（*.key 不入库，运行时 openssl 生成 2 天期临时对） |
+| 56e1ea7 | S4：思考过程显示——三线制捕获（reasoning_content/thinking 块/thought parts）→ StructuredCallResult.thinking → 内核事件 → 消息持久化 → web 折叠面板 |
+| f5d39ce | S5/S6：far mcp add/list/enable/disable/probe（真连探针+lastTest）+ far plugin install/list + docs/EXTENSIBILITY.md（含 Playwright MCP 浏览器控制与电脑控制 MCP 配方） |
+| ff462ed | S7：README/SECURITY 文档真话 + 终端 e2e + 并发会话带入的 3 个 lint error 根修 |
+
+新增真实测试：workspace-tools(18) + terminal-run-command(10) + terminal-api(3) + net-env(12) + thinking-display(7) + cli-extensibility(4) + web e2e terminal(1)。全量门禁：root typecheck/lint(0 error)/vitest 2171 全绿/build 绿；web typecheck/build 绿；e2e 套件见下。
+
+既有能力确认（不重复造）：skills/plugins/MCP(stdio+http)/commands/hooks/subagents/approval cards/list_capabilities/agent 四类工具集成草稿提案；「import→激活→装配注入」与「对话提案→停用入库」e2e 已有（capability-assembly / tool-proposals 套件）。
+
+项目级 completion-gate：B-QWEN-LIVE-ROUTE 仍 OPEN（比赛路线需 DASHSCOPE_API_KEY，用户侧凭据，历史 BLOCKED）——本次扩展目标完成≠项目 ACCEPTANCE 完成，如实区分。
+
+并发会话交互记录：3d7eb71 将本会话 web 层文件一并提交（其门禁已含）；本会话提交均为自身切片，无他人工作卷入。
+
+## 终态门禁（扩展目标，2026-08-29 13:00）
+
+- root：typecheck 绿 / eslint 0 error / vitest 2173 全绿（D-031 守卫一次正确拦截陈旧 dist，重建后通过）/ build 绿
+- web：typecheck 绿 / build 绿 / Playwright e2e 20 passed（含新增 terminal.spec 真实浏览器往返；2 flaky 为已知 perf 高负载偶发，非本次改动面）
+- 对抗自查三修已入库（3071ae8）：符号链接围栏、spawn 失败诚实化、PS 输入编码
+- 项目级 completion-gate 仍由 B-QWEN-LIVE-ROUTE（用户侧 DASHSCOPE_API_KEY）阻塞——扩展目标完成 ≠ 项目 ACCEPTANCE 完成

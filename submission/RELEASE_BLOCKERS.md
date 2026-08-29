@@ -14,7 +14,7 @@ is updated by lane 15 at governance milestones.
 
 ## User-owned submission actions (not engineering blockers; deadline 2026-09-05)
 
-- **PDF swap (2026-08-28)**: `submission/项目提交文档.pdf` was open in a viewer while section 15.2 (金标准闭环) landed; the regenerated 20-page PDF sits at `submission/项目提交文档.new.pdf` (extraction-verified). Close the viewer, then `Move-Item 项目提交文档.new.pdf 项目提交文档.pdf -Force` and commit the pdf.
+- ~~**PDF swap (2026-08-28)**~~ DONE 2026-08-29: `项目提交文档.new.pdf` (extraction-verified 20-page) moved over `项目提交文档.pdf` and committed.
 - ≤10 分钟演示视频 (演示归用户 policy). 演示视频脚本.md 第 10 段新增 live 金标准研究走查（展示服务器 `PORT=4529 FARLAB_DATA_DIR=work/gold node scripts/serve.mjs`，两项研究 + 修订链 + 不可执行实验腿结论）.
 - 网盘 upload + 链接/提取码/上传时间截图 attachment doc.
 - 盖章报名表 PDF (info must match the registration system exactly).
