@@ -1,4 +1,1 @@
-dormant: slice-2 diagnostics loop closed (surgery #17 full suite green —
-216 files, 2205 passed, 7 honest skips, 0 failures). The surgery workflow is
-workflow_dispatch-only now; this marker is kept as documentation of the
-diagnostics trigger mechanism. See scripts/surgery/README.md.
+bump: 4

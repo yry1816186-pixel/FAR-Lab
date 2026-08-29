@@ -1,12 +1,16 @@
 name: surgery
 
-# Remote-surgery patch plane — DORMANT after slice 2 (workflow_dispatch only):
-# the branch-scoped push trigger (marker-file diagnostics mode used to iterate
-# this slice) is removed before the merge so main never auto-runs the patch
-# plane. Revive per-slice on a converge/** branch when the anchored-patch loop
-# is needed again (see scripts/surgery/README.md). Never trigger on pull_request.
+# Remote-surgery patch plane — DIAGNOSTICS MODE REVIVED (slice 2 iteration):
+# ci on this branch fails at a stage the base diagnose does not cover
+# (tui/desktop installs, tui tests, CLI smoke, license, secret-scan,
+# path-hygiene, or web build) — the diagnose job now mirrors EVERY ci.yml
+# verify step with tee'd logs committed to diag.txt. Triggers ONLY on the
+# marker file. Neutralized to workflow_dispatch-only before the merge.
 on:
   workflow_dispatch:
+  push:
+    branches: ['converge/web-protocol']
+    paths: ['scripts/surgery/.diag-trigger']
 
 permissions:
   contents: write
@@ -60,6 +64,12 @@ jobs:
       - name: Install web dependencies (root suite imports web/src)
         working-directory: web
         run: npm ci
+      - name: Install TUI dependencies (ci-only coverage)
+        working-directory: packages/tui
+        run: npm ci 2>&1 | tee /tmp/tui-install.txt || echo "TUI_INSTALL_FAILED" >> /tmp/tui-install.txt
+      - name: Install desktop dependencies (ci-only coverage)
+        working-directory: desktop
+        run: npm ci 2>&1 | tee /tmp/desktop-install.txt || echo "DESKTOP_INSTALL_FAILED" >> /tmp/desktop-install.txt
       - name: Build backend dist (suite imports compiled output)
         run: npm run build
       - name: Typecheck (backend + CLI)
@@ -68,12 +78,38 @@ jobs:
         run: npm run lint 2>&1 | tee /tmp/lint.txt || echo "LINT_FAILED" >> /tmp/lint.txt
       - name: Full test suite (same gates as ci.yml verify)
         run: npm test 2>&1 | tee /tmp/vitest.txt || echo "VITEST_FAILED" >> /tmp/vitest.txt
+      - name: TUI package tests (ci-only coverage)
+        working-directory: packages/tui
+        run: npm test 2>&1 | tee /tmp/tui-test.txt || echo "TUI_TEST_FAILED" >> /tmp/tui-test.txt
+      - name: CLI smoke (ci-only coverage)
+        run: node dist/cli/main.js --help 2>&1 | tee /tmp/cli.txt || echo "CLI_FAILED" >> /tmp/cli.txt
+      - name: License ledger gate (ci-only coverage)
+        run: node zcode-harness/scripts/license-ledger.mjs --check 2>&1 | tee /tmp/license.txt || echo "LICENSE_FAILED" >> /tmp/license.txt
+      - name: Secret scan (ci-only coverage)
+        run: node zcode-harness/scripts/secret-scan.mjs 2>&1 | tee /tmp/secret.txt || echo "SECRET_FAILED" >> /tmp/secret.txt
+      - name: Path hygiene (ci-only coverage)
+        run: node zcode-harness/scripts/path-hygiene.mjs 2>&1 | tee /tmp/hygiene.txt || echo "HYGIENE_FAILED" >> /tmp/hygiene.txt
+      - name: Web production build (ci-only coverage)
+        working-directory: web
+        run: npm run build 2>&1 | tee /tmp/webbuild.txt || echo "WEBBUILD_FAILED" >> /tmp/webbuild.txt
       - name: Commit diagnostics
         run: |
           git config user.name "farlab-surgery-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           mkdir -p scripts/surgery
-          { echo '===== typecheck (last 30 lines) ====='; tail -n 30 /tmp/typecheck.txt; echo; echo '===== lint (last 30 lines) ====='; tail -n 30 /tmp/lint.txt; echo; echo '===== FULL vitest (last 400 lines) ====='; tail -n 400 /tmp/vitest.txt; } > scripts/surgery/diag.txt
+          {
+            echo '===== tui install (last 20 lines) ====='; tail -n 20 /tmp/tui-install.txt;
+            echo; echo '===== desktop install (last 20 lines) ====='; tail -n 20 /tmp/desktop-install.txt;
+            echo; echo '===== typecheck (last 30 lines) ====='; tail -n 30 /tmp/typecheck.txt;
+            echo; echo '===== lint (last 30 lines) ====='; tail -n 30 /tmp/lint.txt;
+            echo; echo '===== FULL vitest (last 400 lines) ====='; tail -n 400 /tmp/vitest.txt;
+            echo; echo '===== tui test (last 40 lines) ====='; tail -n 40 /tmp/tui-test.txt;
+            echo; echo '===== cli smoke (last 20 lines) ====='; tail -n 20 /tmp/cli.txt;
+            echo; echo '===== license (last 30 lines) ====='; tail -n 30 /tmp/license.txt;
+            echo; echo '===== secret scan (last 40 lines) ====='; tail -n 40 /tmp/secret.txt;
+            echo; echo '===== path hygiene (last 40 lines) ====='; tail -n 40 /tmp/hygiene.txt;
+            echo; echo '===== web build (last 60 lines) ====='; tail -n 60 /tmp/webbuild.txt;
+          } > scripts/surgery/diag.txt
           git add scripts/surgery/diag.txt
           if git diff --cached --quiet; then
             echo "no diagnostics change"
@@ -82,6 +118,6 @@ jobs:
             git pull --rebase
             git stash pop
             git add scripts/surgery/diag.txt
-            git commit -m "chore(surgery): diagnostics snapshot (full suite)"
+            git commit -m "chore(surgery): diagnostics snapshot (full suite + ci-only gates)"
             git push
           fi
