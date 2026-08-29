@@ -147,11 +147,24 @@ export const makeReadFileTool = (root: string): AgentTool => ({
     let stat: fs.Stats;
     try { stat = await fsp.stat(abs); } catch { return { ok: false, error: { kind: 'validation', message: `file not found: ${rel}` } }; }
     if (stat.isDirectory()) return { ok: false, error: { kind: 'validation', message: `path is a directory: ${rel}` } };
+    // Symlink escape fence: resolve the REAL path and re-check containment —
+    // a symlink planted inside the root must not read outside it.
+    let realAbs = abs;
+    try {
+      const real = await fsp.realpath(abs);
+      const realRoot = await fsp.realpath(root);
+      if (real !== realRoot && !real.startsWith(realRoot + path.sep)) {
+        return { ok: false, error: { kind: 'validation', message: `path resolves outside the workspace root (symlink?): ${rel}` } };
+      }
+      realAbs = real;
+    } catch {
+      // realpath unavailable (exotic FS): lexical containment already holds.
+    }
     if (stat.size > READ_MAX_BYTES) {
       return { ok: false, error: { kind: 'validation', message: `file is ${stat.size} bytes (over the 1MB read cap): ${rel}` } };
     }
     let buf: Buffer;
-    try { buf = await fsp.readFile(abs); } catch (e) {
+    try { buf = await fsp.readFile(realAbs); } catch (e) {
       return { ok: false, error: { kind: 'execution', message: `unreadable: ${e instanceof Error ? e.message : String(e)}` } };
     }
     const decoded = decodeTextOrBinary(buf);

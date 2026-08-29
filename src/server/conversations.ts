@@ -605,8 +605,9 @@ const executeProposal = async (
         ? `命令超时（${args.timeoutMs}ms）后被终止`
         : `退出码 ${r.exitCode ?? 'unknown'}`;
       return {
-        ok: !r.timedOut && (r.exitCode === 0 || r.exitCode === null),
-        result: `${verdict}，耗时 ${r.durationMs}ms${r.truncated ? '（输出已截断）' : ''}${out}${err}`,
+        // spawnFailed is an execution failure — never reported as success.
+        ok: !r.timedOut && !('spawnFailed' in r) && (r.exitCode === 0 || r.exitCode === null),
+        result: `命令：${args.command}\n${verdict}，耗时 ${r.durationMs}ms${r.truncated ? '（输出已截断）' : ''}${out}${err}`,
       };
     }
     const args = CancelAutomationArgsSchema.parse(proposal.args);

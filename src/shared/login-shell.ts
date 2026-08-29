@@ -63,7 +63,9 @@ const whereIs = (program: string): string | null => {
 };
 
 const powerShell = (program: string, name: 'pwsh' | 'powershell'): LoginShell => {
-  const utf8 = '[Console]::OutputEncoding=[System.Text.Encoding]::UTF8';
+  // Both Input AND Output encoding: piped stdin is read with InputEncoding —
+  // without it, non-ASCII (CJK) input garbles on legacy codepage consoles.
+  const utf8 = '[Console]::InputEncoding=[Console]::OutputEncoding=[System.Text.Encoding]::UTF8';
   return {
     program,
     sessionArgs: ['-NoLogo'],
@@ -115,6 +117,8 @@ export const runInLoginShell = async (opts: {
   let stdout = '';
   let stderr = '';
   let truncated = false;
+  let spawnError: string | null = null;
+  child.on('error', (e: Error) => { spawnError = e.message; });
   child.stdout?.on('data', (c: Buffer) => {
     if (stdout.length <= opts.maxOutputChars * 2) stdout += c.toString('utf8');
     else if (!truncated) { truncated = true; killTree(child); }
@@ -136,10 +140,11 @@ export const runInLoginShell = async (opts: {
   return {
     exitCode: child.exitCode,
     stdout: render(),
-    stderr: stderr.slice(0, opts.maxOutputChars),
+    stderr: (spawnError !== null ? `spawn failed: ${spawnError}\n` : '') + stderr.slice(0, opts.maxOutputChars),
     timedOut,
     durationMs: Date.now() - started,
     truncated,
+    ...(spawnError !== null ? { spawnFailed: true } : {}),
   };
 };
 

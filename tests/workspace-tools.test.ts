@@ -89,6 +89,21 @@ describe('read_file', () => {
     expect(res.ok).toBe(false);
     if (!res.ok && res.error) expect(res.error.message).toContain('not found');
   });
+
+  it('refuses symlinks that resolve outside the root (escape fence)', async () => {
+    const outside = await fsp.mkdtemp(path.join(os.tmpdir(), 'far-ws-out-'));
+    const outsideFile = path.join(outside, 'secret.txt');
+    await fsp.writeFile(outsideFile, 'outside secret');
+    try {
+      await fsp.symlink(outsideFile, path.join(root, 'leak.txt')).catch(() => {});
+      if (!fs.existsSync(path.join(root, 'leak.txt'))) return; // symlink needs dev-mode/privilege — skip honestly
+      const res = await run('read_file', { path: 'leak.txt' });
+      expect(res.ok).toBe(false);
+      if (!res.ok && res.error) expect(res.error.message).toContain('outside the workspace root');
+    } finally {
+      await fsp.rm(outside, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('find_files', () => {

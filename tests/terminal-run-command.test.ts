@@ -83,6 +83,18 @@ describe('runInLoginShell (real processes)', () => {
     });
     expect(r.timedOut).toBe(true);
   }, 30_000);
+
+  it('reports spawn failures honestly (spawnFailed, never success)', async () => {
+    const prev = process.env.FARLAB_SHELL;
+    process.env.FARLAB_SHELL = process.platform === 'win32' ? 'C:\\definitely\\not\\a\\shell.exe' : '/definitely/not/a/shell';
+    try {
+      const r = await runInLoginShell({ command: 'echo hi', cwd: tmp, timeoutMs: 10_000, maxOutputChars: 4000 });
+      expect('spawnFailed' in r).toBe(true);
+      expect(r.stderr).toContain('spawn failed');
+    } finally {
+      if (prev === undefined) delete process.env.FARLAB_SHELL; else process.env.FARLAB_SHELL = prev;
+    }
+  }, 30_000);
 });
 
 describe('TerminalManager (real sessions)', () => {
