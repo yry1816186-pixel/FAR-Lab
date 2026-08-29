@@ -123,4 +123,60 @@ describe('draftSpecFromPlan', () => {
     expect(res.kind).toBe('skip');
     if (res.kind === 'skip') expect(res.reason).toContain('quota_exceeded');
   });
+  it('auto-serialization: binds an operator-registered dataset by id, regression task (mse metrics, below, random split)', async () => {
+    const provider = createTestStubProvider([{
+      forPurpose: 'experiment-spec-draft',
+      rawOutput: JSON.stringify({
+        feasible: true,
+        datasetRecordId: 'ds_registered000000000000000000000',
+        targetColumn: 'value',
+        models: [
+          { name: 'mean-baseline', builderId: 'dummy_mean', hyperparams: {} },
+          { name: 'forest-reg', builderId: 'random_forest_regressor', hyperparams: { n_estimators: 100 } },
+        ],
+      }),
+    }]);
+    const registered = [{
+      id: 'ds_registered000000000000000000000',
+      name: 'scenario-b monthly gridpoint means',
+      columns: ['lat', 'lon', 'month', 'value'],
+      nRows: 33150,
+      targetColumn: 'value',
+      path: 'C:/data/derived.csv',
+    }];
+    const res = await draftSpecFromPlan(plan, 'Do gridpoint features carry learnable monthly temperature structure?', { provider, recordReceipt: plane(provider).recordReceipt }, registered);
+    expect(res.kind).toBe('spec');
+    if (res.kind !== 'spec') return;
+    expect(res.spec.datasets[0]?.source).toEqual({ resolver: 'local', path: 'C:/data/derived.csv' });
+    expect(res.spec.datasets[0]?.targetColumn).toBe('value');
+    expect(res.spec.datasets[0]?.split.method).toBe('random'); // regression: stratified is wrong on a continuous target
+    expect(res.spec.metrics).toEqual(['mean_squared_error', 'r2']);
+    expect(res.spec.comparisons[0]?.metricKey).toBe('mean_squared_error');
+    expect(res.spec.comparisons[0]?.direction).toBe('below');
+  });
+  it('auto-serialization: an unknown datasetRecordId refuses to guess a binding', async () => {
+    const provider = createTestStubProvider([{
+      forPurpose: 'experiment-spec-draft',
+      rawOutput: JSON.stringify({
+        feasible: true,
+        datasetRecordId: 'ds_notregistered0000000000000000000',
+        targetColumn: 'value',
+        models: [{ name: 'mean-baseline', builderId: 'dummy_mean', hyperparams: {} }],
+      }),
+    }]);
+    const res = await draftSpecFromPlan(plan, 'q', { provider, recordReceipt: plane(provider).recordReceipt }, []);
+    expect(res).toMatchObject({ kind: 'skip', reason: expect.stringContaining('unknown datasetRecordId') });
+  });
+  it('mixed classifier/regressor drafts are rejected at the boundary', async () => {
+    const provider = createTestStubProvider([{
+      rawOutput: JSON.stringify({
+        feasible: true,
+        openmlDatasetId: 61,
+        targetColumn: 'Class',
+        models: [{ name: 'mix-clf', builderId: 'logistic_regression', hyperparams: {} }, { name: 'mix-reg', builderId: 'linear_regression', hyperparams: {} }],
+      }),
+    }]);
+    const res = await draftSpecFromPlan(plan, 'q', { provider, recordReceipt: plane(provider).recordReceipt });
+    expect(res.kind).toBe('skip'); // boundary refine rejects the mix before any spec is minted
+  });
 });

@@ -36,23 +36,49 @@ export type MetaSpecDraftOutcome =
   | { kind: 'skip'; reason: string };
 
 const CLASSIFIER_BUILDERS = ['logistic_regression', 'random_forest_classifier', 'gradient_boosting_classifier', 'dummy_most_frequent'] as const;
+const REGRESSION_BUILDERS = ['dummy_mean', 'linear_regression', 'random_forest_regressor', 'gradient_boosting_regressor'] as const;
+const DRAFT_BUILDERS = [...CLASSIFIER_BUILDERS, ...REGRESSION_BUILDERS] as const;
+/**
+ * Operator-registered CSV datasets on far.db (auto-serialization, scenario-B
+ * evidence): the model sees id/name/columns/nRows/targetColumn ONLY — the local
+ * path never enters the prompt; deterministic code resolves it after the draft
+ * picks an id. A dataset_record's existence IS the operator's acquisition act.
+ */
+export interface RegisteredDatasetRef {
+  id: string;
+  name: string;
+  columns: string[];
+  nRows: number;
+  targetColumn: string;
+  path: string;
+}
 
 const DraftOut = z.object({
   /** false = the plan cannot be honored as a tabular ML experiment (honest skip). */
   feasible: z.boolean(),
   skipReason: z.string().min(10).optional(),
-  openmlDatasetId: z.number().int().positive().optional(),
+  openmlDatasetId: z.number().int().positive().optional(),  /** Auto-serialization: bind an operator-registered dataset_record by id (XOR openmlDatasetId). */
+  datasetRecordId: z.string().min(1).optional(),
   targetColumn: z.string().min(1).optional(),
   /** Models only required when feasible=true (enforced below, not by the array
    *  bound: an infeasible verdict legitimately carries no models). */
   models: z.array(z.object({
     name: z.string().min(1).max(60),
-    builderId: z.enum(CLASSIFIER_BUILDERS),
+    builderId: z.enum(DRAFT_BUILDERS),
     hyperparams: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).default({}),
   })).max(4).default([]),
 }).superRefine((d, ctx) => {
-  if (d.feasible && (d.models.length === 0 || d.openmlDatasetId === undefined || d.targetColumn === undefined)) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'feasible=true requires openmlDatasetId, targetColumn and >=1 model' });
+  if (d.feasible) {
+    if (d.models.length === 0 || d.targetColumn === undefined) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'feasible=true requires targetColumn and >=1 model' });
+    }
+    if ((d.openmlDatasetId !== undefined) === (d.datasetRecordId !== undefined)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'feasible=true requires exactly one dataset binding: openmlDatasetId OR datasetRecordId' });
+    }
+    const regressors = d.models.filter((m) => (REGRESSION_BUILDERS as readonly string[]).includes(m.builderId)).length;
+    if (regressors > 0 && regressors !== d.models.length) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'classifier and regressor builders cannot mix in one spec (metric incoherence)' });
+    }
   }
 });
 
@@ -66,6 +92,10 @@ export const ALLOWED_HPARAMS: Readonly<Record<string, readonly string[]>> = {
   logistic_regression: ['C', 'max_iter', 'solver'],
   random_forest_classifier: ['n_estimators', 'max_depth', 'min_samples_leaf'],
   gradient_boosting_classifier: ['n_estimators', 'max_depth', 'learning_rate'],
+  dummy_mean: ['strategy'],
+  linear_regression: [],
+  random_forest_regressor: ['n_estimators', 'max_depth', 'min_samples_leaf'],
+  gradient_boosting_regressor: ['n_estimators', 'max_depth', 'learning_rate'],
 };
 
 const SYSTEM_PROMPT =
@@ -80,12 +110,18 @@ const SYSTEM_PROMPT =
   'from the builder\'s whitelist ONLY: logistic_regression: C, max_iter, solver; ' +
   'random_forest_classifier: n_estimators, max_depth, min_samples_leaf; ' +
   'gradient_boosting_classifier: n_estimators, max_depth, learning_rate; ' +
-  'dummy_most_frequent: strategy. Any other key is rejected before training. Output JSON only.';
+  'Any other key is rejected before training. If the payload carries registeredDatasets (operator-acquired CSV ' +
+  'datasets on this run) and one plausibly satisfies the data requirements, bind it with datasetRecordId (the id, ' +
+  'verbatim) INSTEAD of choosing an OpenML id; use its targetColumn. A NUMERIC target is a regression task: use the ' +
+  'regression builders (dummy_mean, linear_regression, random_forest_regressor, gradient_boosting_regressor) and never ' +
+  'mix classifier and regressor builders in one spec. Never invent a file path — the deterministic layer resolves it. ' +
+  'Output JSON only.';
 
 export const draftSpecFromPlan = async (
   plan: ResearchPlan,
   questionText: string,
   plane: ModelPlaneDeps,
+  registeredDatasets: RegisteredDatasetRef[] = [],
 ): Promise<SpecDraftOutcome> => {
   let draft: z.infer<typeof DraftOut>;
   try {
@@ -104,6 +140,9 @@ export const draftSpecFromPlan = async (
           falsification: plan.decisionRules.falsificationCriterion,
         },
         hypothesisIds: plan.hypothesisIds,
+        ...(registeredDatasets.length > 0
+          ? { registeredDatasets: registeredDatasets.map((r) => ({ id: r.id, name: r.name, columns: r.columns, nRows: r.nRows, targetColumn: r.targetColumn })) }
+          : {}),
       },
       schema: DraftOut,
       temperature: 0.1,
@@ -118,8 +157,17 @@ export const draftSpecFromPlan = async (
     // ENRICH the loop; their absence must not kill an otherwise complete run.
     return { kind: 'skip', reason: `spec drafting failed: ${(e instanceof Error ? e.message : String(e)).slice(0, 180)}` };
   }
-  if (!draft.feasible || draft.openmlDatasetId === undefined || draft.targetColumn === undefined || draft.models.length === 0) {
-    return { kind: 'skip', reason: draft.skipReason ?? 'plan data requirements do not map to a public tabular dataset' };
+  if (!draft.feasible || draft.targetColumn === undefined || draft.models.length === 0) {
+    return { kind: 'skip', reason: draft.skipReason ?? 'plan data requirements do not map to a bindable dataset' };
+  }
+  const boundRecord = draft.datasetRecordId !== undefined
+    ? registeredDatasets.find((r) => r.id === draft.datasetRecordId)
+    : undefined;
+  if (draft.datasetRecordId !== undefined && boundRecord === undefined) {
+    return { kind: 'skip', reason: `draft named unknown datasetRecordId ${draft.datasetRecordId} — refusing to guess a binding` };
+  }
+  if (draft.openmlDatasetId === undefined && boundRecord === undefined) {
+    return { kind: 'skip', reason: draft.skipReason ?? 'draft carries no dataset binding' };
   }
   // Deterministic pre-filter (live-observed failure class: the model emitted
   // 'min_samples_split', the sidecar whitelist rejects it): drop out-of-space
@@ -134,6 +182,7 @@ export const draftSpecFromPlan = async (
     }
     return { ...m, hyperparams };
   });
+  const regression = models.some((m) => (REGRESSION_BUILDERS as readonly string[]).includes(m.builderId));
   // The plan's free-text decision rule cannot seed a verified numeric threshold:
   // the draft marks every threshold as model-stipulated (auditable, honest).
   const spec = ExperimentSpec.parse({
@@ -145,9 +194,9 @@ export const draftSpecFromPlan = async (
     planStepId: plan.steps[0]?.id ?? newId('task'),
     question: questionText.slice(0, 500),
     datasets: [{
-      source: { resolver: 'openml', openmlId: draft.openmlDatasetId },
-      targetColumn: draft.targetColumn,
-      split: { method: 'random_stratified', ratios: { train: 0.7, val: 0.15, test: 0.15 }, seed: 42 },
+      source: boundRecord !== undefined ? { resolver: 'local', path: boundRecord.path } : { resolver: 'openml', openmlId: draft.openmlDatasetId! },
+      targetColumn: boundRecord?.targetColumn ?? draft.targetColumn,
+      split: { method: regression ? 'random' : 'random_stratified', ratios: { train: 0.7, val: 0.15, test: 0.15 }, seed: 42 },
     }],
     models: models.map((m, i) => ({
       name: m.name,
@@ -156,25 +205,25 @@ export const draftSpecFromPlan = async (
       seed: 42 + i,
       tags: [`plan:${plan.id.slice(0, 10)}`, ...(stripped.length > 0 ? [`hparams-stripped:${stripped.join(',')}`.slice(0, 120)] : [])],
     })),
-    metrics: ['accuracy'],
+    metrics: regression ? ['mean_squared_error', 'r2'] : ['accuracy'],
     comparisons: models.length >= 2
       ? [{
           id: `cmp_${plan.id.slice(4, 12)}`,
-          metricKey: 'accuracy',
+          metricKey: regression ? 'mean_squared_error' : 'accuracy',
           kind: 'paired_diff',
           modelAIdx: 0,
           modelBIdx: 1,
-          direction: 'above',
+          direction: regression ? 'below' : 'above',
           threshold: 0,
           thresholdProvenance: 'model-stipulated',
           primary: true,
         }]
       : [{
           id: `cmp_${plan.id.slice(4, 12)}`,
-          metricKey: 'accuracy',
+          metricKey: regression ? 'mean_squared_error' : 'accuracy',
           kind: 'absolute',
           modelIdx: 0,
-          direction: 'above',
+          direction: regression ? 'below' : 'above',
           threshold: 0.5,
           thresholdProvenance: 'model-stipulated',
           primary: true,

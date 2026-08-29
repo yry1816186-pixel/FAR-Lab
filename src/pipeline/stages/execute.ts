@@ -1,7 +1,7 @@
 import type { StageContext, StageHandler, StageOutcome } from '../types.js';
 import { ExperimentSpec, newId, newProtocolExecution, ProtocolSpec, type MethodFamily } from '../../domain/index.js';
 import type { ResearchPlan } from '../../domain/plan.js';
-import { draftSpecFromPlan, draftMetaSpecFromPlan } from '../../experiment/spec-from-plan.js';
+import { draftSpecFromPlan, draftMetaSpecFromPlan, type RegisteredDatasetRef } from '../../experiment/spec-from-plan.js';
 import { draftTheorySpecFromPlan, draftFemSpecFromPlan } from '../../experiment/spec-from-plan.js';
 import { draftProtocolFromPlan, planHashOf, protocolForPlan } from '../../experiment/protocol-from-plan.js';
 import { executeExperiment } from '../../experiment/executor.js';
@@ -117,9 +117,17 @@ export const executeStage: StageHandler = {
       recordReceipt: ctx.recordReceipt,
       runId: ctx.run.id,
     };
+    // Auto-serialization (scenario-B evidence): operator-registered CSV datasets
+    // ride the draft payload (ids/columns only — paths never enter the prompt);
+    // the deterministic layer resolves the local path after the draft binds an id.
+    const registeredDatasets: RegisteredDatasetRef[] = ctx.store
+      .listObjects('dataset_record', ctx.run.id)
+      .flatMap((d) => d.format === 'csv' && d.source.resolver === 'local'
+        ? [{ id: d.id, name: d.name, columns: d.columns, nRows: d.nRows, targetColumn: d.targetColumn, path: d.source.path }]
+        : []);
     let draft: Awaited<ReturnType<typeof draftSpecFromPlan>> | undefined;
     if (!routeSkip('dataset (tabular EEL)', ['machine_learning'])) {
-      draft = await draftSpecFromPlan(plan, question.text, plane);
+      draft = await draftSpecFromPlan(plan, question.text, plane, registeredDatasets);
     }
     if (draft === undefined || draft.kind === 'skip') {
       // W-F M4: literature-type plans fall through to the statistical_meta path —
@@ -272,12 +280,27 @@ export const executeStage: StageHandler = {
       };
     }
 
+    if (draft.spec.datasets[0]?.source.resolver === 'local') {
+      ctx.store.appendEvent(ctx.run.id, {
+        type: 'note',
+        stage: 'execute',
+        detail: {
+          subject: 'dataset_auto_serialized',
+          specId: draft.spec.id,
+          datasetSource: draft.spec.datasets[0]!.source,
+          note: 'plan-bound experiment reads an operator-registered dataset_record (auto-serialization; the model never saw the path)',
+        },
+      });
+    }
     // 2. Execute on the local executor (real path only). Existing completed
     //    runs for this spec hash make this a no-op report (idempotency).
     const runOnce = async (): Promise<Awaited<ReturnType<typeof executeExperiment>>> =>
       executeExperiment(ctx.store, ctx.artifacts, draft.spec, {
         shouldCancel: () => ctx.cancelled() || ctx.disowned(),
-        allowLocalDatasets: false, // plan-drafted specs use public OpenML only
+        // Auto-serialization: a spec bound to an operator-registered dataset_record reads its
+        // local path (the record IS the operator acquisition act); model-drafted
+        // OpenML specs stay public-only.
+        allowLocalDatasets: draft.spec.datasets[0]?.source.resolver === 'local',
       });
     try {
       let executed: Awaited<ReturnType<typeof executeExperiment>>;
