@@ -1,11 +1,11 @@
 name: surgery
 
-# Remote-surgery patch plane — DIAGNOSTICS MODE REVIVED (slice 2 iteration):
-# ci on this branch fails at a stage the base diagnose does not cover
-# (tui/desktop installs, tui tests, CLI smoke, license, secret-scan,
-# path-hygiene, or web build) — the diagnose job now mirrors EVERY ci.yml
-# verify step with tee'd logs committed to diag.txt. Triggers ONLY on the
-# marker file. Neutralized to workflow_dispatch-only before the merge.
+# Remote-surgery patch plane — DIAGNOSTICS MODE (slice 2 iteration):
+# ci on this branch fails ONLY at `web npm run build` (dict.ts zh block
+# misses map.protocol.ethicsApprovalBody while en + ProtocolPanel use it);
+# the diagnose job mirrors every ci.yml verify step with tee'd logs committed
+# to diag.txt. Triggers ONLY on the marker file. Neutralized to
+# workflow_dispatch-only before the merge.
 on:
   workflow_dispatch:
   push:
@@ -33,6 +33,7 @@ jobs:
           node scripts/surgery/apply-api-protocol.mjs
           node scripts/surgery/apply-readme-protocol.mjs
           node scripts/surgery/apply-web-protocol.mjs
+          node scripts/surgery/fix-dict-zh-ethics-key.mjs
           node scripts/surgery/dump-api-context.mjs
       - name: Commit applied patches / refreshed context
         run: |
