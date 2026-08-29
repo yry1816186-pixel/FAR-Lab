@@ -13,6 +13,9 @@ import { executeStage } from '../src/pipeline/stages/execute.js';
 import { createTestStubProvider } from '../src/providers/test-stub.js';
 import type { StageContext } from '../src/pipeline/types.js';
 import type { Sidecar, SidecarCallResult } from '../src/experiment/python.js';
+import { exportStage } from '../src/pipeline/stages/export.js';
+import { verifyBundle } from '../src/app/verify.js';
+import { DatasetRecord } from '../src/domain/index.js';
 
 /**
  * Slice-6 FEM executor: convergence-order verification. Deterministic fake
@@ -223,6 +226,61 @@ describe('fem verdict mechanics (deterministic doubles)', () => {
     expect(failed).toHaveLength(1);
   });
 
+  it('export binds the FEM measurement table and dataset records into the verifiable bundle (W3)', async () => {
+    const { store, runId, artifacts } = makeEnv();
+    const hyp = makeHyp(runId);
+    store.putObject('hypothesis', hyp);
+    const spec = makeSpec(runId); // unbound: exploratory leg needs no D-085 approval
+    const out = await executeFemAnalysis(store, artifacts, spec, { sidecar: () => fakeSidecar([measurement()]), now: () => T0 });
+    expect(out.run.status).toBe('completed');
+    // a dataset record on the same run (data plane) must ride the bundle too
+    const csvRef = (await artifacts.put('month,value\n1,2.0\n')).ref;
+    const ds = DatasetRecord.parse({
+      id: newId('ds') as DatasetRecord['id'],
+      runId,
+      name: 'fixture:monthly',
+      source: { resolver: 'local', path: 'C:/fixture/monthly.csv' },
+      license: 'unknown',
+      format: 'csv',
+      contentRef: csvRef,
+      targetColumn: 'value',
+      columns: ['month', 'value'],
+      nRows: 1,
+      lineage: [{ kind: 'acquired', detail: 'fixture', at: T0 }],
+      fetchedAt: T0,
+    });
+    store.putObjectEvented('dataset_record', ds, { type: 'note', detail: { kind: 'fixture' } }, T0);
+    const ctx: StageContext = {
+      run: store.getRun(runId)!,
+      store,
+      artifacts,
+      provider: createTestStubProvider([]),
+      sourceFor: () => { throw new Error('no source adapter in test'); },
+      recordReceipt: () => {},
+      cancelled: () => false,
+      log: () => {},
+    };
+    const outcome = await exportStage.execute(ctx);
+    expect(outcome.kind).toBe('done');
+    const bundle = store.listObjects('bundle', runId).at(-1)!;
+    // FEM table hash joins experimentEvidence (previously resultIds-only, empty)
+    const note = store.listEvents(runId).find((e) => (e.detail as Record<string, unknown>).kind === 'fem_measurement');
+    const tableRef = (note?.detail as Record<string, unknown>).tableRef as string;
+    const evidence = bundle.experimentEvidence![0]!;
+    expect(evidence.experimentRunId).toBe(out.run.id);
+    expect(evidence.artifactHashes).toContain(tableRef.replace('sha256:', ''));
+    // dataset evidence: ids + content ref + lineage kinds, re-derivable
+    expect(bundle.datasetEvidence).toHaveLength(1);
+    const de = bundle.datasetEvidence![0]!;
+    expect(de.datasetRecordId).toBe(ds.id);
+    expect(de.contentRef).toBe(csvRef);
+    expect(de.lineageKinds).toEqual(['acquired']);
+    // verify re-derives the data-plane evidence and passes the new check
+    const report = await verifyBundle(bundle.id, { store, artifacts });
+    const check = report.checks.find((c) => c.name === 'data_plane_evidence_resolvable');
+    expect(check?.passed).toBe(true);
+    expect(check?.detail).toContain('1 条 datasetEvidence');
+  });
 
 describe('fem executor (real sidecar, uv-run family env with sympy)', () => {
   it('measures optimal convergence for a mixed-boundary manufactured solution', async () => {

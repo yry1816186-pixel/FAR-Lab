@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { BundleId, ReceiptId, RunId, ExperimentRunId, ResultSetId, StatReportId, ProtocolId, ProtocolExecutionId } from './ids.js';
+import { BundleId, ReceiptId, RunId, ExperimentRunId, ResultSetId, StatReportId, ProtocolId, ProtocolExecutionId, DatasetRecordId } from './ids.js';
 
 /**
  * Execution facts captured AS THEY HAPPEN (mission §36/§55). Missing data stays missing —
@@ -134,6 +134,19 @@ export const ReproducibilityBundle = z.object({
     statReportIds: z.array(StatReportId),
     artifactHashes: z.array(z.string().length(64)),
     lockfileHash: z.string().length(64).optional(),
+  })).optional(),
+  /**
+   * AOSSA data plane (audit scientific W3, 2026-08-30): acquired raw and derived
+   * dataset records as first-class bundle evidence — object ids plus content refs
+   * and lineage kinds; verify re-derives all fields from the store and probes the
+   * artifact. Absent on pre-data-plane bundles (optional, like protocolEvidence).
+   */
+  datasetEvidence: z.array(z.object({
+    datasetRecordId: DatasetRecordId,
+    name: z.string(),
+    format: z.string(),
+    contentRef: z.string().min(1),
+    lineageKinds: z.array(z.string()),
   })).optional(),
   /**
    * Protocol chain (slice 4, 2026-08-29): pre-registered research protocols and their

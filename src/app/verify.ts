@@ -12,7 +12,7 @@ import type { ArtifactStore } from '../shared/ports.js';
  * Third-party bundle verification (ACC-14, mission §56 Inspect/Validate/Re-execute/
  * Compare). Every check is really executed against the store, the artifact store and
  * the local environment — no check may assume or fabricate a pass. Invariant: a
- * report always carries the same 15 checks in the same order (VERIFY_CHECK_NAMES);
+ * report always carries the same 16 checks in the same order (VERIFY_CHECK_NAMES);
  * checks that cannot run fail closed with passed=false, never silently skipped.
  */
 
@@ -30,9 +30,10 @@ export const VERIFY_CHECK_NAMES = [
   'claim_taint_labels_present',
   'hypothesis_template_content_absent',
   'paper_outline_ref_resolvable',
-  'figures_tables_refs_resolvable',  'protocol_evidence_resolvable',
-
-] as const;
+  'figures_tables_refs_resolvable',
+  'protocol_evidence_resolvable',
+  'data_plane_evidence_resolvable',
+];
 export type VerifyCheckName = (typeof VERIFY_CHECK_NAMES)[number];
 
 export const VerificationCheck = z.object({
@@ -454,6 +455,41 @@ export async function verifyBundle(bundleId: string, deps: VerifyDeps): Promise<
         : protoProblems.length === 0
           ? `${protoEvidence.length} 条 protocolEvidence 全部解析：对象可读、归属/记录数/偏差/QC 计数一致、工件哈希核验通过、披露行在册`
           : protoProblems.join('；'),
+    });
+
+    // ---- check 16 (AOSSA data plane, audit scientific W3): dataset + numerical
+    // evidence re-derives from the store and its artifacts resolve. Optional
+    // field: absent on pre-data-plane bundles → pass with a note (legacy rule).
+    const dataEvidence = bundle.datasetEvidence ?? [];
+    const dataProblems: string[] = [];
+    for (const de of dataEvidence) {
+      const rec = tryGetObject(store, 'dataset_record', de.datasetRecordId);
+      if (!rec.ok) { dataProblems.push(rec.msg); continue; }
+      if (rec.obj.contentRef !== de.contentRef || rec.obj.format !== de.format || rec.obj.name !== de.name) {
+        dataProblems.push(`dataset ${de.datasetRecordId} 的 name/format/contentRef 与 store 不符 — 需重导出`);
+      }
+      if (rec.obj.lineage.map((l) => l.kind).join('>') !== de.lineageKinds.join('>')) {
+        dataProblems.push(`dataset ${de.datasetRecordId} 的 lineage 已变化（bundle ${de.lineageKinds.join('>')} vs store ${rec.obj.lineage.map((l) => l.kind).join('>')}）— 需重导出`);
+      }
+      const refProblem = await probeArtifact(artifacts, de.contentRef.replace('sha256:', ''));
+      if (refProblem !== null) dataProblems.push(`dataset ${de.datasetRecordId} 工件：${refProblem}`);
+    }
+    // experimentEvidence artifact hashes (result-set per-row refs, training logs,
+    // FEM measurement tables since W3) must all resolve in the artifact store.
+    for (const xe of bundle.experimentEvidence ?? []) {
+      for (const h of xe.artifactHashes) {
+        const p = await probeArtifact(artifacts, h);
+        if (p !== null) dataProblems.push(`experiment ${xe.experimentRunId} 工件 ${h.slice(0, 12)}…：${p}`);
+      }
+    }
+    checks.push({
+      name: 'data_plane_evidence_resolvable',
+      passed: dataProblems.length === 0,
+      detail: dataEvidence.length === 0 && (bundle.experimentEvidence ?? []).length === 0
+        ? '（pre-data-plane bundle：未声明 datasetEvidence/experimentEvidence — 检查空转通过）'
+        : dataProblems.length === 0
+          ? `${dataEvidence.length} 条 datasetEvidence 全部再解析：字段与 store 一致、lineage 一致、工件哈希核验通过；experimentEvidence 工件引用全部解析`
+          : `${dataProblems.length} 处数据面证据校验失败：${dataProblems.join('；')}`,
     });
   }
 

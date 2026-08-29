@@ -1307,7 +1307,7 @@ describe('GET /api/v1/verify/:bundleId', () => {
     expect(status).toBe(200);
     expect(body.bundleId).toBe(bundle1);
     expect(body.runId).toBe(run1);
-    expect(body.checks).toHaveLength(15); // slice-4: +protocol_evidence_resolvable (protocol-less fixture passes the check empty)
+expect(body.checks).toHaveLength(16); // W3: +data_plane_evidence_resolvable (data-plane-less fixture passes the check empty)
     expect(body.checks.map((c: { name: string }) => c.name)[0]).toBe('bundle_readable_and_schema_valid');
     expect(body.checks.every((c: { passed: boolean; detail: string }) => typeof c.passed === 'boolean' && c.detail.length > 0)).toBe(true);
     expect(['verified', 'failed', 'degraded']).toContain(body.verdict);

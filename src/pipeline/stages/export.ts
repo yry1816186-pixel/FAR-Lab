@@ -737,6 +737,20 @@ export const exportStage: StageHandler = {
     const _statReports = ctx.store.listObjects('stat_report', run.id);    // Slice-4 protocol chain: pre-registered protocols + human-attested ledgers ride the export.
     const protocols = ctx.store.listObjects('protocol', run.id);
     const protocolExecutions = ctx.store.listObjects('protocol_execution', run.id);
+    // AOSSA data plane (audit scientific W3, 2026-08-30): datasets + FEM
+    // measurement tables join the bundle — numerical evidence previously sat
+    // outside experimentEvidence (resultIds empty for the FEM leg) and was
+    // unverifiable from the bundle alone.
+    const datasetRecords = ctx.store.listObjects('dataset_record', run.id);
+    const femTablesByRun = new Map<string, string[]>();
+    for (const e of ctx.store.listEvents(run.id)) {
+      if (e.type !== 'note') continue;
+      const d = e.detail as { kind?: string; experimentRun?: string; tableRef?: string };
+      if (d.kind !== 'fem_measurement' || d.experimentRun === undefined || d.tableRef === undefined) continue;
+      const list = femTablesByRun.get(d.experimentRun) ?? [];
+      list.push(d.tableRef.replace('sha256:', ''));
+      femTablesByRun.set(d.experimentRun, list);
+    }
 
 
     // Hash of what is actually on disk; a marked placeholder when missing (never invented).
@@ -928,9 +942,18 @@ export const exportStage: StageHandler = {
           statReportIds: xr.statReportIds,
           artifactHashes: [
             ...resultSets.filter((rs) => rs.experimentRunId === xr.id).flatMap((rs) => rs.cells.map((c) => c.perRowRef.replace('sha256:', ''))),
-            ...(xr.trainingLogRef !== undefined ? [xr.trainingLogRef.replace('sha256:', '')] : []),
+            ...(xr.trainingLogRef !== undefined ? [xr.trainingLogRef.replace('sha256:', '')] : []), ...(femTablesByRun.get(xr.id) ?? []),
           ],
           ...(xr.environment?.lockfileHash !== undefined ? { lockfileHash: xr.environment.lockfileHash } : {}),
+        })),
+      } : {}),
+      ...(datasetRecords.length > 0 ? {
+        datasetEvidence: datasetRecords.map((d) => ({
+          datasetRecordId: d.id,
+          name: d.name,
+          format: d.format,
+          contentRef: d.contentRef,
+          lineageKinds: d.lineage.map((l) => l.kind),
         })),
       } : {}),
       createdAt: new Date().toISOString(),
