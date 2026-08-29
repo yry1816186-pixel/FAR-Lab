@@ -56,7 +56,7 @@ test('zh/en parity: every lab-home and map label renders in the chosen language'
   await expect(page.locator('nav.app-rail').getByRole('button', { name: 'New research' })).toBeVisible();
   // Rail + welcome box EN strings (Bohrium/Doubao shell).
   await expect(page.locator('nav.app-rail').getByRole('button', { name: 'Library' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Start from one scientific question' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Start with a scientific question' })).toBeVisible();
 
   // Map surface in English — these strings exist ONLY through the en dict
   // pairs; a missing key renders the raw key (e.g. "map.title"), failing fast.
