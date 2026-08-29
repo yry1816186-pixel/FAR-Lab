@@ -88,6 +88,17 @@ export const leaseHolderId = (): string => `${process.pid}-${BOOT_NONCE}`;
  * checkpoints (ctx.checkpointed) make resume subtask-granular (dbos OAOO pattern).
  */
 export class Orchestrator {
+  /**
+   * Wire-level cancellation registry (2026-08-29): one AbortController per
+   * executing run. cancel() aborts it so the in-flight provider call dies at the
+   * transport within ms — a user cancel no longer waits out the stage boundary
+   * (up to a 300s model call). Stage handlers get the signal injected via a
+   * provider wrapper built in makeContext (zero per-stage plumbing). The signal
+   * covers in-process cancels only; a persisted cancel from another process is
+   * still honored at the next stage/subtask boundary (disclosed).
+   */
+  private readonly wireCancels = new Map<string, AbortController>();
+
   constructor(private readonly deps: OrchestratorDeps) {
     warnIfLeaseBudgetInvariantBroken();
   }
@@ -134,11 +145,21 @@ export class Orchestrator {
     const { store, signals } = this.deps;
     const signal = signals.get(run.id) ?? { cancelled: false };
     signals.set(run.id, signal);
+    const baseProvider = this.deps.providerFor?.(run) ?? this.deps.provider;
+    const wireCancel = this.wireCancels.get(run.id);
+    // Provider wrapper = the ONE seam for wire-level cancel: every stage call rides
+    // ctx.provider, so injecting the run's AbortSignal here cancels in-flight calls
+    // without touching a single stage implementation (zero half-refactor risk).
+    const provider: ModelProvider = wireCancel === undefined ? baseProvider : {
+      name: baseProvider.name,
+      liveReady: baseProvider.liveReady,
+      structuredCall: (req, parse) => baseProvider.structuredCall({ ...req, signal: wireCancel.signal }, parse),
+    };
     return {
       run,
       store,
       artifacts: this.deps.artifacts,
-      provider: this.deps.providerFor?.(run) ?? this.deps.provider,
+      provider,
       // Real-content discipline: every researcher-facing execution (web/CLI/
       // desktop, and the E2E servers that ride the real orchestrator) refuses
       // deterministic-wire scientific output (see StageContext.productRun).
@@ -235,10 +256,13 @@ export class Orchestrator {
       throw new RunLeaseHeldError(runId, existing?.holder ?? 'unknown');
     }
 
+    const wireCancel = new AbortController();
+    this.wireCancels.set(runId, wireCancel);
     try {
       return await this.executeOwned(runId, holder, run, opts);
     } finally {
       // terminal or thrown: this worker no longer owns the run
+      this.wireCancels.delete(runId);
       this.deps.store.releaseLease(runId, holder);
     }
   }
@@ -699,6 +723,10 @@ export class Orchestrator {
   }
 
   cancel(runId: string): boolean {
+    // Wire-level: kill the in-flight provider call of an executing run (this
+    // process) within ms — the persisted flag below still carries cross-process
+    // cancels to the next stage/subtask boundary.
+    this.wireCancels.get(runId)?.abort();
     // Atomic flag write (W8 audit P2-4): never a whole-doc read-modify-write that could
     // race the owning executor's stage transitions.
     const ok = this.deps.store.requestCancel(runId);

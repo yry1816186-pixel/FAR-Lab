@@ -35,6 +35,14 @@ export interface StructuredCallRequest {
   reasoning?: { style: ReasoningStyle; gear: ReasoningGear };
   /** Retry budget owned by the plane (bounded, classified). */
   purpose: string; // e.g. 'claim-extraction', recorded in provenance
+  /**
+   * Wire-level cancellation (2026-08-29): when aborted, the transport aborts the
+   * in-flight fetch at the next opportunity and fails the call NON-retryably with
+   * a cancel-flavored error — a user cancel lands in ms instead of waiting out the
+   * stage boundary. Optional and additive: providers/eval code that never sets it
+   * behave exactly as before.
+   */
+  signal?: AbortSignal;
 }
 
 export interface StructuredCallResult<T> {

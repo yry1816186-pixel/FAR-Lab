@@ -6,10 +6,11 @@ import { computeRequestHash, extractJsonText, type ModelCallErrorKind, type Slee
  * *** TEST-ONLY *** — a fully scripted, in-process ModelProvider stub.
  *
  * NEVER wire this into production paths: it performs no network call and its
- * outputs are whatever the test author scripted. Results are always marked
- * receipt.executionMode === 'test'. It exists so pipeline/caller tests can
- * exercise the ModelProvider contract deterministically (scripted success,
- * scripted failure injection, scripted latency) without network or keys.
+ * outputs are whatever the test author scripted. Receipts stamp
+ * executionMode 'test' by default (see TestStubOptions.asLive). It exists so
+ * pipeline/caller tests can exercise the ModelProvider contract
+ * deterministically (scripted success, scripted failure injection, scripted
+ * latency) without network or keys.
  *
  * Semantics: one script step is consumed per structuredCall, in order. There is
  * NO automatic retry here — retry orchestration belongs to the live core
@@ -36,10 +37,20 @@ export interface StubStep {
 export interface TestStubOptions {
   name?: string;
   sleep?: SleepLike;
+  /**
+   * Declare the stub's ROLE: a scripted double of a LIVE model (receipts stamp
+   * executionMode 'live'). Default remains 'test' — a stub that does not
+   * declare a role is a test-mode double, and product-run stages refuse
+   * test-stamped scientific output (real-content discipline, 2026-08-29).
+   * asLive exists for orchestrator-level tests whose scripted answers stand in
+   * for a live route's analysis; the stamp names the role played, truthfully.
+   */
+  asLive?: boolean;
 }
 
 export function createTestStubProvider(steps: StubStep[], opts: TestStubOptions = {}): ModelProvider {
   const name = opts.name ?? 'test-stub';
+  const mode: 'live' | 'test' = opts.asLive === true ? 'live' : 'test';
   const sleep: SleepLike = opts.sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   let cursor = 0;
   const nextSequential = (): StubStep | undefined => {
@@ -82,7 +93,7 @@ export function createTestStubProvider(steps: StubStep[], opts: TestStubOptions 
             usage: {}, // a stub produces no real token accounting
             requestHash,
             outputHash: canonicalSha256(''),
-            executionMode: 'test',
+            executionMode: mode,
           },
         };
       }
@@ -107,7 +118,7 @@ export function createTestStubProvider(steps: StubStep[], opts: TestStubOptions 
             usage: {},
             requestHash,
             outputHash: canonicalSha256(raw),
-            executionMode: 'test',
+            executionMode: mode,
           },
         };
       }
@@ -121,7 +132,7 @@ export function createTestStubProvider(steps: StubStep[], opts: TestStubOptions 
           usage: {},
           requestHash,
           outputHash: canonicalSha256(raw),
-          executionMode: 'test',
+          executionMode: mode,
         },
       };
     },

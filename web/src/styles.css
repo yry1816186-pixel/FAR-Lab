@@ -449,6 +449,12 @@ a:hover { text-decoration: underline; }
 
 .app-brand h1 { font-size: var(--fs-h2); }
 .app-brand p { margin: 0; font-size: var(--fs-aux); }
+/* One brand voice: the rail already names the product — the header tagline
+   returns only where the rail is gone (narrow screens). */
+.app-brand .app-tagline { display: none; }
+@media (max-width: 900px) {
+  .app-brand .app-tagline { display: block; }
+}
 
 /* Narrow-viewport discipline (HX §9.5): the chrome controls wrap to a second
    row instead of pushing the page past the viewport. */
@@ -493,6 +499,10 @@ a:hover { text-decoration: underline; }
   cursor: pointer;
 }
 .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.theme-toggle--icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0 8px;
+}
 
 .offline-banner {
   background: var(--v2-refuted-tint);
@@ -619,7 +629,13 @@ a:hover { text-decoration: underline; }
 .field-label { font-size: 12px; font-weight: 600; color: var(--muted); margin-top: 4px; }
 .req { color: var(--err-text); }
 
-textarea, input[type='text'], select {
+/* Base form treatment at ZERO specificity (:where) — a class-level rule
+   (v2 surfaces like .qw-input/.nr-input, palette's underline field) must be
+   able to override the base without an arms race; the base still applies
+   wherever nothing else declares. Before this, `input[type='text']` (0,1,1)
+   silently trampled every class-styled text input (bg/border/padding/radius)
+   — the designed input affordances never rendered. */
+:where(textarea, input[type='text'], select) {
   font: inherit;
   font-size: var(--fs-body);
   line-height: var(--lh-body);
@@ -631,7 +647,7 @@ textarea, input[type='text'], select {
   width: 100%;
 }
 textarea { resize: vertical; font-family: inherit; min-height: 72px; }
-textarea:hover, input[type='text']:hover, select:hover { border-color: var(--text-2); }
+:where(textarea:hover, input[type='text']:hover, select:hover) { border-color: var(--text-2); }
 textarea:focus-visible, input:focus-visible, select:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 0;

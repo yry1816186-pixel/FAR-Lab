@@ -61,6 +61,18 @@ export const scopeStage: StageHandler = {
     });
     const r = res.data;
 
+    // Real-content discipline (owner directive 2026-08-29): a deterministic
+    // development wire's refinement is template scaffolding, not analysis of
+    // the user's question. Refuse adoption — the user's own scope stands and
+    // every surface stays truthful (the proposal panel reports unavailability).
+    if (ctx.productRun === true && res.executionMode === 'test') {
+      return {
+        kind: 'skipped',
+        reason:
+          'model route is the deterministic development wire — template scope output is refused as scientific content; configure a live model route to obtain a real scope refinement',
+      };
+    }
+
     // Original text/background/id/createdAt are preserved verbatim; unrefined
     // scope boundary fields (temporal/spatial/population) survive the merge.
     const refined = ResearchQuestion.parse({

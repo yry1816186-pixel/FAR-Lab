@@ -1198,29 +1198,43 @@ export async function runOpenAICompatStructuredCall<T>(
     }
     markCall(cfg.providerName, Date.now());
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), remaining);
     let attempt: ChatAttempt;
     let retryAfterMsHint: number | undefined;
-    try {
-      const wire = wireRequest(messages);
-      const res = await fetchImpl(url, {
-        method: 'POST',
-        headers: wire.headers,
-        body: wire.body,
-        signal: controller.signal,
-      });
-      const bodyText = await res.text();
-      if (res.status === 200) {
-        attempt = parseWireSuccess(bodyText);
-      } else {
-        retryAfterMsHint = parseRetryAfterMs(res.headers);
-        attempt = { ok: false, failure: classifyHttpStatus(res.status, bodyText, cfg.providerName) };
+    // Wire-level cancel (2026-08-29): a pre-aborted caller signal fails the attempt
+    // immediately (no fetch); an abort DURING the fetch surfaces as AbortError below
+    // and is classified as a non-retryable cancel, never retried.
+    if (req.signal?.aborted) {
+      attempt = { ok: false, failure: { kind: 'provider_error', retryable: false, message: `${cfg.providerName}: call cancelled by user abort before dispatch` } };
+    } else {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), remaining);
+      const onExternalAbort = (): void => controller.abort();
+      req.signal?.addEventListener('abort', onExternalAbort, { once: true });
+      try {
+        const wire = wireRequest(messages);
+        const res = await fetchImpl(url, {
+          method: 'POST',
+          headers: wire.headers,
+          body: wire.body,
+          signal: controller.signal,
+        });
+        const bodyText = await res.text();
+        if (res.status === 200) {
+          attempt = parseWireSuccess(bodyText);
+        } else {
+          retryAfterMsHint = parseRetryAfterMs(res.headers);
+          attempt = { ok: false, failure: classifyHttpStatus(res.status, bodyText, cfg.providerName) };
+        }
+      } catch (err) {
+        if (req.signal?.aborted) {
+          attempt = { ok: false, failure: { kind: 'provider_error', retryable: false, message: `${cfg.providerName}: call cancelled by user abort (wire-level)` } };
+        } else {
+          attempt = { ok: false, failure: classifyTransportError(err, cfg.providerName) };
+        }
+      } finally {
+        clearTimeout(timer);
+        req.signal?.removeEventListener('abort', onExternalAbort);
       }
-    } catch (err) {
-      attempt = { ok: false, failure: classifyTransportError(err, cfg.providerName) };
-    } finally {
-      clearTimeout(timer);
     }
 
     if (attempt.ok) {

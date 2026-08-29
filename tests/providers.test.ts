@@ -294,11 +294,55 @@ describe('dashscope transport shell (mock fetch) — the OpenAI-compat core suit
     expect(body.tool_choice).toEqual({ type: 'function', function: { name: 'respond' } });
   });
 
+  it('wire-level cancel: a PRE-aborted signal fails immediately, non-retryably, without dispatching', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const { fetchImpl, calls } = recorderFetch([() => Promise.resolve(chatOk(RAW_OK))]);
+    const res = await runOpenAICompatStructuredCall(
+      { providerName: 'core-test', baseUrl: 'https://unit.test/v1', apiKey: 'test-fixture-key-core', modelId: 'm', executionMode: 'test' },
+      { ...REQ, signal: controller.signal },
+      parseHypothesis,
+      { fetchImpl, sleep: () => new Promise<void>(() => { /* never reached */ }) },
+    );
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.error.kind).toBe('provider_error');
+      expect(res.error.retryable).toBe(false);
+      expect(res.error.message).toMatch(/cancelled by user abort/);
+    }
+    expect(calls).toHaveLength(0); // nothing was sent on the wire
+  });
+
+  it('wire-level cancel: abort DURING an in-flight fetch fails the call non-retryably (no retry after cancel)', async () => {
+    // fetch hangs until its own signal aborts, then rejects like a real fetch does
+    const fetchImpl = (_url: unknown, init: { signal?: AbortSignal } = {}) => new Promise((_resolve, reject) => {
+      init.signal?.addEventListener('abort', () => {
+        const e = new Error('The operation was aborted');
+        e.name = 'AbortError';
+        reject(e);
+      }, { once: true });
+    });
+    const controller = new AbortController();
+    const resP = runOpenAICompatStructuredCall(
+      { providerName: 'core-test', baseUrl: 'https://unit.test/v1', apiKey: 'test-fixture-key-core', modelId: 'm', executionMode: 'test' },
+      { ...REQ, signal: controller.signal },
+      parseHypothesis,
+      { fetchImpl, sleep: () => new Promise<void>(() => { /* a retry sleep would hang the test */ }) },
+    );
+    await new Promise((r) => setTimeout(r, 20)); // let the fetch start
+    controller.abort();
+    const res = await resP;
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.error.message).toMatch(/cancelled by user abort/);
+      expect(res.error.retryable).toBe(false);
+    }
+  });
+
   it('passes through temperature and demands JSON-only in the system message', async () => {
     const { fetchImpl, calls } = recorderFetch([() => Promise.resolve(chatOk(RAW_OK))]);
     const provider = createDashScopeProvider({ apiKey: 'test-fixture-key-dashscope', fetchImpl });
-    await provider.structuredCall({ ...REQ, temperature: 0.2 }, parseHypothesis);
-    const body = bodyOf(calls[0]!);
+    await provider.structuredCall({ ...REQ, temperature: 0.2 }, parseHypothesis);    const body = bodyOf(calls[0]!);
     expect(body.temperature).toBe(0.2);
     // max_tokens: dashscope strips it on the structured route (W7-F3, asserted in its adapter suite); no provider asserts passthrough anymore since the deepseek shell was removed.
     const messages = body.messages as Array<{ role: string; content: string }>;

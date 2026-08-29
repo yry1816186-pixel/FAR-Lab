@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './conversation-dock.css';
-import { Bell, BellOff, Search, Settings, X } from 'lucide-react';
+import { Bell, BellOff, MonitorCog, Moon, Search, Settings, Sun, X } from 'lucide-react';
 import { ApiError } from './api/client';
 import { getEvents, getRun, listRuns, listConversations, createConversation, deleteConversation, renameConversation, searchAll } from './api/endpoints';
 import { AppRail, type RailSurface } from './lab/AppRail';
@@ -66,6 +66,11 @@ export function App(): JSX.Element {
   // (#lab/new?q=…). Prefill is consumed once by NewResearch on mount.
   const [libraryView, setLibraryView] = useState(false);
   const [prefilledQuestion, setPrefilledQuestion] = useState<string | null>(null);
+  // Judgment-queue size lifted from LabHome (the one truth) for the rail badge.
+  const [judgmentCount, setJudgmentCount] = useState(0);
+  const reportJudgmentCount = useCallback((n: number): void => {
+    setJudgmentCount((cur) => (cur === n ? cur : n));
+  }, []);
 
   // ---- conversations (a tool, not the spine) ----
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -553,7 +558,7 @@ export function App(): JSX.Element {
       <header className="app-header">
         <div className="app-brand">
           <LogoFull size={26} />
-          <p className="muted">{t('app.subtitle')}</p>
+          <p className="muted app-tagline">{t('app.subtitle')}</p>
         </div>
         <div className="app-header-right">
           <div
@@ -590,17 +595,19 @@ export function App(): JSX.Element {
             type="button"
             className="btn btn--small palette-toggle"
             onClick={() => setPaletteOpen(true)}
+            aria-label={t('palette.open')}
             title="Ctrl K"
           >
             <Search size={12} aria-hidden="true" /> {t('palette.open')}
           </button>
           <button
             type="button"
-            className="theme-toggle"
-            aria-label={t('app.themeToggle')}
+            className="theme-toggle theme-toggle--icon"
+            aria-label={`${t('app.themeToggle')}（${t(theme === 'auto' ? 'app.themeAuto' : theme === 'light' ? 'app.themeLight' : 'app.themeDark')}）`}
+            title={`${t('app.themeToggle')} · ${t(theme === 'auto' ? 'app.themeAuto' : theme === 'light' ? 'app.themeLight' : 'app.themeDark')}`}
             onClick={cycleTheme}
           >
-            {t(theme === 'auto' ? 'app.themeAuto' : theme === 'light' ? 'app.themeLight' : 'app.themeDark')}
+            {theme === 'auto' ? <MonitorCog size={12} aria-hidden="true" /> : theme === 'light' ? <Sun size={12} aria-hidden="true" /> : <Moon size={12} aria-hidden="true" />}
           </button>
           <div className="lang-toggle" role="group" aria-label={t('app.langToggle')}>
             <button
@@ -636,6 +643,7 @@ export function App(): JSX.Element {
           surface={railSurface}
           runs={runs}
           conversations={conversations}
+          judgmentCount={judgmentCount}
           onHome={openHome}
           onNewResearch={() => openNewResearch()}
           onLibrary={openLibrary}
@@ -689,6 +697,7 @@ export function App(): JSX.Element {
               onOpenSettings={() => setSettingsOpen(true)}
               onRetryRuns={() => void refreshRunsWithAbort()}
               onAskQuestion={(text) => openNewResearch(text)}
+              onJudgmentCount={reportJudgmentCount}
             />
           ) : runDetail === null ? (
             detailLoading ? (

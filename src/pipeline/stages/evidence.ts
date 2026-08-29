@@ -407,6 +407,13 @@ export const buildEvidenceStage: StageHandler = {
       const extracted = result.data.claims;
       const admitted = extracted.slice(0, MAX_CLAIMS_PER_SOURCE);
       truncatedCount += extracted.length - admitted.length;
+      // Real-content discipline (2026-08-29): the claim TEXT is a verbatim
+      // quote from the retrieved source (kept — it is real, judgeable
+      // content), but the STANCE is model judgment; on the deterministic
+      // development wire it is a template label and must not be stored as a
+      // supporting/counter relation. The relation records 'unknown' with the
+      // refusal as its rationale — visible, never silently dropped.
+      const refuseStance = ctx.productRun === true && result.executionMode === 'test';
       // Captured after the last await: the candidate loop below is synchronous,
       // so this diff is exactly THIS document's yield even under mapBounded
       // concurrency (B3 per-document milestone accuracy).
@@ -484,6 +491,10 @@ export const buildEvidenceStage: StageHandler = {
 
         let relation: EvidenceRelationType = STANCE_TO_RELATION[candidate.stance];
         let rationale = claim.uncertainties[0] ?? STANCE_RATIONALE[candidate.stance];
+        if (refuseStance && relation !== 'unknown') {
+          relation = 'unknown';
+          rationale = 'stance refused: deterministic development wire (template stance is not judgment about this question)';
+        }
         if (!aligned) {
           // Fail-closed: an ungrounded claim never carries a supporting/counter relation,
           // and the degradation is stated in the rationale, not hidden.
@@ -589,6 +600,17 @@ export const buildEvidenceStage: StageHandler = {
         schema: GapSeekSchema,
         temperature: 0,
       });
+      // Real-content discipline (2026-08-29): the gap verdict is a scientific
+      // JUDGMENT — a deterministic development wire's answer is template, so it
+      // must neither refuse the run (tag) nor un-refuse it. Fail-open with a
+      // visible note, exactly like a failed assessment call.
+      if (ctx.productRun === true && first.executionMode === 'test') {
+        ctx.log('build_evidence: subject-coverage assessment SKIPPED — development wire (template judgment is not evidence about this corpus)');
+        return {
+          adequate: true,
+          first: { enoughEvidence: true, gapDescription: 'assessment skipped: development wire — template gap judgment refused', queries: [] },
+        };
+      }
       if (first.data.enoughEvidence) return { adequate: true, first: first.data };
       const confirmGap = await callStructured<GapSeek>(ctx, {
         stage: 'build_evidence',
@@ -842,6 +864,14 @@ export const buildEvidenceStage: StageHandler = {
             schema: CrossRelationOut,
             temperature: 0,
           });
+          // Real-content discipline (2026-08-29): adjudication between claims is
+          // scientific judgment — the deterministic development wire's verdicts
+          // are template. Refuse adoption; the numeric CI context (deterministic
+          // arithmetic) still flows through its own path below.
+          if (ctx.productRun === true && crossRes.executionMode === 'test') {
+            ctx.log('build_evidence: claim cross-relation adjudication SKIPPED — development wire (template verdicts are not science)');
+            crossNote = 'skipped: development wire — template adjudication refused as scientific content';
+          } else {
           const persistable = new Set(['contradicts', 'supports', 'qualifies', 'replicates', 'fails_to_replicate']);
           const byIdA = new Map(verifiedClaims.map((c) => [c.id, c] as const));
           const byIdB = new Map(verifiedClaims.map((c) => [c.id, c] as const));
@@ -903,6 +933,7 @@ export const buildEvidenceStage: StageHandler = {
           }
           crossNote = `${persisted} persisted (${notComparable} not_comparable) of ${candidates.length} prefiltered pairs` +
             (numericDisclosures > 0 ? `; ${numericDisclosures} numeric-heterogeneity disclosure(s)` : '');
+          }
         } catch (e) {
           // Enrichment only: a failure degrades to no cross-relations (visible), never blocks.
           crossNote = `skipped: ${e instanceof Error ? e.message : String(e)}`;

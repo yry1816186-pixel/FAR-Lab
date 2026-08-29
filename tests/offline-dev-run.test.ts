@@ -160,13 +160,12 @@ const runOffline = async (): Promise<ResearchRun> => {
 
 describe('offline dev run: full journey through the real orchestrator', () => {
   it(
-    'completes every stage with all model receipts stamped test-mode (zero live model calls)',
+    'real-content discipline: real retrieval stands, deterministic-wire science is refused honestly (all receipts test-mode, zero live calls)',
     async () => {
       const final = await runOffline();
       expect(final.status).toBe('completed');
       expect(final.lastError ?? '').toBe('');
-      // No stage may FAIL; visible skips are legitimate (execute honestly skips
-      // fabricated experiments; feedback/revise wait for user feedback).
+      // No stage may FAIL; visible skips are the honest vocabulary.
       for (const s of final.stages) {
         expect(s.state, `stage ${s.stage}`).not.toBe('failed');
       }
@@ -174,41 +173,41 @@ describe('offline dev run: full journey through the real orchestrator', () => {
       // Truth plane: every model call went through the offline route as test-mode.
       const receipts = app.store.listObjects('receipt', final.id);
       const modelReceipts = receipts.filter((r) => r.kind === 'model_call');
-      expect(modelReceipts.length).toBeGreaterThan(10);
+      expect(modelReceipts.length).toBeGreaterThan(0);
       for (const r of modelReceipts) {
         expect(r.executionMode, `receipt ${r.id}`).toBe('test');
         expect(r.modelCall?.provider).toBe(`custom:${cfgId}`);
       }
       expect(receipts.some((r) => r.kind === 'model_call' && r.executionMode === 'live')).toBe(false);
 
-      // The journey produced the reading surfaces: hypotheses, plan, export bundle.
-      const hypotheses = app.store.listObjects('hypothesis', final.id);
-      expect(hypotheses.length).toBeGreaterThanOrEqual(2);
-      expect(app.store.listObjects('plan', final.id).length).toBeGreaterThanOrEqual(1);
-      expect(app.store.listObjects('bundle', final.id).length).toBe(1);
-
-      // T1 user task: feedback -> causal revision. Submit one expert feedback
-      // signal and resume; the offline causal-revision handlers must serve the
-      // revise stage and leave a persisted Revision object.
-      app.store.putObject('feedback', {
-        id: newId('fbk'),
-        runId: final.id,
-        source: 'human_expert',
-        content: 'The leading hypothesis ignores baseline-severity stratification; please revise.',
-        provenance: 'offline integration test',
-        receivedAt: new Date().toISOString(),
-      });
-      const resumed = await app.orchestrator.execute(final.id);
-      expect(resumed.status).toBe('completed');
-      expect(app.store.listObjects('revision', final.id).length).toBeGreaterThanOrEqual(1);
-      for (const r of app.store.listObjects('receipt', final.id).filter((x) => x.kind === 'model_call')) {
-        expect(r.executionMode).toBe('test');
+      // REAL content stands: retrieval + claim extraction minted real, quoted,
+      // locator-anchored claims from the (fake-routed) corpus.
+      const claims = app.store.listObjects('claim', final.id);
+      expect(claims.length).toBeGreaterThan(0);
+      for (const c of claims.slice(0, 8)) {
+        expect(c.locators.length, `claim ${c.id} must carry a locator`).toBeGreaterThan(0);
       }
+
+      // REFUSED content: template scope and template hypotheses never mint —
+      // the stages skip with the real-content refusal as their recorded reason
+      // (owner directive 2026-08-29: no demonstration content in the product).
+      const scopeRec = final.stages.find((s) => s.stage === 'scope');
+      expect(scopeRec?.state).toBe('skipped');
+      expect(String(scopeRec?.error)).toContain('deterministic development wire');
+      const hypStageRec = final.stages.find((s) => s.stage === 'generate_hypotheses');
+      expect(hypStageRec?.state).toBe('skipped');
+      expect(String(hypStageRec?.error)).toContain('deterministic development wire');
+      expect(app.store.listObjects('hypothesis', final.id)).toHaveLength(0);
+      expect(app.store.listObjects('plan', final.id)).toHaveLength(0);
+
+      // The run still closes its loop: export bundles the real evidence base.
+      expect(app.store.listObjects('bundle', final.id).length).toBe(1);
 
       // Determinism of the whole offline pipeline: same question, same shape.
       const second = await runOffline();
       expect(second.status).toBe('completed');
-      expect(app.store.listObjects('hypothesis', second.id).length).toBe(hypotheses.length);
+      expect(app.store.listObjects('hypothesis', second.id)).toHaveLength(0);
+      expect(app.store.listObjects('claim', second.id).length).toBe(claims.length);
     },
     120_000,
   );

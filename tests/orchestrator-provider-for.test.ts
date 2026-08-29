@@ -141,6 +141,52 @@ describe('Orchestrator providerFor seam', () => {
     expect(store.listEvents(runB.id).some((e) => (e.detail as { reason?: string } | undefined)?.reason === 'parking_intent_cleared')).toBe(true);
   });
 
+  it('cancel() aborts the in-flight provider call at the wire — every stage request carries the run signal', async () => {
+    // Wire-level cancel (2026-08-29): the registered gap "collaborative cancel without
+    // wire-level abort" closed at the provider seam — makeContext wraps ctx.provider
+    // with the run's AbortSignal, so orchestrator.cancel() kills the in-flight model
+    // call within ms instead of waiting out the stage boundary (up to a 300s call).
+    const run = await newRun();
+    let seenSignal: AbortSignal | undefined;
+    const recordingProvider: ModelProvider = {
+      name: 'wire-recorder',
+      liveReady: true,
+      structuredCall: (req) => {
+        seenSignal = req.signal;
+        return new Promise(() => { /* never resolves — models the in-flight call */ });
+      },
+    };
+    let midStage!: () => void;
+    const midStageP = new Promise<void>((resolve) => { midStage = resolve; });
+    const handler: StageHandler = {
+      stage: 'scope',
+      applicable: async () => true,
+      execute: async (ctx) => {
+        void ctx.provider.structuredCall({
+          task: 'wire-cancel-probe', userPayload: { q: 'x' }, outputKind: 'json', purpose: 'test',
+        }, (raw) => raw as object);
+        midStage();
+        await new Promise((r) => setTimeout(r, 50)); // let the cancel land
+        return { kind: 'done', summary: 'probe complete' };
+      },
+    };
+    const orch = new Orchestrator({
+      store,
+      artifacts: openArtifactStore(path.join(tmp, 'artifacts')),
+      provider: envChainProvider,
+      providerFor: () => recordingProvider,
+      sourceFor: () => { throw new Error('no source expected in this test'); },
+      stages: new Map<RunStageName, StageHandler>([['scope', handler]]),
+      signals: new Map(),
+    });
+    const execP = orch.execute(run.id);
+    await midStageP;
+    expect(orch.cancel(run.id)).toBe(true);
+    await execP;
+    expect(seenSignal).toBeDefined();
+    expect(seenSignal!.aborted).toBe(true); // the in-flight call's transport is dead
+  });
+
   it('progress() is lease-fenced: a disowned worker never writes run state or notes', async () => {
     // Adversarial round-2 REL-4: the progress callback's unfenced updateRun could
     // roll back the adopter's transition after a mid-call adoption. Fence = the

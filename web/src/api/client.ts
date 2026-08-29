@@ -7,6 +7,17 @@
  * All requests accept an AbortSignal — callers must abort on unmount/rekey.
  */
 
+/**
+ * Server error codes with a researcher-language story (the raw message stays
+ * reachable via the ErrorBox tooltip). Codes not listed surface their raw
+ * server message — honest, never a wrong label.
+ */
+const I18N_ERROR_CODES: Record<string, { i18nKey: import('../i18n/dict').DictKey }> = {
+  // Real-content discipline: the offline development route refuses template
+  // scope — the researcher is told what happened and what to do next.
+  scope_proposal_unavailable: { i18nKey: 'err.scopeProposalUnavailable' },
+};
+
 export class ApiError extends Error {
   readonly code: string;
   readonly status: number;
@@ -78,7 +89,7 @@ async function request(
     } catch {
       // non-JSON error body — keep the status-derived message
     }
-    throw new ApiError({ code, message, status: res.status, retryable });
+    throw new ApiError({ code, message, status: res.status, retryable, ...I18N_ERROR_CODES[code] });
   }
 
   if (init.text === true) {

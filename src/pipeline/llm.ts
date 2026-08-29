@@ -30,6 +30,15 @@ export interface LlmResult<T> {
   provider: string;
   modelId: string;
   latencyMs: number;
+  /**
+   * Receipt-declared execution mode. 'test' = the answer came from a
+   * deterministic development wire (providers/offline.ts) — real-content
+   * discipline (2026-08-29 owner directive: no demonstration content in the
+   * product): stages that mint scientific JUDGMENT (hypotheses, scope
+   * refinement, cross-relations, gap verdicts) must refuse test-mode output
+   * instead of storing it as science.
+   */
+  executionMode: 'live' | 'test';
 }
 
 /**
@@ -148,7 +157,7 @@ export async function invokeStructured<T>(deps: ModelPlaneDeps, opts: InvokeOpti
     const err = res.error ?? { kind: 'provider_error', message: 'unknown provider failure' };
     throw new Error(`model call failed (${err.kind}) in ${opts.stage}/${opts.purpose}: ${err.message}`);
   }
-  return { data: res.data, provider: res.receipt.provider, modelId: res.receipt.modelId, latencyMs: res.receipt.latencyMs };
+  return { data: res.data, provider: res.receipt.provider, modelId: res.receipt.modelId, latencyMs: res.receipt.latencyMs, executionMode: res.receipt.executionMode };
 }
 
 /**

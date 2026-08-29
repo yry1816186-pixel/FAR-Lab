@@ -22,13 +22,16 @@ const COLLAPSE_KEY = 'farlab.railCollapsed';
  *  full width there); keyboard users reach the same surfaces via "/" palette
  *  and "n". */
 export function AppRail({
-  surface, runs, conversations,
+  surface, runs, conversations, judgmentCount,
   onHome, onNewResearch, onLibrary, onOpenStudy, onOpenConversation,
   onDeleteConversation, onRenameConversation, onNewConversation, onOpenSettings,
 }: {
   surface: RailSurface;
   runs: RunSummary[];
   conversations: Conversation[];
+  /** Studies awaiting the researcher (live/attention/drafts/counter) — the
+   *  home's judgment queue, lifted so the badge and the queue can't diverge. */
+  judgmentCount: number;
   onHome: () => void;
   onNewResearch: () => void;
   onLibrary: () => void;
@@ -58,7 +61,7 @@ export function AppRail({
   const recentConvs = conversations.slice(0, 5);
 
   const navItem = (
-    key: DictKey, icon: JSX.Element, active: boolean, onClick: () => void, extra?: { title?: string },
+    key: DictKey, icon: JSX.Element, active: boolean, onClick: () => void, extra?: { title?: string; badge?: number },
   ): JSX.Element => (
     <button
       type="button"
@@ -69,6 +72,9 @@ export function AppRail({
     >
       <span className="rail-nav-icon" aria-hidden="true">{icon}</span>
       {!collapsed && <span className="rail-nav-label">{t(key)}</span>}
+      {extra?.badge !== undefined && extra.badge > 0 && (
+        <span className="rail-nav-badge" aria-label={t('rail.judgmentCount', { n: extra.badge })}>{extra.badge}</span>
+      )}
     </button>
   );
 
@@ -88,7 +94,7 @@ export function AppRail({
       </div>
 
       <div className="rail-group">
-        {navItem('rail.home', <Home size={15} aria-hidden="true" />, surface === 'home', onHome)}
+        {navItem('rail.home', <Home size={15} aria-hidden="true" />, surface === 'home', onHome, { badge: judgmentCount })}
         {navItem('rail.newResearch', <Plus size={15} aria-hidden="true" />, surface === 'new', onNewResearch)}
         {navItem('rail.library', <BookOpen size={15} aria-hidden="true" />, surface === 'library', onLibrary)}
       </div>

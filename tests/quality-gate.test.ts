@@ -418,6 +418,9 @@ describe('quality-gate regeneration with the REAL generate_hypotheses stage', ()
       'novelty-check:query-expansion': () => ({ hypotheses: [{ hypothesisId: 'unused', queries: ['q one about editors', 'q two about deamination'] }] }),
     };
     const inner = createTestStubProvider([]);
+    // This scripted double plays a LIVE route (orchestrator-level test: the
+    // regeneration loop's candidates are real analysis in the test's world —
+    // test-stamped output would be refused by the real-content discipline).
     const provider: ModelProvider = {
       name: inner.name,
       liveReady: true,
@@ -430,7 +433,7 @@ describe('quality-gate regeneration with the REAL generate_hypotheses stage', ()
         return {
           ok: true as const, data: parsed as unknown,
           receipt: { provider: inner.name, modelId: 'test-stub', latencyMs: 0, usage: {},
-            requestHash: 'a'.repeat(64), outputHash: 'b'.repeat(64), executionMode: 'test' as const },
+            requestHash: 'a'.repeat(64), outputHash: 'b'.repeat(64), executionMode: 'live' as const },
         };
       },
     };

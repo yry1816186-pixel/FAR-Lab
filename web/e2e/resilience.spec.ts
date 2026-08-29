@@ -33,7 +33,9 @@ test('SSE mid-run drop: reconnect carries the run to completion (offline route)'
   // The run must still complete honestly — via reconnect, polling fallback,
   // or both; the verdict is the un-fakeable end state.
   await expect(page.locator('.map-state')).toBeVisible({ timeout: 120_000 });
-  await expect(page.locator('.map-hyp-card, [class*="hyp-card"]').first()).toBeVisible();
+  // Real-content discipline: offline-route completions carry real claims and
+  // an honest insufficient verdict — never template hypothesis cards.
+  await expect(page.locator('.map-claim-row').first()).toBeVisible({ timeout: 30_000 });
 });
 
 test('failure injection: mid-run cancel (armed) -> honest cancelled state -> resume completes', async ({ page }) => {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Search, Sparkles } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { ApiError } from '../api/client';
 import { Badge, ErrorBox, TimeAgo } from '../components/common';
 import { useI18n } from '../i18n/LanguageContext';
@@ -24,7 +24,7 @@ const STUDY_PREVIEW = 10;
  */
 export function LabHome({
   runs, runsLoading, runsError, conversations,
-  onOpenStudy, onNewResearch, onOpenConversation, onOpenSettings, onRetryRuns, onAskQuestion,
+  onOpenStudy, onNewResearch, onOpenConversation, onOpenSettings, onRetryRuns, onAskQuestion, onJudgmentCount,
 }: {
   runs: RunSummary[];
   runsLoading: boolean;
@@ -36,6 +36,8 @@ export function LabHome({
   onOpenSettings: () => void;
   onRetryRuns: () => void;
   onAskQuestion: (text: string) => void;
+  /** Lifts the judgment-queue size to the shell (rail badge) — one truth. */
+  onJudgmentCount?: (n: number) => void;
 }): JSX.Element {
   const { t } = useI18n();
   const fresh = !runsLoading && runs.length === 0;
@@ -102,14 +104,21 @@ export function LabHome({
   // index (which carries its own counter markers) — first paint stays stable.
   const counterStudies = runs.filter((r) => probeSet.has(r.id)).slice(0, 1);
 
+  // Rail badge truth: every study waiting on the researcher (queue rows may
+  // cap for layout; the count stays complete — never a smaller number than
+  // the actual workload).
+  useEffect(() => {
+    onJudgmentCount?.(live.length + attentionAll.length + drafts.length + counterStudies.length);
+  }, [live.length, attentionAll.length, drafts.length, counterStudies.length, onJudgmentCount]);
+
   return (
     <div className="lab-root">
       <header className="lab-topline">
         <span className="lab-title">{t('labhome.title')}</span>
         <span className="lab-spacer" />
-        <button type="button" className="lab-new-btn" onClick={onNewResearch}>
-          <Plus size={13} aria-hidden="true" /> {t('labhome.newResearch')}
-        </button>
+        {/* No third "new research" button here: the rail entry and the
+            question box below ARE the paths — a third one only muddied which
+            action is primary. */}
       </header>
 
       <main className="queue-canvas">
@@ -202,11 +211,20 @@ export function LabHome({
                 ? <p className="queue-empty">{t('labhome.studiesNoMatch')}</p>
                 : visibleStudies.map((g) => {
                   const active = g.activeCount > 0;
+                  // Dot encodes ATTENTION, not identity: running pulses, drafts
+                  // and attention states carry warm colors, settled studies go
+                  // neutral — the badge already states the outcome, and a
+                  // colored dot on top contradicted it (blue × completed).
+                  const latest = g.latest.status;
+                  const sev = latest === 'running' || latest === 'queued' ? 'sev-live'
+                    : latest === 'partial' || latest === 'failed' ? 'sev-attention'
+                    : latest === 'created' || latest === 'paused' ? 'sev-review'
+                    : 'sev-done';
                   return (
                     <button
                       type="button"
                       key={g.key}
-                      className="queue-item queue-item--study sev-info"
+                      className={`queue-item queue-item--study ${sev}`}
                       onClick={() => onOpenStudy(g.latest.id)}
                     >
                       <span className="q-dot" aria-hidden="true" />
@@ -326,7 +344,6 @@ function QuestionWelcome({ onAsk }: { onAsk: (text: string) => void }): JSX.Elem
               inputRef.current?.setSelectionRange(q.template.length, q.template.length);
             }}
           >
-            <Sparkles size={11} aria-hidden="true" />
             {t(q.key)}
           </button>
         ))}

@@ -13,6 +13,15 @@ export interface StageContext {
   artifacts: ArtifactStore;
   provider: ModelProvider;
   /**
+   * Owner directive 2026-08-29 (real content only): set by the ORCHESTRATOR on
+   * every researcher-facing product execution. When true, stages that mint
+   * scientific judgment refuse test-stamped model output (the deterministic
+   * offline development wire) instead of storing template content as science.
+   * Direct stage-level tests leave it unset — they exercise mechanics with
+   * deterministic doubles, which is not a product run.
+   */
+  productRun?: boolean;
+  /**
    * RU-9 GO2: the run's resolved reasoning route (declared-capability model
    * configs only); absent for env builtin routes — zero reasoning fields on
    * the wire, exact legacy behavior. callStructured derives the per-call gear

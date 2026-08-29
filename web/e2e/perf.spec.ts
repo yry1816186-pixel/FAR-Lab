@@ -83,7 +83,8 @@ test('perf: study map renders the full corpus without long-task storms', async (
   expect(v.lcp, 'map LCP within good budget').toBeLessThan(4_000);
   expect(v.cls, 'map layout stable').toBeLessThan(0.1);
   // Operability proxy (§21 "large data still operable"): the deterministic
-  // offline corpus must actually materialize on the map.
+  // offline corpus must actually materialize on the map. Real-content
+  // discipline: claims are the materializing objects offline (template
+  // hypotheses are refused — hyps expected 0).
   expect(counts.claims).toBeGreaterThan(0);
-  expect(counts.hyps).toBeGreaterThan(0);
 });

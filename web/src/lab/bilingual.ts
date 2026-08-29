@@ -1,4 +1,5 @@
-import type { Lang } from '../i18n/dict';
+import type { DictKey, Lang } from '../i18n/dict';
+import { useI18n } from '../i18n/LanguageContext';
 
 /**
  * W-C bilingual display layer: prefer the zh rendering when the reader chose zh
@@ -7,6 +8,27 @@ import type { Lang } from '../i18n/dict';
  */
 export const zhFirst = (statement: string, statementZh: string | undefined, lang: Lang): string =>
   lang === 'zh' && statementZh !== undefined && statementZh.trim().length > 0 ? statementZh : statement;
+
+/**
+ * Scorecard dimension names: closed snake_case enum → researcher language.
+ * Unknown values pass through verbatim (honest, never a wrong label).
+ */
+const DIMENSION_KEYS: Record<string, DictKey> = {
+  scientific_plausibility: 'dim.scientific_plausibility',
+  evidence_grounding: 'dim.evidence_grounding',
+  counter_evidence_exposure: 'dim.counter_evidence_exposure',
+  novelty: 'dim.novelty',
+  falsifiability: 'dim.falsifiability',
+  testability: 'dim.testability',
+  data_availability: 'dim.data_availability',
+  methodological_soundness: 'dim.methodological_soundness',
+  expected_information_gain: 'dim.expected_information_gain',
+  resource_cost: 'dim.resource_cost',
+  risk: 'dim.risk',
+  uncertainty: 'dim.uncertainty',
+};
+export const dimensionLabel = (name: string, t: ReturnType<typeof useI18n>['t']): string =>
+  DIMENSION_KEYS[name] !== undefined ? t(DIMENSION_KEYS[name]) : name;
 
 /**
  * Localize a closed set of code-generated marker strings (scientific-state.ts

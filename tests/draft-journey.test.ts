@@ -56,7 +56,11 @@ beforeAll(async () => {
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'farlab-draft-'));
   app = await createApp({
     dataDir: tmp,
-    providerOverride: createTestStubProvider([{ rawOutput: SCOPE_JSON, forPurpose: 'scope-refinement' }]),
+    // asLive: this stub stands in for a LIVE route's scope analysis (the §8.2
+    // journey rides the real orchestrator, where test-stamped scientific output
+    // is refused by the real-content discipline — the offline wire's template
+    // refusal is asserted in offline-dev-run.test.ts instead).
+    providerOverride: createTestStubProvider([{ rawOutput: SCOPE_JSON, forPurpose: 'scope-refinement' }], { asLive: true }),
   });
   // Real orchestrator for the scoped proposal pass (receipt-backed scope stage
   // over the scripted provider); the full-launch branch completes the run like
@@ -119,6 +123,8 @@ describe('§8.2 draft journey', () => {
     expect(run.status).toBe('paused'); // parked — watchdog can never auto-adopt
     expect(run.stages.find((s) => s.stage === 'scope')?.state).toBe('done');
     expect(run.stages.find((s) => s.stage === 'retrieve')?.state).toBe('pending');
+    // crash-guard lifecycle: the pre-execution 'parking:*' tag is cleared by the park
+    expect(run.tags.some((t) => String(t).startsWith('parking:'))).toBe(false);
     // receipt-backed: the scope model call has provenance in this run
     expect(app.store.listObjects('receipt', draftId).length).toBeGreaterThan(0);
     expect(executorCalls.find((c) => c.runId === draftId)?.opts?.stopAfter).toBe('retrieve');

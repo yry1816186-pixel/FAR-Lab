@@ -51,10 +51,9 @@ test('zh/en parity: every lab-home and map label renders in the chosen language'
   // Switch to English via the real header toggle.
   await page.getByRole('button', { name: 'English', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Studies' })).toBeVisible();
-  // Two real "New research" entries now exist (rail nav + home topline) —
-  // both must render the EN dict string.
+  // The "New research" path renders the EN dict string (rail nav — the one
+  // persistent entry; the home hero's question box is the primary path).
   await expect(page.locator('nav.app-rail').getByRole('button', { name: 'New research' })).toBeVisible();
-  await expect(page.locator('.lab-topline .lab-new-btn')).toHaveText(/New research/);
   // Rail + welcome box EN strings (Bohrium/Doubao shell).
   await expect(page.locator('nav.app-rail').getByRole('button', { name: 'Library' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Start from one scientific question' })).toBeVisible();
@@ -63,8 +62,8 @@ test('zh/en parity: every lab-home and map label renders in the chosen language'
   // pairs; a missing key renders the raw key (e.g. "map.title"), failing fast.
   await page.goto(`/#study/${studyId}`);
   await expect(page.locator('.map-node-label').first()).toHaveText(/Research question/);
-  await expect(page.getByText(/Evidence \(counter-first/).first()).toBeVisible();
-  await expect(page.getByText(/Candidate hypotheses/).first()).toBeVisible();
+  await expect(page.locator('.map-node-label', { hasText: 'Evidence' }).first()).toBeVisible();
+  await expect(page.locator('.map-node-label', { hasText: 'Candidate hypotheses' }).first()).toBeVisible();
   await expect(page.getByText(/Current scientific state/).first()).toBeVisible();
   await expect(page.getByText(/Next best research action/).first()).toBeVisible();
 });
@@ -153,15 +152,15 @@ test('§15 claim judgement: exclude -> disclosed marks + adjusted projection -> 
   await expect(page.locator('.map-claim-row.is-excluded').first()).toBeVisible();
   await expect(page.locator('.map-claim-row.is-excluded .map-claim-text').first()).toHaveCSS('text-decoration-line', 'line-through');
 
-  // The hypotheses band discloses the researcher-adjusted projection.
-  await expect(page.locator('.map-band--adjusted')).toBeVisible();
-  await expect(page.getByText(/研究者调整视图|Researcher-adjusted view/)).toBeVisible();
-
-  // Server truth: the adjusted projection exists over exactly this claim.
+  // Real-content discipline: offline-route runs mint no hypotheses and no ACH
+  // analysis, so there is no adjusted projection TO disclose (nothing to
+  // adjust) — the browser assertions cover the researcher-layer marks; the
+  // adjusted-projection math stays covered by vitest claim-ops tests.
+  await expect(page.locator('.map-band--adjusted')).toHaveCount(0);
   const hyp = await (await request.get(`/api/v1/runs/${studyId}/hypotheses`)).json() as { achResearcherAdjusted: { excludedClaimIds: string[] } | null };
-  expect(hyp.achResearcherAdjusted?.excludedClaimIds.length).toBeGreaterThanOrEqual(1);
+  expect(hyp.achResearcherAdjusted).toBeNull(); // no analysis objects -> no adjustment
 
-  // Reinstate: marks clear, the adjusted band disappears, server returns to null.
+  // Reinstate: marks clear, server truth follows.
   await page.locator('.map-claim-row.is-excluded').first().click();
   await page.getByRole('button', { name: /恢复进入分析|Reinstate into analysis/ }).click();
   await expect(page.locator('.map-claim-row.is-excluded')).toHaveCount(0, { timeout: 15_000 });
@@ -184,27 +183,16 @@ test('§8.2 pre-launch: draft -> scope proposal -> edit -> server truth -> launc
   await expect(page.locator('.map-claim-row')).toHaveCount(0);
   await expect(page.locator('.map-hyp-card')).toHaveCount(0);
 
-  // Generate the proposal (real scope-stage execution; offline route is fast).
+  // Real-content discipline: the offline route refuses template scope — the
+  // proposal surfaces honest unavailability instead of an editable template.
+  // (The full proposal→edit→save browser journey rides a live-model double in
+  // draft-journey.test.ts; the PATCH contract is asserted there too.)
   await page.getByRole('button', { name: /生成范围提议|Generate scope proposal/ }).click();
-  await expect(page.locator('#scope-domain')).toBeVisible({ timeout: 30_000 });
-  const proposedDomain = await page.locator('#scope-domain').inputValue();
-  expect(proposedDomain.length).toBeGreaterThan(0);
-
-  // Edit domain + phenomena, save.
-  await page.locator('#scope-domain').fill('cognitive aging (edited by researcher)');
-  await page.locator('#scope-phenomena').fill('executive function adaptation\ntraining-induced neuroplasticity');
-  await page.getByRole('button', { name: /保存修改|Save changes/ }).click();
-  await expect(page.getByText(/已保存：|Saved:/)).toBeVisible({ timeout: 15_000 });
-
-  // Server truth: the stored question carries the researcher's edits verbatim.
-  const runs1 = await (await request.get(`/api/v1/runs/${runId}`)).json() as { status: string };
-  expect(runs1.status).toBe('paused'); // parked — never auto-continues
-  const q = await (await request.get(`/api/v1/runs/${runId}/question`)).json() as { scope: { domain: string; phenomena: string[] } };
-  expect(q.scope.domain).toBe('cognitive aging (edited by researcher)');
-  expect(q.scope.phenomena).toContain('training-induced neuroplasticity');
+  await expect(page.locator('.errorbox').first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('#scope-domain')).toHaveCount(0); // never fabricated
 
   // Launch: the remainder runs; the map lands on the scientific state band.
-  await page.getByRole('button', { name: /^启动研究$|^Launch study$/ }).click();
+  await page.getByRole('button', { name: /直接启动研究|^启动研究$|^Launch|^Launch study$/ }).click();
   await expect(page.locator('.map-state').first()).toBeVisible({ timeout: 90_000 });
   const done = await (await request.get(`/api/v1/runs/${runId}`)).json() as { status: string };
   expect(done.status).toBe('completed');
@@ -230,10 +218,12 @@ test('deep-tools layer: map state band links to every sanctioned deep panel and 
   await expectLink(/导出可复现包|Export reproducible/, 'verify');
 
   // Navigate into one deep panel (plan) and back to the map — the deep layer
-  // and the map are one product, not separate apps.
+  // and the map are one product, not separate apps. Real-content discipline:
+  // offline runs mint no plan, so the panel shows its honest empty state;
+  // the navigation itself is the assertion.
   await page.locator(`.ss-links a[href="#run/${studyId}/plan"]`).click();
   await expect(page).toHaveURL(new RegExp(`#run/${studyId}/plan`));
-  await expect(page.getByText(/判定规则|decision rule|步骤/i).first()).toBeVisible({ timeout: 15_000 });
+  await page.waitForTimeout(500); // tab mount settles
   await page.goBack();
   await expect(page).toHaveURL(new RegExp(`#study/${studyId}`));
   await expect(page.locator('.map-state').first()).toBeVisible();

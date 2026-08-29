@@ -60,6 +60,15 @@
   color: var(--v2-text-3);
   margin-bottom: 6px;
 }
+/* Interaction hints ride the node label as a lighter continuation — the label
+   stays a navigational heading, not an instruction sentence. */
+.map-node-label .map-node-hint {
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  margin-left: 8px;
+  color: color-mix(in oklab, var(--v2-text-3) 72%, transparent);
+}
+.map-node-hint { font-size: 10.5px; }
 .map-question {
   font-family: var(--font-statement, serif);
   font-size: 21px;
@@ -94,6 +103,12 @@
 }
 .map-claim-row:hover { border-color: var(--v2-info); }
 .map-claim-row.is-counter { border-color: color-mix(in oklab, var(--v2-refuted) 45%, var(--v2-border)); }
+.map-claim-main { min-width: 0; display: grid; gap: 2px; }
+/* Source attribution line — provenance visible before the inspector opens. */
+.map-claim-src {
+  font-size: 11px; color: var(--v2-text-3); line-height: 1.4;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .map-claim-text {
   font-size: 13px;
   line-height: 1.5;
@@ -119,7 +134,14 @@
   gap: 8px;
 }
 .map-hyp-card:hover { border-color: var(--v2-info); }
-.map-hyp-card.is-top { border-color: color-mix(in oklab, var(--v2-verified) 55%, var(--v2-border)); }
+/* The leading hypothesis OWNS its row — full width, stronger edge; the
+   followers keep the shared grid. (It is the study's current answer.) */
+.map-hyp-card.is-top {
+  border-color: color-mix(in oklab, var(--v2-verified) 55%, var(--v2-border));
+  border-width: 1.5px;
+  background: color-mix(in oklab, var(--v2-verified) 4%, var(--v2-surface));
+  grid-column: 1 / -1;
+}
 .map-hyp-rank { font-size: 11px; color: var(--v2-text-3); display: flex; gap: 8px; align-items: baseline; }
 .map-hyp-statement { font-size: 13px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .map-hyp-why { font-size: 11px; line-height: 1.45; color: var(--v2-text-3); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; cursor: help; }
@@ -195,6 +217,7 @@
 .queue-item.sev-attention .q-dot { background: var(--v2-refuted); }
 .queue-item.sev-live .q-dot { background: var(--v2-verified); animation: labPulse 1.6s ease-in-out infinite; }
 .queue-item.sev-info .q-dot { background: var(--v2-info); }
+.queue-item.sev-done .q-dot { background: var(--v2-border); }
 @keyframes labPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) { .queue-item.sev-live .q-dot { animation: none; } }
 .queue-item .q-main { min-width: 0; }
@@ -608,8 +631,13 @@
   border-color: color-mix(in oklab, var(--v2-warn, #b8860b) 55%, var(--v2-border));
   background: color-mix(in oklab, var(--v2-warn, #b8860b) 6%, var(--v2-surface));
 }
-.map-state--insufficient { border-color: var(--v2-border); }
-.ss-title { font-size: 14px; font-weight: 600; line-height: 1.5; }
+/* "Evidence insufficient" is a CONCLUSION, not an absence of UI — it gets the
+   same visual weight a leading hypothesis gets, in the caution voice. */
+.map-state--insufficient {
+  border-color: color-mix(in oklab, var(--v2-caution) 45%, var(--v2-border));
+  background: color-mix(in oklab, var(--v2-caution) 3%, var(--v2-surface));
+}
+.ss-title { font-size: 15px; font-weight: 600; line-height: 1.5; }
 .ss-leader {
   font-family: var(--font-statement, serif);
   font-size: 15.5px;
@@ -913,6 +941,23 @@
    (vision-review finding: 12.5/12px alone was too weak a distinction). */
 .rail-nav-item { font-weight: 500; }
 .rail-nav-item.is-active { font-weight: 600; }
+/* Judgment-queue count on the home entry — attention color, numeric (never a
+   bare dot: the number IS the information). White on caution reads in both
+   themes; the caution tokens are for tint surfaces, not solid fills. */
+.rail-nav-badge {
+  margin-left: auto;
+  min-width: 18px; height: 18px; padding: 0 5px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 600; line-height: 1;
+  color: var(--v2-btn-ink-fg);
+  background: var(--v2-caution);
+  border-radius: 999px;
+}
+.app-rail.is-collapsed .rail-nav-badge {
+  position: absolute; top: 2px; right: 4px; margin: 0;
+  min-width: 15px; height: 15px; font-size: 10px; padding: 0 3px;
+}
+.rail-nav-item { position: relative; }
 
 /* Group-title inline add button (new conversation) */
 .rail-group-add {

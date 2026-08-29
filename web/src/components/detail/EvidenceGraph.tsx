@@ -54,28 +54,48 @@ const FIRST_ROW_Y = 46;
 const STRENGTH_W: Record<NonNullable<GraphEdge['strength']>, number> = { strong: 2.2, moderate: 1.6, weak: 1.0, unrated: 1.2 };
 
 /**
- * Truncation that keeps look-alike labels distinguishable: identical truncated
- * labels (common with hypothesis statements sharing a long prefix) get their
- * slice window extended in steps until they differ or hit the hard cap —
- * the reader can always tell two rows apart at a glance.
+ * Pixel-budget label fitting: a node label must never cross into the next
+ * column (measured defect: 36-60 CJK chars at 11px ≈ 400-660px spilled from
+ * the claim column over the hypothesis column). Advance width is estimated
+ * without DOM measurement — CJK/fullwidth ≈ fontSize, Latin ≈ 0.56×fontSize.
+ * Look-alike truncated labels stay distinguishable: identical fits get a tail
+ * fragment appended (head…tail) within the same budget instead of growing
+ * past the column edge.
  */
-function truncateLabels(raw: string[], baseMax: number, hardMax: number): string[] {
-  const out = raw.map((s) => (s.length > baseMax ? `${s.slice(0, baseMax)}…` : s));
-  const dupeAt = (i: number): boolean => {
+const charWidth = (ch: string, fs: number): number =>
+  ch.charCodeAt(0) > 0x2e7f ? fs : fs * 0.56;
+const fitsWidth = (s: string, budgetPx: number, fs: number): boolean => {
+  let w = 0;
+  for (const ch of s) { w += charWidth(ch, fs); if (w > budgetPx) return false; }
+  return true;
+};
+function fitLabel(raw: string, budgetPx: number, fs: number): string {
+  if (fitsWidth(raw, budgetPx, fs)) return raw;
+  let out = '';
+  let w = charWidth('…', fs);
+  for (const ch of raw) {
+    w += charWidth(ch, fs);
+    if (w > budgetPx) break;
+    out += ch;
+  }
+  return `${out}…`;
+}
+function fitLabels(raw: string[], budgetPx: number, fs = 11): string[] {
+  const out = raw.map((s) => fitLabel(s, budgetPx, fs));
+  // Disambiguate identical fits with a tail slice, still inside the budget.
+  for (let i = 0; i < out.length; i++) {
     const own = out[i];
     const ownRaw = raw[i];
-    if (own === undefined || ownRaw === undefined) return false;
-    return out.some((o, j) => j !== i && o === own && raw[j] !== undefined && raw[j] !== ownRaw);
-  };
-  let max = baseMax;
-  while (max < hardMax && out.some((_, i) => dupeAt(i))) {
-    max = Math.min(hardMax, max + 10);
-    out.forEach((label, i) => {
-      const original = raw[i];
-      if (original !== undefined && original.length > label.length - 1 && dupeAt(i)) {
-        out[i] = original.length > max ? `${original.slice(0, max)}…` : original;
-      }
-    });
+    if (own === undefined || ownRaw === undefined) continue;
+    if (!out.some((o, j) => j !== i && o === own && raw[j] !== ownRaw)) continue;
+    const headLen = Math.max(2, own.replace(/…$/, '').length - 2);
+    const tailLen = Math.min(6, ownRaw.length - headLen);
+    let candidate = fitLabel(`${ownRaw.slice(0, headLen)}…${ownRaw.slice(ownRaw.length - tailLen)}`, budgetPx, fs);
+    if (candidate === own) {
+      // No room for head+tail: index markers — still distinguishable.
+      candidate = fitLabel(`${own} [${i + 1}]`, budgetPx, fs);
+    }
+    out[i] = candidate;
   }
   return out;
 }
@@ -109,7 +129,7 @@ export function EvidenceGraph({
   const hypRes = useResource(hypFetcher, [run.id], `${run.updatedAt}:${run.status}`);
   const hypotheses = hypRes.data?.hypotheses ?? [];
 
-  const { nodes, edges, height, truncated } = useMemo(() => {
+  const { nodes, edges, height, truncated, floating } = useMemo(() => {
     // Discriminating filter needs hypothesis bindings; claim→hyp edges come
     // from BOTH the hypothesis id-arrays (authoritative) and relations.
     const supportingOf = new Map<string, Set<string>>();
@@ -130,7 +150,16 @@ export function EvidenceGraph({
     };
 
     const cap = showAll ? Number.POSITIVE_INFINITY : MAX_NODES_PER_COL;
-    const visibleSources = sources.slice(0, cap);
+    // A source column of half-connected floats is noise, not structure: the
+    // graph shows only sources LOCATED by a claim (the locator edges are its
+    // reason to exist); the rest stay in the sources table.
+    const locatedSourceIds = new Set<string>();
+    for (const c of claims) {
+      for (const loc of c.locators) locatedSourceIds.add(loc.sourceDocumentId);
+    }
+    const connectedSources = sources.filter((s) => locatedSourceIds.has(s.id));
+    const floating = sources.length - connectedSources.length;
+    const visibleSources = connectedSources.slice(0, cap);
     const visibleClaims = claims
       .filter((c) => {
         if (filter === 'counter') return (counterOf.get(c.id)?.size ?? 0) > 0;
@@ -142,13 +171,18 @@ export function EvidenceGraph({
     const visibleHyps = hypotheses.slice(0, cap);
 
     const nodeList: GraphNode[] = [];
-    const sourceLabels = truncateLabels(visibleSources.map((s) => decodeEntities(s.title)), 30, 52);
+    // Label budgets: next column's x minus this node's glyph+label offset and
+    // a margin — a label physically cannot reach the neighboring column.
+    const sourceLabelPx = COL_X.claim - COL_X.source - 14 - 12;
+    const claimLabelPx = COL_X.hypothesis - COL_X.claim - 14 - 12;
+    const hypLabelPx = VIEW_W - COL_X.hypothesis - 14 - 6;
+    const sourceLabels = fitLabels(visibleSources.map((s) => decodeEntities(s.title)), sourceLabelPx);
     visibleSources.forEach((s, i) => nodeList.push({
       id: s.id, kind: 'source', x: COL_X.source, y: FIRST_ROW_Y + i * ROW_H,
       label: sourceLabels[i] ?? s.title, title: decodeEntities(s.title),
       supportingCount: 0, counterCount: 0,
     }));
-    const claimLabels = truncateLabels(visibleClaims.map((c) => decodeEntities(c.text)), 36, 60);
+    const claimLabels = fitLabels(visibleClaims.map((c) => decodeEntities(c.text)), claimLabelPx);
     visibleClaims.forEach((c, i) => nodeList.push({
       id: c.id, kind: 'claim', x: COL_X.claim, y: FIRST_ROW_Y + i * ROW_H,
       label: claimLabels[i] ?? c.text, title: decodeEntities(c.text),
@@ -158,7 +192,7 @@ export function EvidenceGraph({
     }));
     // Hypothesis labels follow the reader's language when the W-C zh rendering exists.
     const hypTexts = visibleHyps.map((h) => zhFirst(h.statement, h.statementZh, lang));
-    const hypLabels = truncateLabels(hypTexts, 44, 72);
+    const hypLabels = fitLabels(hypTexts, hypLabelPx);
     visibleHyps.forEach((h, i) => nodeList.push({
       id: h.id, kind: 'hypothesis', x: COL_X.hypothesis, y: FIRST_ROW_Y + i * ROW_H,
       label: hypLabels[i] ?? h.statement, title: hypTexts[i] ?? h.statement,
@@ -190,11 +224,11 @@ export function EvidenceGraph({
     }
     const maxRows = Math.max(visibleSources.length, visibleClaims.length, visibleHyps.length);
     const truncated = Math.max(
-      (sources.length > visibleSources.length ? sources.length - visibleSources.length : 0),
+      (connectedSources.length > visibleSources.length ? connectedSources.length - visibleSources.length : 0),
       (claims.length > visibleClaims.length ? claims.length - visibleClaims.length : 0),
       (hypotheses.length > visibleHyps.length ? hypotheses.length - visibleHyps.length : 0),
     );
-    return { nodes: nodeList, edges: edgeList, height: FIRST_ROW_Y + 18 + maxRows * ROW_H, truncated };
+    return { nodes: nodeList, edges: edgeList, height: FIRST_ROW_Y + 18 + maxRows * ROW_H, truncated, floating };
   }, [sources, claims, relations, hypotheses, filter, showAll]);
 
   const byId = useMemo(() => new Map(nodes.map((n) => [n.id, n] as const)), [nodes]);
@@ -374,6 +408,9 @@ export function EvidenceGraph({
         </g>
       </svg>
       <p className="muted small">{t('graph.legend')}</p>
+      {floating > 0 && (
+        <p className="muted small">{t('graph.floating', { n: floating })}</p>
+      )}
     </div>
   );
 }

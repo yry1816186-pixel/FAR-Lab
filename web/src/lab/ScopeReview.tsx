@@ -95,9 +95,19 @@ export function ScopeReview({ run, question, onQuestionChanged, onLaunched }: {
         {!scopeDone ? (
           <div className="scope-propose">
             <p className="scope-propose-hint">{t('scope.proposeHint')}</p>
-            <button type="button" className="fu-start" disabled={busy !== null} onClick={() => { void doPropose(); }}>
-              {busy === 'propose' ? t('scope.proposing') : t('scope.propose')}
-            </button>
+            <div className="scope-acts">
+              <button type="button" className="fu-start" disabled={busy !== null} onClick={() => { void doPropose(); }}>
+                {busy === 'propose' ? t('scope.proposing') : t('scope.propose')}
+              </button>
+              {/* Honest path when this route provides no proposal (the offline
+                  development wire refuses template scope): the draft still
+                  launches directly — the pipeline runs for real (retrieval,
+                  evidence) and reports whatever it can honestly produce. */}
+              <button type="button" className="mb-act" disabled={busy !== null} onClick={() => { void doLaunch(); }}>
+                {busy === 'launch' ? t('scope.launching') : t('scope.launchDirect')}
+              </button>
+            </div>
+            <p className="scope-note">{t('scope.launchDirectHint')}</p>
           </div>
         ) : (
           <>

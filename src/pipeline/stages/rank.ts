@@ -654,7 +654,12 @@ async function rankExecute(ctx: StageContext): Promise<StageOutcome> {
       assertNotCancelled(ctx, 'rank');
       // W8 S2: per-batch step checkpoint keyed by the batch's first hypothesis id — a
       // stable domain key, so a mid-stage kill + resume re-runs only unfinished batches.
-      return ctx.checkpointed('rank', 'scoring', `score-batch:${batch[0]!.id}`, scoringInputs, () =>
+      // Family key rc2 (2026-08-29): the real-content guard needs the receipt's
+      // executionMode in the cached envelope; pre-guard caches ('scoring') carry
+      // no mode and would replay template-era batches unguarded. The bump
+      // orphans old caches (never replayed) at the cost of re-running in-flight
+      // rank stages once — the honest trade for a semantics change.
+      return ctx.checkpointed('rank', 'scoring-rc2', `score-batch:${batch[0]!.id}`, scoringInputs, () =>
         callStructured<z.infer<typeof RankOut>>(ctx, {
           stage: 'rank',
           purpose: 'hypothesis-ranking:dimension-scores',
@@ -883,7 +888,7 @@ async function rankExecute(ctx: StageContext): Promise<StageOutcome> {
             // SUCCESSFUL judgments are cached — a pair whose judge call failed stays
             // uncached and gets a fresh attempt on resume (transient failures, not
             // seed-dependent outcomes, so same-seed-same-output holds for fresh runs).
-            const cached = await ctx.checkpointed('rank', 'pairs', `pair:${pair.aId}:${pair.bId}`, pairInputs, () =>
+            const cached = await ctx.checkpointed('rank', 'pairs-rc2', `pair:${pair.aId}:${pair.bId}`, pairInputs, () =>
               callStructured<z.infer<typeof PairJudgeOut>>(ctx, {
                 stage: 'rank',
                 purpose: 'hypothesis-ranking:pairwise-tournament',

@@ -10,14 +10,14 @@ import {
 } from '../api/endpoints';
 import { DISPATCHABLE_ACTIONS, type DispatchableAction } from '../api/endpoints';
 import type {
-  AchResearcherAdjusted, EvidenceRelation, HypothesisCandidate, ResearchQuestion, ResearchRun, RunEvent, ScienceBundle, ScientificClaim, SourceDocument,
+  AchResearcherAdjusted, EvidenceRelation, HypothesisCandidate, HypothesisScorecard, ResearchQuestion, ResearchRun, RunEvent, ScienceBundle, ScientificClaim, SourceDocument,
 } from '../api/types';
 import { runProgress } from '../api/types';
 import { RELATION_POLARITY } from '../api/types';
 import { runStatusKey } from '../tones';
 import { EvidenceGraph } from '../components/detail/EvidenceGraph';
 import { ClaimInspector } from './ClaimInspector';
-import { zhFirst, markerZh } from './bilingual';
+import { zhFirst, markerZh, dimensionLabel, decodeEntities } from './bilingual';
 import { useRunTruth } from '../components/detail/ResearchStatePanel';
 import { ScopeReview } from './ScopeReview';
 import { runLabel, type StudyGroup } from '../studies';
@@ -95,8 +95,11 @@ export function StudyMap({
   const [sources, setSources] = useState<SourceDocument[]>([]);
   const [hyps, setHyps] = useState<HypothesisCandidate[]>([]);
   const [ranks, setRanks] = useState<Map<string, number>>(new Map());
-  /** #1's basis, from its scorecard — the map must answer "why is #1 #1" without a deep dive. */
-  const [leaderWhy, setLeaderWhy] = useState<string | null>(null);
+  /** #1's scorecard — the basis line is composed at RENDER time from the
+   *  structured dimensions (current language, researcher language); the
+   *  audit-grade formula (overallRationale) rides the tooltip. Formulas on
+   *  the card itself read as debugging, not judgment. */
+  const [leaderCard, setLeaderCard] = useState<HypothesisScorecard | null>(null);
   const [adjusted, setAdjusted] = useState<AchResearcherAdjusted | null>(null);
   const [science, setScience] = useState<ScienceBundle | null>(null);
   const [insp, setInsp] = useState<Insp | null>(null);
@@ -122,11 +125,10 @@ export function StudyMap({
       .then((h) => {
         setHyps(h.hypotheses);
         setRanks(new Map(h.scorecards.map((s) => [s.hypothesisId, s.rank] as const)));
-        const top = h.scorecards.find((s) => s.rank === 1) ?? null;
-        setLeaderWhy(top !== null && top.overallRationale.trim().length > 0 ? top.overallRationale : null);
+        setLeaderCard(h.scorecards.find((s) => s.rank === 1) ?? null);
         setAdjusted(h.achResearcherAdjusted);
       })
-      .catch(() => { setHyps([]); setRanks(new Map()); setAdjusted(null); });
+      .catch(() => { setHyps([]); setRanks(new Map()); setAdjusted(null); setLeaderCard(null); });
     // Spine projection: state/next-actions/deltas. Failure is non-fatal (the
     // map still renders its bands) but leaves science null — never fake state.
     // A 404 is specifically the old-server case: surfaced as its own notice.
@@ -186,16 +188,24 @@ export function StudyMap({
     return m;
   }, [relations]);
 
+  const sourceById = useMemo(() => new Map(sources.map((s) => [s.id, s] as const)), [sources]);
+
   const claimOrder = useMemo(() => claims
     .map((c, i) => ({ c, i, bal: balances.get(c.id) ?? { supports: 0, counters: 0 } }))
     // Researcher layer shapes the band (§15): pinned first. Excluded rows
     // KEEP their position, weakened in place — the judgement must stay
     // disclosed in its original context (never sunk out of reach).
+    // Tie-break on id, NOT array index: the server re-appends a claim object
+    // when the researcher layer rewrites it (exclude/pin/annotate), so index
+    // order reshuffles after every op — an excluded claim could jump to the
+    // tail and fall out of the 7-row window (live-reproduced 2026-08-29).
     .sort((a, b) => {
       const pa = a.c.researcher?.pinned === true ? 0 : 1;
       const pb = b.c.researcher?.pinned === true ? 0 : 1;
       if (pa !== pb) return pa - pb;
-      return (b.bal.counters - a.bal.counters) || (b.bal.supports + b.bal.counters - a.bal.supports - a.bal.counters) || (a.i - b.i);
+      const byCounters = (b.bal.counters - a.bal.counters) || (b.bal.supports + b.bal.counters - a.bal.supports - a.bal.counters);
+      if (byCounters !== 0) return byCounters;
+      return a.c.id < b.c.id ? -1 : a.c.id > b.c.id ? 1 : 0;
     }), [claims, balances]);
 
   const activeHyps = useMemo(() => hyps
@@ -425,7 +435,7 @@ export function StudyMap({
           />
         )}
         <section className="map-node">
-          <p className="map-node-label">{t('map.evidenceLabel')}</p>
+          <p className="map-node-label">{t('map.evidenceLabel')}<span className="map-node-hint">{t('map.evidenceHint')}</span></p>
           {claims.length === 0 && !running
             ? scienceLoaded
               ? <p className="queue-empty">{t('map.evidenceEmpty')}</p>
@@ -435,6 +445,10 @@ export function StudyMap({
                 {claimOrder.slice(0, 7).map(({ c, bal }) => {
                   const excluded = c.researcher?.excluded === true;
                   const pinned = c.researcher?.pinned === true;
+                  // Source attribution (provenance at a glance): the FIRST
+                  // locator's document title — the researcher can see whose
+                  // claim this is before opening the inspector.
+                  const src = sourceById.get(c.locators[0]?.sourceDocumentId ?? '');
                   return (
                     <button
                       key={c.id}
@@ -445,7 +459,16 @@ export function StudyMap({
                       <span aria-hidden="true" style={{ fontSize: 13, color: excluded ? 'var(--v2-text-3)' : bal.counters > 0 ? 'var(--v2-refuted-on-tint)' : 'var(--v2-verified-on-tint)' }}>
                         {excluded ? '⊘' : pinned ? '◆' : bal.counters > 0 ? '✗' : bal.supports > 0 ? '✓' : '–'}
                       </span>
-                      <span className="map-claim-text">{c.text}</span>
+                      <span className="map-claim-main">
+                        <span className="map-claim-text">{c.text}</span>
+                        {src !== undefined && (
+                          <span className="map-claim-src">
+                            {decodeEntities(src.title)}
+                            {c.locators.length > 1 && ` +${c.locators.length - 1}`}
+                            {src.publicationYear !== undefined && ` · ${src.publicationYear}`}
+                          </span>
+                        )}
+                      </span>
                       <span className="map-claim-meta">
                         {excluded && t('map.claimExcluded')}
                         {!excluded && pinned && t('map.claimPinned')}
@@ -461,7 +484,7 @@ export function StudyMap({
         </section>
 
         <section className="map-node" id="map-hyps">
-          <p className="map-node-label">{t('map.hypsLabel')}</p>
+          <p className="map-node-label">{t('map.hypsLabel')}<span className="map-node-hint">{t('map.hypsHint')}</span></p>
           {science?.state.discriminatingObservations.slice(0, 1).map((o) => (
             <p key={o.betweenHypothesisIds.join('-')} className="map-discrim">
               <span className="map-discrim-tag">{t('map.discrimLabel')}</span>
@@ -498,9 +521,19 @@ export function StudyMap({
                     >
                       <span className="map-hyp-rank">#{rank ?? '—'}{rank === 1 && t('map.topMark')}</span>
                       <span className="map-hyp-statement">{zhFirst(h.statement, h.statementZh, lang)}</span>
-                      {rank === 1 && leaderWhy !== null && (
-                        <span className="map-hyp-why" title={leaderWhy}>{t('map.hypWhy', { text: leaderWhy.length > 110 ? `${leaderWhy.slice(0, 110)}…` : leaderWhy })}</span>
-                      )}
+                      {rank === 1 && leaderCard !== null && (() => {
+                        const dims = leaderCard.dimensions
+                          .filter((d) => d.value !== null)
+                          .sort((a, b) => (b.value ?? 0) - (a.value ?? 0))
+                          .slice(0, 3);
+                        const basis = dims
+                          .map((d) => `${dimensionLabel(d.dimension, t)} ${d.qualitative !== undefined && d.qualitative !== 'not_assessed' ? t(`map.qual.${d.qualitative}` as DictKey) : (d.value ?? 0).toFixed(1)}`)
+                          .join(' · ');
+                        const audit = leaderCard.overallRationale.trim().length > 0 ? leaderCard.overallRationale : undefined;
+                        return basis.length > 0
+                          ? <span className="map-hyp-why" title={audit}>{t('map.hypWhy', { text: basis })}</span>
+                          : null;
+                      })()}
                       <span className="map-hyp-stats"><span>✓ {sup}</span><span>✗ {ctr}</span></span>
                     </button>
                   );
@@ -835,11 +868,14 @@ function StateBand({ run, science, onResume, onDispatch, dispatchError, busy }: 
           })}</p>
           {(() => {
             // The WHY in researcher language: the honesty gate's refusal reason
-            // (or any hypotheses-stage skip reason) rides on the run's stage record.
+            // (or any hypotheses-stage skip reason) rides on the run's stage
+            // record. The known real-content refusal gets localized copy (the
+            // raw reason stays on hover); everything else renders verbatim.
             const skipped = run.stages.find((st) => st.stage === 'generate_hypotheses');
-            return skipped?.error !== undefined
-              ? <p className="ss-line">{t('map.stateInsufficientWhy', { text: skipped.error.slice(0, 220) })}</p>
-              : null;
+            if (skipped?.error === undefined) return null;
+            const raw = skipped.error;
+            const isWireRefusal = raw.includes('deterministic development wire');
+            return <p className="ss-line" title={raw}>{isWireRefusal ? t('map.insufficientWireReason') : t('map.stateInsufficientWhy', { text: raw.slice(0, 220) })}</p>;
           })()}
         </div>
       ) : (
@@ -851,7 +887,7 @@ function StateBand({ run, science, onResume, onDispatch, dispatchError, busy }: 
               {s.leading !== null && s.leading.whyItLeads.length > 0
                 ? s.leading.whyItLeads.map((d) => (
                   <p key={`${d.dimension}-${d.rationale}`} className="ss-why">
-                    <span className={`ss-dim ss-dim--${d.qualitative ?? 'n'}`}>{d.dimension}{d.qualitative !== null ? ` · ${t(`map.qual.${d.qualitative}` as DictKey)}` : ''}</span>
+                    <span className={`ss-dim ss-dim--${d.qualitative ?? 'n'}`}>{dimensionLabel(d.dimension, t)}{d.qualitative !== null ? ` · ${t(`map.qual.${d.qualitative}` as DictKey)}` : ''}</span>
                     <span className="ss-why-text">{d.rationale}</span>
                   </p>
                 ))

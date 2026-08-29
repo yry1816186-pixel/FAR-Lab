@@ -45,15 +45,18 @@ test('full journey: formation -> launch -> study map -> inspector -> home', asyn
   await page.getByRole('button', { name: /启动研究|Start research/ }).click();
   await expect(page).toHaveURL(/#study\/run_[a-z0-9]+/, { timeout: 30_000 });
 
-  // 4. The map: question, then materializing bands, verdict at the end —
-  //    all on ONE canvas (no tabs), counter-first evidence when counters exist.
+  // 4. The map: question, then materializing bands. Real-content discipline
+  //    (2026-08-29): the offline route refuses template hypotheses/scope — the
+  //    settled study shows its honest INSUFFICIENT verdict + real claims, and
+  //    hypothesis cards must NOT appear (no demonstration content).
   await expect(page.locator('.map-question')).toContainText('resistance training', { timeout: 20_000 });
   await expect(page.locator('.map-state')).toBeVisible({ timeout: 90_000 });
-  await expect(page.locator('.map-hyp-card, [class*="hyp-card"]').first()).toBeVisible();
+  await expect(page.locator('.map-claim-row').first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('.map-hyp-card')).toHaveCount(0);
 
-  // 5. Inspector: click the first claim/hypothesis object -> detail drawer,
+  // 5. Inspector: click the first claim object -> detail drawer,
   //    Esc closes (keyboard path).
-  const firstObject = page.locator('.map-claim-row, .map-hyp-card, [class*="claim-row"]').first();
+  const firstObject = page.locator('.map-claim-row').first();
   await firstObject.click();
   const inspector = page.locator('.lab-inspector, [role="dialog"]');
   await expect(inspector).toBeVisible();
