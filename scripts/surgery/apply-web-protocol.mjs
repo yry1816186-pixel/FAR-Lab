@@ -13,18 +13,18 @@ const fail = (msg) => {
   process.exit(1);
 };
 
-/** Split into lines, splice after/before the unique line matching pred. */
+/** Split into lines; splice after/before/replace the unique matching line. */
 const patchLines = (path, ops) => {
   let src = readFileSync(path, 'utf8');
   for (const op of ops) {
-    if (src.includes(op.done Marker)) continue;
+    if (op.done !== undefined && src.includes(op.done)) continue;
     const L = src.split('\n');
     const hits = L.map((l, i) => (op.match(l) ? i : -1)).filter((i) => i >= 0);
     if (hits.length !== 1) {
       fail(`${path}: anchor for '${op.what}' matched ${hits.length} lines (need exactly 1)`);
     }
-    const at = hits[0] + (op.where === 'before' ? 0 : 1);
-    L.splice(at, 0, ...op.lines);
+    if (op.where === 'replace') L.splice(hits[0], 1, ...op.lines);
+    else L.splice(hits[0] + (op.where === 'before' ? 0 : 1), 0, ...op.lines);
     src = L.join('\n');
   }
   writeFileSync(path, src);
@@ -34,8 +34,7 @@ const patchLines = (path, ops) => {
 // StudyMap.tsx — import, state, fetch reset, fetch, band
 // ---------------------------------------------------------------------------
 const STUDYMAP = 'web/src/lab/StudyMap.tsx';
-const sm = readFileSync(STUDYMAP, 'utf8');
-if (sm.includes("import { ProtocolPanel } from './ProtocolPanel';")) {
+if (readFileSync(STUDYMAP, 'utf8').includes("import { ProtocolPanel } from './ProtocolPanel';")) {
   console.log('[surgery:web] StudyMap already patched — nothing to do');
 } else {
   patchLines(STUDYMAP, [
@@ -62,7 +61,7 @@ if (sm.includes("import { ProtocolPanel } from './ProtocolPanel';")) {
       ],
     },
     {
-      what: 'run-switch effect reset',
+      what: 'run-switch effect line',
       done: 'setProtocol(null); setProtocolError(null); loadScience(run.id); }, [run.id, run.status, loadScience]);',
       match: (l) => l.includes('useEffect(() => { setInsp(null); setLoadError(null); setSpineUnavailable(false); loadScience(run.id); }, [run.id, run.status, loadScience]);'),
       where: 'replace',
@@ -91,8 +90,7 @@ if (sm.includes("import { ProtocolPanel } from './ProtocolPanel';")) {
 
   // Band insertion: before the <section> that opens the verdict fallback.
   // The verdict h2 line is pure-text findable; walk up (bounded) to its section.
-  let src = readFileSync(STUDYMAP, 'utf8');
-  const L = src.split('\n');
+  const L = readFileSync(STUDYMAP, 'utf8').split('\n');
   const verdictHits = L.map((l, i) => (l.includes("t('map.verdictLabel')") ? i : -1)).filter((i) => i >= 0);
   if (verdictHits.length !== 1) {
     fail(`StudyMap: verdict label matched ${verdictHits.length} lines (need exactly 1)`);
@@ -105,7 +103,7 @@ if (sm.includes("import { ProtocolPanel } from './ProtocolPanel';")) {
     fail('StudyMap: no <section opening within 6 lines above the verdict label');
   }
   L.splice(sectionIdx, 0,
-    '        {protocol !== null && (',
+    '        {(protocol !== null || protocolError !== null) && (',
     '          <ProtocolPanel',
     '            runId={run.id}',
     '            state={protocol}',
@@ -120,14 +118,16 @@ if (sm.includes("import { ProtocolPanel } from './ProtocolPanel';")) {
 }
 
 // ---------------------------------------------------------------------------
-// dict.ts — zh/en map.protocol.* keys (auto-extends DictKey = keyof typeof zh)
+// dict.ts — zh/en map.protocol.* keys (DictKey must be keyof typeof zh)
 // ---------------------------------------------------------------------------
 const DICT = 'web/src/i18n/dict.ts';
-const dict = readFileSync(DICT, 'utf8');
-if (dict.includes("'map.protocol.title'")) {
-  console.log('[surgery:web] dict already has map.protocol.* keys');
+const dictSrc = readFileSync(DICT, 'utf8');
+const ZH_DONE = "'map.protocol.title': '研究协议";
+const EN_DONE = "'map.protocol.title': 'Research protocol";
+if (dictSrc.includes(ZH_DONE) && dictSrc.includes(EN_DONE)) {
+  console.log('[surgery:web] dict already has map.protocol.* keys in both languages');
 } else {
-  if (!/^export type DictKey\b[^\n]*keyof typeof zh/m.test(dict)) {
+  if (!/^export type DictKey\b[^\n]*keyof typeof zh/m.test(dictSrc)) {
     fail('dict.ts: DictKey is not `keyof typeof zh` — protocol keys would not typecheck; inspect dict.ts head and adapt');
   }
   const ZH = [
@@ -146,7 +146,6 @@ if (dict.includes("'map.protocol.title'")) {
     "  'map.protocol.allocationNone': '非随机分配：{why}',",
     "  'map.protocol.ethics': '伦理',",
     "  'map.protocol.ethicsConsent': '需知情同意',",
-    "  'map.protocol.ethicsApprovalBody': '审批机构',",
     "  'map.protocol.ethicsPending': '伦理审批未记录——执行记录已封闭（fail-closed）。先录入审批，解锁后续记录。',",
     "  'map.protocol.draftNotes': '起草披露',",
     "  'map.protocol.actor': '记录人',",
@@ -164,6 +163,8 @@ if (dict.includes("'map.protocol.title'")) {
     "  'map.protocol.measureQcFail': 'QC 未过',",
     "  'map.protocol.measureQcDetail': '原因：{detail}',",
     "  'map.protocol.measureEmpty': '尚无测量记录',",
+    "  'map.protocol.measureInputEmpty': '值不能为空',",
+    "  'map.protocol.measureInputNotNumeric': '数值型变量需要合法数字',",
     "  'map.protocol.collectionForm': '采集表（预注册派生）',",
     "  'map.protocol.deviations': '偏差登记',",
     "  'map.protocol.deviate': '登记偏差',",
@@ -236,6 +237,8 @@ if (dict.includes("'map.protocol.title'")) {
     "  'map.protocol.measureQcFail': 'QC failed',",
     "  'map.protocol.measureQcDetail': 'Reason: {detail}',",
     "  'map.protocol.measureEmpty': 'No measurements recorded yet',",
+    "  'map.protocol.measureInputEmpty': 'value must not be empty',",
+    "  'map.protocol.measureInputNotNumeric': 'numeric variables need a valid number',",
     "  'map.protocol.collectionForm': 'Collection form (preregistration-derived)',",
     "  'map.protocol.deviations': 'Deviations',",
     "  'map.protocol.deviate': 'Log deviation',",
@@ -277,14 +280,14 @@ if (dict.includes("'map.protocol.title'")) {
   patchLines(DICT, [
     {
       what: 'zh object opener',
-      done: "'map.protocol.title'",
+      done: ZH_DONE,
       match: (l) => /^export const zh\b.*\{\s*$/.test(l),
       where: 'after',
       lines: ZH,
     },
     {
       what: 'en object opener',
-      done: "'map.protocol.title'",
+      done: EN_DONE,
       match: (l) => /^export const en\b.*\{\s*$/.test(l),
       where: 'after',
       lines: EN,
