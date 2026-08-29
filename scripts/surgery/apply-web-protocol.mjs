@@ -5,6 +5,11 @@
  * (zh/en map.protocol.* keys), lab.css (band styles). Fail-loud unique
  * anchors; idempotent re-runs. Anchors are chosen as pure-JS lines that
  * survive generic/JSX-stripping remote reads verbatim.
+ *
+ * Rev2: the band originally spliced before the verdict <section> — INSIDE
+ * the conditional's parentheses — producing adjacent JSX roots (parse
+ * error). This revision removes a mispasted band and re-inserts it BEFORE
+ * the `{settled && science === null && (` conditional line, as a sibling.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 
@@ -34,9 +39,7 @@ const patchLines = (path, ops) => {
 // StudyMap.tsx — import, state, fetch reset, fetch, band
 // ---------------------------------------------------------------------------
 const STUDYMAP = 'web/src/lab/StudyMap.tsx';
-if (readFileSync(STUDYMAP, 'utf8').includes("import { ProtocolPanel } from './ProtocolPanel';")) {
-  console.log('[surgery:web] StudyMap already patched — nothing to do');
-} else {
+{
   patchLines(STUDYMAP, [
     {
       what: 'ClaimInspector import',
@@ -88,21 +91,10 @@ if (readFileSync(STUDYMAP, 'utf8').includes("import { ProtocolPanel } from './Pr
     },
   ]);
 
-  // Band insertion: before the <section> that opens the verdict fallback.
-  // The verdict h2 line is pure-text findable; walk up (bounded) to its section.
-  const L = readFileSync(STUDYMAP, 'utf8').split('\n');
-  const verdictHits = L.map((l, i) => (l.includes("t('map.verdictLabel')") ? i : -1)).filter((i) => i >= 0);
-  if (verdictHits.length !== 1) {
-    fail(`StudyMap: verdict label matched ${verdictHits.length} lines (need exactly 1)`);
-  }
-  let sectionIdx = -1;
-  for (let i = verdictHits[0]; i >= Math.max(0, verdictHits[0] - 6); i -= 1) {
-    if (L[i].trim().startsWith('<section')) { sectionIdx = i; break; }
-  }
-  if (sectionIdx === -1) {
-    fail('StudyMap: no <section opening within 6 lines above the verdict label');
-  }
-  L.splice(sectionIdx, 0,
+  // Band placement (rev2). The band is a SIBLING of the verdict fallback:
+  // it must sit BEFORE the `{settled && science === null && (` conditional
+  // line, never inside its parentheses.
+  const BAND = [
     '        {(protocol !== null || protocolError !== null) && (',
     '          <ProtocolPanel',
     '            runId={run.id}',
@@ -111,10 +103,44 @@ if (readFileSync(STUDYMAP, 'utf8').includes("import { ProtocolPanel } from './Pr
     '            onMutated={() => { onMutated(); loadScience(run.id); }}',
     '          />',
     '        )}',
-    '',
-  );
-  writeFileSync(STUDYMAP, L.join('\n'));
-  console.log('[surgery:web] StudyMap patched: protocol band mounted before verdict fallback');
+  ];
+  let src = readFileSync(STUDYMAP, 'utf8');
+  const L = src.split('\n');
+  const bandText = BAND.join('\n');
+
+  // Remove any mispasted band: the exact block followed (optionally after a
+  // blank line) by a <section line — i.e. spliced INSIDE a conditional.
+  for (let i = 0; i <= L.length - BAND.length; i += 1) {
+    if (L.slice(i, i + BAND.length).join('\n') !== bandText) continue;
+    let j = i + BAND.length;
+    if (j < L.length && L[j].trim() === '') j += 1;
+    if (j < L.length && L[j].trim().startsWith('<section')) {
+      L.splice(i, j - i);
+      console.log('[surgery:web] removed mispasted protocol band (inside conditional)');
+      src = L.join('\n');
+      break;
+    }
+  }
+
+  const lines2 = src.split('\n');
+  const alreadyPlaced = lines2.some((l, i) =>
+    l.trim() === BAND[0].trim()
+    && i > 0
+    && lines2[i - 1] !== undefined
+    && /\{settled && science === null && \(/.test(lines2[i - 1]));
+  if (alreadyPlaced) {
+    console.log('[surgery:web] protocol band already correctly placed');
+  } else {
+    const verdictHits = lines2
+      .map((l, i) => (l.trim() === '{settled && science === null && (' ? i : -1))
+      .filter((i) => i >= 0);
+    if (verdictHits.length !== 1) {
+      fail(`StudyMap: verdict conditional matched ${verdictHits.length} lines (need exactly 1)`);
+    }
+    lines2.splice(verdictHits[0], 0, ...BAND);
+    writeFileSync(STUDYMAP, lines2.join('\n'));
+    console.log('[surgery:web] protocol band placed before the verdict conditional');
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -219,7 +245,6 @@ if (dictSrc.includes(ZH_DONE) && dictSrc.includes(EN_DONE)) {
     "  'map.protocol.allocationNone': 'Non-randomized: {why}',",
     "  'map.protocol.ethics': 'Ethics',",
     "  'map.protocol.ethicsConsent': 'consent required',",
-    "  'map.protocol.ethicsApprovalBody': 'approval body',",
     "  'map.protocol.ethicsPending': 'No approval recorded — execution records are closed (fail-closed). Record the approval first to unlock.',",
     "  'map.protocol.draftNotes': 'Draft disclosures',",
     "  'map.protocol.actor': 'Recorder',",
