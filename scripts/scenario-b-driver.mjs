@@ -58,8 +58,7 @@ console.log(`run: ${run.id}`);
 
 // 2. Raw acquisition + QC + derived features
 const raw = await acquireNetcdfDataset(store, artifacts, run.id, ncPath, 'air', { license: 'public domain (NCEP/NCAR reanalysis via xarray-data)' });
-console.log(`raw dataset_record: ${raw.id} (${raw.contentRef.slice(0, 19)}…, ${raw.nRows} cells)`);
-const { record: derived } = await extractNetcdfFeatures(store, artifacts, raw,
+const { record: derived } = await extractNetcdfFeatures(store, artifacts, raw, 'monthly_mean_per_gridpoint', {
   maxRows: 60000,
   materializeDir: path.join(dataDir, 'derived'),
 });
