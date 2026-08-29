@@ -1,5 +1,5 @@
 import type { Store } from '../persistence/store.js';
-import type { EvidenceRelation, HypothesisCandidate, ResearchRun } from '../domain/index.js';
+import type { ResearchRun } from '../domain/index.js';
 import { LINEAGE_COUNTER_RELATIONS } from '../domain/lineage.js';
 
 /**

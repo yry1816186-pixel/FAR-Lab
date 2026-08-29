@@ -1,7 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { Store } from '../persistence/store.js';
 import { MemoryItemSchema, deriveTrustClass, type MemoryItem } from '../domain/memory.js';
-import type { ExperimentRun } from '../domain/index.js';
 
 /**
  * Deterministic memory consolidation (RU-1, TencentDB cursor-consolidation +

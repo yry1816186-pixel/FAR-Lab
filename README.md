@@ -13,7 +13,8 @@ Evidence-constrained, falsifiable scientific hypothesis generation and research-
 - **Hypothesis comparison with evidence discrimination** — structured comparison view with per-cell evidence support/contradiction states; falsification stage produces ACH-style contrastivity analysis
 - **Model control plane** — failover chains with verified semantics (fail-over error classes, cooldown, serving route visible in every receipt) and a receipt-derived usage ledger (cost only from user-declared pricing — unknown stays unknown); pluggable backends via `FARLAB_MODEL_PROVIDER` (Zhipu GLM `zai`, Alibaba DashScope/Qwen `dashscope`, custom)
 - **Resident conversation agent** — conversations run on the agent kernel with a read-tool plane over the workspace, `propose_action` approval cards (approve/reject/remember), and an automations engine (schedule + run-completed triggers) whose proposals always gate on the human
-- **Tool integrations (MCP)** — external MCP servers (e.g. Docling document understanding) join kernel sessions under capability-scoped admission (read-only capabilities admit read-class tools only); declarative hook rules compile to kernel permissions (strictest-wins, fail-closed when headless)
+- **Tool integrations (MCP)** — external MCP servers (e.g. Docling document understanding) join kernel sessions under capability-scoped admission (read-only capabilities admit read-class tools only); declarative hook rules compile to kernel permissions (strictest-wins, fail-closed when headless); plugins (`far-plugin.json`: skills/commands/hooks/MCP + subprocess-isolated JS entry) import via `far plugin install` — all staged DISABLED for review
+- **Extensibility plane** — `far mcp add/probe` (real connectivity round trip; browser control via Playwright MCP, desktop automation recipes in docs/EXTENSIBILITY.md), integrated terminal (login shell, profile-loaded, SSE-streamed; no PTY — honestly documented), approval-gated `run_command` proposals, agent file tools (`read_file`/`find_files`/`grep_content`), network plane (HTTP(S) proxy + custom CA for ALL outbound fetch, `far probe net` loopback self-test), and model thinking capture (reasoning_content / thinking blocks) surfaced per conversation message
 - **Research-product export** — deterministic zero-LLM IMRaD paper projection with limitations synthesized from real counts and BibTeX from stored metadata only; reproducibility bundles verifiable independently via `far verify`
 - **CLI workbench** (`far` binary) — 15+ commands covering the full lifecycle: create runs, inspect objects, resume from checkpoint, export reports/papers/bundles, record feedback, run experiments, verify reproducibility; optional interactive TUI (`packages/tui`, isolated Ink package)
 - **Web workbench** — React SPA with real-time SSE streaming (visible reconnect state), run sidebar, hypothesis tournament table, ACH comparison canvas, research composer with offline dictation (ONNX Runtime Whisper), command palette (`Ctrl+K`), i18n (zh/en), dark/light theme
@@ -261,7 +262,21 @@ FARLAB_GIT_COMMIT=auto        # Git commit hash for provenance (auto-detected)
 OPENALEX_API_KEY=             # OpenAlex API key (higher rate limits)
 OPENALEX_MAILTO=              # OpenAlex polite-pool identifier
 CROSSREF_MAILTO=              # CrossRef polite-pool identifier
+
+# === Network plane (proxy + custom CA; applies to ALL outbound fetch) ===
+FARLAB_HTTPS_PROXY=           # e.g. http://127.0.0.1:7890 (falls back to HTTPS_PROXY)
+FARLAB_HTTP_PROXY=            # plain-HTTP proxy (falls back to HTTP_PROXY)
+FARLAB_NO_PROXY=              # bypass list (falls back to NO_PROXY)
+FARLAB_CA_CERT=               # PEM file with extra CAs (corporate MITM proxies)
+# Applied at process boot (Node fetch contract); long-running entrypoints re-exec
+# once to apply it. Verify with: far probe net  (real loopback self-test)
+
+# === Terminal (web integrated terminal) ===
+FARLAB_TERMINAL=off           # set to disable the terminal surface entirely
+FARLAB_SHELL=                 # force the shell program (default: auto-detect pwsh/powershell/cmd or $SHELL)
 ```
+
+See [docs/EXTENSIBILITY.md](docs/EXTENSIBILITY.md) for the full extensibility guide: skills, plugins (`far plugin install`), MCP servers (`far mcp add/probe`, incl. browser control via Playwright MCP and desktop automation recipes), commands, hooks, the integrated terminal, agent-proposed shell commands, file find/grep tools, the network plane, and thinking display.
 
 ### Provider Selection
 
