@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus, Square, TerminalSquare } from 'lucide-react';
 import { useI18n } from '../i18n/LanguageContext';
-import type { DictKey } from '../i18n/dict';
 import {
   createTerminalSession, killTerminalSession, listTerminalSessions,
   terminalEventsUrl, writeTerminalInput, type TerminalSessionView,

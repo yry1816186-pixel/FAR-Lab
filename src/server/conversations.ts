@@ -9,8 +9,10 @@ import {
 } from '../domain/index.js';
 import {
   generateConversationTurn, CreateAutomationArgsSchema, LaunchResearchArgsSchema, CancelAutomationArgsSchema,
-  CancelRunArgsSchema, conversationSessionId, planConversationResume, conversationRolloutDir,
+  CancelRunArgsSchema, RunCommandArgsSchema, conversationSessionId, planConversationResume, conversationRolloutDir,
 } from './conversation-agent.js';
+import { runInLoginShell } from '../shared/login-shell.js';
+import { resolveInsideRoot } from '../agent/capabilities/workspace-tools.js';
 
 /**
  * Conversation service (resident-agent flow, PROPOSAL-resident-agent): the
@@ -580,6 +582,31 @@ const executeProposal = async (
       app.store.putObject('tool_integration', integration);
       const warnings = args.warnings.length > 0 ? `注意：${args.warnings.join('；')}` : '';
       return { ok: true, result: `已暂存工具「${integration.label}」（默认停用）——到 设置→工具 中审查、填入密钥并启用。${warnings}` };
+    }
+    if (proposal.kind === 'run_command') {
+      const args = RunCommandArgsSchema.parse(proposal.args);
+      const root = process.cwd();
+      const cwd = resolveInsideRoot(root, args.cwd ?? '.');
+      if (cwd === null) {
+        return { ok: false, result: `工作目录越界（${args.cwd ?? '.'}）——只允许工作区内的相对路径` };
+      }
+      // The card shows the exact command (argSummary carries it verbatim); this
+      // is the researcher-approved execution — profile-loaded shell, bounded.
+      const r = await runInLoginShell({
+        command: args.command,
+        cwd,
+        timeoutMs: args.timeoutMs,
+        maxOutputChars: 20_000,
+      });
+      const out = r.stdout.length > 0 ? `\n stdout:\n${r.stdout}` : '';
+      const err = r.stderr.length > 0 ? `\n stderr:\n${r.stderr}` : '';
+      const verdict = r.timedOut
+        ? `命令超时（${args.timeoutMs}ms）后被终止`
+        : `退出码 ${r.exitCode ?? 'unknown'}`;
+      return {
+        ok: !r.timedOut && (r.exitCode === 0 || r.exitCode === null),
+        result: `${verdict}，耗时 ${r.durationMs}ms${r.truncated ? '（输出已截断）' : ''}${out}${err}`,
+      };
     }
     const args = CancelAutomationArgsSchema.parse(proposal.args);
     const automation = app.store.getObject('automation', args.automationId);

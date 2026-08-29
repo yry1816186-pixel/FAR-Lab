@@ -44,6 +44,8 @@ import {
   setConversationReasoningGear, ConversationError, type ConversationDeps,
 } from './conversations.js';
 import { startAutomationEngine, type AutomationEngine } from './automations.js';
+import { TerminalManager } from './terminal.js';
+import { resolveInsideRoot } from '../agent/capabilities/workspace-tools.js';
 import { aggregateRunUsage, aggregateWorkspaceUsage } from '../app/usage-ledger.js';
 import { workspaceSpendStatus, writeSpendLimit } from '../app/spend-limit.js';
 import {
@@ -93,7 +95,7 @@ import { checkPlanExecutability } from '../pipeline/stages/plan.js';
  */
 
 export interface ApiServerError {
-  code: 'not_found' | 'validation' | 'already_running' | 'run_active' | 'not_started' | 'internal' | 'target_not_found' | 'question_required' | 'action_model_failed' | 'action_budget_exhausted' | 'invalid_action_request' | 'invalid_counter_search' | 'provider_unreachable' | 'conversation_model_failed' | 'conversation_full' | 'turn_in_flight' | 'no_corpus' | 'session_stopped' | 'src_not_in_pool' | 'run_not_found' | 'already_launched' | 'scope_proposal_failed' | 'scope_proposal_unavailable' | 'lease_held';
+  code: 'not_found' | 'validation' | 'already_running' | 'run_active' | 'not_started' | 'internal' | 'target_not_found' | 'question_required' | 'action_model_failed' | 'action_budget_exhausted' | 'invalid_action_request' | 'invalid_counter_search' | 'provider_unreachable' | 'conversation_model_failed' | 'conversation_full' | 'turn_in_flight' | 'no_corpus' | 'session_stopped' | 'src_not_in_pool' | 'run_not_found' | 'already_launched' | 'scope_proposal_failed' | 'scope_proposal_unavailable' | 'lease_held' | 'feature_disabled' | 'terminal_limit' | 'terminal_not_writable';
   message: string;
   retryable: boolean;
   runId?: string;
@@ -278,6 +280,9 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
   const lastAdoptedAt = new Map<string, number>();
   let watchdogTimer: NodeJS.Timeout | null = null;
   let automationEngine: AutomationEngine | null = null;
+  // Terminal sessions (extensibility lane): persistent login shells behind
+  // /api/v1/terminal/* — loopback workbench surface, FARLAB_TERMINAL=off kills it.
+  const terminals = new TerminalManager();
   // Sweep-health visibility (WP2 F-007): a persistent store error would otherwise
   // silently stop adoptions forever with only a stderr line — /health reports it.
   let consecutiveSweepFailures = 0;
@@ -443,6 +448,48 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
         close();
       }
     }, 1_000);
+    req.on('close', close);
+    res.on('error', close);
+  };
+
+  /**
+   * Terminal SSE (extensibility lane): ring-buffer replay then live shell output.
+   * Same framing/lifetime contract as runEventStream; no cursor — the replay IS
+   * the resume (bounded ring, droppedChars disclosed on the first comment line).
+   */
+  const terminalEventStream = (req: http.IncomingMessage, res: http.ServerResponse, id: string): void => {
+    const onEvent = (event: { type: 'out'; data: string } | { type: 'exit'; code: number | null }): void => {
+      if (event.type === 'out') res.write(`event: terminal-out\ndata: ${JSON.stringify({ data: event.data })}\n\n`);
+      else {
+        res.write(`event: terminal-exit\ndata: ${JSON.stringify({ code: event.code })}\n\n`);
+        close();
+      }
+    };
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+    res.write(': stream open\n\n');
+    let closed = false;
+    const close = (): void => {
+      if (closed) return;
+      closed = true;
+      clearInterval(timer);
+      clearTimeout(lifetime);
+      terminals.unsubscribe(id, onEvent);
+      res.end();
+    };
+    const timer = setInterval(() => { if (!closed) res.write(': ping\n\n'); }, 5_000);
+    const lifetime = setTimeout(close, 30 * 60_000);
+    const sub = terminals.subscribe(id, onEvent);
+    if (sub === null) {
+      res.write(`event: terminal-exit\ndata: ${JSON.stringify({ code: null, reason: 'session not found (expired or killed)' })}\n\n`);
+      close();
+      return;
+    }
+    if (sub.droppedChars > 0) res.write(`: ring evicted ${sub.droppedChars} older chars\n\n`);
     req.on('close', close);
     res.on('error', close);
   };
@@ -2064,6 +2111,56 @@ function parseSeedSources(raw: unknown): string | {
       throw notFound(`no route: ${method} ${url.pathname}`);
     }
 
+    // ---- terminal sessions (extensibility lane): persistent login shells ----
+    if (segments[2] === 'terminal' && segments[3] === 'sessions') {
+      if (!terminals.enabled()) {
+        throw new HttpError(403, { code: 'feature_disabled', message: 'terminal disabled: FARLAB_TERMINAL=off', retryable: false });
+      }
+      if (segments.length === 4) {
+        if (method === 'GET') { sendJson(res, 200, { sessions: terminals.list() }); return; }
+        if (method === 'POST') {
+          // Empty POST body is legal here (no cwd = workspace root) — only read
+          // JSON when a body is actually present.
+          const hasBody = (Number(req.headers['content-length'] ?? 0) > 0) || req.headers['transfer-encoding'] !== undefined;
+          const body = hasBody ? await readJsonObject(req) : {};
+          const rawCwd = typeof body.cwd === 'string' ? body.cwd : '.';
+          const cwd = resolveInsideRoot(process.cwd(), rawCwd);
+          if (cwd === null) throw validation(`cwd escapes the workspace root: ${rawCwd}`);
+          try {
+            sendJson(res, 201, terminals.create(cwd));
+          } catch (e) {
+            throw new HttpError(409, { code: 'terminal_limit', message: e instanceof Error ? e.message : String(e), retryable: false });
+          }
+          return;
+        }
+        throw notFound(`method ${method} not allowed for ${url.pathname}`);
+      }
+      const id = segments[4];
+      if (id === undefined) throw notFound(`no route: ${method} ${url.pathname}`);
+      if (segments.length === 5) {
+        if (method === 'GET') { sendJson(res, 200, terminals.get(id)); return; }
+        if (method === 'DELETE') { sendJson(res, 200, { killed: terminals.kill(id) }); return; }
+        throw notFound(`method ${method} not allowed for ${url.pathname}`);
+      }
+      if (segments.length === 6 && segments[5] === 'input' && method === 'POST') {
+        const body = await readJsonObject(req);
+        if (typeof body.text !== 'string' || body.text.length === 0) {
+          throw validation('field "text" must be a non-empty string');
+        }
+        try {
+          terminals.write(id, body.text);
+          sendJson(res, 200, { ok: true });
+        } catch (e) {
+          throw new HttpError(409, { code: 'terminal_not_writable', message: e instanceof Error ? e.message : String(e), retryable: false });
+        }
+        return;
+      }
+      if (segments.length === 6 && segments[5] === 'events' && method === 'GET') {
+        return terminalEventStream(req, res, id);
+      }
+      throw notFound(`no route: ${method} ${url.pathname}`);
+    }
+
     if (segments[2] === 'runs') {
       if (segments.length === 3) {
         if (method === 'GET') return listRuns(res);
@@ -2351,7 +2448,7 @@ function parseSeedSources(raw: unknown): string | {
         }
         if (leaf === 'hypotheses' && method === 'GET') {
           mustGetRun(runId);
-          const achAnalysis = app.store.listObjects('ach_analysis', runId).at(-1) ?? null;
+          const achAnalysisRaw = app.store.listObjects('ach_analysis', runId).at(-1) ?? null;
           // Real-content discipline (owner directive 2026-08-29): template
           // hypotheses minted by legacy offline runs stay in the store (audit
           // truth plane) but are NEVER served as scientific objects. Scorecards,
@@ -2359,6 +2456,12 @@ function parseSeedSources(raw: unknown): string | {
           const allHyps = app.store.listObjects('hypothesis', runId);
           const realHyps = allHyps.filter((h) => !isTemplateHypothesis(h));
           const realHypIds = new Set(realHyps.map((h) => h.id));
+          // ACH matrices referencing only template hypotheses follow the same
+          // exclusion (red-team P2-2): an ACH over hypotheses absent from the
+          // served list is not a comparable scientific view.
+          const achAnalysis = achAnalysisRaw !== null && achAnalysisRaw.hypothesisIds.some((id) => realHypIds.has(id))
+            ? achAnalysisRaw
+            : null;
           // HX §15 downstream semantics of claim exclusion: a read-time
           // researcher-adjusted PROJECTION recomputed with the same pure
           // functions the pipeline used (stored AchAnalysis stays untouched;
@@ -2897,6 +3000,7 @@ function parseSeedSources(raw: unknown): string | {
     new Promise((resolve) => {
       if (watchdogTimer !== null) clearInterval(watchdogTimer);
       automationEngine?.stop();
+      terminals.closeAll();
       server.close(() => resolve());
       server.closeIdleConnections();
       server.closeAllConnections();
