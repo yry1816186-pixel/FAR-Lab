@@ -19,6 +19,7 @@ export * from './evidence-strength.js';
 export * from './ach.js';
 export * from './prediction.js';
 export * from './meta.js';
+export * from './theory.js';
 export * from './paper-outline.js';
 export * from './conversation.js';
 export * from './automation.js';

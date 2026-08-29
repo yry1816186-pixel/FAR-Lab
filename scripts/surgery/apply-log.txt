@@ -1,13 +1,8 @@
-===== node scripts/surgery/apply-protocol-export.mjs =====
-[surgery:protocol-export] provenance.ts already carries protocolEvidence — nothing to do
-[surgery:protocol-export] verify.ts already carries the protocol check — nothing to do
-[surgery:protocol-export] export.ts already carries the protocol chain — nothing to do
-[surgery:protocol-export] paper-outline.ts already carries the protocol category — nothing to do
-[surgery:protocol-export] package.ts already writes protocol files — nothing to do
-[surgery:protocol-export] all edits done
-===== node scripts/surgery/apply-protocol-export-fix.mjs =====
-[surgery:protocol-export-fix] declaration block already sits above the limitations array — nothing to do
-===== node scripts/surgery/apply-protocol-export-tests.mjs =====
-[surgery:protocol-export-tests] api count assertion already 15 — nothing to do
-[surgery:protocol-export-tests] paper assertion already lowercase — nothing to do
-APPLY_RC=0
+===== node scripts/surgery/apply-theory-executor.mjs =====
+EDITED src/domain/index.ts
+EDITED src/domain/experiment.ts
+EDITED experiment-runtime/farlab_experiment_runtime/ops.py
+EDITED src/experiment/spec-from-plan.ts
+APPLY-THEORY-FAILED: src/experiment/spec-from-plan.ts: drafter symbol count != 2 (export + return)
+SCRIPT FAILED: apply-theory-executor
+APPLY_RC=1
