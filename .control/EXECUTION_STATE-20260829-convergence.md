@@ -377,3 +377,24 @@ Execution + Auditable Research Record）。本窗口落地：
 2. explore-runtime / explore-web 两测绘 agent 受配额限流未回（8-31 21:01 重置）；
    explore-backend 已交付并折入盘点文档。
 3. StudyMap 问题模型带（UI）未做——数值腿落地后一并（那时有真实内容可显示）。
+
+## 切片 3a 已落地（4ee30c4，main ff）：数值执行腿 FEM
+
+场景 A 执行平面贯通：fem_poisson_2d sidecar op（sympy 精确源项 + P1 混合
+边界装配 + 均匀阶梯 + L2/H1 阶）+ FemSpec 预注册域 + 机械裁决执行器 +
+execute 级联插入（theory 后 protocol 前）+ 9 项测试含真实 sidecar 阶实测
+（混合边界 L2→1.99 / H1→0.99，verdict=supports）。真 bug 一枚被数值验证
+抓住并修复（Neumann 边积分 Gauss 权重复 0.5 → 阶归零）。全量 2251 绿。
+新依赖：experiment-runtime sympy>=1.14（BSD）。
+
+过程教训（登记）：PowerShell 行数组插入/替换在模板字符串（${}）与反引号
+上翻了两次车——FEM 块一度被插进模块文档注释内部且 tsc 照样绿（注释内
+死文本）；靠目检+锚点复查发现并完整修复。教训：涉及模板字符串的代码块
+插入必须走临时文件+单引号 here-string，插入后必须目检锚点上下文。
+
+## 剩余（按杠杆）
+
+1. 切片 3b：自适应网格（Dörfler 标记 + 恢复均衡或保守闭包），场景 A 完整
+   闭环（形式化→弱式→实现→实验→误差/阶→图→解释→复现）的端到端 live run。
+2. CPS-AOSSA-3：NetCDF/xarray 数据族 + QC + DatasetVersion（场景 B 前置）。
+3. StudyMap 问题模型带 + FEM 实验呈现（数值腿有真实内容可显示后）。
