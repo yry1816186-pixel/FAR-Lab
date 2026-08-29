@@ -5,7 +5,7 @@ import os from 'node:os';
 import { openDb, type Db } from '../src/persistence/db.js';
 import { Store } from '../src/persistence/store.js';
 import { openArtifactStore } from '../src/persistence/artifacts.js';
-import { FemSpec, HypothesisCandidate, newId, ResearchQuestion, type FemMeasurement } from '../src/domain/index.js';
+import { FemSpec, HypothesisCandidate, newId, ResearchQuestion, MethodSelection, type FemMeasurement } from '../src/domain/index.js';
 import { executeFemAnalysis } from '../src/experiment/executor-fem.js';
 import { femConvergenceVerdict, femAdaptiveVerdict, checkFemSpec, type FemAdaptiveMeasurement } from '../src/domain/fem.js';
 import { ResearchPlan } from '../src/domain/index.js';
@@ -367,6 +367,66 @@ describe('execute stage routing: the numerical-PDE leg', () => {
     expect(reports).toHaveLength(1);
     expect(reports[0]?.verdict).toBe('supports');
     expect(store.getObject('fem_spec', reports[0]!.experimentRunId) ?? store.listObjects('fem_spec', runId)).toBeTruthy();
+  }, 120_000);
+  it('routes by method selection: scope-rejected families skip their drafts entirely (no wasted model calls)', async () => {
+    const { store, runId, artifacts } = makeEnv();
+    const hyp = makeHyp(runId);
+    store.putObject('hypothesis', hyp);
+    const run = store.getRun(runId)!;
+    const question = store.getObject('question', run.questionId)!;
+    const sel = MethodSelection.parse({
+      id: newId('msel'), runId, questionId: question.id, forObjectiveId: 'obj1',
+      candidates: [
+        { family: 'numerical_simulation', assessment: 'selected', rationale: 'a well-posed elliptic boundary-value verification', validationPlan: 'observed convergence order vs theory-fixed P1 rates' },
+        { family: 'machine_learning', assessment: 'rejected_inappropriate', rationale: 'no labeled tabular dataset exists for this question' },
+        { family: 'statistical_inference', assessment: 'rejected_inappropriate', rationale: 'no published effect estimates to pool' },
+        { family: 'analytic_symbolic', assessment: 'rejected_inappropriate', rationale: 'not a closed-form identity claim' },
+      ],
+      decidedBy: 'model_proposed', createdAt: T0, // fixture stands in for the scope stage's decision
+    });
+    store.putObjectEvented('method_selection', sel, { type: 'note', detail: { subject: 'fixture' } }, T0);
+    const plan = ResearchPlan.parse({
+      id: newId('pln'), runId,
+      objective: 'Verify that a P1 finite-element solver with mixed Dirichlet/Neumann assembly converges at optimal order.',
+      hypothesisIds: [hyp.id],
+      steps: [{
+        id: newId('task'), title: 'solve the Poisson problem and measure convergence', kind: 'simulation',
+        method: 'finite-element discretization of the elliptical weak form with a manufactured solution and refinement ladder',
+        failureConditions: ['observed order below the theoretical rate'],
+      }],
+      metrics: ['fem_l2_error_final_level'],
+      decisionRules: {
+        successCriterion: 'L2/H1 orders within tolerance of 2/1',
+        weakeningCriterion: 'orders near the falsification band',
+        falsificationCriterion: 'an order entirely lost or non-decreasing errors',
+        stopCriterion: 'ladder evaluated once',
+      },
+      createdAt: T0,
+    });
+    store.putObject('plan', plan);
+    // ONLY the selected family's draft is scripted: any experiment-spec/meta/theory
+    // draft call would hit the empty sequential cursor and throw 'script exhausted'.
+    const provider = createTestStubProvider([
+      {
+        forPurpose: 'fem-spec-draft',
+        rawOutput: JSON.stringify({
+          feasible: true,
+          manufacturedSolution: 'sin(pi*x)*sin(pi*y) + x*x*y + 0.5*x',
+          boundary: { bottom: 'dirichlet', top: 'neumann', left: 'dirichlet', right: 'neumann' },
+        }),
+      },
+    ], { asLive: true });
+    const ctx: StageContext = {
+      run, store, artifacts, provider, productRun: true,
+      cancelled: () => false, disowned: () => false, log: () => {}, recordReceipt: () => {},
+      checkpointed: async <T>(_s: string, _f: string, _k: string, _fp: string | undefined, fn: () => Promise<T>): Promise<T> => fn(),
+    };
+    const out = await executeStage.execute(ctx);
+    expect(out.kind).toBe('done');
+    const routing = store.listEvents(runId).filter((e) => (e.detail as Record<string, unknown>).subject === 'method_selection_routing');
+    expect(routing.length).toBeGreaterThanOrEqual(3); // dataset + meta + theory legs routed out, honestly noted
+    const femRuns = store.listObjects('experiment_run', runId).filter((r) => r.status === 'completed');
+    expect(femRuns).toHaveLength(1);
   }, 120_000);
 });
 

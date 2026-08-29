@@ -1,5 +1,5 @@
 import type { StageContext, StageHandler, StageOutcome } from '../types.js';
-import { ExperimentSpec, newId, newProtocolExecution, ProtocolSpec } from '../../domain/index.js';
+import { ExperimentSpec, newId, newProtocolExecution, ProtocolSpec, type MethodFamily } from '../../domain/index.js';
 import type { ResearchPlan } from '../../domain/plan.js';
 import { draftSpecFromPlan, draftMetaSpecFromPlan } from '../../experiment/spec-from-plan.js';
 import { draftTheorySpecFromPlan, draftFemSpecFromPlan } from '../../experiment/spec-from-plan.js';
@@ -81,6 +81,32 @@ export const executeStage: StageHandler = {
       return { kind: 'skipped', reason: 'question object missing — cannot draft an experiment spec' };
     }
 
+    // Method-selection routing (AOSSA, run_fq3rdff1 evidence): when the run
+    // carries method selections, a family the scope stage explicitly REJECTED
+    // does not get its leg drafted — the draft call is skipped (an honest note
+    // records it), and the cascade falls straight to the selected families'
+    // legs. Legs whose families were never mentioned stay reachable (viable
+    // alternatives are not rejections). Pre-AOSSA runs carry no selections and
+    // keep the fixed order unchanged.
+    const methodSelections = ctx.store.listObjects('method_selection', ctx.run.id);
+    const rejectedFamilies = new Set(
+      methodSelections.flatMap((s) => s.candidates.filter((c) => c.assessment === 'rejected_inappropriate').map((c) => c.family)),
+    );
+    const routeSkip = (legName: string, families: MethodFamily[]): boolean => {
+      if (methodSelections.length === 0 || families.length === 0) return false;
+      if (!families.every((f) => rejectedFamilies.has(f))) return false;
+      ctx.store.appendEvent(ctx.run.id, {
+        type: 'note',
+        stage: 'execute',
+        detail: {
+          subject: 'method_selection_routing',
+          leg: legName,
+          rejectedFamilies: families,
+          reason: 'every family behind this leg was assessed rejected_inappropriate at scope time — draft skipped, not silently retried',
+        },
+      });
+      return true;
+    };
     // 1. Draft (LLM proposes inside a closed space; deterministic validation
     //    happens inside executeExperiment before any resource is spent). The plane
     //    carries the run's budget + lease-aware receipt sink so drafting is governed
@@ -91,12 +117,17 @@ export const executeStage: StageHandler = {
       recordReceipt: ctx.recordReceipt,
       runId: ctx.run.id,
     };
-    const draft = await draftSpecFromPlan(plan, question.text, plane);
-    if (draft.kind === 'skip') {
+    let draft: Awaited<ReturnType<typeof draftSpecFromPlan>> | undefined;
+    if (!routeSkip('dataset (tabular EEL)', ['machine_learning'])) {
+      draft = await draftSpecFromPlan(plan, question.text, plane);
+    }
+    if (draft === undefined || draft.kind === 'skip') {
       // W-F M4: literature-type plans fall through to the statistical_meta path —
       // pooling published effect estimates is their honest experiment, closing the
       // falsification loop for medicine-style questions that map to no dataset.
-      const metaDraft = await draftMetaSpecFromPlan(plan, question.text, plane);
+        let metaDraft: Awaited<ReturnType<typeof draftMetaSpecFromPlan>> | undefined;
+      if (!routeSkip('statistical_meta', ['statistical_inference'])) {
+      metaDraft = await draftMetaSpecFromPlan(plan, question.text, plane);
       if (metaDraft.kind === 'meta') {
         try {
           const executed = await executeMetaAnalysis(ctx.store, ctx.artifacts, metaDraft.spec, {
@@ -124,12 +155,15 @@ export const executeStage: StageHandler = {
         }
       }
 
+      }
       // Slice-5 theory leg: plans whose falsifiable content is a claimed
       // closed-form identity get a NUMERICAL verification experiment on a
       // preregistered grid (spec -> hash binding -> sidecar identity_check ->
       // mechanical verdict), instead of falling straight to the human protocol.
       // Honestly disclosed as a numerical spot-check, never a symbolic proof.
-      const theoryDraft = await draftTheorySpecFromPlan(plan, question.text, plane);
+        let theoryDraft: Awaited<ReturnType<typeof draftTheorySpecFromPlan>> | undefined;
+      if (!routeSkip('theory_identity', ['analytic_symbolic'])) {
+      theoryDraft = await draftTheorySpecFromPlan(plan, question.text, plane);
       if (theoryDraft.kind === 'theory') {
         try {
           refuseTemplateMode(ctx, theoryDraft.executionMode, 'theory draft');
@@ -152,12 +186,14 @@ export const executeStage: StageHandler = {
         }
       }
 
+      }
       // Slice-6 numerical-PDE leg: plans whose discriminating content is an
       // elliptic boundary-value verification get a FEM convergence experiment
       // (manufactured solution -> sympy-exact forcing -> P1 mixed-boundary
       // assembly -> refinement ladder -> mechanical order verdict), instead of
       // falling straight to the human protocol. Honestly scoped: uniform P1
       // refinement on the unit square, not a solver certification.
+      if (!routeSkip('numerical_pde', ['numerical_simulation'])) {
       const femDraft = await draftFemSpecFromPlan(plan, question.text, plane);
       if (femDraft.kind === 'fem' && femDraft.spec !== undefined) {
         try {
@@ -188,6 +224,7 @@ export const executeStage: StageHandler = {
         }
       }
 
+      }
       // Protocol fallback (paradigm-honest execution): the computational legs are
       // unavailable, so the real-world legs get their frozen preregistration.
       const existing = protocolForPlan(ctx.store, ctx.run.id, plan);
@@ -211,12 +248,12 @@ export const executeStage: StageHandler = {
       } catch (e) {
         if (e instanceof TemplateModeRefusal) return { kind: 'skipped', reason: e.message };
         if (e instanceof ProtocolDraftSkipped) {
-          return { kind: 'skipped', reason: `tabular: ${draft.reason}; literature-pool: ${metaDraft.reason}; theory: ${theoryDraft.reason}; protocol: ${e.reason}` };
+          return { kind: 'skipped', reason: `tabular: ${draft?.kind === "skip" ? draft.reason : "routed out by method selection"}; literature-pool: ${metaDraft?.kind === "skip" ? metaDraft.reason : "routed out by method selection"}; theory: ${theoryDraft?.kind === "skip" ? theoryDraft.reason : "routed out by method selection"}; protocol: ${e.reason}` };
         }
         if (e instanceof RunBudgetExhaustedError) throw e;
         return {
           kind: 'skipped',
-          reason: `tabular: ${draft.reason}; literature-pool: ${metaDraft.reason}; theory: ${theoryDraft.reason}; protocol: drafting failed (${(e instanceof Error ? e.message : String(e)).slice(0, 180)})`,
+          reason: `tabular: ${draft?.kind === "skip" ? draft.reason : "routed out by method selection"}; literature-pool: ${metaDraft?.kind === "skip" ? metaDraft.reason : "routed out by method selection"}; theory: ${theoryDraft?.kind === "skip" ? theoryDraft.reason : "routed out by method selection"}; protocol: drafting failed (${(e instanceof Error ? e.message : String(e)).slice(0, 180)})`,
         };
       }
       const registered = ProtocolSpec.parse({
