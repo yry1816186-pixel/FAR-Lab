@@ -179,7 +179,7 @@ export async function protocolCommand(sub: string | undefined, o: ProtocolComman
       if (runId === undefined || !RUN_ID_RE.test(runId)) {
         return { code: 2, text: `far protocol show requires a run id (run_<26-char id>)\n${USAGE}` };
       }
-      return show(o, runId);
+      return await show(o, runId);
     }
     if (sub === 'record') {
       const runId = o.positional;
@@ -190,7 +190,7 @@ export async function protocolCommand(sub: string | undefined, o: ProtocolComman
       if (kind === undefined || !isKind(kind)) {
         return { code: 2, text: `far protocol record requires --kind <${KINDS.join('|')}>\n${USAGE}` };
       }
-      return record(o, runId, kind);
+      return await record(o, runId, kind);
     }
     return { code: 2, text: USAGE };
   } catch (e) {
