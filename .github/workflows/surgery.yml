@@ -1,15 +1,12 @@
 name: surgery
 
-# Remote-surgery patch plane. Diagnostics mode while slice 2 iterates:
-# triggers ONLY on the dedicated marker file below (not on workflow edits,
-# not on source pushes) so the diagnose job has a quiet window to commit its
-# snapshot without push races. Neutralized to workflow_dispatch-only before
-# the merge (see scripts/surgery/README.md).
+# Remote-surgery patch plane — DORMANT after slice 2 (workflow_dispatch only):
+# the branch-scoped push trigger (marker-file diagnostics mode used to iterate
+# this slice) is removed before the merge so main never auto-runs the patch
+# plane. Revive per-slice on a converge/** branch when the anchored-patch loop
+# is needed again (see scripts/surgery/README.md). Never trigger on pull_request.
 on:
   workflow_dispatch:
-  push:
-    branches: ['converge/web-protocol']
-    paths: ['scripts/surgery/.diag-trigger']
 
 permissions:
   contents: write

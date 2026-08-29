@@ -53,12 +53,31 @@
    无效体 400、QC 失败值保留）——补上 #132 登记的 HTTP e2e 留白
 5. 手术 workflow 分支作用域重启用→本切片末位重新休眠（仅 workflow_dispatch）
 
+## 切片 2 迭代史（诚实，含本会话自误）
+
+1. **根因一（诊断 #16 裁决）**：夹具用 newId('tsk') 铸出 tsk_…，而 ids.ts
+   ID_PREFIX.task='task'（TaskId 要求 ^task_…）→ seedProtocol 的
+   ProtocolSpec.parse 直接抛 ZodError，两个 HTTP 契约测试从未跑到断言。
+   修复：newId('task')×2。
+2. **根因二（我的一次反向误改）**：修复一时误把 409 的 error.code 期望从
+   'validation' 改成 'state_conflict'——只读了 protocol-ops.ts 的内部错误码，
+   没读 api.ts 路由层的公开词表收敛（apply-api-protocol.mjs 铁证：
+   `code: e.code === 'state_conflict' ? 'validation' : e.code`，状态码 409 不变）。
+   修复：改回 'validation' 并在断言处注明两层契约差异。教训：HTTP 契约以路由层为准。
+3. **取证污染教训**：GitHub Actions 列表页对未登录视图存在分钟级滞后（同一页
+   混合新旧渲染），期间我据“完成时长 2m26-2m50”误判多轮绿失败；裁决一律以
+   SHA 锁定的 diag.txt / 无扰动完成的 run 为准。
+4. **诊断 #17 裁决（3d26979，即本树）**：typecheck 干净、lint 0 错误、
+   全量 vitest 216 文件 2205 通过 + 7 诚实跳过 + 0 失败——含 protocol-api
+   两个 HTTP 契约测试与 protocol-web/protocol-ops 全部用例。
+
 ## 验证状态（诚实）
 
 - 切片 1：全量绿（见上）+ 311f4a7 ci verify succeeded
-- 切片 2：最终裁决以 head ci 全绿为准（含 web-e2e/release-pack）
-- 迭代历史：中途 lint 解析错误（手术脚本语法、band 错位）已修；
-  两次 diagnose 提交与我推送竞态失败（cosmetic，不影响代码）
+- 切片 2：诊断 #17 全绿（见上）；最终合并门=末位休眠提交的 head ci 全绿
+  （含 web build/web-e2e/path-hygiene 等 ci-only 阶段；本提交即末位，此后无推送）
+- 中途 lint 解析错误（手术脚本语法、band 错位）已修；诊断提交竞态已由
+  stash 后重 add 修复（ff1aaad）
 
 ## 登记未做（后续切片，非本 PR 声称范围）
 
@@ -67,6 +86,8 @@
 - 导出链：协议+台账入 bundle（verify 项）与论文 limitations 投影
 - 范式覆盖深化：theory（CAS 集成）、archive（登记库检索接口）
 - 手术 workflow 在 main 保持休眠（本切片末位已重新休眠）
+- 既有 cosmetic：tests/memory-live-check.test.ts 三条 unused eslint-disable 警告
+  （main 上既有，非本切片引入）
 
 ## 用户侧不变
 
