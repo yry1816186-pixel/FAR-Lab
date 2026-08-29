@@ -197,6 +197,18 @@ const DIVERSITY_DISCIPLINE =
   'Respond only with JSON matching the required schema.';
 
 /**
+ * AOSSA: hypotheses are generated UNDER the run's Scientific Problem Model when one
+ * exists (the scope stage forms it before this stage ever runs; pre-AOSSA runs carry
+ * none — absent, never fabricated).
+ */
+const PROBLEM_MODEL_DISCIPLINE =
+  'Problem-model discipline: when the payload carries question.problemModel, every hypothesis must address ' +
+  'at least one of its objectives, use its variables by name where applicable, and stay inside the scope its ' +
+  'data inventory actually supports. If its selected method families exclude hypothesis-style reasoning ' +
+  '(e.g. only numerical_simulation was selected), derive candidates that operationalize the objective for ' +
+  'those methods — never free speculation beyond the problem model.';
+
+/**
  * Cross-strategy negative conditioning (Wave-5 F4; mechanism learned from AI-Scientist-v2's
  * iterative ideation — full history visible + explicit differentiation demand — and Kaimen's
  * evolution-operator taxonomy, both clean-room paraphrased): strategy calls after the first
@@ -468,12 +480,27 @@ export const generateHypothesesStage: StageHandler = {
 
     const warnings: string[] = [];
     let raws: RawCandidate[] = [];
+    // AOSSA disclosure: the run's problem model + selected method families ride
+    // every strategy prompt (rides strategyInputs, so a changed model invalidates
+    // the family cache).
+    const problemModel = ctx.store.listObjects('problem_model', ctx.run.id)[0];
+    const problemModelForPrompt =
+      problemModel === undefined
+        ? null
+        : {
+            objectives: problemModel.objectives,
+            variables: problemModel.variables,
+            selectedMethods: ctx.store
+              .listObjects('method_selection', ctx.run.id)
+              .flatMap((s) => s.candidates.filter((cd) => cd.assessment === 'selected').map((cd) => cd.family)),
+          };
     const questionForPrompt = {
       text: question.text,
       background: question.background,
       goalType: question.goalType,
       domain: question.scope.domain,
       phenomena: question.scope.phenomena,
+      ...(problemModelForPrompt !== null ? { problemModel: problemModelForPrompt } : {}),
     };
     // RU-1 memory consumer #1: past OWN outcomes condition generation (failed
     // experiments must not be re-proposed blind). Deterministic retrieval ONCE
@@ -541,17 +568,16 @@ export const generateHypothesesStage: StageHandler = {
         ? { regenerationCritique: { reasons: critique.reasons, weakDimensions: critique.weakDimensions, priorStatements } }
         : {}),
     });
-    // Family key rc2 (2026-08-29): pre-guard caches carry no executionMode and
-    // would replay template-era generations unguarded (red-team P2-1); the bump
-    // orphans them — in-flight generation re-runs once, honestly.
+    // Family key rc3 (2026-08-30): rc2 predates the problem-model prompt projection;
+    // the bump orphans caches whose prompts carried no problemModel field.
     let res: { provider: string; modelId: string; executionMode: 'live' | 'test'; data: z.infer<typeof StrategyOut> };
     try {
-      res = await ctx.checkpointed('generate_hypotheses', 'strategies-rc2', `strategy:${def.strategy}:r${round}`, strategyInputs, () =>
+      res = await ctx.checkpointed('generate_hypotheses', 'strategies-rc3', `strategy:${def.strategy}:r${round}`, strategyInputs, () =>
         callStructured<z.infer<typeof StrategyOut>>(ctx, {
           stage: 'generate_hypotheses',
           purpose: def.purpose,
           systemPrompt:
-            `${def.instruction}${antiRepetitionInstruction(raws.length)} ${DIVERSITY_DISCIPLINE}` +
+            `${def.instruction}${antiRepetitionInstruction(raws.length)} ${DIVERSITY_DISCIPLINE} ${PROBLEM_MODEL_DISCIPLINE}` +
             (regeneration && critique !== null
               ? ' REGENERATION ROUND: a previous hypothesis set was judged WEAK by deterministic quality gates ' +
                 `(${critique.reasons.join('; ')}). Propose hypotheses that materially differ in mechanism from ` +
@@ -1092,3 +1118,4 @@ export const generateHypothesesStage: StageHandler = {
     return { kind: 'done', summary: parts.join(' ') };
   },
 };
+

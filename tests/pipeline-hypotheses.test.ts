@@ -11,6 +11,7 @@ import {
   newId,
 } from '../src/domain/index.js';
 import { MemoryItemSchema } from '../src/domain/memory.js';
+import { ScientificProblemModel, MethodSelection } from '../src/domain/problem-model.js';
 import type { RunId } from '../src/domain/index.js';
 import type { StageContext } from '../src/pipeline/types.js';
 import { createTestStubProvider, type StubStep } from '../src/providers/test-stub.js';
@@ -322,6 +323,59 @@ describe('generate_hypotheses stage', () => {
 
     // regeneration is not applicable once hypotheses exist
     expect(await generateHypothesesStage.applicable({ ...ctx, run: { ...ctx.run } })).toBe(false);
+  });
+
+  it(`AOSSA: strategy prompts carry the run problem model + selected method families (absent runs stay clean)`, async () => {
+    const { store, run } = setup();
+    const q = store.getObject('question', run.questionId);
+    if (q === null) throw new Error('test setup: question missing');
+    const clmA = makeClaim(run.id, 'claim A: off-target deamination is motif-dependent');
+    store.putObject('claim', clmA);
+    const now = new Date().toISOString();
+    store.putObject('problem_model', ScientificProblemModel.parse({
+      id: newId('pmod'), runId: run.id, questionId: q.id,
+      objectives: [{ id: 'obj1', statement: 'identify the deamination mechanism' }],
+      variables: [{ name: 'off-target rate', role: 'dependent', unit: 'per site', valueType: 'numeric' }],
+      formalization: { problemClass: 'none_stated', governingRelations: [], boundaryConditions: [], wellPosednessNotes: [] },
+      dataInventory: [], statisticalPremises: { assumptions: [], causalClaims: [] }, metrics: [],
+      stopConditions: ['decision rule evaluated once'], unknowns: [],
+      provenance: { formedBy: 'model_proposed' }, createdAt: now, updatedAt: now,
+    }));
+    store.putObject('method_selection', MethodSelection.parse({
+      id: newId('msel'), runId: run.id, questionId: q.id, forObjectiveId: 'obj1',
+      candidates: [
+        { family: 'retrieval_synthesis', assessment: 'selected', rationale: 'evidential question across literature', validationPlan: 'verbatim claim binding + counter-evidence search' },
+        { family: 'machine_learning', assessment: 'rejected_inappropriate', rationale: 'no labeled dataset for editing outcomes' },
+      ],
+      decidedBy: 'model_proposed', createdAt: now,
+    }));
+    const steps: StubStep[] = [
+      { rawOutput: gen(cand('E1'), cand('E2')) },
+      { rawOutput: gen(cand('C1'), cand('C2')) },
+      { rawOutput: gen(cand('M1'), cand('M2')) },
+      { rawOutput: JSON.stringify({ clusters: [{ memberIndices: [0], reason: 'identity' }, { memberIndices: [1], reason: 'identity' }, { memberIndices: [2], reason: 'identity' }, { memberIndices: [3], reason: 'identity' }, { memberIndices: [4], reason: 'identity' }, { memberIndices: [5], reason: 'identity' }] }) },
+      { rawOutput: JSON.stringify({ labels: [{ index: 0, noveltyLabel: 'mixed' }] }) },
+    ];
+    const capture = { reqs: [] as StructuredCallRequest[] };
+    const { ctx } = makeCtx(run, store, steps, { capture });
+    const outcome = await generateHypothesesStage.execute(ctx);
+    expect(outcome.kind).toBe('done');
+    const purposes = [
+      'hypothesis-search:evidence-conditioned',
+      'hypothesis-search:contradiction-driven',
+      'hypothesis-search:mechanism-driven',
+    ];
+    for (const p of purposes) {
+      const r = capture.reqs.find((x) => x.task === p);
+      expect(r, `strategy ${p} was called`).toBeDefined();
+      const input = ((r?.userPayload as { input?: Record<string, unknown> })?.input ?? {}) as {
+        question?: { problemModel?: { objectives?: unknown[]; variables?: unknown[]; selectedMethods?: string[] } } };
+      expect(input.question?.problemModel, `${p} payload carries the problem model`).toBeDefined();
+      expect(input.question?.problemModel?.selectedMethods).toEqual(['retrieval_synthesis']);
+    }
+    // system prompt carries the discipline
+    const sysPrompt = String(capture.reqs.find((x) => x.task === 'hypothesis-search:evidence-conditioned')?.systemPrompt ?? '');
+    expect(sysPrompt).toContain('Problem-model discipline');
   });
 
   it('W5-F4: later strategy calls see previouslyProposed negative conditioning; first does not', async () => {
@@ -1701,3 +1755,5 @@ describe('generate_hypotheses — RU-1 memory conditioning', () => {
     expect(outcome.kind === 'done' ? outcome.summary : '').not.toMatch(/memory conditioning/);
   });
 });
+
+

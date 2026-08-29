@@ -61,6 +61,8 @@ Honest statement of the two structural gaps this plan closes:
 | UI | **KEEP spine, ADD surfaces** | StudyMap spine (evidence/hypotheses/state band/actions/revisions/graph) is the audited core (IA-DECISIONS 2026-08-29). ADD later increments: problem-model/method-selection disclosure on the map; dataset/QC surfaces for scenario B. Terminal = global panel (879cea1), conversation = dock. |
 | Eval | **KEEP + EXTEND** | W4R baseline contrast, rediscovery, adjudication-accuracy instruments exist (eval/). EXTEND: scenario A/B/C runs enter the same predeclared-metric discipline; no cherry-picking. |
 
+Post-exploration FACT amendments (backend inventory, 2026-08-30): conclusion grading already exists as layered enums (5-class ExperimentVerdict, 9-band log-LR, Carneades proof standards, ScientificStateKind) — CPS-AOSSA-5 is a UNIFICATION task, not a build-from-zero; SimulationSpec (Monte-Carlo CRN) has a real executor but is CLI-only and outside the execute cascade — the numerical leg (CPS-AOSSA-2) should ride the same pattern (sidecar op + deterministic executor + mechanical verdict); the multimodal ingest lane (ingest/dataset.ts) is NOT bridged into EEL dataset_records — confirms the data-plane disposition; objects-table history is INSERT-OR-REPLACE current-state with append-only events (stateAtSeq discloses the limit) — DatasetVersion must lean on events + content-addressed archives, not table history.
+
 DELETE list: nothing load-bearing identified at this pass beyond what the
 2026-08-29 real-content purge already removed (template content in exports,
 demo wording, test-double as product route). Remaining registered cleanups
@@ -127,3 +129,4 @@ lands (file under active edit; do not double-write). Semantics decided here:
 - This lane: problem-model domain file (new), scope-stage extension, later the
   map surface. Shared-file edits (domain/index.ts, ids.ts) wait for the
   sibling commit.
+

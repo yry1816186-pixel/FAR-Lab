@@ -316,3 +316,45 @@ ci (pull_request) 于 29e3f56 全绿（verify success 8m13s，零失败注解）
 
 - B-QWEN-LIVE-ROUTE：DASHSCOPE_API_KEY（比赛路线 live receipt）仍 OPEN
 - B-S1-TECHNICAL-PDF：待用户审阅
+
+---
+
+# AOSSA 收敛重构会话（2026-08-30 凌晨，goal 接管）
+
+接管指令：收敛为 AOSSA 科研操作环境（Scientific Second Brain + Research
+Execution + Auditable Research Record）。本窗口落地：
+
+## 已完成（6c769ae，main ff-merge 经 aossa/problem-model 分支）
+
+- **系统盘点落 canonical**：`project-spec/AOSSA-CONVERGENCE-PLAN.md` —— 七层
+  KEEP/REDESIGN/DELETE 处置 + 两个结构缺口定性（LLM-first 无问题模型/方法选择；
+  执行面仅表格 ML 无数值腿）+ 五项 CPS + 场景 A/B/C 映射。
+- **CPS-AOSSA-1 第一切片落地**：`src/domain/problem-model.ts`（Scientific
+  ProblemModel + MethodSelection + Draft 闭空间；12 方法族闭枚举对齐真实可路由
+  面；selected 强制 validationPlan；确定性 id/交叉引用/超Refine 校验）+
+  scope 阶段第二次结构化调用铸成（putObjectEvented + note 审计）+ product run
+  上 test 模式拒绝（真实内容纪律延续）+ test-double purpose handler +
+  测试（域 14 + scope 集成 + 双调用契约适配）。
+- 门禁：root tsc 0 / eslint 0 err / vitest 2238+4skip（agent-mcp 超时一次为
+  全量负载 flake，隔离 7/7 绿；executor-theory 同型前例）/ build 绿 /
+  web tsc+build 绿 / cli-spawn 12/12。D-031 守卫路径被真实演练（src 晚于
+  dist 的 lint 修复触发拦截，重建后绿）。
+
+## 车道协调（本窗口实录）
+
+- 并发会话同树活跃：test-double 隔离（879cea1）→ protocol 子系统（staged 落
+  b300775/1d2ea53/63f26d1）→ 中途把 HEAD 从 min 切到 main（我的提交按
+  branch→ff-merge 惯例落 main）。protocol/theory/execute/export/StudyMap/
+  dict/api/store 为其车道，本窗口未触碰（problem-model 注册涉及的
+  ids/index/store 三处为加法式注册，无语义冲突）。
+- 3 个 Explore 测绘 agent（backend/runtime/web）派发后超 1h 未回；已 SendMessage
+  催收 backend 报告。盘点文档的 runtime/eval/web 节基于主线程直读证据
+  （experiment-runtime venv、eval/、scripts/、src 逐文件），报告送达后再补强。
+
+## 下一步（按杠杆排序）
+
+1. CPS-AOSSA-1 第二切片：下游披露——plan/hypotheses 载荷携带已选方法族与
+   目标引用（disclosure first，再收紧为引用完整性）；StudyMap 增问题模型带。
+2. CPS-AOSSA-2：数值执行腿——sidecar 增 FEM/ODE op（收敛阶验证为 validator），
+   场景 A（2D Poisson 混合边界）贯通。
+3. CPS-AOSSA-3：NetCDF/xarray 数据族 + QC + 派生版本 lineage，场景 B 前置。

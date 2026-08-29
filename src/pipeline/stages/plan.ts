@@ -58,6 +58,11 @@ const PLAN_SYSTEM_PROMPT = [
     'and measurable/estimand/controlRun one-liners when applicable. Thresholds must follow the metric direction (a higher_better ' +
     'metric succeeds at ">= threshold" and weakens/excludes at "<= threshold"). Leave a field absent rather than fabricating it — ' +
     'absence is disclosed, fabrication is not tolerated.',
+  'Problem-model alignment (AOSSA): when the payload carries problemModel, its objectives are the ground ' +
+    'truth for what the plan must discriminate and its selectedMethods are the method families chosen for this ' +
+    'objective — plan steps must operate INSIDE those families (a numerical_simulation selection means solver ' +
+    'steps with discretization-error analysis, not a literature screen). Deviating from a selected family is ' +
+    'legal only as an explicitly justified additional lane recorded in risks.',
 ].join(' ');
 
 /** Model-output shape: the full plan minus server-owned fields (id/runId/createdAt/check). */
@@ -323,6 +328,21 @@ async function planExecute(ctx: Parameters<NonNullable<StageHandler['execute']>>
             priorResearchMemory: priorOutcomes,
           }
         : {}),
+      // AOSSA: the run's problem model rides the plan payload — objectives ground
+      // what to discriminate; selected families constrain step methods.
+      ...(() => {
+        const pm = ctx.store.listObjects('problem_model', ctx.run.id)[0];
+        if (pm === undefined) return {};
+        return {
+          problemModel: {
+            objectives: pm.objectives,
+            variables: pm.variables,
+            selectedMethods: ctx.store
+              .listObjects('method_selection', ctx.run.id)
+              .flatMap((s) => s.candidates.filter((cd) => cd.assessment === 'selected').map((cd) => cd.family)),
+          },
+        };
+      })(),
       rules: { minSteps: MIN_STEPS, minMetrics: MIN_METRICS },
     };
 
