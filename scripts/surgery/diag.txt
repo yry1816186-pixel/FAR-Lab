@@ -1,6 +1,6 @@
 ===== tui install (last 20 lines) =====
 
-added 39 packages, and audited 40 packages in 2s
+added 39 packages, and audited 40 packages in 1s
 
 23 packages are looking for funding
   run `npm fund` for details
@@ -9,7 +9,7 @@ found 0 vulnerabilities
 
 ===== desktop install (last 20 lines) =====
 
-added 3 packages, and audited 4 packages in 791ms
+added 3 packages, and audited 4 packages in 589ms
 
 1 package is looking for funding
   run `npm fund` for details
@@ -21,18 +21,12 @@ found 0 vulnerabilities
 > far-lab@0.1.0 build
 > tsc -p tsconfig.json
 
-src/experiment/executor-theory.ts(74,19): error TS2345: Argument of type '"theory_spec"' is not assignable to parameter of type 'ObjectKind'.
-src/experiment/executor-theory.ts(183,21): error TS1361: 'FeedbackSignal' cannot be used as a value because it was imported using 'import type'.
-BUILD_FAILED
 
 ===== typecheck (last 30 lines) =====
 
 > far-lab@0.1.0 typecheck
 > tsc -p tsconfig.json --noEmit
 
-src/experiment/executor-theory.ts(74,19): error TS2345: Argument of type '"theory_spec"' is not assignable to parameter of type 'ObjectKind'.
-src/experiment/executor-theory.ts(183,21): error TS1361: 'FeedbackSignal' cannot be used as a value because it was imported using 'import type'.
-TYPECHECK_FAILED
 
 ===== lint (last 30 lines) =====
 
@@ -40,284 +34,323 @@ TYPECHECK_FAILED
 > eslint .
 
 
-/home/runner/work/FAR-Lab/FAR-Lab/scripts/surgery/apply-theory-executor.mjs
-  404:11  error  'OLD_KIND' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
-
 /home/runner/work/FAR-Lab/FAR-Lab/tests/memory-live-check.test.ts
   23:3  warning  Unused eslint-disable directive (no problems were reported from 'no-console')
   38:3  warning  Unused eslint-disable directive (no problems were reported from 'no-console')
   48:5  warning  Unused eslint-disable directive (no problems were reported from 'no-console')
 
-✖ 4 problems (1 error, 3 warnings)
+✖ 3 problems (0 errors, 3 warnings)
   0 errors and 3 warnings potentially fixable with the `--fix` option.
 
-LINT_FAILED
 
 ===== FULL vitest (last 400 lines) =====
-#5 17.49 Setting up libbinutils:amd64 (2.40-2) ...
-#5 17.49 Setting up libfido2-1:amd64 (1.12.0-2+b1) ...
-#5 17.49 Setting up libisl23:amd64 (0.25-1.1) ...
-#5 17.49 Setting up libc-dev-bin (2.36-9+deb12u14) ...
-#5 17.50 Setting up libbsd0:amd64 (0.11.7-2) ...
-#5 17.50 Setting up readline-common (8.2-1.3) ...
-#5 17.50 Setting up libcc1-0:amd64 (12.2.0-14+deb12u1) ...
-#5 17.51 Setting up liblsan0:amd64 (12.2.0-14+deb12u1) ...
-#5 17.51 Setting up libitm1:amd64 (12.2.0-14+deb12u1) ...
-#5 17.51 Setting up libjs-underscore (1.13.4~dfsg+~1.11.4-3) ...
-#5 17.52 Setting up libctf0:amd64 (2.40-2) ...
-#5 17.52 Setting up liblapack3:amd64 (3.11.0-2) ...
-#5 17.52 update-alternatives: using /usr/lib/x86_64-linux-gnu/lapack/liblapack.so.3 to provide /usr/lib/x86_64-linux-gnu/liblapack.so.3 (liblapack.so.3-x86_64-linux-gnu) in auto mode
-#5 17.52 Setting up cpp-12 (12.2.0-14+deb12u1) ...
-#5 17.53 Setting up libopenblas0-pthread:amd64 (0.3.21+ds-4) ...
-#5 17.53 update-alternatives: using /usr/lib/x86_64-linux-gnu/openblas-pthread/libblas.so.3 to provide /usr/lib/x86_64-linux-gnu/libblas.so.3 (libblas.so.3-x86_64-linux-gnu) in auto mode
-#5 17.53 update-alternatives: using /usr/lib/x86_64-linux-gnu/openblas-pthread/liblapack.so.3 to provide /usr/lib/x86_64-linux-gnu/liblapack.so.3 (liblapack.so.3-x86_64-linux-gnu) in auto mode
-#5 17.53 update-alternatives: using /usr/lib/x86_64-linux-gnu/openblas-pthread/libopenblas.so.0 to provide /usr/lib/x86_64-linux-gnu/libopenblas.so.0 (libopenblas.so.0-x86_64-linux-gnu) in auto mode
-#5 17.54 Setting up libedit2:amd64 (3.1-20221030-2) ...
-#5 17.54 Setting up libreadline8:amd64 (8.2-1.3) ...
-#5 17.54 Setting up libgprofng0:amd64 (2.40-2) ...
-#5 17.54 Setting up libgcc-12-dev:amd64 (12.2.0-14+deb12u1) ...
-#5 17.55 Setting up libgssapi-krb5-2:amd64 (1.20.1-2+deb12u5) ...
-#5 17.55 Setting up ucf (3.0043+nmu1+deb12u1) ...
-#5 17.62 debconf: unable to initialize frontend: Dialog
-#5 17.62 debconf: (TERM is not set, so the dialog frontend is not usable.)
-#5 17.62 debconf: falling back to frontend: Readline
-#5 17.62 debconf: unable to initialize frontend: Readline
-#5 17.62 debconf: (Can't locate Term/ReadLine.pm in @INC (you may need to install the Term::ReadLine module) (@INC contains: /etc/perl /usr/local/lib/x86_64-linux-gnu/perl/5.36.0 /usr/local/share/perl/5.36.0 /usr/lib/x86_64-linux-gnu/perl5/5.36 /usr/share/perl5 /usr/lib/x86_64-linux-gnu/perl-base /usr/lib/x86_64-linux-gnu/perl/5.36 /usr/share/perl/5.36 /usr/local/lib/site_perl) at /usr/share/perl5/Debconf/FrontEnd/Readline.pm line 7.)
-#5 17.62 debconf: falling back to frontend: Teletype
-#5 17.64 Setting up libjs-sphinxdoc (5.3.0-4) ...
-#5 17.64 Setting up libopenblas0:amd64 (0.3.21+ds-4) ...
-#5 17.64 Setting up cpp (4:12.2.0-3) ...
-#5 17.65 Setting up liblbfgsb0:amd64 (3.0+dfsg.4-1) ...
-#5 17.65 Setting up binutils-x86-64-linux-gnu (2.40-2) ...
-#5 17.65 Setting up libopenblas-pthread-dev:amd64 (0.3.21+ds-4) ...
-#5 17.66 update-alternatives: using /usr/lib/x86_64-linux-gnu/openblas-pthread/libblas.so to provide /usr/lib/x86_64-linux-gnu/libblas.so (libblas.so-x86_64-linux-gnu) in auto mode
-#5 17.66 update-alternatives: using /usr/lib/x86_64-linux-gnu/openblas-pthread/liblapack.so to provide /usr/lib/x86_64-linux-gnu/liblapack.so (liblapack.so-x86_64-linux-gnu) in auto mode
-#5 17.66 update-alternatives: using /usr/lib/x86_64-linux-gnu/openblas-pthread/libopenblas.so to provide /usr/lib/x86_64-linux-gnu/libopenblas.so (libopenblas.so-x86_64-linux-gnu) in auto mode
-#5 17.67 Setting up libtirpc3:amd64 (1.3.3+ds-1) ...
-#5 17.67 Setting up openssh-client (1:9.2p1-2+deb12u10) ...
-#5 17.72 Setting up binutils (2.40-2) ...
-#5 17.72 Setting up libopenblas-dev:amd64 (0.3.21+ds-4) ...
-#5 17.72 Setting up libtirpc-dev:amd64 (1.3.3+ds-1) ...
-#5 17.73 Setting up gcc-12 (12.2.0-14+deb12u1) ...
-#5 17.73 Setting up libnsl2:amd64 (1.3.0-2) ...
-#5 17.73 Setting up openssh-sftp-server (1:9.2p1-2+deb12u10) ...
-#5 17.79 Setting up libpython3.11-stdlib:amd64 (3.11.2-6+deb12u8) ...
-#5 17.80 Setting up gcc (4:12.2.0-3) ...
-#5 17.81 Setting up libwrap0:amd64 (7.6.q-32) ...
-#5 17.81 Setting up libnsl-dev:amd64 (1.3.0-2) ...
-#5 17.81 Setting up libc6-dev:amd64 (2.36-9+deb12u14) ...
-#5 17.82 Setting up libpython3-stdlib:amd64 (3.11.2-1+b1) ...
-#5 17.82 Setting up python3.11 (3.11.2-6+deb12u8) ...
-#5 18.43 Setting up libpython3.11:amd64 (3.11.2-6+deb12u8) ...
-#5 18.43 Setting up openssh-server (1:9.2p1-2+deb12u10) ...
-#5 18.50 debconf: unable to initialize frontend: Dialog
-#5 18.50 debconf: (TERM is not set, so the dialog frontend is not usable.)
-#5 18.50 debconf: falling back to frontend: Readline
-#5 18.50 debconf: unable to initialize frontend: Readline
-#5 18.50 debconf: (Can't locate Term/ReadLine.pm in @INC (you may need to install the Term::ReadLine module) (@INC contains: /etc/perl /usr/local/lib/x86_64-linux-gnu/perl/5.36.0 /usr/local/share/perl/5.36.0 /usr/lib/x86_64-linux-gnu/perl5/5.36 /usr/share/perl5 /usr/lib/x86_64-linux-gnu/perl-base /usr/lib/x86_64-linux-gnu/perl/5.36 /usr/share/perl/5.36 /usr/local/lib/site_perl) at /usr/share/perl5/Debconf/FrontEnd/Readline.pm line 7.)
-#5 18.50 debconf: falling back to frontend: Teletype
-#5 18.56 
-#5 18.56 Creating config file /etc/ssh/sshd_config with new version
-#5 18.58 Creating SSH2 RSA key; this may take some time ...
-#5 18.85 3072 SHA256:AZGHAA7UpvqwuP9fAWqNAQA9QarAUkKUvNq3RbNAPRo root@buildkitsandbox (RSA)
-#5 18.85 Creating SSH2 ECDSA key; this may take some time ...
-#5 18.86 256 SHA256:+B8liu3FG+eGQCLHB7BjL3/A1HyhxGE/gdeGJseowLI root@buildkitsandbox (ECDSA)
-#5 18.86 Creating SSH2 ED25519 key; this may take some time ...
-#5 18.87 256 SHA256:k5JZynXl9ge+5CVHSap8HNqPWlQhNIv/sJMdZb4Jl9c root@buildkitsandbox (ED25519)
-#5 18.93 invoke-rc.d: could not determine current runlevel
-#5 18.93 invoke-rc.d: policy-rc.d denied execution of start.
-#5 19.11 Setting up libstdc++-12-dev:amd64 (12.2.0-14+deb12u1) ...
- [32m✓[39m tests/exploration-runner.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 5143[2mms[22m[39m
-   [33m[2m✓[22m[39m runExploration (real sidecar)[2m > [22mexecutes gated analysis code and persists artifact + receipt + event [33m 1364[2mms[22m[39m
-   [33m[2m✓[22m[39m runExploration (real sidecar)[2m > [22mrecords runtime failures inside the sandbox as visible candidate findings [33m 1383[2mms[22m[39m
-   [33m[2m✓[22m[39m runExploration (real sidecar)[2m > [22mdunder-traversal escape is refused before spawn AND mirrored at the Python AST layer [33m 1197[2mms[22m[39m
-   [33m[2m✓[22m[39m runExploration (real sidecar)[2m > [22mnumpy-lazy-submodule payloads execute (14-F2 regression: np ops that lazily import internals) [33m 1185[2mms[22m[39m
-#5 19.11 Setting up python3 (3.11.2-1+b1) ...
-#5 19.12 running python rtupdate hooks for python3.11...
-#5 19.12 running python post-rtupdate hooks for python3.11...
-#5 19.19 Setting up python3-decorator (5.1.1-3) ...
-#5 19.31 Setting up libexpat1-dev:amd64 (2.5.0-1+deb12u2) ...
-#5 19.32 Setting up zlib1g-dev:amd64 (1:1.2.13.dfsg-1) ...
-#5 19.33 Setting up python3-lib2to3 (3.11.2-3) ...
-#5 19.42 Setting up g++-12 (12.2.0-14+deb12u1) ...
- [32m✓[39m tests/ingest-pdftext.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 15[2mms[22m[39m
-#5 19.42 Setting up python3-pkg-resources (66.1.1-1+deb12u2) ...
-#5 19.66 Setting up python3-distutils (3.11.2-3) ...
-#5 19.77 Setting up libboost1.74-dev:amd64 (1.74.0+ds1-21) ...
-#5 19.77 Setting up python3-joblib (1.2.0-4+deb12u1) ...
- [32m✓[39m tests/science-retrieval-bench.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 6[2mms[22m[39m
-#5 20.01 Setting up python3-ply (3.11-5) ...
-#5 20.14 Setting up python3-threadpoolctl (3.1.0-1) ...
- [32m✓[39m tests/ingest-pptx.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 15[2mms[22m[39m
-#5 20.27 Setting up python3-gast (0.5.2-2) ...
-#5 20.38 Setting up python3-all (3.11.2-1+b1) ...
-#5 20.39 Setting up python3-beniget (0.4.1-3) ...
-#5 20.51 Setting up libpython3.11-dev:amd64 (3.11.2-6+deb12u8) ...
-#5 20.51 Setting up python3-numpy (1:1.24.2-1+deb12u1) ...
-#5 21.97 Setting up g++ (4:12.2.0-3) ...
-#5 21.98 update-alternatives: using /usr/bin/g++ to provide /usr/bin/c++ (c++) in auto mode
-#5 21.98 Setting up libboost-dev:amd64 (1.74.0.3) ...
-#5 21.98 Setting up libpython3-dev:amd64 (3.11.2-1+b1) ...
-#5 21.98 Setting up python3.11-dev (3.11.2-6+deb12u8) ...
-#5 21.99 Setting up python3-sklearn-lib:amd64 (1.2.1+dfsg-1) ...
-#5 21.99 Setting up libpython3-all-dev:amd64 (3.11.2-1+b1) ...
-#5 21.99 Setting up python3-dev (3.11.2-1+b1) ...
-#5 21.99 Setting up python3-all-dev (3.11.2-1+b1) ...
-#5 22.00 Setting up python3-pythran (0.11.0+ds-7) ...
-#5 22.28 Setting up python3-scipy (1.10.1-2) ...
- [32m✓[39m tests/net-env.test.ts [2m([22m[2m12 tests[22m[2m)[22m[33m 2483[2mms[22m[39m
-   [33m[2m✓[22m[39m probeNetwork (real loopback self-test)[2m > [22mvalidates the CA and tunnels a real fetch through a real CONNECT proxy [33m 839[2mms[22m[39m
-   [33m[2m✓[22m[39m selfTestMaterial (fresh-clone path: no committed private key)[2m > [22mgenerates an ephemeral throwaway CA+server pair when fixtures lack the key [33m 403[2mms[22m[39m
-   [33m[2m✓[22m[39m boot re-exec (compiled CLI, real child process)[2m > [22mfar probe net reports the configured proxy and passes the loopback self-test [33m 720[2mms[22m[39m
-   [33m[2m✓[22m[39m boot re-exec (compiled CLI, real child process)[2m > [22ma non-probe command re-execs exactly once with the proxy env applied (observable on stderr) [33m 509[2mms[22m[39m
- [32m✓[39m tests/run-deletion.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 132[2mms[22m[39m
- [32m✓[39m tests/protocol-ops.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 195[2mms[22m[39m
- [32m✓[39m tests/ingest-docx.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 13[2mms[22m[39m
-#5 24.50 Setting up python3-sklearn (1.2.1+dfsg-1) ...
- [32m✓[39m tests/custom-provider.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 14[2mms[22m[39m
- [32m✓[39m tests/agent-mcp.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 768[2mms[22m[39m
-   [33m[2m✓[22m[39m MCP client pagination + tools/list_changed (real child process)[2m > [22mnotifications/tools/list_changed reaches subscribers (previously dropped at the dispatch guard) [33m 434[2mms[22m[39m
-#5 25.81 Processing triggers for libc-bin (2.36-9+deb12u14) ...
- [32m✓[39m tests/ingest-svgplot.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 21[2mms[22m[39m
- [32m✓[39m tests/reasoning-wire.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 13[2mms[22m[39m
- [32m✓[39m tests/ingest-md-latex.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 8[2mms[22m[39m
-#5 DONE 26.5s
- [32m✓[39m tests/agent-permissions.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+#5 18.61 Selecting previously unselected package python3-ply.
+#5 18.61 Preparing to unpack .../68-python3-ply_3.11-5_all.deb ...
+#5 18.61 Unpacking python3-ply (3.11-5) ...
+#5 18.65 Selecting previously unselected package python3-pythran.
+#5 18.65 Preparing to unpack .../69-python3-pythran_0.11.0+ds-7_amd64.deb ...
+#5 18.65 Unpacking python3-pythran (0.11.0+ds-7) ...
+#5 18.86 Selecting previously unselected package python3-scipy.
+#5 18.86 Preparing to unpack .../70-python3-scipy_1.10.1-2_amd64.deb ...
+#5 18.86 Unpacking python3-scipy (1.10.1-2) ...
+#5 19.47 Selecting previously unselected package python3-threadpoolctl.
+#5 19.47 Preparing to unpack .../71-python3-threadpoolctl_3.1.0-1_all.deb ...
+#5 19.47 Unpacking python3-threadpoolctl (3.1.0-1) ...
+#5 19.49 Selecting previously unselected package python3-sklearn-lib:amd64.
+#5 19.49 Preparing to unpack .../72-python3-sklearn-lib_1.2.1+dfsg-1_amd64.deb ...
+#5 19.49 Unpacking python3-sklearn-lib:amd64 (1.2.1+dfsg-1) ...
+#5 19.76 Selecting previously unselected package python3-sklearn.
+ [32m✓[39m tests/net-env.test.ts [2m([22m[2m12 tests[22m[2m)[22m[33m 2149[2mms[22m[39m
+   [33m[2m✓[22m[39m probeNetwork (real loopback self-test)[2m > [22mvalidates the CA and tunnels a real fetch through a real CONNECT proxy [33m 615[2mms[22m[39m
+   [33m[2m✓[22m[39m selfTestMaterial (fresh-clone path: no committed private key)[2m > [22mgenerates an ephemeral throwaway CA+server pair when fixtures lack the key [33m 397[2mms[22m[39m
+   [33m[2m✓[22m[39m boot re-exec (compiled CLI, real child process)[2m > [22mfar probe net reports the configured proxy and passes the loopback self-test [33m 697[2mms[22m[39m
+   [33m[2m✓[22m[39m boot re-exec (compiled CLI, real child process)[2m > [22ma non-probe command re-execs exactly once with the proxy env applied (observable on stderr) [33m 422[2mms[22m[39m
+#5 19.76 Preparing to unpack .../73-python3-sklearn_1.2.1+dfsg-1_all.deb ...
+#5 19.76 Unpacking python3-sklearn (1.2.1+dfsg-1) ...
+#5 20.00 Setting up media-types (10.0.0) ...
+#5 20.01 Setting up runit-helper (2.15.2) ...
+#5 20.01 Setting up libkeyutils1:amd64 (1.6.3-2) ...
+#5 20.01 Setting up libtirpc-common (1.3.3+ds-1) ...
+#5 20.02 Setting up libcbor0.8:amd64 (0.8.0-2+b1) ...
+#5 20.02 Setting up libsqlite3-0:amd64 (3.40.1-2+deb12u2) ...
+#5 20.02 Setting up binutils-common:amd64 (2.40-2) ...
+#5 20.03 Setting up linux-libc-dev:amd64 (6.1.180-1) ...
+#5 20.03 Setting up libctf-nobfd0:amd64 (2.40-2) ...
+#5 20.03 Setting up libgomp1:amd64 (12.2.0-14+deb12u1) ...
+#5 20.04 Setting up libjansson4:amd64 (2.14-2) ...
+#5 20.04 Setting up libkrb5support0:amd64 (1.20.1-2+deb12u5) ...
+#5 20.05 Setting up libxsimd-dev:amd64 (8.1.0-7) ...
+#5 20.06 Setting up libblas3:amd64 (3.11.0-2) ...
+#5 20.06 update-alternatives: using /usr/lib/x86_64-linux-gnu/blas/libblas.so.3 to provide /usr/lib/x86_64-linux-gnu/libblas.so.3 (libblas.so.3-x86_64-linux-gnu) in auto mode
+#5 20.06 Setting up rpcsvc-proto (1.4.3-1) ...
+#5 20.07 Setting up libmpfr6:amd64 (4.2.0-1) ...
+#5 20.07 Setting up libquadmath0:amd64 (12.2.0-14+deb12u1) ...
+#5 20.09 Setting up libproc2-0:amd64 (2:4.0.2-3) ...
+#5 20.10 Setting up libmpc3:amd64 (1.3.1-1) ...
+#5 20.10 Setting up libatomic1:amd64 (12.2.0-14+deb12u1) ...
+#5 20.11 Setting up libncursesw6:amd64 (6.4-4) ...
+#5 20.11 Setting up libk5crypto3:amd64 (1.20.1-2+deb12u5) ...
+#5 20.11 Setting up libgfortran5:amd64 (12.2.0-14+deb12u1) ...
+#5 20.12 Setting up libubsan1:amd64 (12.2.0-14+deb12u1) ...
+#5 20.13 Setting up sensible-utils (0.0.17+nmu1) ...
+#5 20.13 Setting up libcrypt-dev:amd64 (1:4.4.33-2) ...
+#5 20.13 Setting up libasan8:amd64 (12.2.0-14+deb12u1) ...
+#5 20.15 Setting up procps (2:4.0.2-3) ...
+#5 20.17 Setting up libkrb5-3:amd64 (1.20.1-2+deb12u5) ...
+#5 20.17 Setting up libtsan2:amd64 (12.2.0-14+deb12u1) ...
+#5 20.17 Setting up libjs-jquery (3.6.1+dfsg+~3.5.14-1) ...
+#5 20.18 Setting up libbinutils:amd64 (2.40-2) ...
+#5 20.19 Setting up libfido2-1:amd64 (1.12.0-2+b1) ...
+#5 20.19 Setting up libisl23:amd64 (0.25-1.1) ...
+#5 20.19 Setting up libc-dev-bin (2.36-9+deb12u14) ...
+#5 20.20 Setting up libbsd0:amd64 (0.11.7-2) ...
+#5 20.20 Setting up readline-common (8.2-1.3) ...
+#5 20.20 Setting up libcc1-0:amd64 (12.2.0-14+deb12u1) ...
+#5 20.21 Setting up liblsan0:amd64 (12.2.0-14+deb12u1) ...
+#5 20.25 Setting up libitm1:amd64 (12.2.0-14+deb12u1) ...
+ [32m✓[39m tests/run-deletion.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 156[2mms[22m[39m
+#5 20.25 Setting up libjs-underscore (1.13.4~dfsg+~1.11.4-3) ...
+#5 20.26 Setting up libctf0:amd64 (2.40-2) ...
+#5 20.26 Setting up liblapack3:amd64 (3.11.0-2) ...
+#5 20.26 update-alternatives: using /usr/lib/x86_64-linux-gnu/lapack/liblapack.so.3 to provide /usr/lib/x86_64-linux-gnu/liblapack.so.3 (liblapack.so.3-x86_64-linux-gnu) in auto mode
+#5 20.26 Setting up cpp-12 (12.2.0-14+deb12u1) ...
+#5 20.27 Setting up libopenblas0-pthread:amd64 (0.3.21+ds-4) ...
+#5 20.27 update-alternatives: using /usr/lib/x86_64-linux-gnu/openblas-pthread/libblas.so.3 to provide /usr/lib/x86_64-linux-gnu/libblas.so.3 (libblas.so.3-x86_64-linux-gnu) in auto mode
+#5 20.27 update-alternatives: using /usr/lib/x86_64-linux-gnu/openblas-pthread/liblapack.so.3 to provide /usr/lib/x86_64-linux-gnu/liblapack.so.3 (liblapack.so.3-x86_64-linux-gnu) in auto mode
+#5 20.27 update-alternatives: using /usr/lib/x86_64-linux-gnu/openblas-pthread/libopenblas.so.0 to provide /usr/lib/x86_64-linux-gnu/libopenblas.so.0 (libopenblas.so.0-x86_64-linux-gnu) in auto mode
+#5 20.27 Setting up libedit2:amd64 (3.1-20221030-2) ...
+#5 20.30 Setting up libreadline8:amd64 (8.2-1.3) ...
+#5 20.33 Setting up libgprofng0:amd64 (2.40-2) ...
+#5 20.33 Setting up libgcc-12-dev:amd64 (12.2.0-14+deb12u1) ...
+#5 20.34 Setting up libgssapi-krb5-2:amd64 (1.20.1-2+deb12u5) ...
+#5 20.34 Setting up ucf (3.0043+nmu1+deb12u1) ...
+#5 20.42 debconf: unable to initialize frontend: Dialog
+#5 20.42 debconf: (TERM is not set, so the dialog frontend is not usable.)
+#5 20.42 debconf: falling back to frontend: Readline
+#5 20.42 debconf: unable to initialize frontend: Readline
+#5 20.42 debconf: (Can't locate Term/ReadLine.pm in @INC (you may need to install the Term::ReadLine module) (@INC contains: /etc/perl /usr/local/lib/x86_64-linux-gnu/perl/5.36.0 /usr/local/share/perl/5.36.0 /usr/lib/x86_64-linux-gnu/perl5/5.36 /usr/share/perl5 /usr/lib/x86_64-linux-gnu/perl-base /usr/lib/x86_64-linux-gnu/perl/5.36 /usr/share/perl/5.36 /usr/local/lib/site_perl) at /usr/share/perl5/Debconf/FrontEnd/Readline.pm line 7.)
+#5 20.42 debconf: falling back to frontend: Teletype
+#5 20.45 Setting up libjs-sphinxdoc (5.3.0-4) ...
+#5 20.45 Setting up libopenblas0:amd64 (0.3.21+ds-4) ...
+#5 20.45 Setting up cpp (4:12.2.0-3) ...
+#5 20.49 Setting up liblbfgsb0:amd64 (3.0+dfsg.4-1) ...
+#5 20.50 Setting up binutils-x86-64-linux-gnu (2.40-2) ...
+#5 20.50 Setting up libopenblas-pthread-dev:amd64 (0.3.21+ds-4) ...
+#5 20.50 update-alternatives: using /usr/lib/x86_64-linux-gnu/openblas-pthread/libblas.so to provide /usr/lib/x86_64-linux-gnu/libblas.so (libblas.so-x86_64-linux-gnu) in auto mode
+#5 20.50 update-alternatives: using /usr/lib/x86_64-linux-gnu/openblas-pthread/liblapack.so to provide /usr/lib/x86_64-linux-gnu/liblapack.so (liblapack.so-x86_64-linux-gnu) in auto mode
+#5 20.51 update-alternatives: using /usr/lib/x86_64-linux-gnu/openblas-pthread/libopenblas.so to provide /usr/lib/x86_64-linux-gnu/libopenblas.so (libopenblas.so-x86_64-linux-gnu) in auto mode
+#5 20.51 Setting up libtirpc3:amd64 (1.3.3+ds-1) ...
+#5 20.51 Setting up openssh-client (1:9.2p1-2+deb12u10) ...
+#5 21.20 Setting up binutils (2.40-2) ...
+#5 21.20 Setting up libopenblas-dev:amd64 (0.3.21+ds-4) ...
+#5 21.21 Setting up libtirpc-dev:amd64 (1.3.3+ds-1) ...
+#5 21.21 Setting up gcc-12 (12.2.0-14+deb12u1) ...
+#5 21.21 Setting up libnsl2:amd64 (1.3.0-2) ...
+#5 21.22 Setting up openssh-sftp-server (1:9.2p1-2+deb12u10) ...
+#5 21.22 Setting up libpython3.11-stdlib:amd64 (3.11.2-6+deb12u8) ...
+#5 21.22 Setting up gcc (4:12.2.0-3) ...
+#5 21.23 Setting up libwrap0:amd64 (7.6.q-32) ...
+#5 21.33 Setting up libnsl-dev:amd64 (1.3.0-2) ...
+#5 21.33 Setting up libc6-dev:amd64 (2.36-9+deb12u14) ...
+#5 21.33 Setting up libpython3-stdlib:amd64 (3.11.2-1+b1) ...
+#5 21.34 Setting up python3.11 (3.11.2-6+deb12u8) ...
+ [32m✓[39m tests/protocol-ops.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 556[2mms[22m[39m
+ [32m✓[39m tests/ingest-docx.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m tests/custom-provider.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+#5 22.03 Setting up libpython3.11:amd64 (3.11.2-6+deb12u8) ...
+#5 22.31 Setting up openssh-server (1:9.2p1-2+deb12u10) ...
+#5 22.50 debconf: unable to initialize frontend: Dialog
+#5 22.50 debconf: (TERM is not set, so the dialog frontend is not usable.)
+#5 22.50 debconf: falling back to frontend: Readline
+#5 22.50 debconf: unable to initialize frontend: Readline
+#5 22.50 debconf: (Can't locate Term/ReadLine.pm in @INC (you may need to install the Term::ReadLine module) (@INC contains: /etc/perl /usr/local/lib/x86_64-linux-gnu/perl/5.36.0 /usr/local/share/perl/5.36.0 /usr/lib/x86_64-linux-gnu/perl5/5.36 /usr/share/perl5 /usr/lib/x86_64-linux-gnu/perl-base /usr/lib/x86_64-linux-gnu/perl/5.36 /usr/share/perl/5.36 /usr/local/lib/site_perl) at /usr/share/perl5/Debconf/FrontEnd/Readline.pm line 7.)
+#5 22.50 debconf: falling back to frontend: Teletype
+#5 22.53 
+#5 22.53 Creating config file /etc/ssh/sshd_config with new version
+#5 22.55 Creating SSH2 RSA key; this may take some time ... [32m✓[39m tests/agent-mcp.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 712[2mms[22m[39m
+   [33m[2m✓[22m[39m MCP client pagination + tools/list_changed (real child process)[2m > [22mnotifications/tools/list_changed reaches subscribers (previously dropped at the dispatch guard) [33m 426[2mms[22m[39m
+ [32m✓[39m tests/ingest-svgplot.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+
+ [32m✓[39m tests/reasoning-wire.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+#5 23.12 3072 SHA256:aUcAYC/KCd5jYTZNxQpF4ga9bl0n6zsM9BaO5iSE0OQ root@buildkitsandbox (RSA)
+#5 23.12 Creating SSH2 ECDSA key; this may take some time ...
+#5 23.13 256 SHA256:Lpm4KRYaTiLb6/Z9PTAJfTL9N+qqc/Dmc1bgsR+F+K0 root@buildkitsandbox (ECDSA)
+#5 23.13 Creating SSH2 ED25519 key; this may take some time ...
+#5 23.14 256 SHA256:8hnA4ghtVESB+0U57hgHr6sTH9va76gI/u6Bc0dahg4 root@buildkitsandbox (ED25519)
+#5 23.27 invoke-rc.d: could not determine current runlevel
+ [32m✓[39m tests/ingest-md-latex.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+#5 23.27 invoke-rc.d: policy-rc.d denied execution of start.
+ [32m✓[39m tests/agent-permissions.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+#5 23.60 Setting up libstdc++-12-dev:amd64 (12.2.0-14+deb12u1) ...
+#5 23.60 Setting up python3 (3.11.2-1+b1) ...
+#5 23.61 running python rtupdate hooks for python3.11...
+#5 23.61 running python post-rtupdate hooks for python3.11...
+#5 23.67 Setting up python3-decorator (5.1.1-3) ...
+#5 23.76 Setting up libexpat1-dev:amd64 (2.5.0-1+deb12u2) ...
+#5 23.78 Setting up zlib1g-dev:amd64 (1:1.2.13.dfsg-1) ...
+#5 23.78 Setting up python3-lib2to3 (3.11.2-3) ...
+#5 23.87 Setting up g++-12 (12.2.0-14+deb12u1) ...
+#5 23.87 Setting up python3-pkg-resources (66.1.1-1+deb12u2) ...
+#5 24.19 Setting up python3-distutils (3.11.2-3) ...
+#5 24.27 Setting up libboost1.74-dev:amd64 (1.74.0+ds1-21) ...
+#5 24.27 Setting up python3-joblib (1.2.0-4+deb12u1) ...
+#5 24.44 Setting up python3-ply (3.11-5) ...
+#5 24.53 Setting up python3-threadpoolctl (3.1.0-1) ...
+#5 24.61 Setting up python3-gast (0.5.2-2) ...
+#5 24.69 Setting up python3-all (3.11.2-1+b1) ...
+#5 24.69 Setting up python3-beniget (0.4.1-3) ...
+#5 24.77 Setting up libpython3.11-dev:amd64 (3.11.2-6+deb12u8) ...
+#5 24.77 Setting up python3-numpy (1:1.24.2-1+deb12u1) ...
+#5 25.76 Setting up g++ (4:12.2.0-3) ...
+#5 25.76 update-alternatives: using /usr/bin/g++ to provide /usr/bin/c++ (c++) in auto mode
+#5 25.77 Setting up libboost-dev:amd64 (1.74.0.3) ...
+#5 25.77 Setting up libpython3-dev:amd64 (3.11.2-1+b1) ...
+#5 25.78 Setting up python3.11-dev (3.11.2-6+deb12u8) ...
+#5 25.78 Setting up python3-sklearn-lib:amd64 (1.2.1+dfsg-1) ...
+#5 25.78 Setting up libpython3-all-dev:amd64 (3.11.2-1+b1) ...
+#5 25.78 Setting up python3-dev (3.11.2-1+b1) ...
+#5 25.79 Setting up python3-all-dev (3.11.2-1+b1) ...
+#5 25.79 Setting up python3-pythran (0.11.0+ds-7) ...
+#5 26.03 Setting up python3-scipy (1.10.1-2) ...
+ [32m✓[39m tests/api-tools.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 2629[2mms[22m[39m
+   [33m[2m✓[22m[39m tool integrations API[2m > [22mtest route: real stdio round-trip persisted as lastTest; failures honest; non-MCP 400 [33m 2054[2mms[22m[39m
+ [32m✓[39m tests/lineage-storage.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 436[2mms[22m[39m
+ [32m✓[39m tests/json-repair.test.ts [2m([22m[2m95 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+#5 28.35 Setting up python3-sklearn (1.2.1+dfsg-1) ...
+ [32m✓[39m tests/api-actions.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 770[2mms[22m[39m
+#5 29.63 Processing triggers for libc-bin (2.36-9+deb12u14) ...
+#5 DONE 31.1s
 
 #6 exporting to image
 #6 exporting layers
- [32m✓[39m tests/api-tools.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 2228[2mms[22m[39m
-   [33m[2m✓[22m[39m tool integrations API[2m > [22mtest route: real stdio round-trip persisted as lastTest; failures honest; non-MCP 400 [33m 2084[2mms[22m[39m
- [32m✓[39m tests/lineage-storage.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 65[2mms[22m[39m
- [32m✓[39m tests/json-repair.test.ts [2m([22m[2m95 tests[22m[2m)[22m[32m 36[2mms[22m[39m
- [32m✓[39m tests/api-actions.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 153[2mms[22m[39m
-#6 exporting layers 4.8s done
-#6 writing image sha256:8a6b57310f71921989815e9ccf77e88e640d0efb7f68a5a2175890a9a01992fd done
-#6 naming to docker.io/library/farlab-ssh-target done
-#6 DONE 4.8s
- [32m✓[39m tests/mcp-manager.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 4198[2mms[22m[39m
-   [33m[2m✓[22m[39m McpManager (real child processes)[2m > [22mconnects enabled servers, skips disabled, records failures honestly [33m 2053[2mms[22m[39m
-   [33m[2m✓[22m[39m McpManager (real child processes)[2m > [22mtestIntegration: ok path summarizes tools + latency, failure path returns the error [33m 2035[2mms[22m[39m
+ [32m✓[39m tests/mcp-manager.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 4155[2mms[22m[39m
+   [33m[2m✓[22m[39m McpManager (real child processes)[2m > [22mconnects enabled servers, skips disabled, records failures honestly [33m 2040[2mms[22m[39m
+   [33m[2m✓[22m[39m McpManager (real child processes)[2m > [22mtestIntegration: ok path summarizes tools + latency, failure path returns the error [33m 2030[2mms[22m[39m
  [32m✓[39m tests/ingest-tei.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 7[2mms[22m[39m
- [32m✓[39m tests/gateway.test.ts [2m([22m[2m2 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 36099[2mms[22m[39m
-   [33m[2m✓[22m[39m P3 ssh2-gateway on a real Docker/WSL2 Linux target (D-084)[2m > [22mreal Linux target: key-only SSH, remote training, host-key pinning [33m 35892[2mms[22m[39m
- [32m✓[39m tests/scheduler-dlq.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 86[2mms[22m[39m
- [32m✓[39m tests/storage-hardening.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 1176[2mms[22m[39m
-   [33m[2m✓[22m[39m RU-7.1 backup CLI verb (far backup)[2m > [22mend-to-end via main(): writes a restorable snapshot under backup/, refuses overwrite [33m 1090[2mms[22m[39m
- [32m✓[39m tests/spend-limit.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 192[2mms[22m[39m
- [32m✓[39m tests/lineage.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 90[2mms[22m[39m
- [32m✓[39m tests/campaign-runtime.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 10[2mms[22m[39m
- [32m✓[39m tests/bilingual-zh.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 68[2mms[22m[39m
- [32m✓[39m tests/remote-executor.test.ts [2m([22m[2m2 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 44654[2mms[22m[39m
-   [33m[2m✓[22m[39m P3 remote executor: device-bound queue -> remote training -> local verdicts[2m > [22mworker on the ssh device executes the full chain [33m 44441[2mms[22m[39m
- [32m✓[39m tests/orchestrator-loop-guidance.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 201[2mms[22m[39m
- [32m✓[39m tests/orchestrator-attempt.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 128[2mms[22m[39m
- [32m✓[39m tests/tool-proposals.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 156[2mms[22m[39m
- [32m✓[39m tests/migrations-upgrade.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 109[2mms[22m[39m
- [32m✓[39m tests/run-fork.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 33[2mms[22m[39m
- [32m✓[39m tests/ingest-latexml.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 12[2mms[22m[39m
- [32m✓[39m tests/prediction-ledger.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 16[2mms[22m[39m
- [32m✓[39m tests/ingest-dataset.test.ts [2m([22m[2m18 tests[22m[2m)[22m[33m 1829[2mms[22m[39m
-   [33m[2m✓[22m[39m large-spreadsheet stress (BENCHMARK.md gap closed 2026-08-24)[2m > [22mprofiles 150k rows correctly (types, stats, no truncation) [33m 891[2mms[22m[39m
-   [33m[2m✓[22m[39m large-spreadsheet stress (BENCHMARK.md gap closed 2026-08-24)[2m > [22mrow cap 200k fires honestly past the limit [33m 929[2mms[22m[39m
- [32m✓[39m tests/campaign-spec.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 18[2mms[22m[39m
- [32m✓[39m tests/agent-resume.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 23[2mms[22m[39m
- [32m✓[39m tests/spec-from-plan.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 158[2mms[22m[39m
- [32m✓[39m tests/cli-term.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 347[2mms[22m[39m
-   [33m[2m✓[22m[39m cli vendored picocolors: color discipline[2m > [22mcolors follow the vendored contract under controlled env (15→03: ambient worker env drift made the in-process assertion a hosted-CI red) [33m 334[2mms[22m[39m
- [32m✓[39m tests/model-plane-failures.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 12[2mms[22m[39m
- [32m✓[39m tests/mcp-http.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 455[2mms[22m[39m
-   [33m[2m✓[22m[39m MCP streamable-HTTP client (real local server)[2m > [22msurfaces per-request timeouts as honest errors [33m 322[2mms[22m[39m
- [32m✓[39m tests/agent-subagents.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 27[2mms[22m[39m
- [32m✓[39m tests/web-i18n-keys.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 17[2mms[22m[39m
- [32m✓[39m tests/ingest-code-nb.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 13[2mms[22m[39m
- [32m✓[39m tests/lit-graph.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 14[2mms[22m[39m
- [32m✓[39m tests/hooks-compose.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 16[2mms[22m[39m
- [32m✓[39m tests/agent-rollout.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 9[2mms[22m[39m
- [32m✓[39m tests/experiment-screening.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 12[2mms[22m[39m
- [32m✓[39m tests/experiment-mde-gate.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 12[2mms[22m[39m
- [32m✓[39m tests/research-tools.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 1595[2mms[22m[39m
-   [33m[2m✓[22m[39m explore_code tool (real sidecar)[2m > [22mruns gated analysis end-to-end and returns candidate findings with audit chain [33m 1553[2mms[22m[39m
- [32m✓[39m tests/ingest-epub.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 11[2mms[22m[39m
- [32m✓[39m tests/tool-integration.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 16[2mms[22m[39m
- [32m✓[39m tests/minhash.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 18[2mms[22m[39m
- [32m✓[39m tests/outbox.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 89[2mms[22m[39m
- [32m✓[39m tests/ingest-html.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 15[2mms[22m[39m
- [32m✓[39m tests/agent-compaction.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 8[2mms[22m[39m
- [32m✓[39m tests/evidence-debt-reopen.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 44[2mms[22m[39m
- [32m✓[39m tests/cache-layout.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 8[2mms[22m[39m
- [32m✓[39m tests/numeric-provenance.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 11[2mms[22m[39m
- [32m✓[39m tests/research-query.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 68[2mms[22m[39m
- [32m✓[39m tests/plan-viz.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 9[2mms[22m[39m
- [32m✓[39m tests/cli-extensibility.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 5382[2mms[22m[39m
-   [33m[2m✓[22m[39m far mcp (real store + real MCP round trip)[2m > [22madd stages DISABLED, list shows it, enable flips it [33m 1339[2mms[22m[39m
-   [33m[2m✓[22m[39m far mcp (real store + real MCP round trip)[2m > [22mprobe does a REAL initialize + tools/list round trip and persists lastTest [33m 742[2mms[22m[39m
-   [33m[2m✓[22m[39m far mcp (real store + real MCP round trip)[2m > [22mprobe of a dead server fails honestly with a nonzero exit [33m 2613[2mms[22m[39m
-   [33m[2m✓[22m[39m far plugin (real local plugin import)[2m > [22minstall expands far-plugin.json into disabled integrations; list shows provenance [33m 679[2mms[22m[39m
- [32m✓[39m tests/agent-policy.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 186[2mms[22m[39m
- [32m✓[39m tests/audit-chain.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 56[2mms[22m[39m
- [32m✓[39m tests/terminal-api.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 448[2mms[22m[39m
-   [33m[2m✓[22m[39m terminal sessions API (real shells)[2m > [22mcreates a session, streams output over SSE, accepts input, kills [33m 331[2mms[22m[39m
- [32m✓[39m tests/exploratory-codeact.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 16[2mms[22m[39m
- [32m✓[39m tests/stage-reasoning.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 15[2mms[22m[39m
- [32m✓[39m tests/revision-predicates.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 11[2mms[22m[39m
- [32m✓[39m tests/response-cache.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 26[2mms[22m[39m
- [32m✓[39m tests/agent-skills.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 16[2mms[22m[39m
- [32m✓[39m tests/claim-match.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 10[2mms[22m[39m
- [32m✓[39m tests/ingest-routing.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 19[2mms[22m[39m
- [32m✓[39m tests/ingest-service.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 20[2mms[22m[39m
- [32m✓[39m tests/supervisor-integration.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 176[2mms[22m[39m
- [32m✓[39m tests/web-revision-decisions.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 11[2mms[22m[39m
- [32m✓[39m tests/reasoning-gear.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 13[2mms[22m[39m
- [32m✓[39m tests/experiment-viz.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 11[2mms[22m[39m
- [32m✓[39m tests/supervisor-p1-fix.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 48[2mms[22m[39m
- [32m✓[39m tests/time-travel.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 517[2mms[22m[39m
-   [33m[2m✓[22m[39m stateAtSeq (time travel)[2m > [22mAPI surface contract: GET /runs/:id/state-at/:seq (400 bad seq, 404 unknown run) [33m 481[2mms[22m[39m
- [32m✓[39m tests/evaluators.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 49[2mms[22m[39m
- [32m✓[39m tests/platform/dotenv.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 11[2mms[22m[39m
- [32m✓[39m tests/far-search-trigram.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 102[2mms[22m[39m
- [32m✓[39m tests/exploration-feasibility.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 1500[2mms[22m[39m
-   [33m[2m✓[22m[39m exploratory CodeAct environment feasibility (real sidecar)[2m > [22mruns gated analysis code through the real sidecar and lands full audit chain [33m 1498[2mms[22m[39m
- [32m✓[39m tests/hypothesis-dedup.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 18[2mms[22m[39m
- [32m✓[39m tests/cross-viz.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 7[2mms[22m[39m
- [32m✓[39m tests/reliability-artifact-atomicity.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 38[2mms[22m[39m
- [32m✓[39m tests/zip.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 12[2mms[22m[39m
- [32m✓[39m tests/server-hardening.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 95[2mms[22m[39m
+ [32m✓[39m tests/storage-hardening.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 724[2mms[22m[39m
+   [33m[2m✓[22m[39m RU-7.1 backup CLI verb (far backup)[2m > [22mend-to-end via main(): writes a restorable snapshot under backup/, refuses overwrite [33m 639[2mms[22m[39m
+ [32m✓[39m tests/scheduler-dlq.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 1007[2mms[22m[39m
+   [33m[2m✓[22m[39m RU-7.2 poison-job DLQ[2m > [22ma crash-looping job is dead-lettered at the attempts cap and never reclaimed again [33m 923[2mms[22m[39m
+#6 exporting layers 4.9s done
+#6 writing image sha256:525a56c50530c3841c0c68a29e6a4e4dbce68d82a3db4e35d074a9f4ef782f76 done
+#6 naming to docker.io/library/farlab-ssh-target done
+#6 DONE 4.9s
+ [32m✓[39m tests/spend-limit.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 268[2mms[22m[39m
+ [32m✓[39m tests/lineage.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 37[2mms[22m[39m
+ [32m✓[39m tests/bilingual-zh.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 45[2mms[22m[39m
+ [32m✓[39m tests/campaign-runtime.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m tests/orchestrator-loop-guidance.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 245[2mms[22m[39m
+ [32m✓[39m tests/ingest-dataset.test.ts [2m([22m[2m18 tests[22m[2m)[22m[33m 1162[2mms[22m[39m
+   [33m[2m✓[22m[39m large-spreadsheet stress (BENCHMARK.md gap closed 2026-08-24)[2m > [22mprofiles 150k rows correctly (types, stats, no truncation) [33m 560[2mms[22m[39m
+   [33m[2m✓[22m[39m large-spreadsheet stress (BENCHMARK.md gap closed 2026-08-24)[2m > [22mrow cap 200k fires honestly past the limit [33m 586[2mms[22m[39m
+ [32m✓[39m tests/orchestrator-attempt.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 110[2mms[22m[39m
+ [32m✓[39m tests/tool-proposals.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 145[2mms[22m[39m
+ [32m✓[39m tests/gateway.test.ts [2m([22m[2m2 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 40793[2mms[22m[39m
+   [33m[2m✓[22m[39m P3 ssh2-gateway on a real Docker/WSL2 Linux target (D-084)[2m > [22mreal Linux target: key-only SSH, remote training, host-key pinning [33m 40600[2mms[22m[39m
+ [32m✓[39m tests/run-fork.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 560[2mms[22m[39m
+   [33m[2m✓[22m[39m RU-2 forkRun (branch writer)[2m > [22mcreates a fork referencing the source immutably: question shared by id, lineage edge, step-cache seed, audited reason [33m 548[2mms[22m[39m
+ [32m✓[39m tests/migrations-upgrade.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 684[2mms[22m[39m
+   [33m[2m✓[22m[39m cross-version migration upgrade (v5 -> latest)[2m > [22mupgrades a legacy db in place: latest user_version, repaired derivables, authoritative rows intact, new tables usable [33m 646[2mms[22m[39m
+ [32m✓[39m tests/ingest-latexml.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/prediction-ledger.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m tests/campaign-spec.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m tests/agent-resume.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m tests/remote-executor.test.ts [2m([22m[2m2 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 50841[2mms[22m[39m
+   [33m[2m✓[22m[39m P3 remote executor: device-bound queue -> remote training -> local verdicts[2m > [22mworker on the ssh device executes the full chain [33m 50691[2mms[22m[39m
+ [32m✓[39m tests/spec-from-plan.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 148[2mms[22m[39m
+ [32m✓[39m tests/cli-term.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 252[2mms[22m[39m
+ [32m✓[39m tests/mcp-http.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 426[2mms[22m[39m
+   [33m[2m✓[22m[39m MCP streamable-HTTP client (real local server)[2m > [22msurfaces per-request timeouts as honest errors [33m 318[2mms[22m[39m
+ [32m✓[39m tests/model-plane-failures.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m tests/agent-subagents.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32m✓[39m tests/web-i18n-keys.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/ingest-code-nb.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/lit-graph.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m tests/hooks-compose.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m tests/agent-rollout.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/experiment-screening.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/experiment-mde-gate.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m tests/research-tools.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 1154[2mms[22m[39m
+   [33m[2m✓[22m[39m explore_code tool (real sidecar)[2m > [22mruns gated analysis end-to-end and returns candidate findings with audit chain [33m 1123[2mms[22m[39m
+ [32m✓[39m tests/ingest-epub.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m tests/tool-integration.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m tests/minhash.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m tests/ingest-html.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m tests/agent-compaction.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m tests/outbox.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 488[2mms[22m[39m
+   [33m[2m✓[22m[39m RU-7.4 outbox atomicity[2m > [22mputObjectEventedOutboxed lands the object, the event and the outbox row in ONE transaction [33m 432[2mms[22m[39m
+ [32m✓[39m tests/evidence-debt-reopen.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 295[2mms[22m[39m
+ [32m✓[39m tests/cache-layout.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m tests/numeric-provenance.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m tests/research-query.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 30[2mms[22m[39m
+ [32m✓[39m tests/plan-viz.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/cli-extensibility.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 4714[2mms[22m[39m
+   [33m[2m✓[22m[39m far mcp (real store + real MCP round trip)[2m > [22madd stages DISABLED, list shows it, enable flips it [33m 986[2mms[22m[39m
+   [33m[2m✓[22m[39m far mcp (real store + real MCP round trip)[2m > [22mprobe does a REAL initialize + tools/list round trip and persists lastTest [33m 528[2mms[22m[39m
+   [33m[2m✓[22m[39m far mcp (real store + real MCP round trip)[2m > [22mprobe of a dead server fails honestly with a nonzero exit [33m 2467[2mms[22m[39m
+   [33m[2m✓[22m[39m far plugin (real local plugin import)[2m > [22minstall expands far-plugin.json into disabled integrations; list shows provenance [33m 729[2mms[22m[39m
+ [32m✓[39m tests/agent-policy.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 405[2mms[22m[39m
+ [32m✓[39m tests/terminal-api.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 639[2mms[22m[39m
+ [32m✓[39m tests/exploratory-codeact.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m tests/audit-chain.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 42[2mms[22m[39m
+ [32m✓[39m tests/stage-reasoning.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m tests/revision-predicates.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m tests/response-cache.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32m✓[39m tests/agent-skills.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m tests/claim-match.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/ingest-routing.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m tests/ingest-service.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m tests/web-revision-decisions.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/supervisor-integration.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 317[2mms[22m[39m
+ [32m✓[39m tests/reasoning-gear.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m tests/supervisor-p1-fix.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 39[2mms[22m[39m
+ [32m✓[39m tests/experiment-viz.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m tests/time-travel.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 476[2mms[22m[39m
+   [33m[2m✓[22m[39m stateAtSeq (time travel)[2m > [22mAPI surface contract: GET /runs/:id/state-at/:seq (400 bad seq, 404 unknown run) [33m 451[2mms[22m[39m
+ [32m✓[39m tests/evaluators.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 68[2mms[22m[39m
+ [32m✓[39m tests/platform/dotenv.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m tests/exploration-feasibility.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 1385[2mms[22m[39m
+   [33m[2m✓[22m[39m exploratory CodeAct environment feasibility (real sidecar)[2m > [22mruns gated analysis code through the real sidecar and lands full audit chain [33m 1383[2mms[22m[39m
+ [32m✓[39m tests/far-search-trigram.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 409[2mms[22m[39m
+   [33m[2m✓[22m[39m far_search trigram dual-index[2m > [22ma CJK question is findable by a CJK phrase substring (trigram path) [33m 341[2mms[22m[39m
+ [32m✓[39m tests/hypothesis-dedup.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m tests/cross-viz.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m tests/reliability-artifact-atomicity.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m tests/zip.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/server-hardening.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 87[2mms[22m[39m
 [90mstdout[2m | tests/report-pandoc.test.ts[2m > [22m[2mdetectPandoc[2m > [22m[2mreturns a parsed semver or null (never throws)
 [22m[39mpandoc absent on this machine — conversion tests below are SKIPPED (honest skip, not a pass)
 
- [32m✓[39m tests/report-pandoc.test.ts [2m([22m[2m6 tests[22m[2m | [22m[33m3 skipped[39m[2m)[22m[32m 8[2mms[22m[39m
- [32m✓[39m tests/model-config-e2e.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 199[2mms[22m[39m
- [32m✓[39m tests/ingest-xml.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 11[2mms[22m[39m
- [32m✓[39m tests/artifact-diff.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 13[2mms[22m[39m
- [32m✓[39m tests/context-compiler.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 71[2mms[22m[39m
- [32m✓[39m tests/counter-evidence-metric.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 8[2mms[22m[39m
- [32m✓[39m tests/stage-viz.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m tests/report-pandoc.test.ts [2m([22m[2m6 tests[22m[2m | [22m[33m3 skipped[39m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m tests/ingest-xml.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/context-compiler.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 47[2mms[22m[39m
+ [32m✓[39m tests/artifact-diff.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m tests/model-config-e2e.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 734[2mms[22m[39m
+ [32m✓[39m tests/counter-evidence-metric.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m tests/stage-viz.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 6[2mms[22m[39m
  [2m[90m↓[39m[22m tests/memory-live-check.test.ts [2m([22m[2m1 test[22m[2m | [22m[33m1 skipped[39m[2m)[22m
- [32m✓[39m tests/search-conversations.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 139[2mms[22m[39m
- [32m✓[39m tests/corpus-items.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 30[2mms[22m[39m
- [32m✓[39m tests/server-bind-guard.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 679[2mms[22m[39m
-   [33m[2m✓[22m[39m server bind guard (F-3)[2m > [22mrefuses HOST=0.0.0.0 without FARLAB_ALLOW_REMOTE, names the remedy, exits 1 [33m 335[2mms[22m[39m
-   [33m[2m✓[22m[39m server bind guard (F-3)[2m > [22mloopback HOST passes the guard (server reaches listening state) [33m 341[2mms[22m[39m
- [32m✓[39m tests/dictation.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 11[2mms[22m[39m
- [32m✓[39m tests/judge-temp-pin.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 7[2mms[22m[39m
- [32m✓[39m tests/cli-dist-freshness.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 8[2mms[22m[39m
- [32m✓[39m tests/recovery.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 37[2mms[22m[39m
- [32m✓[39m tests/citation-entries.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 114[2mms[22m[39m
- [32m✓[39m tests/dataset-audit.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 6508[2mms[22m[39m
-   [33m[2m✓[22m[39m RU-8 GO1 dataset audit (real sidecar, cleanlab)[2m > [22mclean dataset -> verdict ok, zero findings [33m 2213[2mms[22m[39m
-   [33m[2m✓[22m[39m RU-8 GO1 dataset audit (real sidecar, cleanlab)[2m > [22mleakage and duplicates are detected exactly and degrade the verdict [33m 2161[2mms[22m[39m
-   [33m[2m✓[22m[39m RU-8 GO1 dataset audit (real sidecar, cleanlab)[2m > [22mplanted label errors are surfaced (advisory, count > 0) [33m 2131[2mms[22m[39m
- [32m✓[39m tests/judge-votes.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 8[2mms[22m[39m
- [32m✓[39m tests/event-stream-tracker.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 7[2mms[22m[39m
- [32m✓[39m tests/reliability-db-guards.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 24[2mms[22m[39m
- [32m✓[39m tests/codeact-escape-regression.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 15[2mms[22m[39m
- [32m✓[39m tests/protocol-web.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 6[2mms[22m[39m
- [32m✓[39m tests/gateway-discipline.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 6[2mms[22m[39m
- [32m✓[39m tests/health.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 9[2mms[22m[39m
- [32m✓[39m tests/web-normalize.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 8[2mms[22m[39m
- [32m✓[39m tests/identifier-extract.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 8[2mms[22m[39m
- [32m✓[39m tests/file-ingest.test.ts [2m([22m[2m13 tests[22m[2m)[22m[33m 355[2mms[22m[39m
+ [32m✓[39m tests/search-conversations.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 153[2mms[22m[39m
+ [32m✓[39m tests/dataset-audit.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 4556[2mms[22m[39m
+   [33m[2m✓[22m[39m RU-8 GO1 dataset audit (real sidecar, cleanlab)[2m > [22mclean dataset -> verdict ok, zero findings [33m 1422[2mms[22m[39m
+   [33m[2m✓[22m[39m RU-8 GO1 dataset audit (real sidecar, cleanlab)[2m > [22mleakage and duplicates are detected exactly and degrade the verdict [33m 1461[2mms[22m[39m
+   [33m[2m✓[22m[39m RU-8 GO1 dataset audit (real sidecar, cleanlab)[2m > [22mplanted label errors are surfaced (advisory, count > 0) [33m 1671[2mms[22m[39m
+ [32m✓[39m tests/corpus-items.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 106[2mms[22m[39m
+ [32m✓[39m tests/dictation.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/server-bind-guard.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 525[2mms[22m[39m
+ [32m✓[39m tests/cli-dist-freshness.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m tests/judge-temp-pin.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m tests/judge-votes.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m tests/recovery.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 104[2mms[22m[39m
+ [32m✓[39m tests/citation-entries.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 74[2mms[22m[39m
+ [32m✓[39m tests/event-stream-tracker.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m tests/reliability-db-guards.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m tests/codeact-escape-regression.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m tests/protocol-web.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m tests/gateway-discipline.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m tests/health.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m tests/web-normalize.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/identifier-extract.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m tests/file-ingest.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 282[2mms[22m[39m
 [90mstderr[2m | tests/ingest-pdf-e2e.test.ts[2m > [22m[2mdense synthetic paper end-to-end — collect → validate → understand → SDM[2m > [22m[2mcollects a dense text layer, validates, and builds structured SDM with provenance
 [22m[39mWarning: Font "F1" is not available -- attempting to fallback to a default font.
 
@@ -333,52 +366,10 @@ LINT_FAILED
 [90mstderr[2m | tests/ingest-pdf-e2e.test.ts[2m > [22m[2mpayload integrity[2m > [22m[2mcollector sha256 matches the shared hasher
 [22m[39mWarning: Indexing all PDF objects
 
- [32m✓[39m tests/ingest-pdf-e2e.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 1119[2mms[22m[39m
-   [33m[2m✓[22m[39m dense synthetic paper end-to-end — collect → validate → understand → SDM[2m > [22mcollects a dense text layer, validates, and builds structured SDM with provenance [33m 1066[2mms[22m[39m
+ [32m✓[39m tests/ingest-pdf-e2e.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 481[2mms[22m[39m
+   [33m[2m✓[22m[39m dense synthetic paper end-to-end — collect → validate → understand → SDM[2m > [22mcollects a dense text layer, validates, and builds structured SDM with provenance [33m 438[2mms[22m[39m
 
-[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 6 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
-
-[41m[1m FAIL [22m[49m tests/executor-theory.test.ts[2m > [22mtheory executor (deterministic doubles, real store)[2m > [22ma bound true identity verdicts supports and feeds the hypothesis (approval covered)
-[31m[1mTypeError[22m: Cannot read properties of undefined (reading 'parse')[39m
-[36m [2m❯[22m Store.putObject src/persistence/store.ts:[2m463:27[22m[39m
-    [90m461| [39m  putObject<K extends ObjectKind>(kind: K, obj: DomainObject<K>): void…
-    [90m462| [39m    [35mconst[39m schema [33m=[39m [33mKIND_SCHEMAS[39m[kind] [35mas[39m [33mAnySchema[39m[33m;[39m
-    [90m463| [39m    const parsed = schema.parse(obj) as { id?: string; revisionId?: st…
-    [90m   | [39m                          [31m^[39m
-    [90m464| [39m    // VersionDiff is the one kind keyed by revisionId instead of id; …
-    [90m465| [39m    [35mconst[39m id [33m=[39m parsed[33m.[39mid [33m??[39m parsed[33m.[39mrevisionId[33m;[39m
-[90m [2m❯[22m executeTheoryAnalysis src/experiment/executor-theory.ts:[2m74:9[22m[39m
-[90m [2m❯[22m tests/executor-theory.test.ts:[2m116:23[22m[39m
-
-[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯[22m[39m
-
-[41m[1m FAIL [22m[49m tests/executor-theory.test.ts[2m > [22mtheory executor (deterministic doubles, real store)[2m > [22ma false identity verdicts falsifies (residual above tolerance)
-[31m[1mTypeError[22m: Cannot read properties of undefined (reading 'parse')[39m
-[36m [2m❯[22m Store.putObject src/persistence/store.ts:[2m463:27[22m[39m
-    [90m461| [39m  putObject<K extends ObjectKind>(kind: K, obj: DomainObject<K>): void…
-    [90m462| [39m    [35mconst[39m schema [33m=[39m [33mKIND_SCHEMAS[39m[kind] [35mas[39m [33mAnySchema[39m[33m;[39m
-    [90m463| [39m    const parsed = schema.parse(obj) as { id?: string; revisionId?: st…
-    [90m   | [39m                          [31m^[39m
-    [90m464| [39m    // VersionDiff is the one kind keyed by revisionId instead of id; …
-    [90m465| [39m    [35mconst[39m id [33m=[39m parsed[33m.[39mid [33m??[39m parsed[33m.[39mrevisionId[33m;[39m
-[90m [2m❯[22m executeTheoryAnalysis src/experiment/executor-theory.ts:[2m74:9[22m[39m
-[90m [2m❯[22m tests/executor-theory.test.ts:[2m154:23[22m[39m
-
-[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯[22m[39m
-
-[41m[1m FAIL [22m[49m tests/executor-theory.test.ts[2m > [22mtheory executor (deterministic doubles, real store)[2m > [22mnon-finite grid points make the claim insufficient_data (the grid cannot test it)
-[31m[1mTypeError[22m: Cannot read properties of undefined (reading 'parse')[39m
-[36m [2m❯[22m Store.putObject src/persistence/store.ts:[2m463:27[22m[39m
-    [90m461| [39m  putObject<K extends ObjectKind>(kind: K, obj: DomainObject<K>): void…
-    [90m462| [39m    [35mconst[39m schema [33m=[39m [33mKIND_SCHEMAS[39m[kind] [35mas[39m [33mAnySchema[39m[33m;[39m
-    [90m463| [39m    const parsed = schema.parse(obj) as { id?: string; revisionId?: st…
-    [90m   | [39m                          [31m^[39m
-    [90m464| [39m    // VersionDiff is the one kind keyed by revisionId instead of id; …
-    [90m465| [39m    [35mconst[39m id [33m=[39m parsed[33m.[39mid [33m??[39m parsed[33m.[39mrevisionId[33m;[39m
-[90m [2m❯[22m executeTheoryAnalysis src/experiment/executor-theory.ts:[2m74:9[22m[39m
-[90m [2m❯[22m tests/executor-theory.test.ts:[2m178:23[22m[39m
-
-[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯[22m[39m
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 3 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
 
 [41m[1m FAIL [22m[49m tests/executor-theory.test.ts[2m > [22mtheory executor (deterministic doubles, real store)[2m > [22mthe lexical admission gate rejects free identifiers outside the grid
 [31m[1mZodError[22m: [
@@ -403,21 +394,26 @@ LINT_FAILED
     [90m 53| [39m    question[33m:[39m [32m'Does the derived identity hold?'[39m[33m,[39m
 [90m [2m❯[22m tests/executor-theory.test.ts:[2m205:18[22m[39m
 
-[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯[22m[39m
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯[22m[39m
 
 [41m[1m FAIL [22m[49m tests/executor-theory.test.ts[2m > [22mtheory executor (real sidecar)[2m > [22mevaluates a true identity to a machine-epsilon residual on the real grid
-[31m[1mTypeError[22m: Cannot read properties of undefined (reading 'parse')[39m
-[36m [2m❯[22m Store.putObject src/persistence/store.ts:[2m463:27[22m[39m
-    [90m461| [39m  putObject<K extends ObjectKind>(kind: K, obj: DomainObject<K>): void…
-    [90m462| [39m    [35mconst[39m schema [33m=[39m [33mKIND_SCHEMAS[39m[kind] [35mas[39m [33mAnySchema[39m[33m;[39m
-    [90m463| [39m    const parsed = schema.parse(obj) as { id?: string; revisionId?: st…
-    [90m   | [39m                          [31m^[39m
-    [90m464| [39m    // VersionDiff is the one kind keyed by revisionId instead of id; …
-    [90m465| [39m    [35mconst[39m id [33m=[39m parsed[33m.[39mid [33m??[39m parsed[33m.[39mrevisionId[33m;[39m
-[90m [2m❯[22m executeTheoryAnalysis src/experiment/executor-theory.ts:[2m74:9[22m[39m
-[90m [2m❯[22m tests/executor-theory.test.ts:[2m235:23[22m[39m
+[31m[1mError[22m: theory experiment xrun_yabr6tnszshxk44rj034m7f9jh failed: theory experiment xrun_yabr6tnszshxk44rj034m7f9jh failed: IndexError: index 36 is out of bounds for size 1[39m
+[36m [2m❯[22m fail src/experiment/executor-theory.ts:[2m98:11[22m[39m
+    [90m 96| [39m  const fail: (message: string, cause?: unknown) => never = (message, …
+    [90m 97| [39m    persist({ ...expRun, status: 'failed', error: message, endedAt: no…
+    [90m 98| [39m    throw new Error(`theory experiment ${expRun.id} failed: ${message}…
+    [90m   | [39m          [31m^[39m
+    [90m 99| [39m  }[33m;[39m
+    [90m100| [39m
+[90m [2m❯[22m executeTheoryAnalysis src/experiment/executor-theory.ts:[2m214:5[22m[39m
+[90m [2m❯[22m tests/executor-theory.test.ts:[2m235:17[22m[39m
 
-[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯[22m[39m
+[31m[1mCaused by: Error[22m: theory experiment xrun_yabr6tnszshxk44rj034m7f9jh failed: IndexError: index 36 is out of bounds for size 1[39m
+[36m [2m❯[22m fail src/experiment/executor-theory.ts:[2m98:11[22m[39m
+[90m [2m❯[22m executeTheoryAnalysis src/experiment/executor-theory.ts:[2m134:44[22m[39m
+[90m [2m❯[22m tests/executor-theory.test.ts:[2m235:17[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯[22m[39m
 
 [41m[1m FAIL [22m[49m tests/executor-theory.test.ts[2m > [22mexecute stage routing: ML and literature infeasible fall through to the theory leg[2m > [22mruns a theory identity experiment end-to-end (exploratory, real sidecar)
 [31m[1mAssertionError[22m: expected 'skipped' to be 'done' // Object.is equality[39m
@@ -433,61 +429,55 @@ Received: "skipped"
     [90m317| [39m    expect(out.kind === 'done' && out.summary).toContain('theory ident…
     [90m318| [39m    expect(out.kind === 'done' && out.summary).toContain('numerical sp…
 
-[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯[22m[39m
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯[22m[39m
 
 
 [2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m217 passed[39m[22m[2m | [22m[33m1 skipped[39m[90m (219)[39m
-[2m      Tests [22m [1m[31m6 failed[39m[22m[2m | [22m[1m[32m2213 passed[39m[22m[2m | [22m[33m7 skipped[39m[90m (2226)[39m
-[2m   Start at [22m 15:42:57
-[2m   Duration [22m 103.68s[2m (transform 5.86s, setup 0ms, collect 41.61s, tests 212.08s, environment 680ms, prepare 17.61s)[22m
+[2m      Tests [22m [1m[31m3 failed[39m[22m[2m | [22m[1m[32m2216 passed[39m[22m[2m | [22m[33m7 skipped[39m[90m (2226)[39m
+[2m   Start at [22m 15:50:11
+[2m   Duration [22m 97.23s[2m (transform 4.27s, setup 0ms, collect 30.13s, tests 222.91s, environment 418ms, prepare 11.65s)[22m
 
-
-::error file=/home/runner/work/FAR-Lab/FAR-Lab/src/persistence/store.ts,title=tests/executor-theory.test.ts > theory executor (deterministic doubles%2C real store) > a bound true identity verdicts supports and feeds the hypothesis (approval covered),line=463,column=27::TypeError: Cannot read properties of undefined (reading 'parse')%0A ❯ Store.putObject src/persistence/store.ts:463:27%0A ❯ executeTheoryAnalysis src/experiment/executor-theory.ts:74:9%0A ❯ tests/executor-theory.test.ts:116:23%0A%0A
-
-::error file=/home/runner/work/FAR-Lab/FAR-Lab/src/persistence/store.ts,title=tests/executor-theory.test.ts > theory executor (deterministic doubles%2C real store) > a false identity verdicts falsifies (residual above tolerance),line=463,column=27::TypeError: Cannot read properties of undefined (reading 'parse')%0A ❯ Store.putObject src/persistence/store.ts:463:27%0A ❯ executeTheoryAnalysis src/experiment/executor-theory.ts:74:9%0A ❯ tests/executor-theory.test.ts:154:23%0A%0A
-
-::error file=/home/runner/work/FAR-Lab/FAR-Lab/src/persistence/store.ts,title=tests/executor-theory.test.ts > theory executor (deterministic doubles%2C real store) > non-finite grid points make the claim insufficient_data (the grid cannot test it),line=463,column=27::TypeError: Cannot read properties of undefined (reading 'parse')%0A ❯ Store.putObject src/persistence/store.ts:463:27%0A ❯ executeTheoryAnalysis src/experiment/executor-theory.ts:74:9%0A ❯ tests/executor-theory.test.ts:178:23%0A%0A
 
 ::error file=/home/runner/work/FAR-Lab/FAR-Lab/tests/executor-theory.test.ts,title=tests/executor-theory.test.ts > theory executor (deterministic doubles%2C real store) > the lexical admission gate rejects free identifiers outside the grid,line=51,column=14::ZodError: [%0A  {%0A    "code": "custom",%0A    "message": "claims[0].lhs: identifier 'y' is neither a grid variable nor a whitelisted function/constant",%0A    "path": [%0A      "claims",%0A      0,%0A      "lhs"%0A    ]%0A  }%0A]%0A ❯ Object.get error [as error] node_modules/zod/v3/types.js:39:31%0A ❯ ZodEffects.parse node_modules/zod/v3/types.js:114:22%0A ❯ makeSpec tests/executor-theory.test.ts:51:14%0A ❯ tests/executor-theory.test.ts:205:18%0A%0A⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯%0ASerialized Error: { issues: [ { code: 'custom', message: 'claims[0].lhs: identifier \'y\' is neither a grid variable nor a whitelisted function/constant', path: [ 'claims', +0, 'lhs' ] } ], addIssue: 'Function<anonymous>', addIssues: 'Function<anonymous>', errors: [ { code: 'custom', message: 'claims[0].lhs: identifier \'y\' is neither a grid variable nor a whitelisted function/constant', path: [ 'claims', +0, 'lhs' ] } ], format: 'Function<format>', isEmpty: false, flatten: 'Function<flatten>', formErrors: { formErrors: [], fieldErrors: { claims: [ 'claims[0].lhs: identifier \'y\' is neither a grid variable nor a whitelisted function/constant' ] } } }%0A
 
-::error file=/home/runner/work/FAR-Lab/FAR-Lab/src/persistence/store.ts,title=tests/executor-theory.test.ts > theory executor (real sidecar) > evaluates a true identity to a machine-epsilon residual on the real grid,line=463,column=27::TypeError: Cannot read properties of undefined (reading 'parse')%0A ❯ Store.putObject src/persistence/store.ts:463:27%0A ❯ executeTheoryAnalysis src/experiment/executor-theory.ts:74:9%0A ❯ tests/executor-theory.test.ts:235:23%0A%0A
+::error file=/home/runner/work/FAR-Lab/FAR-Lab/src/experiment/executor-theory.ts,title=tests/executor-theory.test.ts > theory executor (real sidecar) > evaluates a true identity to a machine-epsilon residual on the real grid,line=98,column=11::Error: theory experiment xrun_yabr6tnszshxk44rj034m7f9jh failed: theory experiment xrun_yabr6tnszshxk44rj034m7f9jh failed: IndexError: index 36 is out of bounds for size 1%0A ❯ fail src/experiment/executor-theory.ts:98:11%0A ❯ executeTheoryAnalysis src/experiment/executor-theory.ts:214:5%0A ❯ tests/executor-theory.test.ts:235:17%0A%0ACaused by: Caused by: Error: theory experiment xrun_yabr6tnszshxk44rj034m7f9jh failed: IndexError: index 36 is out of bounds for size 1%0A ❯ fail src/experiment/executor-theory.ts:98:11%0A ❯ executeTheoryAnalysis src/experiment/executor-theory.ts:134:44%0A ❯ tests/executor-theory.test.ts:235:17%0A%0A
 
 ::error file=/home/runner/work/FAR-Lab/FAR-Lab/tests/executor-theory.test.ts,title=tests/executor-theory.test.ts > execute stage routing%3A ML and literature infeasible fall through to the theory leg > runs a theory identity experiment end-to-end (exploratory%2C real sidecar),line=316,column=22::AssertionError: expected 'skipped' to be 'done' // Object.is equality%0A%0AExpected: "done"%0AReceived: "skipped"%0A%0A ❯ tests/executor-theory.test.ts:316:22%0A%0A
 VITEST_FAILED
 
 ===== tui test (last 40 lines) =====
-✔ e2e chat: post → agent reply; proposal card carries server-computed risk/args; approve executes it (34.418777ms)
-✔ e2e chat: provider failure keeps the researcher message with replyError (12.364845ms)
-✔ e2e control: cancel answers with the honest requested/reason contract (6.689128ms)
-✔ parseSseChunk: complete frames in one chunk (1.794271ms)
-✔ parseSseChunk: frames split across chunks reassemble (id/data/blank-line splits) (4.315011ms)
-✔ parseSseChunk: CRLF wires parse identically; multi-line data joins with \n (0.275502ms)
-✔ parseSseChunk: comment-only keep-alives produce no messages; unknown fields ignored (2.109166ms)
-✔ backoffDelayMs: 500ms base, doubling, capped at 8s (0.269159ms)
-✔ applyEventToStages: incremental merge equals the full-list derivation (1.969436ms)
-✔ applyEventToStages: input map is never mutated (pure) (0.415962ms)
-✔ App: [2] switches to the conversations workspace and renders rows (253.691431ms)
-✔ App: conversation list rows show title, turns, and recency (114.616628ms)
-✔ ChatView: renders turns, failed-turn banner, tool bar, pending card with risk + argSummary (120.348799ms)
-✔ ChatView: y approves without remember; a approves with remember; n rejects (704.833818ms)
-✔ ChatView: n opens the chat composer; confirm sends the REAL message via deps.post (504.795323ms)
-✔ ChatView: launch composer stops at READY without FAR_ALLOW_LIVE (no launch call) (468.712464ms)
-✔ ChatView: s attaches a local file that rides the next posted message (781.168148ms)
-✔ ChatView: s with an unreadable path surfaces the honest error and keeps composing (389.420231ms)
-✔ RunDetailView live: initial snapshot renders, subscription events update stages + conn state (298.505455ms)
-✔ RunDetailView live: c→y requests cancel through deps; f→y forks and reports the new id (637.661046ms)
-✔ RunDetailView live: h/e/l sub-views render narrowed objects; Esc returns (776.804253ms)
-✔ RunDetailView static (injected events): no subscription, no conn state, stages render (176.941914ms)
-✔ App renders study list from injected runs (no network) (52.300693ms)
-✔ App detail view renders the stage narrative from injected events (191.825371ms)
-✔ Composer: typing, enter → confirm view, y → submitted-ready (no POST path) (277.055115ms)
-✔ Composer: q in confirm cancels; n returns to editing (429.182697ms)
-✔ App "n" opens the composer view (109.962781ms)
-✔ readSeedFile: text file becomes a seed with filename title + full text (1.959898ms)
-✔ readSeedFile: missing file fails with the actionable cause (0.510448ms)
-✔ readSeedFile: directory is refused honestly (0.257858ms)
-✔ readSeedFile: oversized text is refused (50k contract) (0.417545ms)
-✔ readSeedFile: empty path is refused (0.233383ms)
+✔ e2e chat: post → agent reply; proposal card carries server-computed risk/args; approve executes it (26.576421ms)
+✔ e2e chat: provider failure keeps the researcher message with replyError (10.40817ms)
+✔ e2e control: cancel answers with the honest requested/reason contract (6.462972ms)
+✔ parseSseChunk: complete frames in one chunk (4.29152ms)
+✔ parseSseChunk: frames split across chunks reassemble (id/data/blank-line splits) (3.02182ms)
+✔ parseSseChunk: CRLF wires parse identically; multi-line data joins with \n (0.212207ms)
+✔ parseSseChunk: comment-only keep-alives produce no messages; unknown fields ignored (2.375391ms)
+✔ backoffDelayMs: 500ms base, doubling, capped at 8s (0.206877ms)
+✔ applyEventToStages: incremental merge equals the full-list derivation (1.561139ms)
+✔ applyEventToStages: input map is never mutated (pure) (0.299392ms)
+✔ App: [2] switches to the conversations workspace and renders rows (253.591602ms)
+✔ App: conversation list rows show title, turns, and recency (105.270675ms)
+✔ ChatView: renders turns, failed-turn banner, tool bar, pending card with risk + argSummary (108.850562ms)
+✔ ChatView: y approves without remember; a approves with remember; n rejects (683.172864ms)
+✔ ChatView: n opens the chat composer; confirm sends the REAL message via deps.post (495.600885ms)
+✔ ChatView: launch composer stops at READY without FAR_ALLOW_LIVE (no launch call) (461.701437ms)
+✔ ChatView: s attaches a local file that rides the next posted message (774.664164ms)
+✔ ChatView: s with an unreadable path surfaces the honest error and keeps composing (381.555344ms)
+✔ RunDetailView live: initial snapshot renders, subscription events update stages + conn state (290.507281ms)
+✔ RunDetailView live: c→y requests cancel through deps; f→y forks and reports the new id (630.760358ms)
+✔ RunDetailView live: h/e/l sub-views render narrowed objects; Esc returns (769.711854ms)
+✔ RunDetailView static (injected events): no subscription, no conn state, stages render (169.922464ms)
+✔ App renders study list from injected runs (no network) (99.281674ms)
+✔ App detail view renders the stage narrative from injected events (181.776299ms)
+✔ Composer: typing, enter → confirm view, y → submitted-ready (no POST path) (264.327865ms)
+✔ Composer: q in confirm cancels; n returns to editing (422.153613ms)
+✔ App "n" opens the composer view (101.605942ms)
+✔ readSeedFile: text file becomes a seed with filename title + full text (1.310212ms)
+✔ readSeedFile: missing file fails with the actionable cause (0.4319ms)
+✔ readSeedFile: directory is refused honestly (0.140287ms)
+✔ readSeedFile: oversized text is refused (50k contract) (0.275219ms)
+✔ readSeedFile: empty path is refused (0.123208ms)
 ℹ tests 49
 ℹ suites 0
 ℹ pass 49
@@ -495,7 +485,7 @@ VITEST_FAILED
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 6086.119259
+ℹ duration_ms 5823.743366
 
 ===== cli smoke (last 20 lines) =====
   far data obs [--json]                          Reliability observability: process/storage state,
@@ -649,4 +639,4 @@ license ledger: PASS (4 workspaces audited, 1 allowed exception(s))
 - Using dynamic import() to code-split the application
 - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
-[32m✓ built in 16.56s[39m
+[32m✓ built in 12.80s[39m
