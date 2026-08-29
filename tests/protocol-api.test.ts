@@ -140,11 +140,13 @@ describe('protocol HTTP surface (real server)', () => {
           body: JSON.stringify(body),
         });
 
-      // dependency order: ps2 cannot start while ps1 is pending — 409 with the machine's reason
+      // dependency order: ps2 cannot start while ps1 is pending — 409 with the machine's reason.
+      // Wire contract: api.ts collapses state_conflict into the public 'validation' code;
+      // the 409 status still distinguishes a state-machine rejection from a malformed body.
       const early = await post({ actor: 'Dr. Chen', kind: 'step_started', stepId: 'ps2' });
       expect(early.status).toBe(409);
       const earlyBody = (await early.json()) as { error: { code: string; message: string } };
-      expect(earlyBody.error.code).toBe('state_conflict');
+      expect(earlyBody.error.code).toBe('validation');
       expect(earlyBody.error.message).toContain('depends on ps1');
 
       // invalid body: actor missing → 400
