@@ -213,8 +213,42 @@ fn final_transitions(
 
 #[cfg(test)]
 mod tests {
-    use super::final_transitions;
+    use super::{deep_link_hash, final_transitions, hash_assign_script};
     use std::collections::HashMap;
+
+    #[test]
+    fn deep_link_hash_maps_the_documented_shapes() {
+        assert_eq!(deep_link_hash("far://run/run_abc123"), Some("#study/run_abc123".to_string()));
+        assert_eq!(deep_link_hash("far://"), Some("#lab/new".to_string()));
+        assert_eq!(deep_link_hash("far://lab/new"), Some("#lab/new".to_string()));
+        assert_eq!(deep_link_hash("far://conv/c_1"), Some("#conv/c_1".to_string()));
+        // payload prefix (e.g. the protocol handler's quoting) is tolerated
+        assert_eq!(deep_link_hash("\"far://run/x\""), Some("#study/x".to_string()));
+        // cut-set: quote/space/backslash end the path
+        assert_eq!(deep_link_hash("far://run/x y"), Some("#study/x".to_string()));
+        assert_eq!(deep_link_hash("far://run/x\"y"), Some("#study/x".to_string()));
+        assert_eq!(deep_link_hash("far://run/x\\y"), Some("#study/x".to_string()));
+        // no far:// scheme -> no navigation
+        assert_eq!(deep_link_hash("https://example.com"), None);
+        assert_eq!(deep_link_hash(""), None);
+    }
+
+    #[test]
+    fn hash_assign_script_never_leaks_raw_input_into_the_literal() {
+        // The red-team attack payload: single-quote breakout.
+        let s = hash_assign_script("#lab/x';eval('arbitrary');//");
+        assert!(s.starts_with("location.hash = \""));
+        assert!(s.ends_with("\";"));
+        assert!(serde_json::from_str::<String>(&s["location.hash = ".len()..s.len() - 1]).is_ok());
+        // Property: the encoded argument is a complete JSON string literal — the
+        // script is exactly `location.hash = <literal>;` with no unescaped quote
+        // before the terminating semicolon.
+        for probe in ["#a\"b", "#a\\b", "#a\nb", "#a\rb", "#a\tb", "#a\u{2028}b", "#日本語", "#a\u{1F600}"] {
+            let script = hash_assign_script(probe);
+            let body = script.strip_prefix("location.hash = ").and_then(|s| s.strip_suffix(';')).unwrap();
+            assert_eq!(serde_json::from_str::<String>(body).unwrap(), probe, "probe {probe:?}");
+        }
+    }
 
     fn m(pairs: &[(&str, &str)]) -> HashMap<String, String> {
         pairs.iter().map(|(a, b)| (a.to_string(), b.to_string())).collect()
@@ -261,32 +295,44 @@ mod tests {
 /// JS string literal executed by `eval` (which bypasses page CSP).
 fn navigate_hash(app: &tauri::AppHandle, hash: &str) {
     if let Some(w) = app.get_webview_window("main") {
-        let encoded = serde_json::to_string(hash).unwrap_or_else(|_| "\"#lab/new\"".to_string());
-        let script = format!("location.hash = {encoded};");
+        let script = hash_assign_script(hash);
         let _ = w.eval(&script);
     }
+}
+
+/// Pure: the exact script `navigate_hash` executes. Exported-in-module for the
+/// table/property tests below (red-team P2: the injection-critical encoding
+/// must be locked by tests, not by review).
+fn hash_assign_script(hash: &str) -> String {
+    // to_string of a &str cannot fail; the fallback is unreachable belt-and-braces.
+    let encoded = serde_json::to_string(hash).unwrap_or_else(|_| "\"#lab/new\"".to_string());
+    format!("location.hash = {encoded};")
+}
+
+/// Pure: map a raw deep-link payload to the workbench hash it navigates to
+/// (None when the payload carries no far:// URL). Extracted from
+/// handle_deep_link for table-driven tests.
+fn deep_link_hash(payload: &str) -> Option<String> {
+    let start = payload.find("far://")?;
+    let rest = &payload[start + "far://".len()..];
+    // Cut at characters that cannot be part of a hash route we ever mint
+    // (defense in depth on top of hash_assign_script's JSON encoding).
+    let end = rest.find(['"', '\'', ' ', '\\']).unwrap_or(rest.len());
+    let path = &rest[..end];
+    Some(match path.strip_prefix("run/") {
+        // far://run/<id> opens the study MAP (the primary view); other
+        // paths pass through as hashes (#study/.., #conv/.., #lab/new).
+        Some(run_id) => format!("#study/{run_id}"),
+        None if path.is_empty() => "#lab/new".to_string(),
+        None => format!("#{path}"),
+    })
 }
 
 /// Handle a far:// URL: far://run/<id> -> workbench #run/<id>. Unknown paths
 /// fall back to the home view; malformed input never crashes the shell.
 fn handle_deep_link(app: &tauri::AppHandle, payload: &str) {
-    if let Some(start) = payload.find("far://") {
-        let rest = &payload[start + "far://".len()..];
-        // Cut at characters that cannot be part of a hash route we ever mint
-        // (defense in depth on top of navigate_hash's JSON encoding).
-        let end = rest.find(['"', '\'', ' ', '\\']).unwrap_or(rest.len());
-        let path = &rest[..end];
-        if path.is_empty() {
-            navigate_hash(app, "#lab/new");
-        } else {
-            // far://run/<id> opens the study MAP (the primary view); other
-            // paths pass through as hashes (#study/.., #conv/.., #lab/new).
-            if let Some(run_id) = path.strip_prefix("run/") {
-                navigate_hash(app, &format!("#study/{run_id}"));
-            } else {
-                navigate_hash(app, &format!("#{path}"));
-            }
-        }
+    if let Some(hash) = deep_link_hash(payload) {
+        navigate_hash(app, &hash);
     }
 }
 

@@ -69,6 +69,9 @@ Usage:
   far data info [--json]                         Data footprint: runs, db size, artifacts, exports
   far data obs [--json]                          Reliability observability: process/storage state,
                                                   per-run recovery phases, workspace error profile
+  far ingest <file.(md|tex|csv|…|xlsx|svg)>      Deterministic artifact understanding (SDM or dataset
+                                                  profile; PDFs are web-client pdfjs only)
+  far inspect <runId> [seq] [--json]             Time-travel projection of a run AS OF an event seq
   far memory <query> [--kind <k>] [--json]       Search the re-audit memory queue (kind:
                                                   episodic|semantic|experiment_outcome|profile)
   far backup [<dest.db>]                         Consistent DB snapshot via VACUUM INTO (never

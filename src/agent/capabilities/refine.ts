@@ -3,6 +3,7 @@ import path from 'node:path';
 import { canonicalSha256 } from '../../shared/crypto.js';
 import type { ArtifactStore, ModelProvider, SourceAdapter } from '../../shared/ports.js';
 import type { Store } from '../../persistence/store.js';
+import { isTemplateHypothesis } from '../../domain/scientific-state.js';
 import type { SourceFamily } from '../../domain/source.js';
 import { newId, ProvenanceReceipt, AgentSession, AgentReport, type AgentTelemetrySummary, type AgentTurnRecord } from '../../domain/index.js';
 import { receiptEventDetail } from '../../pipeline/llm.js';
@@ -110,9 +111,14 @@ export const runEvidenceGapRefinement = async (deps: RefineDeps, runId: string, 
   if (run === null) throw new Error(`run not found: ${runId}`);
   const question = deps.store.getObject('question', run.questionId);
   if (question === null) throw new Error(`question not found for run ${runId}: ${run.questionId}`);
-  const hypotheses = deps.store.listObjects('hypothesis', runId);
+  // Real-content discipline (red-team P2-4): legacy offline runs carry template
+  // hypotheses in the audit store — refining them spends live tokens analyzing
+  // non-science and mints reports about objects every product surface filters.
+  const hypotheses = deps.store.listObjects('hypothesis', runId).filter((h) => !isTemplateHypothesis(h));
   if (hypotheses.length === 0) {
-    throw new Error(`run ${runId} has no hypotheses — run the pipeline first (far research start / resume)`);
+    throw new Error(
+      `run ${runId} has no real hypotheses (only offline-template content or none) — run the pipeline under a live route first (far research start / resume)`,
+    );
   }
 
   const topK = Math.max(1, Math.min(opts.topK ?? 2, 3));

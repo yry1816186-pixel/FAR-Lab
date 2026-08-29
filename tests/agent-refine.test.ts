@@ -144,7 +144,7 @@ describe('evidence-gap refinement capability (end-to-end on a real store)', () =
       await expect(runEvidenceGapRefinement(
         { store, artifacts, provider: createTestStubProvider([]), sourceFor: fakeAdapter, rolloutDir },
         emptyRun.id,
-      )).rejects.toThrow(/has no hypotheses/);
+      )).rejects.toThrow(/has no real hypotheses/);
     } finally {
       (store as unknown as { db: { close(): void } }).db.close();
     }

@@ -24,7 +24,7 @@ API server 的 loopback 安全守卫（api.ts F-1）天然只放行本机访问�
 |---|---|---|
 | Windows | **本仓库开发机真实构建+端到端验证**（拉起 health 200/1s；强杀经 Job Object 随行终止 server，4521 隔离端口复测 000） | WebView2 运行时（Win10 1803+ 预装） |
 | Linux | **Ubuntu 24.04（WSL2）真实构建+端到端验证**（`desktop/wsl-e2e-test.sh` 一键复现：cargo build → WSLg 窗口 → health 200 → 强杀 → `node-died-with-shell`——PR_SET_PDEATHSIG）；其他发行版未实测 | webkit2gtk-4.1（Debian 12+/Ubuntu 22.04+）；Node ≥24；NVIDIA/Wayland 已知 WebKitGTK 驱动坑见 line-b2 报告 |
-| macOS | **部分能力在 macOS 上为死路径**（代码就绪，未实测）：`far://` 协议注册仅 Windows 实现（main.rs 其余平台 no-op，且 macOS 深链经 Apple Events 而非 argv 送达，当前未接入）；tauri-plugin-single-instance 不支持 macOS（二次启动会开出第二个实例）。宣称可用前须在真实 Mac 实测并接入上述两项（Apple 许可将 macOS 限定于 Apple 硬件，本环境无法合法验证） | macOS 10.15+（系统 WebKit） |
+| macOS | **深链为死路径**（代码就绪，未实测）：`far://` 协议注册仅 Windows 实现（main.rs 其余平台 no-op），且 macOS 深链经 Apple Events 而非 argv 送达，当前未接入——二实例无法向首实例转发 far:// 链接。单实例插件（tauri-plugin-single-instance 2.4.3）有完整 macOS 实现（Unix socket 通知+聚焦首实例），该能力可用。宣称可用前须在真实 Mac 实测并接入深链（Apple 许可将 macOS 限定于 Apple 硬件，本环境无法合法验证） | macOS 10.15+（系统 WebKit） |
 
 ## 已知边界（不掩盖）
 

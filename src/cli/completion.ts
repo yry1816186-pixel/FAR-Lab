@@ -68,6 +68,8 @@ export const FAR_COMMANDS: readonly CompletionCommand[] = [
     { name: 'info', help: 'runs, db size, artifacts, exports' },
     { name: 'obs', help: 'reliability observability snapshot' },
   ] },
+  { name: 'ingest', help: 'deterministic artifact understanding (SDM/dataset profile)', subs: [] },
+  { name: 'inspect', help: 'time-travel projection of a run as of an event seq', subs: [] },
   { name: 'verify', help: 'verify a reproducibility bundle', subs: [] },
   { name: 'new', help: 'interactive wizard (TTY only)', subs: [] },
   {
