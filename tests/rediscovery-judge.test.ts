@@ -121,7 +121,7 @@ describe('judgeRediscovery pipeline v2.1', () => {
     expect(agentSidePair?.candidate).not.toBe(gt[0]);
   });
 
-  it('partial vote failure: 1-of-3 votes fail -> 2 valid; 1-1 tie does NOT match, 2-0 matches, all-fail is fail-visible', async () => {
+  it('partial vote failure: 1-of-5 votes fail -> 4 valid; 2-2 tie does NOT match, 4-0 matches, all-fail is fail-visible', async () => {
     const gt = ['Conjugative plasmids are the dominant horizontal-transfer vector for resistance genes in hospital settings.'];
     const agentClaim = 'Conjugative plasmid transfer is the dominant mechanism driving ARG spread in hospital environments.';
     const makeCall = (verdictPlan: Array<boolean[] | 'fail'>) => {
@@ -139,19 +139,19 @@ describe('judgeRediscovery pipeline v2.1', () => {
       };
     };
     // both sides of the pair are borderline -> each adjudication call carries TWO items
-    // vote1 fail, vote2 [T,T], vote3 [F,F] -> 1-1 tie among 2 valid -> NOT matched
+    // vote1 fail, votes2-5 [T,T],[F,F],[F,F],[F,F] -> 2-2 tie among 4 valid -> NOT matched
     const tie = await judgeRediscovery({ agentText: 't', gtClaims: gt, call: makeCall(['fail', [true, true], [false, false]]) });
     expect(tie.ok).toBe(true);
     if (tie.ok) {
       expect(tie.counts.agentMatched).toBe(0);
       expect(tie.scoredUnscored.votesFailed).toBe(1);
-      expect(tie.adjudicationVotes[0].votesOk).toBe(2);
+      expect(tie.adjudicationVotes[0].votesOk).toBe(4);
     }
-    // vote1 fail, vote2/vote3 unanimous yes -> 2-0 among 2 valid -> matched
+    // vote1 fail, votes2-5 unanimous yes -> 4-0 among 4 valid -> matched
     const unanim = await judgeRediscovery({ agentText: 't', gtClaims: gt, call: makeCall(['fail', [true, true], [true, true]]) });
     expect(unanim.ok).toBe(true);
     if (unanim.ok) expect(unanim.counts.agentMatched).toBe(1);
-    // all three fail -> fail-visible error
+    // all five fail -> fail-visible error
     const allFail = await judgeRediscovery({ agentText: 't', gtClaims: gt, call: makeCall(['fail', 'fail', 'fail']) });
     expect(allFail.ok).toBe(false);
     if (!allFail.ok) expect(allFail.error.stage).toBe('adjudicate');
@@ -173,7 +173,38 @@ describe('judgeRediscovery pipeline v2.1', () => {
     if (!res.ok) expect(res.error.stage).toBe('adjudicate');
   });
 
-  it('majority vote decides borderline pairs (2-of-3)', async () => {
+  it('object-shaped verdict elements ([{k,verdict:"same"}] — live-observed glm shape) are rejected, never silently counted as NO', async () => {
+    // 2026-08-29 live finding: glm-5.3 sometimes returns verdicts as objects; the
+    // consumer's `x === true` map turned each object into a false vote — whole
+    // batches voted 0/5 NO on paraphrase pairs. The validator must discard these
+    // as failed votes (fail-visible / unscored), and a single well-formed vote
+    // still decides when others are malformed.
+    const gt = ['Conjugative plasmids are the dominant horizontal-transfer vector for resistance genes in hospital settings.'];
+    const agentClaim = 'Conjugative plasmid transfer is the dominant mechanism driving ARG spread in hospital environments.';
+    let adjCall = 0;
+    const call = async (req: { purpose: string }, validate: (raw: unknown) => unknown) => {
+      if (req.purpose === 'rediscovery:decompose-v21') {
+        const v = validate({ agentClaims: [agentClaim] });
+        return v instanceof Error ? { ok: false, error: { message: v.message } } : { ok: true, data: v };
+      }
+      adjCall += 1;
+      // vote 1 and 2: object-shaped (rejected); votes 3-5: bare booleans, unanimous yes
+      const raw = adjCall <= 2
+        ? { verdicts: [{ k: 0, verdict: 'same' }, { k: 1, verdict: 'same' }] }
+        : { verdicts: [true, true] };
+      const v = validate(raw);
+      return v instanceof Error ? { ok: false, error: { message: v.message } } : { ok: true, data: v };
+    };
+    const res = await judgeRediscovery({ agentText: 't', gtClaims: gt, call });
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.scoredUnscored.votesFailed).toBe(2); // 2 malformed calls (object-shaped verdicts)
+      expect(res.scoredUnscored.votesOk).toBe(8); // accounting is per borderline item: 2 items x 5 votes - 2 failed calls
+      expect(res.counts.agentMatched).toBe(1); // the 3 well-formed yes votes decide — NOT the 2 object-shaped "no"s
+    }
+  });
+
+  it('majority vote decides borderline pairs (3-of-5)', async () => {
     // One agent claim chosen to land in the borderline band vs this GT claim — BOTH
     // sides independently classify as borderline at the calibrated thresholds.
     const gt = ['Conjugative plasmids are the dominant horizontal-transfer vector for resistance genes in hospital settings.'];
@@ -199,7 +230,7 @@ describe('judgeRediscovery pipeline v2.1', () => {
     if (res.ok) {
       expect(res.counts.agentMatched).toBe(1); // majority yes
       expect(res.counts.gtMatched).toBe(1);
-      expect(res.matcher.version).toBe('v2.1-fixed-gt+tfidf+3vote');
+      expect(res.matcher.version).toBe('v2.2-fixed-gt+tfidf+5vote');
     }
   });
 });
@@ -367,25 +398,36 @@ describe('gold calibration regression (claim-pair-gold.jsonl)', () => {
   const gold = readFileSync(goldPath, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l) as {
     task: string; side: string; claim: string; counterpart: string | null; bestSim: number; label: boolean;
   });
+  const goldV21Path = resolve(process.cwd(), 'eval/claim-pair-gold-v21.jsonl');
+  const goldV21 = readFileSync(goldV21Path, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l) as typeof gold[number]);
+  const merged = [...gold, ...goldV21];
 
   it('gold file exists with the recorded protocol (28 true / 76 false, main-agent)', () => {
     expect(gold.length).toBe(104);
     expect(gold.filter((g) => g.label).length).toBe(28);
   });
 
-  it('PRODUCTION defaults (MATCH_DEFAULTS) make ZERO deterministic errors on gold — mutation-locked', () => {
-    const detYes = gold.filter((g) => g.bestSim >= MATCH_DEFAULTS.high);
-    const detNo = gold.filter((g) => g.bestSim < MATCH_DEFAULTS.low);
+  it('v2.1-era gold batch exists (below-floor + band zones, 13 true / 40 false)', () => {
+    expect(goldV21.length).toBe(53);
+    expect(goldV21.filter((g) => g.label).length).toBe(13);
+    expect(goldV21.every((g) => g.src === 'rediscovery.jsonl@v2.1-concise-20260829')).toBe(true);
+  });
+
+  it('PRODUCTION defaults (MATCH_DEFAULTS) make ZERO deterministic errors on BOTH gold sets — mutation-locked', () => {
+    const detYes = merged.filter((g) => g.bestSim >= MATCH_DEFAULTS.high);
+    const detNo = merged.filter((g) => g.bestSim < MATCH_DEFAULTS.low);
     // regression guard: the values SHIPPED IN PRODUCTION must not auto-match a false
-    // pair nor auto-reject a true pair (verified by mutation: low 0.12->0.13 reddens)
+    // pair nor auto-reject a true pair (verified by mutation: low 0.10->0.12 reddens
+    // via the v21 batch's true pairs at 0.110-0.119)
     expect(detYes.every((g) => g.label)).toBe(true);
     expect(detNo.every((g) => !g.label)).toBe(true);
   });
 
   it('a tighter low threshold than production WOULD kill a true gold pair (mutation evidence)', () => {
-    // documents WHY low=0.12 exactly: the true pair at bestSim 0.124 sits just above it
-    const wouldKill = gold.filter((g) => g.label && g.bestSim < 0.13);
-    expect(wouldKill.length).toBeGreaterThan(0);
+    // documents WHY low=0.10: the 08-22 true pair at 0.124 AND the v21 true pairs at
+    // 0.110-0.119 all sit just above it
+    const wouldKill = merged.filter((g) => g.label && g.bestSim < 0.12);
+    expect(wouldKill.length).toBeGreaterThanOrEqual(3);
   });
 
   it('the old default (0.45/0.18) KILLED a true pair at 0.124 — mutation evidence the calibration mattered', () => {

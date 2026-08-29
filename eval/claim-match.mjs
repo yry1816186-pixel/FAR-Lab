@@ -85,13 +85,19 @@ export const tfidfCosine = (docsTokens) => {
  * that several claims may map to the same counterpart).
  */
 /**
- * Production matching thresholds. Calibrated 2026-08-22 against the main-agent gold
- * set (eval/claim-pair-gold.jsonl, 104 pairs) under a ZERO-gold-error constraint
- * (claim-match-calibrate.mjs v2); equivalence band 0.34-0.50 at detShare 33% — the
- * lexical-semantic separation ceiling. Exported so tests can lock the PRODUCTION
- * values (a mutation here must redden the gold regression test).
+ * Production matching thresholds. Calibrated against main-agent gold sets under a
+ * ZERO-gold-error constraint (claim-match-calibrate.mjs):
+ *  - 2026-08-22: claim-pair-gold.jsonl (104 pairs, verbose-decomposition era) → 0.40/0.12
+ *  - 2026-08-29: + claim-pair-gold-v21.jsonl (53 pairs sampled from the BELOW-FLOOR and
+ *    borderline zones of the v2.1 concise decomposition — a zone the 08-22 gold never
+ *    sampled). Three true pairs sit at 0.110-0.119, so low=0.12 auto-rejected them;
+ *    low drops to 0.10 (zero gold errors on 157 pairs; true min 0.110). high stays
+ *    0.40 (false max 0.340). A length-robust containment signal was tested and
+ *    REJECTED: gold true/false containment distributions overlap 0.20-0.63 (no
+ *    zero-error cutoff exists). Exported so tests can lock the PRODUCTION values
+ *    (a mutation here must redden the gold regression test).
  */
-export const MATCH_DEFAULTS = Object.freeze({ high: 0.40, low: 0.12 });
+export const MATCH_DEFAULTS = Object.freeze({ high: 0.40, low: 0.10 });
 
 export const thresholdMatch = (agentClaims, gtClaims, { high = MATCH_DEFAULTS.high, low = MATCH_DEFAULTS.low } = {}) => {
   const agentTokens = agentClaims.map(contentTokens);

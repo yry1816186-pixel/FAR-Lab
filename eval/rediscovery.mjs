@@ -14,11 +14,11 @@
  * falsification expectation) of a real research start run — rediscovery at hypothesis
  * level. NOT comparable to official FIRE-Bench agent scores (full-cycle, executed).
  *
- * Judge v2.1 (Wave-9 D-029, 2026-08-22): FIXED ground-truth claims (rediscovery-tasks.mjs,
+ * Judge v2.2 (2026-08-29 recalibration): FIXED ground-truth claims (rediscovery-tasks.mjs,
  * GT_REV) + agent-side fixed-granularity 3-pass-median decomposition + deterministic
- * TF-IDF threshold matching + 3-vote LLM adjudication ONLY for the borderline band
- * (pipeline single-sourced in rediscovery-judge.mjs). Variance budget and offline/live
- * measurement: eval/judge-variance.mjs.
+ * TF-IDF threshold matching (low recalibrated 0.12→0.10 on a new below-floor gold batch)
+ * + 5-vote LLM adjudication ONLY for the borderline band (pipeline single-sourced in
+ * rediscovery-judge.mjs). Variance budget and offline/live measurement: eval/judge-variance.mjs.
  *
  * Usage: node eval/rediscovery.mjs [--skip-runs] [--sample N]
  * Env: FARLAB_JUDGE_PROVIDER=zai|dashscope (deepseek banned 2026-08-22; default zai); key via env or .far-run/secrets.env.

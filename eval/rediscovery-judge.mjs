@@ -2,8 +2,11 @@
  * Rediscovery judge pipeline v2.1 (Wave-9 D-029 completion; single source of truth).
  *
  * v2 (D-037) made MATCHING deterministic (TF-IDF thresholds + LLM only for the
- * borderline band, 2-of-3 majority). v2.1 closes the remaining variance source:
- * DECOMPOSITION. The ground truth is no longer re-decomposed per judging pass —
+ * borderline band, majority-of-votes). v2.2 (2026-08-29) recalibrates the floor
+ * against a NEW gold batch sampled from the v2.1 concise decomposition's below-floor
+ * zone (claim-pair-gold-v21.jsonl): low 0.12→0.10, votes 3→5.
+ * v2.1 closed the remaining variance source: DECOMPOSITION. The ground truth is no
+ * longer re-decomposed per judging pass —
  * every task carries a FIXED, main-agent-reviewed gtClaims list (authored from the
  * recorded v1 median pass, 2026-08-22; see evidence/W9/) — and the agent-side
  * decomposition gets a fixed-granularity protocol (atomic subject-mechanism-direction
@@ -15,7 +18,10 @@
  *   agent decomposition -> 3-pass median (residual LLM variance, live-measured
  *                          by eval/judge-variance.mjs --live; BLOCKED while model
  *                          routes are down per D-036)
- *   borderline adjudication -> 3-vote majority (same)
+ *   borderline adjudication -> 5-vote majority (raised from 3 on 2026-08-29 with the
+ *                          gold-v21 recalibration: the wider band carries more pairs,
+ *                          and W9's vote-count experiment showed 3 votes are the
+ *                          largest single variance lever on band decisions)
  */
 
 import { thresholdMatch, finalizeCounts, MATCH_DEFAULTS } from './claim-match.mjs';
@@ -88,7 +94,7 @@ export const medianPass = (passes) => {
  * adapter: async (req, validate) -> { ok, data } | { ok:false, error }. Returns
  * fail-visible errors instead of throwing so variance harnesses can record them.
  */
-export const judgeRediscovery = async ({ agentText, gtClaims, call, passes = 3, votes = 3 }) => {
+export const judgeRediscovery = async ({ agentText, gtClaims, call, passes = 3, votes = 5 }) => {
   const validateDecompose = (raw) => {
     if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return new Error('not an object');
     if (!Array.isArray(raw.agentClaims) || raw.agentClaims.length === 0) return new Error('agentClaims empty');
@@ -106,7 +112,7 @@ export const judgeRediscovery = async ({ agentText, gtClaims, call, passes = 3, 
     decPasses.push(r.data.agentClaims.map((c) => String(c).trim()).filter(Boolean));
   }
   const agentClaims = medianPass(decPasses);
-  const MATCH = MATCH_DEFAULTS; // gold-calibrated 2026-08-22 (claim-pair-gold.jsonl, 104 pairs, zero-error constraint) — single source, mutation-locked by tests
+  const MATCH = MATCH_DEFAULTS; // gold-calibrated 2026-08-22 + 2026-08-29 (claim-pair-gold.jsonl 104 pairs + claim-pair-gold-v21.jsonl 53 pairs, zero-error constraint) — single source, mutation-locked by tests
   const m = thresholdMatch(agentClaims, gtClaims, MATCH);
   const adjudications = [];
   let adjudicationVotes = [];
@@ -123,6 +129,11 @@ export const judgeRediscovery = async ({ agentText, gtClaims, call, passes = 3, 
     const validateAdjudicate = (raw) => {
       if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return new Error('not an object');
       if (!Array.isArray(raw.verdicts) || raw.verdicts.length !== items.length) return new Error('verdicts misaligned');
+      // element type is load-bearing: glm-5.3 sometimes returns [{k, verdict:'same'}]
+      // objects; without this check the consumer's `x === true` map silently turned
+      // every object element into a NO vote (live-measured 2026-08-29 — whole batches
+      // voted 0/5 on paraphrase pairs)
+      if (!raw.verdicts.every((v) => typeof v === 'boolean')) return new Error('verdicts not booleans');
       return raw;
     };
     for (let v = 0; v < votes; v += 1) {
@@ -133,7 +144,7 @@ export const judgeRediscovery = async ({ agentText, gtClaims, call, passes = 3, 
           userPayload: {
             pairs: items.map((x, k) => ({ k, claim: x.claim, candidate: x.bestCounterpart })),
             instruction:
-              'For each pair decide: does the CLAIM assert substantially the same scientific finding (same entity/mechanism/direction) as the CANDIDATE? Synonyms count; vague-but-covering counts; unrelated or fabricated does not. Return verdicts array aligned with k order.',
+              'For each pair decide: does the CLAIM assert substantially the same scientific finding (same entity/mechanism/direction) as the CANDIDATE? Synonyms count; vague-but-covering counts; unrelated or fabricated does not. Return verdicts array aligned with k order, each element a bare JSON boolean (true/false) — NOT an object or string.',
           },
           outputKind: 'json',
           temperature: 0,
@@ -164,7 +175,7 @@ export const judgeRediscovery = async ({ agentText, gtClaims, call, passes = 3, 
     ok: true,
     agentClaims,
     decomposition: { passes: decPasses.map((p) => p.length), selected: agentClaims.length },
-    matcher: { version: 'v2.1-fixed-gt+tfidf+3vote', ...MATCH, borderline: m.borderline.length },
+    matcher: { version: 'v2.2-fixed-gt+tfidf+5vote', ...MATCH, borderline: m.borderline.length },
     adjudications,
     adjudicationVotes,
     scoredUnscored: { votesRequested, votesOk: votesRequested - votesFailed, votesFailed, note: 'failed votes are excluded from the decision, never counted as no (inspect_ai unscored semantics)' },

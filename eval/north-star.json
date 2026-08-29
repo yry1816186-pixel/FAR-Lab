@@ -6,11 +6,11 @@
       "id": "rediscovery-mean-f1",
       "what": "Rediscovery eval mean F1 vs established findings (5-task authored seed, hypothesis-level)",
       "current": {
-        "value": 0.14,
-        "detail": "RECALIBRATION IN PROGRESS 2026-08-29, same frozen artifacts/GT: v2.1-spec enforcement on the decomposition prompt (terse atomic sentences — the current model's verbose claims violated the protocol and dropped TF-IDF sims out of the band) recovered mean F1 0.03/0.05 -> 0.14 (crc 0.38, cdiff 0.31, arg 0 both eras). Remaining distance to 0.58 needs the full gold recalibration pass (fresh claim-pair decomposition under current stack + threshold re-derivation) — recorded as the next eval-infra task. Product regression ruled out (artifacts frozen).",
+        "value": 0.226,
+        "detail": "v2.2 RECALIBRATION COMPLETE 2026-08-29 (same frozen artifacts/GT, instrument-only changes): (1) REAL BUG — glm-5.3 intermittently returned object-shaped verdicts [{k,verdict}] that the length-only validator passed and the consumer silently mapped to false votes (whole batches 0/5 on paraphrases); boolean-strict validation now fails these visible. (2) NEW gold batch claim-pair-gold-v21.jsonl (53 pairs from the below-floor zone the 08-22 gold never sampled; 3 true pairs at 0.110-0.119) → floor 0.12→0.10, votes 3→5, zero gold errors on 157 pairs. Measurement: 0.14→0.226 (crc 0.612, crispr 0.364, cdiff 0.154, arg/egfr 0). The 2026-08-22 \"0.58\" was judge LENIENCY, not rediscovery: on the same artifacts the old uncalibrated LLM matcher scored arg 0.50/cdiff 1.00 while the agent hypotheses are topically disjoint from GT (biofilms vs hospital plasmid epidemiology; lineage plasticity vs T790M) — see evidence/W-EV2/rediscovery.md. Remaining gap is product-level: 2/5 top hypotheses propose a different mechanism than the established finding (novelty-vs-rediscovery tension, disclosed).",
         "at": "2026-08-29",
-        "evidence": "eval/results/rediscovery.jsonl (2026-08-29) vs rediscovery-v2-pass1.jsonl; live probe: crc with reasoning-route thinking -> {stage:adjudicate, all votes failed}",
-        "note": "target 0.7 unchanged; judge hardening is the lever, agent artifacts are frozen and unchanged"
+        "evidence": "eval/results/rediscovery.jsonl (v2.2) vs rediscovery-buggy-verdicts-20260829.jsonl vs rediscovery-pre-v22-20260829.jsonl; gold: eval/claim-pair-gold.jsonl + eval/claim-pair-gold-v21.jsonl; calibration: eval/claim-match-calibrate.mjs",
+        "note": "target 0.7 unchanged (anti-inflation rule); closing it requires hypothesis-anchoring changes in the PRODUCT (top hypothesis converging on established findings), not further judge work — judge layers are now deterministic-locked (zero gold error) and boolean-strict"
       },
       "target": 0.7,
       "stretch": 0.8,
