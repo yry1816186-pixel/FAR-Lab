@@ -101,6 +101,23 @@ describe('Orchestrator providerFor seam', () => {
     expect(seen.providerNames).toEqual(['env-chain']);
   });
 
+  it('a stopAfter exit PARKS the run before the lease releases — never running-without-lease', async () => {
+    // Adoption-window closure (2026-08-29): executeOwned used to return with
+    // status='running' and execute()'s finally then released the lease — a lease-less
+    // 'running' run is exactly what the watchdog (or a process restart) adopts, which
+    // would continue the full pipeline behind the user's back after a scope proposal
+    // or CLI --stop-after.
+    const run = await newRun();
+    const seen: { providerNames: string[] } = { providerNames: [] };
+    await recordingOrchestrator(seen).execute(run.id, { stopAfter: 'retrieve' });
+    const after = store.getRun(run.id);
+    expect(after?.status).toBe('paused');
+    const parked = store.listEvents(run.id).find((e) => (e.detail as { reason?: string } | undefined)?.reason === 'stop_after_parked');
+    expect(parked).toBeDefined();
+    expect((parked?.detail as { after?: string }).after).toBe('retrieve');
+    expect(store.getRunLease(run.id).holder).toBeNull(); // lease released; paused means unadoptable
+  });
+
   it('a run-pinned routeOverride keeps the run on its registry route even with an active config set', async () => {
     // The live-observed bug: CLI --route zai run resumed into the workspace's
     // dead deepseek default. routeOverride must outrank the active config.

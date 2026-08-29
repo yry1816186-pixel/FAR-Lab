@@ -159,6 +159,30 @@ describe('§8.2 draft journey', () => {
     expect(prop.body.error.code).toBe('already_launched');
   });
 
+  it('resume refuses truthfully (409 lease_held) when a foreign process owns the run — no silent 202 no-op', async () => {
+    // The pre-fix behavior: the lease check happened inside the async execution AFTER
+    // the 202, so a cross-process resume was accepted and then silently never ran
+    // (stderr only). The 409 must carry the holder and expiry so the caller knows
+    // when the lease becomes reclaimable.
+    const created = await postJson(`${base}/api/v1/runs`, { text: 'Foreign lease probe question for resume semantics?', draft: true });
+    expect(created.status).toBe(202);
+    const runId = created.body.runId as string;
+    const until = new Date(Date.now() + 60_000).toISOString();
+    expect(app.store.acquireLease(runId, 'proc-other-test', until)).toBe(true);
+    const res = await postJson(`${base}/api/v1/runs/${runId}/resume`, {});
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('lease_held');
+    expect(res.body.error.message).toContain('proc-other-test');
+    expect(res.body.error.message).toContain(until);
+    expect(executorCalls.filter((c) => c.runId === runId)).toHaveLength(0); // never accepted
+    // expired/released foreign lease: reclaimable — resume proceeds (202, execution starts)
+    app.store.releaseLease(runId, 'proc-other-test');
+    expect(app.store.getRunLease(runId).holder).toBeNull();
+    const res2 = await postJson(`${base}/api/v1/runs/${runId}/resume`, {});
+    expect(res2.status).toBe(202);
+    expect(executorCalls.filter((c) => c.runId === runId && c.opts === undefined)).toHaveLength(1);
+  });
+
   it('non-draft POST auto-starts (regression: existing journey unchanged)', async () => {
     const res = await postJson(`${base}/api/v1/runs`, { text: 'A normal immediate launch question' });
     expect(res.status).toBe(202);

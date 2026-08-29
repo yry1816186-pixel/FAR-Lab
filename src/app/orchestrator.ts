@@ -491,6 +491,24 @@ export class Orchestrator {
       cursor += 1;
     }
 
+    // stopAfter exit: park the run BEFORE the lease releases (execute()'s finally).
+    // Returning with status='running' + no lease opened an adoption window: the
+    // watchdog (30s tick) or a process restart adopts lease-less 'running' runs and
+    // would continue the full pipeline behind the user's back — exactly what the
+    // scope-proposal draft flow must never allow. 'paused' is the only safe resting
+    // state for a deliberately stopped run (covers CLI --stop-after too).
+    if (opts?.stopAfter && run.status === 'running') {
+      run = await this.transition(runId, (r) => {
+        r.status = 'paused' satisfies RunStatus;
+        return r;
+      }, lease);
+      this.deps.store.appendEvent(runId, {
+        type: 'note', status: 'paused',
+        detail: { reason: 'stop_after_parked', after: opts.stopAfter },
+      });
+      return run;
+    }
+
     // ---- research iteration rounds (src/app/iteration.ts): a FULLY completed pass
     // with actionable falsification-loop legs left reopens them as the next bounded
     // round instead of parking the run as completed. Deterministic decision, full audit.

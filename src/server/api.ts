@@ -14,6 +14,7 @@ import {
 import { createCustomProvider } from '../providers/custom.js';
 import { analyzeTrajectory } from '../app/supervisor.js';
 import { runTruthProfile } from '../app/truth-profile.js';
+import { RunLeaseHeldError } from '../app/orchestrator.js';
 import { runCounterSearch, CounterSearchError } from './counter-search.js';
 import { buildZip, type ZipEntry } from './zip.js';
 import { buildLineageGraph } from '../app/lineage.js';
@@ -90,7 +91,7 @@ import { checkPlanExecutability } from '../pipeline/stages/plan.js';
  */
 
 export interface ApiServerError {
-  code: 'not_found' | 'validation' | 'already_running' | 'run_active' | 'not_started' | 'internal' | 'target_not_found' | 'question_required' | 'action_model_failed' | 'action_budget_exhausted' | 'invalid_action_request' | 'invalid_counter_search' | 'provider_unreachable' | 'conversation_model_failed' | 'conversation_full' | 'turn_in_flight' | 'no_corpus' | 'session_stopped' | 'src_not_in_pool' | 'run_not_found' | 'already_launched' | 'scope_proposal_failed';
+  code: 'not_found' | 'validation' | 'already_running' | 'run_active' | 'not_started' | 'internal' | 'target_not_found' | 'question_required' | 'action_model_failed' | 'action_budget_exhausted' | 'invalid_action_request' | 'invalid_counter_search' | 'provider_unreachable' | 'conversation_model_failed' | 'conversation_full' | 'turn_in_flight' | 'no_corpus' | 'session_stopped' | 'src_not_in_pool' | 'run_not_found' | 'already_launched' | 'scope_proposal_failed' | 'lease_held';
   message: string;
   retryable: boolean;
   runId?: string;
@@ -248,9 +249,14 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
       .then(() => executor(runId, execOpts))
       .catch((e: unknown) => {
         // Stage failures are persisted by the orchestrator into run state (visible via
-        // GET /runs/:id). A throw here means the execution itself never ran — log it.
+        // GET /runs/:id). A throw here means the execution itself never ran — log it,
+        // and for the lease-held case also persist a run event: the 202 already went
+        // out, so the run timeline is the only place this refusal is observable.
         const msg = e instanceof Error ? e.message : String(e);
         process.stderr.write(`far-api: execution of run ${runId} failed: ${msg}\n`);
+        if (e instanceof RunLeaseHeldError) {
+          app.store.appendEvent(runId, { type: 'note', detail: { reason: 'execution_refused_lease_held', error: msg } });
+        }
         return undefined;
       })
       .finally(() => {
@@ -1119,7 +1125,21 @@ function parseSeedSources(raw: unknown): string | {
 
   const resumeRun = (res: http.ServerResponse, runId: string): void => {
     mustGetRun(runId);
-    if (!startRun(runId)) throw alreadyRunning(runId);
+    if (executing.has(runId)) throw alreadyRunning(runId);
+    // Cross-process single-writer truth: a live lease in ANOTHER process used to be
+    // discovered only inside the async execution AFTER this 202 — the resume was a
+    // silent no-op (stderr only, run never advances here, client never told). Refuse
+    // up front with the expiry so the caller knows when a retry becomes reclaimable.
+    const lease = app.store.getRunLease(runId);
+    if (lease.holder !== null && lease.expiresAt !== null && lease.expiresAt > new Date().toISOString()) {
+      throw new HttpError(409, {
+        code: 'lease_held',
+        message: `run is owned by executor ${lease.holder} until ${lease.expiresAt} — the lease becomes reclaimable after expiry; retry then`,
+        retryable: true,
+        runId,
+      });
+    }
+    if (!startRun(runId)) throw alreadyRunning(runId); // race backstop
     sendJson(res, 202, { runId });
   };
 
