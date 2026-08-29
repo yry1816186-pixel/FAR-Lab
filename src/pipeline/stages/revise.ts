@@ -7,6 +7,7 @@ import {
   DecisionRules,
   HypothesisCandidate,
   PlanStep,
+  DatasetRequirement,
   ResearchPlan,
   Revision,
   RevisionOperation,
@@ -85,6 +86,8 @@ const PlanRevisionOut = z.object({
   multipleTestingPolicy: z.enum(['single_primary', 'alpha_spending', 'e_value_accumulation']).optional(),
   multipleTestingNote: z.string().optional(),
   revisionRationale: z.string().min(1),
+  /** Present when the revision re-binds data requirements (e.g. a new_dataset signal registered an acquired dataset — auto-serialization then serves the execute leg). */
+  dataRequirements: z.array(DatasetRequirement).min(1).optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -98,6 +101,9 @@ const CAUSAL_ANALYSIS_PROMPT = [
   'from the payload (hypothesis/plan/claim ids; the question id counts as scope) — invented ids are dropped.',
   'Each affected entry needs a reason stating the causal pressure, not a restatement of the feedback.',
   'causalChain explains HOW the feedback propagates from its entry point through the affected objects.',
+  'When the payload carries registeredDatasets and the feedback is new_dataset data acquisition, the causal',
+  'response is usually a PLAN revision binding that data (data requirements + analysis steps) — revise the plan,',
+  'not only the hypotheses.',
   'expectedQualityDelta is your honest expectation: "inconclusive" is legitimate; never promise improvement you cannot argue for.',
 ].join(' ');
 
@@ -106,6 +112,9 @@ const HYPOTHESIS_REVISION_PROMPT = [
   'statement and mechanism rewritten where the feedback demands it; the complete new assumption list',
   '(keep unchanged assumptions verbatim so identity is preserved, drop assumptions the feedback invalidates,',
   'add new ones where needed); updated predictions; addedUncertainties the revision exposes.',
+  'When the payload carries registeredDatasets (operator-acquired data on this run), bind them by rewriting',
+  'dataRequirements (availability public, name the dataset by id) and reshaping the analysis steps to consume',
+  'that data — a plan that can now execute beats one that still says must_collect.',
   'Never erase existing uncertainties — only add. revisionRationale states what changed and why, causally tied to the feedback.',
 ].join(' ');
 
@@ -329,7 +338,7 @@ const revisePlan = async (
   plan: Plan,
   reason: string,
   causalChain: string,
-  knownHypothesisIds: string[],
+  knownHypothesisIds: string[],  registeredDatasets: Array<{ id: string; name: string; columns: string[]; nRows: number; targetColumn: string }>,
 ): Promise<RevisedObject & { executabilityPassed?: boolean }> => {
   const out = await callStructured<z.infer<typeof PlanRevisionOut>>(ctx, {
     stage: 'revise',
@@ -353,6 +362,8 @@ const revisePlan = async (
         })),
         metrics: plan.metrics,
         decisionRules: plan.decisionRules,
+        dataRequirements: plan.dataRequirements,
+        ...(registeredDatasets.length > 0 ? { registeredDatasets } : {}),
       },
     },
     schema: PlanRevisionOut,
@@ -370,6 +381,7 @@ const revisePlan = async (
     steps: out.data.steps,
     metrics: out.data.metrics,
     decisionRules: out.data.decisionRules,
+    ...(out.data.dataRequirements !== undefined ? { dataRequirements: out.data.dataRequirements } : {}),
     ...(out.data.multipleTestingPolicy !== undefined ? { multipleTestingPolicy: out.data.multipleTestingPolicy } : {}),
     ...(out.data.multipleTestingNote !== undefined ? { multipleTestingNote: out.data.multipleTestingNote } : {}),
   });
@@ -457,6 +469,11 @@ async function reviseExecute(ctx: StageContext): Promise<StageOutcome> {
       const plans = ctx.store.listObjects('plan', runId);
       const claims = ctx.store.listObjects('claim', runId);
       const question = ctx.store.getObject('question', ctx.run.questionId);
+      const registeredDatasets = ctx.store
+        .listObjects('dataset_record', runId)
+        .flatMap((d) => d.format === 'csv' && d.source.resolver === 'local'
+          ? [{ id: d.id, name: d.name, columns: d.columns, nRows: d.nRows, targetColumn: d.targetColumn }]
+          : []);
       const representatives = hypotheses.filter(isRepresentative);
 
       // ---- causal analysis: which persisted objects does this feedback force to change, and why ----
@@ -482,6 +499,10 @@ async function reviseExecute(ctx: StageContext): Promise<StageOutcome> {
             decisionRules: p.decisionRules,
           })),
           claimsSummary: claims.map((c) => ({ id: c.id, text: c.text, bindingStatus: c.bindingStatus })),
+          // AOSSA data plane: datasets registered on this run ride the causal
+          // analysis so a new_dataset signal can force a PLAN revision (the
+          // frozen plan predates the acquisition; ids only, never paths).
+          ...(registeredDatasets.length > 0 ? { registeredDatasets } : {}),
           question: question ? { id: question.id, text: question.text } : null,
         },
         schema: CausalAnalysisOut,
@@ -563,7 +584,7 @@ async function reviseExecute(ctx: StageContext): Promise<StageOutcome> {
       }
 
       for (const { plan, reason } of targets.plans) {
-        const revised = await revisePlan(ctx, signal, plan, reason, analysis.data.causalChain, hypotheses.map((h) => h.id));
+        const revised = await revisePlan(ctx, signal, plan, reason, analysis.data.causalChain, hypotheses.map((h) => h.id), registeredDatasets);
         artifactRefs.push(revised.archiveRef);
         operations.push({
           objectType: 'plan',

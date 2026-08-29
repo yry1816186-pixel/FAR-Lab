@@ -97,6 +97,19 @@ const probeArtifact = async (artifacts: ArtifactStore, hash: string): Promise<st
   return sha256Hex(content) === hash ? null : '内容 sha256 与声明的哈希不一致（文件损坏或非内容寻址）';
 };
 
+/** Binary-safe artifact probe: dataset records may reference BINARY blobs (e.g. the
+ * raw NetCDF) — ArtifactStore.get is utf8-text by contract, so hash the
+ * content-addressed FILE instead of round-tripping bytes through a text decode. */
+const probeArtifactFile = (artifacts: ArtifactStore, hash: string): string | null => {
+  try {
+    const file = artifacts.path(hash);
+    return sha256Hex(fs.readFileSync(file)) === hash ? null : '内容 sha256 与声明的哈希不一致（文件损坏或非内容寻址）';
+  } catch (e) {
+    if (e instanceof Error && (e as NodeJS.ErrnoException).code === 'ENOENT') return '工件在 artifact store 中不存在';
+    return `工件不可读：${e instanceof Error ? e.message : String(e)}`;
+  }
+};
+
 const probeArtifacts = async (
   artifacts: ArtifactStore,
   hashes: readonly string[],
@@ -471,7 +484,7 @@ export async function verifyBundle(bundleId: string, deps: VerifyDeps): Promise<
       if (rec.obj.lineage.map((l) => l.kind).join('>') !== de.lineageKinds.join('>')) {
         dataProblems.push(`dataset ${de.datasetRecordId} 的 lineage 已变化（bundle ${de.lineageKinds.join('>')} vs store ${rec.obj.lineage.map((l) => l.kind).join('>')}）— 需重导出`);
       }
-      const refProblem = await probeArtifact(artifacts, de.contentRef.replace('sha256:', ''));
+      const refProblem = probeArtifactFile(artifacts, de.contentRef.replace('sha256:', ''));
       if (refProblem !== null) dataProblems.push(`dataset ${de.datasetRecordId} 工件：${refProblem}`);
     }
     // experimentEvidence artifact hashes (result-set per-row refs, training logs,

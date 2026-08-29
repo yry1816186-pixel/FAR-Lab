@@ -53,6 +53,7 @@ Method families: analytic_symbolic, numerical_simulation, statistical_inference,
 Rules:
 - Consider AT LEAST TWO families per objective, including ones you reject — say why in the rationale.
 - Every candidate with assessment "selected" MUST have a "validationPlan" naming the real check that verifies results (e.g. convergence order against an analytic solution, preregistered statistical test, held-out test set, protocol QC rule, independent replication).
+- Candidates you do NOT select must OMIT validationPlan entirely (short placeholders like "n/a" are rejected).
 - Match the family to the problem: a well-posed PDE/ODE question selects numerical_simulation with a convergence/discretization-error validation plan; a question about a natural phenomenon with no formal structure selects retrieval_synthesis and/or physical_experiment; a closed-form identity claim selects analytic_symbolic with a grid-check plan.
 - Prefer empty arrays over fabricating variables, data, premises or unknowns.
 - Preserve the question's own language for descriptive fields.`;
@@ -190,7 +191,7 @@ export const scopeStage: StageHandler = {
         runId: ctx.run.id,
         questionId: question.id,
         forObjectiveId: `obj${s.forObjective}`,
-        candidates: s.candidates,
+        candidates: s.candidates.map((c) => c.assessment === 'selected' ? c : { ...c, validationPlan: undefined }), // a validationPlan on a rejected/viable candidate is placeholder noise; selected keep theirs (canonical min(10))
         undecidedReason: s.undecidedReason,
         decidedBy: 'model_proposed',
         createdAt: now,

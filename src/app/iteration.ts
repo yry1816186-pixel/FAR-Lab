@@ -80,6 +80,15 @@ export const experimentLegStatus = (store: Store, runId: string): ExperimentLegS
     const execStage = store.getRun(runId)?.stages.find((s) => s.stage === 'execute');
     const execSkipReason = execStage?.error;
     if (execStage?.state === 'skipped' && execSkipReason !== undefined && isScientificUnexecutableSkip(execSkipReason)) {
+      // Convergence 2026-08-30 (scenario-B native run): a scientific-unexecutable
+      // skip verdict predating the CURRENT plan freeze is STALE — the plan was
+      // revised after it (e.g. new data bound via feedback->revise), and the
+      // revised registration deserves a fresh executability attempt. Same
+      // freeze-discipline as the protocol gate below.
+      const skipEndedAt = execStage.endedAt ?? "";
+      if (plan.frozenAt !== undefined && plan.frozenAt > skipEndedAt) {
+        return { kind: 'unexecuted', planId: plan.id };
+      }
       return { kind: 'unexecutable', planId: plan.id, reason: execSkipReason };
     }
     return { kind: 'unexecuted', planId: plan.id };

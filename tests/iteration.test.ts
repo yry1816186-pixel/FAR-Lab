@@ -152,6 +152,25 @@ describe('evaluateIteration (pure decision procedure)', () => {
     expect(transport.decision).toBe('continue');
     expect(transport.record.continueTrigger).toMatchObject({ kind: 'executable_plan_unexecuted', because: 'never_executed' });
   });
+  it('scenario-B native (2026-08-30): a scientific skip verdict predating a plan RE-FREEZE is stale — the leg re-arms', () => {
+    const { store, runId } = openStore();
+    const hypId = addHypothesis(store, runId);
+    const planId = addPlan(store, runId, hypId);
+    const t0 = '2026-08-24T10:00:00.000Z';
+    const t1 = '2026-08-24T11:00:00.000Z';
+    const run = store.getRun(runId)!;
+    const rec = run.stages.find((s) => s.stage === 'execute')!;
+    rec.state = 'skipped';
+    rec.error = 'tabular: no tabular data; literature-pool: not poolable';
+    rec.endedAt = t0;
+    store.updateRun(run);
+    // verdict FROZE the plan only at t1 AFTER the skip -> dataset bound via feedback->revise
+    const plan = store.getObject('plan', planId)!;
+    store.putObject('plan', { ...plan, frozenAt: t1, planHash: 'c'.repeat(64) });
+    const it = evaluateIteration({ store, runId, round: 1, budget: unlimitedBudget() });
+    expect(it.decision).toBe('continue');
+    expect(it.record.continueTrigger).toEqual({ kind: 'executable_plan_unexecuted', planId, because: 'never_executed' });
+  });
 
   it('a causally REVISED plan (re-frozen after the experiment) re-arms the execute leg', () => {
     const { store, runId } = openStore();

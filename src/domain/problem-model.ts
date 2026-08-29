@@ -238,7 +238,7 @@ export const MethodCandidate = z.object({
    * check verifies results of this method (convergence order, preregistered
    * test, held-out metric, protocol QC rule...). REQUIRED when selected.
    */
-  validationPlan: z.string().min(10).max(600).optional(),
+    validationPlan: z.string().min(10).max(600).optional(), // canonical discipline: a real validation plan is at least a sentence (the DRAFT tolerates short placeholders; scope.ts strips them before this parse)
 });
 export type MethodCandidate = z.infer<typeof MethodCandidate>;
 
@@ -314,7 +314,7 @@ export const MethodSelectionDraft = z.object({
     family: MethodFamily,
     assessment: MethodAssessment,
     rationale: z.string().min(10).max(1000),
-    validationPlan: z.string().min(10).max(600).optional(),
+    validationPlan: z.string().min(1).max(600).optional(), // draft-tolerant (live-discovered 2026-08-30): models emit short placeholders on NON-selected candidates; scope.ts strips them deterministically, canonical MethodSelection keeps min(10)
   })).min(2).max(12),
   undecidedReason: z.string().min(10).max(500).optional(),
 });

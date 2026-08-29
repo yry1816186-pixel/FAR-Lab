@@ -221,3 +221,27 @@ describe('ProblemModelDraftGuards (W3: boundary rejection before persistence)', 
     expect(() => ProblemModelDraftGuards.parse(draft)).toThrow(/no selected family requires undecidedReason/);
   });
 });
+describe('draft tolerance: short validationPlan on non-selected candidates (live-discovered)', () => {
+  const makeDraft = () => ({
+    objectives: [{ statement: 'estimate the treatment effect' }],
+    variables: [],
+    formalization: { problemClass: 'statistical_estimation', governingRelations: [], boundaryConditions: [], wellPosednessNotes: [] },
+    dataInventory: [],
+    statisticalPremises: { assumptions: [], causalClaims: [] },
+    metrics: [],
+    stopConditions: ['one preregistered analysis'],
+    unknowns: [],
+    methodSelections: [{
+      forObjective: 1,
+      candidates: [
+        { family: 'machine_learning', assessment: 'selected', rationale: 'tabular features with a numeric target', validationPlan: 'preregistered paired bootstrap CI on the untouched test split' },
+        { family: 'retrieval_synthesis', assessment: 'rejected_inappropriate', rationale: 'no published pooled estimate for this grid', validationPlan: 'n/a' },
+      ],
+    }],
+  });
+  it('the boundary accepts the draft and the canonical parse strips the placeholder', () => {
+    const d = makeDraft();
+    expect(() => ProblemModelDraftGuards.parse(d)).not.toThrow();
+    expect(d.methodSelections[0]!.candidates[1]!.validationPlan).toBe('n/a'); // draft keeps it verbatim
+  });
+});
