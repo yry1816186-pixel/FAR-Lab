@@ -79,9 +79,10 @@ describe('tallyVerdicts', () => {
       { verdict: 'supports' },
       { verdict: 'supports' },
       { verdict: 'falsifies' },
-      { exploratory: true }, // no verdict → inconclusive + exploratory
+      { verdict: 'inconclusive' },
+      { exploratory: true }, // no verdict at all → unjudged (audit Note A: never presented as a scientific judgment)
       { secondary: true },
     ]);
-    expect(t).toMatchObject({ supports: 2, falsifies: 1, inconclusive: 2, exploratory: 1, secondary: 1 });
+    expect(t).toMatchObject({ supports: 2, falsifies: 1, inconclusive: 1, unjudged: 2, exploratory: 1, secondary: 1 }); // 2 verdict-less rows (exploratory AND secondary) land in unjudged
   });
 });

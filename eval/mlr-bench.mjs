@@ -12,7 +12,7 @@
  *
  * Comparability discipline:
  * - published anchors in-repo were judged by claude-3-7-sonnet / gemini-2.5-pro;
- *   our judge is deepseek-chat (temperature 0). Cross-judge numbers are CONTEXT
+ *   our judge is the makeProvider GLM route (temperature 0; glm since the 2026-08-22 DeepSeek ban).
  *   ONLY; the decision comparison is our-judge-on-same-tasks: farlab vs the
  *   published o4-mini / deepseek-r1 idea+proposal files.
  * - FAR-Lab outputs are rendered from persisted run objects by a deterministic
@@ -20,7 +20,7 @@
  *   editing, no embellishment.
  *
  * Usage: node eval/mlr-bench.mjs [--skip-runs]   (writes eval/results/mlr-bench.jsonl)
- * Env: MLRBENCH_REPO (default .cache/repos/mlrbench), DEEPSEEK_API_KEY.
+ * Env: MLRBENCH_REPO (default .cache/repos/mlrbench); provider via makeProvider (GLM default, FARLAB_BASELINE_PROVIDER=glm|zai|dashscope; deepseek banned).
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { resolve, join } from 'node:path';
@@ -220,7 +220,7 @@ const renderProposal = (runId) => {
 };
 
 // ---------------------------------------------------------------------------
-// judging (official rubric verbatim; our DeepSeek judge, temperature 0)
+// judging (official rubric verbatim; makeProvider GLM route, temperature 0)
 // ---------------------------------------------------------------------------
 
 // Official dimension key sets (must match the verbatim rubrics; asserted at startup so an
@@ -282,7 +282,7 @@ const judgeOne = async (provider, rubric, expectedDims, stage, contentMd, taskTe
 // ---------------------------------------------------------------------------
 
 const provider = await makeProvider();
-if (!provider.liveReady && !RENDER_ONLY) die('DEEPSEEK_API_KEY not set');
+if (!provider.liveReady && !RENDER_ONLY) die('live route not ready (check FARLAB_BASELINE_PROVIDER/ZAI key per makeProvider — deepseek is banned)');
 
 const eligible = eligibleTasks();
 if (eligible.length < SAMPLE_N) die(`only ${eligible.length} eligible tasks with full anchor coverage`);
@@ -374,7 +374,7 @@ for (const r of uniqueRuns) {
       try {
         const review = await judgeOne(provider, rubric, dims, stage, md, taskText, r.task, agent, ideaMd);
         records.push({
-          task: r.task, runId: r.runId, agent, stage, judge: 'deepseek-chat', temperature: 0,
+judge: 'glm (makeProvider route; identity per PROTOCOL addendum)', temperature: 0,
           ...(agent === 'farlab' ? { rendering: 'idea-proposal-v2' } : {}),
           scores: Object.fromEntries(Object.entries(review).map(([k, v]) => [k, v.score])),
           overall: review.OverallAssessment.score,

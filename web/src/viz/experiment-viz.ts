@@ -121,17 +121,21 @@ export function metricShares(cells: MetricCell[]): Map<string, Map<string, numbe
 export interface VerdictTally {
   supports: number;
   falsifies: number;
-  inconclusive: number;
+  inconclusive: number;  /** Product audit Note A: verdict-less reports (sequential re-runs) — never presented as a scientific judgment. */
+  unjudged: number;
   exploratory: number;
   secondary: number;
 }
 
 export function tallyVerdicts(reports: ForestInputReport[]): VerdictTally {
-  const t: VerdictTally = { supports: 0, falsifies: 0, inconclusive: 0, exploratory: 0, secondary: 0 };
+  const t: VerdictTally = { supports: 0, falsifies: 0, inconclusive: 0, unjudged: 0, exploratory: 0, secondary: 0 };
   for (const r of reports) {
     if (r.verdict === 'supports') t.supports += 1;
     else if (r.verdict === 'falsifies') t.falsifies += 1;
-    else t.inconclusive += 1;
+    // Product audit Note A: a verdict-less report (sequential exploratory re-run,
+    // insufficient data) is NOT an inconclusive scientific judgment - its own bucket.
+    else if (r.verdict === 'inconclusive' || r.verdict === 'insufficient_data' || r.verdict === 'weakens') t.inconclusive += 1;
+    else t.unjudged += 1;
     if (r.exploratory === true) t.exploratory += 1;
     if (r.secondary === true) t.secondary += 1;
   }

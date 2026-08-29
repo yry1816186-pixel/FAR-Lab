@@ -111,7 +111,7 @@ export const acquireNetcdfDataset = async (
     id: newId('ds') as DatasetRecord['id'],
     runId,
     name: `${variable}@${path.split(/[\\/]/).pop() ?? path}`,
-    source: { resolver: 'local_netcdf', path, variable, ...(opts.license !== undefined ? {} : {}) },
+    source: { resolver: 'local_netcdf', path, variable, sha256Expected: sha },
     license: opts.license ?? 'unknown',
     format: 'netcdf',
     contentRef: raw.ref,
@@ -169,6 +169,15 @@ export const extractNetcdfFeatures = async (
   let csv: string;
   let nRows: number;
   try {
+    // Engineering audit W5 (residual): sha256Expected written at acquisition is
+    // now VERIFIED at consumption — bytes that changed between acquire and
+    // extract must not produce a derived record whose lineage lies.
+    if (rawRecord.source.sha256Expected !== undefined) {
+      const shaNow = createHash('sha256').update(fs.readFileSync(rawRecord.source.path)).digest('hex');
+      if (shaNow !== rawRecord.source.sha256Expected) {
+        throw new Error(`raw netcdf changed since acquisition (expected sha256 ${rawRecord.source.sha256Expected.slice(0, 12)}, found ${shaNow.slice(0, 12)}) — refusing to derive features from unverified bytes`);
+      }
+    }
     const r = await sidecar.call<{ csv: string; nRows: number }>('netcdf_extract_features', {
       path: rawRecord.source.path,
       variable: rawRecord.source.variable,

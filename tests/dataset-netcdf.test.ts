@@ -82,6 +82,26 @@ describe.skipIf(!fs.existsSync(REAL_NC))('netcdf data plane (real NCEP file, rea
   }, 180_000);
 });
 
+  it('sha256Expected gate: bytes tampered between acquire and extract are refused (W5 residual)', async () => {
+    const { store, runId, artifacts } = makeEnv();
+    const copy = path.join(dirs[0] ?? os.tmpdir(), 'tamper-copy.nc');
+    fs.copyFileSync(REAL_NC, copy);
+    try {
+      const raw = await acquireNetcdfDataset(store, artifacts, runId, copy, 'air', { now: () => T0 });
+      expect(raw.source.sha256Expected).toMatch(/^[0-9a-f]{64}$/); // written at acquisition
+      const stat = fs.openSync(copy, 'r+');
+      try {
+        const buf = Buffer.from('T');
+        fs.writeSync(stat, buf, 0, 1, Math.floor(fs.statSync(copy).size / 2)); // flip one mid-file byte
+      } finally {
+        fs.closeSync(stat);
+      }
+      await expect(extractNetcdfFeatures(store, artifacts, raw, 'global_mean_timeseries', { now: () => T0 }))
+        .rejects.toThrow(/changed since acquisition/);
+    } finally {
+      fs.rmSync(copy, { force: true });
+    }
+  }, 180_000);
 describe('audit C1 regression: monthly gridpoint coordinates are physical, never index-fabricated', () => {
   it('monthly_mean_per_gridpoint emits lat in the file coordinate range and lon likewise', async () => {
     const { createSidecar } = await import('../src/experiment/python.js');
@@ -129,3 +149,17 @@ describe('netcdf source path guard (fires before any file access)', () => {
     }
   });
 });
+  it('op layer rejects URIs and relative paths before any open (security W2 residual)', async () => {
+    const { createSidecar } = await import('../src/experiment/python.js');
+    const sidecar = createSidecar();
+    try {
+      const r1 = await sidecar.call('netcdf_profile', { path: 'https://example.com/x.nc' }, 30_000);
+      expect(r1.ok).toBe(false);
+      expect(r1.error?.message).toContain('not a URI');
+      const r2 = await sidecar.call('netcdf_profile', { path: 'relative/air.nc' }, 30_000);
+      expect(r2.ok).toBe(false);
+      expect(r2.error?.message).toContain('absolute path');
+    } finally {
+      sidecar.close();
+    }
+  }, 60_000);

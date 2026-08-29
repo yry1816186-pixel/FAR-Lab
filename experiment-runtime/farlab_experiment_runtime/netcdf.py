@@ -18,6 +18,26 @@ from typing import Any
 _MAX_VARS = 64
 _MAX_DIMS = 16
 _MAX_ATTR_ITEMS = 32
+def _assert_local_path(path: str) -> None:
+    """Op-layer defense-in-depth (security audit W2): a netcdf op only ever
+    opens a plain absolute local path. URIs (netcdf4's DAP support would fire
+    an outbound request), relative paths, and paths outside FARLAB_DATA_ROOT
+    (when set) are rejected before xr.open_dataset sees them. The TS boundary
+    enforces the same rule; this is the second, independent gate."""
+    import os
+    if "://" in path:
+        raise ValueError(f"netcdf op requires a local path, not a URI: {path}")
+    if not os.path.isabs(path):
+        raise ValueError(f"netcdf op requires an absolute path (got relative: {path})")
+    root = os.environ.get("FARLAB_DATA_ROOT", "").strip()
+    if root:
+        root_r = os.path.realpath(root)
+        resolved = os.path.realpath(path)
+        if resolved != root_r and not resolved.startswith(root_r + os.sep):
+            raise ValueError(f"netcdf op path escapes FARLAB_DATA_ROOT ({root}): {path}")
+    size = os.path.getsize(path)
+    if size > 200 * 1024 * 1024:
+        raise ValueError(f"netcdf file exceeds 200MB: {path} ({size} bytes)")
 
 
 def _attrs_bounded(attrs: dict) -> dict[str, Any]:
@@ -33,6 +53,8 @@ def _attrs_bounded(attrs: dict) -> dict[str, Any]:
 def op_netcdf_profile(payload: dict[str, Any]) -> dict[str, Any]:
     import numpy as np
     import xarray as xr
+    _assert_local_path(payload["path"])
+
 
     path = payload["path"]
     open_kwargs: dict[str, Any] = {"decode_times": True}
@@ -140,6 +162,7 @@ def op_netcdf_extract_features(payload: dict[str, Any]) -> dict[str, Any]:
     import xarray as xr
 
     path = payload["path"]
+    _assert_local_path(path)
     variable = str(payload["variable"])
     feature = payload["feature"]
     max_rows = int(payload.get("maxRows", 50000))

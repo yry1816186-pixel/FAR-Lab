@@ -39,7 +39,7 @@ function VerdictTallyStrip({ reports }: { reports: ReportLike[] }): JSX.Element 
   const parts: { tone: BadgeTone; label: string; n: number }[] = [
     { tone: 'ok', label: t('exp.tallySupports'), n: tally.supports },
     { tone: 'err', label: t('exp.tallyFalsifies'), n: tally.falsifies },
-    { tone: 'muted', label: t('exp.tallyInconclusive'), n: tally.inconclusive },
+    { tone: 'muted' as const, label: t('exp.tallyInconclusive'), n: tally.inconclusive },    ...(tally.unjudged > 0 ? [{ tone: 'muted' as const, label: t('exp.tallyUnjudged'), n: tally.unjudged }] : []),
   ];
   return (
     <p className="exp-tally small" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -184,6 +184,9 @@ export function ExperimentsTab({ run }: { run: ResearchRun }): JSX.Element {
                 <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
                   <Badge tone={verdictTone(rep.verdict)}>{rep.verdict ?? t('exp.noVerdict')}</Badge>
                   <span className="mono small">{str(rep.comparisonId)} [{str(rep.metricKey)}]</span>
+                  {rep.hypothesisId !== undefined && (
+                    <span className="muted small mono">{t('exp.boundHyp', { id: str(rep.hypothesisId) })}</span>
+                  )}
                   <span className="mono small">point={num(rep.pointEstimate)}</span>
                   {rep.ci !== undefined && (
                     <span className="mono small">CI{num(rep.ci.level, 3)}[{num(rep.ci.low)}, {num(rep.ci.high)}]</span>
