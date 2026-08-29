@@ -1,0 +1,20 @@
+===== typecheck (last 120 lines) =====
+
+> far-lab@0.1.0 typecheck
+> tsc -p tsconfig.json --noEmit
+
+
+===== lint (last 120 lines) =====
+
+> far-lab@0.1.0 lint
+> eslint .
+
+
+/home/runner/work/FAR-Lab/FAR-Lab/tests/memory-live-check.test.ts
+  23:3  warning  Unused eslint-disable directive (no problems were reported from 'no-console')
+  38:3  warning  Unused eslint-disable directive (no problems were reported from 'no-console')
+  48:5  warning  Unused eslint-disable directive (no problems were reported from 'no-console')
+
+✖ 3 problems (0 errors, 3 warnings)
+  0 errors and 3 warnings potentially fixable with the `--fix` option.
+
