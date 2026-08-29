@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { RunId, PlanId, TaskId, HypothesisId, ExperimentSpecId } from './ids.js';
-import { ComputeProfile, type ExperimentVerdict } from './experiment.js';
-import { BindingApproval } from './experiment.js';
+import { BindingApproval, ComputeProfile, type ExperimentVerdict } from './experiment.js';
 import { DecisionRuleProvenance } from './hypothesis.js';
 
 /**
