@@ -185,7 +185,7 @@ const makeCtx = (store: Store, run: ResearchRun, plan: ResearchPlan, asLive: boo
   disowned: () => false,
   log: () => {},
   recordReceipt: () => {},
-  checkpointed: async (_s, _f, _k, _fp, fn) => fn(),
+  checkpointed: async <T>(_s: string, _f: string, _k: string, _fp: string | undefined, fn: () => Promise<T>): Promise<T> => fn(),
 });
 
 describe('execute stage: protocol fallback (paradigm-honest execution)', () => {
