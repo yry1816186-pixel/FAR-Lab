@@ -398,3 +398,24 @@ execute 级联插入（theory 后 protocol 前）+ 9 项测试含真实 sidecar 
    闭环（形式化→弱式→实现→实验→误差/阶→图→解释→复现）的端到端 live run。
 2. CPS-AOSSA-3：NetCDF/xarray 数据族 + QC + DatasetVersion（场景 B 前置）。
 3. StudyMap 问题模型带 + FEM 实验呈现（数值腿有真实内容可显示后）。
+
+## 切片 3b 已落地（40d3db6，main ff）：自适应 AFEM 全链
+
+CPS-AOSSA-2 完成。均匀+自适应双模式齐备，角奇异 r^0.7 对照证据：
+uniform H1 h-阶退化 0.68 vs adaptive ndof-率 -0.681（最优 -0.5 基准），
+效应指数稳定 ~4.2。调试抓到三个真数学 bug（NVB 子代最新顶点错标 /
+边跳跃估计子缺 h_e 因子 / 误用 ∇φ₀ 代 ∇u_h），全部数值取证后修复。
+全量 2254 passed 0 failed。
+
+# AOSSA 会话累计（2026-08-30 凌晨，6 个 main 提交）
+
+6c769ae 问题模型+方法选择 / 90f8c11 下游披露 / 4ee30c4 FEM 均匀腿 /
+f3678e1+123325c 控制面 / 40d3db6 AFEM 自适应腿。
+
+## 剩余（按杠杆，下一窗口起点）
+
+1. 场景 A 端到端 live run（12 阶段管线跑真实 FEM 问题：形式化→弱式→
+   plan→execute(adaptive)→报告→复现 bundle）——实现已备，需要 live 路由。
+2. CPS-AOSSA-3：NetCDF/xarray 数据族 + QC + DatasetVersion（场景 B 前置）。
+3. StudyMap 问题模型带 + FEM 实验呈现（数值腿有真实内容可显示）。
+4. completion-gate + 独立四维审计（终局）。
