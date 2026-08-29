@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { planNetworkEnv, validateCaFile, probeNetwork } from '../src/shared/net-env.js';
+import { planNetworkEnv, validateCaFile, probeNetwork, selfTestMaterial } from '../src/shared/net-env.js';
 
 /**
  * Network plane (proxy + custom CA) — REAL verification:
@@ -107,6 +107,33 @@ describe('probeNetwork (real loopback self-test)', () => {
     expect(r.selfTest.ok).toBe(false);
     expect(r.selfTest.detail).toContain('nothing to verify');
   });
+});
+
+describe('selfTestMaterial (fresh-clone path: no committed private key)', () => {
+  it('generates an ephemeral throwaway CA+server pair when fixtures lack the key', async () => {
+    // Simulate a fresh clone: fixtures dir exists but *.key was gitignored away.
+    const junk = fs.mkdtempSync(path.join(os.tmpdir(), 'far-stm-'));
+    const materialPath = path.resolve('tests/fixtures/net');
+    const keyPath = path.join(materialPath, 'server.key');
+    const keyExists = fs.existsSync(keyPath);
+    if (keyExists) fs.renameSync(keyPath, path.join(junk, 'server.key.hidden'));
+    try {
+      const m = await selfTestMaterial();
+      if ('unavailable' in m) {
+        // No openssl on this machine AND fixtures hidden — honest unavailability.
+        expect(m.unavailable.length).toBeGreaterThan(0);
+      } else {
+        expect(m.key.length).toBeGreaterThan(0);
+        expect(m.cert.length).toBeGreaterThan(0);
+        expect(m.caFile.length).toBeGreaterThan(0);
+        expect(fs.existsSync(m.caFile)).toBe(true);
+        m.cleanup?.();
+      }
+    } finally {
+      if (keyExists) fs.renameSync(path.join(junk, 'server.key.hidden'), keyPath);
+      fs.rmSync(junk, { recursive: true, force: true });
+    }
+  }, 45_000);
 });
 
 describe('boot re-exec (compiled CLI, real child process)', () => {

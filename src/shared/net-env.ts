@@ -1,6 +1,7 @@
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
+import os from 'node:os';
 import http from 'node:http';
 import https from 'node:https';
 import path from 'node:path';
@@ -135,6 +136,64 @@ export interface NetworkProbeResult {
 
 const here = (): string => path.dirname(fileURLToPath(import.meta.url));
 
+const OPENSSL_CANDIDATES = process.platform === 'win32'
+  ? ['openssl', 'C:\\Program Files\\Git\\usr\\bin\\openssl.exe', 'C:\\Program Files\\Git\\mingw64\\bin\\openssl.exe']
+  : ['openssl'];
+
+const openssl = (): string | null => {
+  for (const candidate of OPENSSL_CANDIDATES) {
+    const probe = spawnSync(candidate, ['version'], { encoding: 'utf8', windowsHide: true, timeout: 5000 });
+    if (probe.status === 0) return candidate;
+  }
+  return null;
+};
+
+/**
+ * Self-test cert material. Committed test certs live in tests/fixtures/net
+ * (PUBLIC certs only — *.key is globally gitignored by design, private keys
+ * never enter the repo). When the server key is absent (fresh clone), we
+ * generate an ephemeral throwaway CA+server pair with openssl into the OS
+ * temp dir; when openssl is unavailable the self-test reports itself
+ * unavailable instead of pretending.
+ */
+export const selfTestMaterial = async (): Promise<
+  { key: Buffer; cert: Buffer; caFile: string; cleanup?: () => void } | { unavailable: string }
+> => {
+  const fixDir = path.resolve(here(), '../../tests/fixtures/net');
+  const certPath = path.join(fixDir, 'server.crt');
+  const keyPath = path.join(fixDir, 'server.key');
+  if (fs.existsSync(certPath) && fs.existsSync(keyPath) && fs.existsSync(path.join(fixDir, 'ca.crt'))) {
+    return { key: fs.readFileSync(keyPath), cert: fs.readFileSync(certPath), caFile: path.join(fixDir, 'ca.crt') };
+  }
+  const bin = openssl();
+  if (bin === null) {
+    return { unavailable: 'self-test needs TLS cert material: tests/fixtures/net/server.key is absent (gitignored private key) and no openssl was found to generate a throwaway pair' };
+  }
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'far-net-selftest-'));
+  const cleanup = (): void => {
+    try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* best effort */ }
+  };
+  const run = (args: string[]): void => {
+    const r = spawnSync(bin, args, { cwd: dir, encoding: 'utf8', windowsHide: true, timeout: 15_000 });
+    if (r.status !== 0) throw new Error(`openssl ${args[0]} failed: ${(r.stderr ?? '').slice(0, 200)}`);
+  };
+  try {
+    run(['req', '-x509', '-newkey', 'rsa:2048', '-keyout', 'ca.key', '-out', 'ca.crt', '-days', '2', '-nodes', '-subj', '/CN=FarLab Ephemeral SelfTest CA']);
+    run(['req', '-newkey', 'rsa:2048', '-keyout', 'server.key', '-out', 'server.csr', '-nodes', '-subj', '/CN=127.0.0.1']);
+    fs.writeFileSync(path.join(dir, 'ext.cnf'), 'subjectAltName=IP:127.0.0.1,DNS:localhost\n');
+    run(['x509', '-req', '-in', 'server.csr', '-CA', 'ca.crt', '-CAkey', 'ca.key', '-CAcreateserial', '-out', 'server.crt', '-days', '2', '-extfile', 'ext.cnf']);
+    return {
+      key: fs.readFileSync(path.join(dir, 'server.key')),
+      cert: fs.readFileSync(path.join(dir, 'server.crt')),
+      caFile: path.join(dir, 'ca.crt'),
+      cleanup,
+    };
+  } catch (e) {
+    cleanup();
+    return { unavailable: `self-test cert generation failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
+};
+
 /**
  * `far probe net`: honest network-plane status PLUS a real loopback self-test —
  * local TLS server (tests/fixtures/net certs) + local CONNECT proxy; a child
@@ -147,7 +206,6 @@ export const probeNetwork = async (): Promise<NetworkProbeResult> => {
   const proxyConfigured = plan.envVars.NODE_USE_ENV_PROXY === '1';
   const caFile = plan.envVars.NODE_EXTRA_CA_CERTS;
 
-  const fixDir = path.resolve(here(), '../../tests/fixtures/net');
   const result: NetworkProbeResult = {
     proxyConfigured,
     proxy: {
@@ -171,9 +229,13 @@ export const probeNetwork = async (): Promise<NetworkProbeResult> => {
   }
 
   // --- loopback self-test ---
+  const material = await selfTestMaterial();
+  if ('unavailable' in material) {
+    result.selfTest = { ok: false, detail: material.unavailable };
+    return result;
+  }
   try {
-    const key = fs.readFileSync(path.join(fixDir, 'server.key'));
-    const cert = fs.readFileSync(path.join(fixDir, 'server.crt'));
+    const { key, cert, caFile: selfTestCa } = material;
     const tlsServer = https.createServer({ key, cert }, (req, res) => { res.writeHead(200); res.end('far-net-selftest-pong'); });
     await new Promise<void>((resolve) => tlsServer.listen(0, '127.0.0.1', () => resolve()));
     const tlsPort = (tlsServer.address() as net.AddressInfo).port;
@@ -194,8 +256,10 @@ export const probeNetwork = async (): Promise<NetworkProbeResult> => {
     await new Promise<void>((resolve) => proxyServer.listen(0, '127.0.0.1', () => resolve()));
     const proxyPort = (proxyServer.address() as net.AddressInfo).port;
 
-    const childEnv: NodeJS.ProcessEnv = { ...process.env, NODE_USE_ENV_PROXY: '1', HTTPS_PROXY: `http://127.0.0.1:${proxyPort}`, NO_PROXY: 'localhost,::1' };
-    if (caFile !== undefined) childEnv.NODE_EXTRA_CA_CERTS = caFile;
+    // The child uses the SELF-TEST CA (it signs the loopback server cert) —
+    // this verifies the NODE_EXTRA_CA_CERTS + CONNECT mechanics end-to-end;
+    // the user's own CA file was already parse-validated above.
+    const childEnv: NodeJS.ProcessEnv = { ...process.env, NODE_USE_ENV_PROXY: '1', HTTPS_PROXY: `http://127.0.0.1:${proxyPort}`, NO_PROXY: 'localhost,::1', NODE_EXTRA_CA_CERTS: selfTestCa };
     const child: ChildProcess = spawn(process.execPath, ['--input-type=module', '-e', `const r = await fetch('https://127.0.0.1:${tlsPort}/ping'); if (!r.ok) throw new Error('HTTP ' + r.status); process.stdout.write(await r.text());`], { env: childEnv, windowsHide: true });
     const stdout = await new Promise<string>((resolve, reject) => {
       let out = '';
@@ -207,6 +271,7 @@ export const probeNetwork = async (): Promise<NetworkProbeResult> => {
     });
     tlsServer.close();
     proxyServer.close();
+    material.cleanup?.();
     result.selfTest = {
       ok: stdout.includes('far-net-selftest-pong'),
       detail: stdout.includes('far-net-selftest-pong')
@@ -214,6 +279,7 @@ export const probeNetwork = async (): Promise<NetworkProbeResult> => {
         : `unexpected child output: ${stdout.slice(0, 120)}`,
     };
   } catch (e) {
+    material.cleanup?.();
     result.selfTest = { ok: false, detail: `self-test failed: ${e instanceof Error ? e.message : String(e)}` };
   }
   return result;
