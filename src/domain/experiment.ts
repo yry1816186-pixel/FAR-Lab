@@ -30,6 +30,14 @@ export const DatasetSource = z.discriminatedUnion('resolver', [
     path: z.string().min(1),
     sha256Expected: z.string().length(64).optional(),
   }),
+  z.object({
+    resolver: z.literal('local_netcdf'),
+    /** Operator-provided NetCDF file; profiled at acquisition (xarray sidecar). */
+    path: z.string().min(1),
+    /** The primary data variable this dataset represents (for feature extraction). */
+    variable: z.string().min(1),
+    sha256Expected: z.string().length(64).optional(),
+  }),
 ]);
 export type DatasetSource = z.infer<typeof DatasetSource>;
 
@@ -66,7 +74,7 @@ export const DatasetRecord = z.object({
   name: z.string().min(1),
   source: DatasetSource,
   license: z.string().default('unknown'),
-  format: z.enum(['csv', 'arff']),
+  format: z.enum(['csv', 'arff', 'netcdf']),
   /** Content-addressed ref of the RAW acquired file (before any preprocessing). */
   contentRef: z.string().regex(/^sha256:[0-9a-f]{64}$/),
   targetColumn: z.string().min(1),
@@ -875,5 +883,6 @@ export const SidecarStatsResult = z.object({
   effect: z.object({ kind: z.string().min(1), value: z.number() }),
 });
 export type SidecarStatsResult = z.infer<typeof SidecarStatsResult>;
+
 
 

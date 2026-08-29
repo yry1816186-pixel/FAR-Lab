@@ -1,0 +1,181 @@
+import { createHash } from 'node:crypto';
+import fs from 'node:fs';
+import type { Store } from '../persistence/store.js';
+import type { ArtifactStore } from '../shared/ports.js';
+import { DatasetRecord, newId, type RunId } from '../domain/index.js';
+import { createSidecar, type Sidecar } from './python.js';
+
+/**
+ * AOSSA scientific data plane (scenario B): NetCDF acquisition + derived
+ * feature datasets.
+ *
+ *  - acquireNetcdfDataset: immutable RAW record — file sha256 content-ref,
+ *    xarray profile (dims/coords/units/attrs) + record-time QC findings from
+ *    the real sidecar, FAIR-ish metadata (license unknown-until-declared),
+ *    lineage step 'acquired';
+ *  - extractNetcdfFeatures: DERIVED tabular record — the sidecar derives a
+ *    bounded CSV feature table (closed enum of aggregations) which becomes a
+ *    content-addressed artifact + DatasetRecord(format csv) whose lineage
+ *    'preprocess' step names the raw ref. One truth: the derived record
+ *    references the raw; nothing re-parses the file on the TS side.
+ *
+ * The sidecar is REQUIRED (real profile/extraction authority); tests inject
+ * the real uv-run sidecar or skip when no real file is present.
+ */
+
+export interface NetcdfProfileResult {
+  path: string;
+  dims: Record<string, number>;
+  coords: Array<{ name: string; dtype: string; size: number; units?: string; attrs: Record<string, unknown> }>;
+  variables: Array<{
+    name: string; dtype: string; shape: number[]; units?: string;
+    nanCount?: number; infCount?: number; missingFraction?: number;
+    min?: number | null; max?: number | null;
+  }>;
+  globalAttrs: Record<string, unknown>;
+  structureHash: string;
+  qcFindings: Array<Record<string, unknown>>;
+  nDataVars: number;
+  engine: string;
+}
+
+export interface AcquireNetcdfOptions {
+  sidecar?: () => Sidecar;
+  now?: () => string;
+  license?: string;
+  timeoutMs?: number;
+}
+
+export const acquireNetcdfDataset = async (
+  store: Store,
+  artifacts: ArtifactStore,
+  runId: RunId,
+  path: string,
+  variable: string,
+  opts: AcquireNetcdfOptions = {},
+): Promise<DatasetRecord> => {
+  const now = opts.now ?? (() => new Date().toISOString());
+  const buf = fs.readFileSync(path);
+  if (buf.length > 200 * 1024 * 1024) throw new Error(`netcdf file exceeds 200MB: ${path}`);
+  const sha = createHash('sha256').update(buf).digest('hex');
+  const raw = await artifacts.put(buf);
+
+  const sidecar = (opts.sidecar ?? (() => createSidecar()))();
+  let profile: NetcdfProfileResult;
+  try {
+    const r = await sidecar.call<NetcdfProfileResult>('netcdf_profile', { path }, opts.timeoutMs ?? 120_000);
+    if (!r.ok || r.result === undefined) {
+      throw new Error(`netcdf_profile failed: ${r.error?.message ?? 'no result'}`);
+    }
+    profile = r.result;
+  } finally {
+    sidecar.close();
+  }
+  if (!profile.variables.some((v) => v.name === variable)) {
+    throw new Error(`variable '${variable}' not present in ${path} (vars: ${profile.variables.map((v) => v.name).join(', ')})`);
+  }
+
+  const record = DatasetRecord.parse({
+    id: newId('ds') as DatasetRecord['id'],
+    runId,
+    name: `${variable}@${path.split(/[\\/]/).pop() ?? path}`,
+    source: { resolver: 'local_netcdf', path, variable, ...(opts.license !== undefined ? {} : {}) },
+    license: opts.license ?? 'unknown',
+    format: 'netcdf',
+    contentRef: raw.ref,
+    targetColumn: variable,
+    columns: profile.variables.map((v) => v.name),
+    nRows: Object.values(profile.dims).reduce((a, b) => a * b, 1),
+    lineage: [
+      {
+        kind: 'acquired',
+        detail: `netcdf raw acquired (sha256 ${sha.slice(0, 16)}…, xarray profile: ${profile.nDataVars} vars, dims ${JSON.stringify(profile.dims)}, structureHash ${profile.structureHash.slice(0, 16)}…, qc ${profile.qcFindings.length} finding(s))`,
+        at: now(),
+      },
+    ],
+    fetchedAt: now(),
+  });
+  store.putObjectEvented('dataset_record', record, {
+    type: 'note',
+    detail: {
+      kind: 'netcdf_acquired',
+      datasetRecordId: record.id,
+      rawRef: raw.ref,
+      variable,
+      dims: profile.dims,
+      structureHash: profile.structureHash,
+      qcFindings: profile.qcFindings,
+      units: Object.fromEntries(profile.variables.filter((v) => v.units !== undefined).map((v) => [v.name, v.units])),
+    },
+  }, now());
+  return record;
+};
+
+export interface NetcdfExtractOptions {
+  sidecar?: () => Sidecar;
+  now?: () => string;
+  timeoutMs?: number;
+  maxRows?: number;
+}
+
+export type NetcdfFeatureMode = 'global_mean_timeseries' | 'monthly_mean_per_gridpoint' | 'flatten_all';
+
+export const extractNetcdfFeatures = async (
+  store: Store,
+  artifacts: ArtifactStore,
+  rawRecord: DatasetRecord,
+  mode: NetcdfFeatureMode,
+  opts: NetcdfExtractOptions = {},
+): Promise<{ record: DatasetRecord; csv: string }> => {
+  const now = opts.now ?? (() => new Date().toISOString());
+  if (rawRecord.source.resolver !== 'local_netcdf') {
+    throw new Error(`extractNetcdfFeatures requires a local_netcdf raw record (got ${rawRecord.source.resolver})`);
+  }
+  const sidecar = (opts.sidecar ?? (() => createSidecar()))();
+  let csv: string;
+  let nRows: number;
+  try {
+    const r = await sidecar.call<{ csv: string; nRows: number }>('netcdf_extract_features', {
+      path: rawRecord.source.path,
+      variable: rawRecord.source.variable,
+      feature: mode,
+      ...(opts.maxRows !== undefined ? { maxRows: opts.maxRows } : {}),
+    }, opts.timeoutMs ?? 180_000);
+    if (!r.ok || r.result === undefined) {
+      throw new Error(`netcdf_extract_features failed: ${r.error?.message ?? 'no result'}`);
+    }
+    csv = r.result.csv;
+    nRows = r.result.nRows;
+  } finally {
+    sidecar.close();
+  }
+  const ref = (await artifacts.put(csv)).ref;
+  const header = csv.split('\n')[0]?.trim() ?? '';
+  const columns = header.split(',').map((c) => c.trim()).filter((c) => c.length > 0);
+  const record = DatasetRecord.parse({
+    id: newId('ds') as DatasetRecord['id'],
+    runId: rawRecord.runId,
+    name: `${rawRecord.source.variable}:${mode}`,
+    source: { resolver: 'local', path: `${rawRecord.source.path}#${mode}` },
+    license: rawRecord.license,
+    format: 'csv',
+    contentRef: ref,
+    targetColumn: columns[columns.length - 1] ?? 'value',
+    columns,
+    nRows,
+    lineage: [
+      ...rawRecord.lineage,
+      {
+        kind: 'preprocess',
+        detail: `feature extraction (${mode}) from raw netcdf ${rawRecord.id} (${rawRecord.contentRef}) via xarray sidecar — bounded aggregation, no spatial structure claimed beyond the named mode`,
+        at: now(),
+      },
+    ],
+    fetchedAt: now(),
+  });
+  store.putObjectEvented('dataset_record', record, {
+    type: 'note',
+    detail: { kind: 'netcdf_features_extracted', datasetRecordId: record.id, fromRaw: rawRecord.id, mode, nRows, ref },
+  }, now());
+  return { record, csv };
+};

@@ -11,6 +11,8 @@ dependencies = [
     # errors / train-test leakage / exact duplicates. Deterministic (seeded).
     "cleanlab>=2.6,<3",
     "sympy>=1.14.0",
+    "xarray>=2026.7.0",
+    "netcdf4>=1.7.4",
 ]
 
 [build-system]

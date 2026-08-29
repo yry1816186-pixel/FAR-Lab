@@ -11,6 +11,7 @@ from sklearn.metrics import accuracy_score, balanced_accuracy_score, f1_score, l
 
 from . import builders
 from .exploration import op_run_exploration
+from .netcdf import op_netcdf_profile, op_netcdf_extract_features
 from .fem import op_fem_poisson_2d, op_fem_poisson_2d_adaptive
 
 CLASSIFICATION_METRICS = ("accuracy", "balanced_accuracy", "f1_macro", "roc_auc", "log_loss")
@@ -485,6 +486,9 @@ OPS = {
     # Slice-6: FEM verification (2D Poisson, mixed BCs, convergence orders).
     "fem_poisson_2d": op_fem_poisson_2d,
     "fem_poisson_2d_adaptive": op_fem_poisson_2d_adaptive,
+    # AOSSA scientific data plane: NetCDF profiling + record-time QC.
+    "netcdf_profile": op_netcdf_profile,
+    "netcdf_extract_features": op_netcdf_extract_features,
 }
 
 
