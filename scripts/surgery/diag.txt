@@ -1,10 +1,10 @@
-===== typecheck (last 120 lines) =====
+===== typecheck (last 40 lines) =====
 
 > far-lab@0.1.0 typecheck
 > tsc -p tsconfig.json --noEmit
 
 
-===== lint (last 120 lines) =====
+===== lint (last 40 lines) =====
 
 > far-lab@0.1.0 lint
 > eslint .
@@ -18,3 +18,48 @@
 ✖ 3 problems (0 errors, 3 warnings)
   0 errors and 3 warnings potentially fixable with the `--fix` option.
 
+
+===== targeted vitest (last 200 lines) =====
+
+[1m[46m RUN [49m[22m [36mv3.2.7 [39m[90m/home/runner/work/FAR-Lab/FAR-Lab[39m
+
+ [32m✓[39m tests/scientific-state.test.ts [2m([22m[2m24 tests[22m[2m)[22m[32m 39[2mms[22m[39m
+ [32m✓[39m tests/protocol-domain.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 33[2mms[22m[39m
+ [32m✓[39m tests/real-content-mixed-route.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 100[2mms[22m[39m
+ [32m✓[39m tests/iteration.test.ts [2m([22m[2m17 tests[22m[2m)[22m[33m 575[2mms[22m[39m
+ [31m❯[39m tests/protocol-execute-stage.test.ts [2m([22m[2m5 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[32m 107[2mms[22m[39m
+   [32m✓[39m execute stage: protocol fallback (paradigm-honest execution)[2m > [22mregisters a frozen protocol + empty awaiting-human ledger when both computational legs skip (live)[32m 36[2mms[22m[39m
+   [32m✓[39m execute stage: protocol fallback (paradigm-honest execution)[2m > [22ma product run on the deterministic development wire is refused (template protocol is not science)[32m 12[2mms[22m[39m
+   [32m✓[39m execute stage: protocol fallback (paradigm-honest execution)[2m > [22mregistration is idempotent per plan hash — a second pass reports, never re-drafts[32m 20[2mms[22m[39m
+   [32m✓[39m execute stage: protocol fallback (paradigm-honest execution)[2m > [22miteration: a registered protocol stops machine rounds and surfaces the human unblock path[32m 17[2mms[22m[39m
+[31m   [31m×[31m execute stage: protocol fallback (paradigm-honest execution)[2m > [22mwithout a protocol the unexecuted leg still re-arms (compatibility control)[39m[32m 21[2mms[22m[39m
+[31m     → expected 'stop' to be 'continue' // Object.is equality[39m
+ [32m✓[39m tests/protocol-from-plan.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 37[2mms[22m[39m
+ [32m✓[39m tests/protocol-ops.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 179[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/protocol-execute-stage.test.ts[2m > [22mexecute stage: protocol fallback (paradigm-honest execution)[2m > [22mwithout a protocol the unexecuted leg still re-arms (compatibility control)
+[31m[1mAssertionError[22m: expected 'stop' to be 'continue' // Object.is equality[39m
+
+Expected: "continue"
+Received: "stop"
+
+[36m [2m❯[22m tests/protocol-execute-stage.test.ts:[2m241:31[22m[39m
+    [90m239| [39m    [35mconst[39m { store[33m,[39m run } [33m=[39m [34msetup[39m()[33m;[39m
+    [90m240| [39m    const decision = evaluateIteration({ store, runId: run.id, round: …
+    [90m241| [39m    [34mexpect[39m(decision[33m.[39mdecision)[33m.[39m[34mtoBe[39m([32m'continue'[39m)[33m;[39m
+    [90m   | [39m                              [31m^[39m
+    [90m242| [39m    expect(decision.record.continueTrigger?.kind).toBe('executable_pla…
+    [90m243| [39m  })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m6 passed[39m[22m[90m (7)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m77 passed[39m[22m[90m (78)[39m
+[2m   Start at [22m 06:55:31
+[2m   Duration [22m 2.51s[2m (transform 1.58s, setup 0ms, collect 3.56s, tests 1.07s, environment 1ms, prepare 567ms)[22m
+
+
+::error file=/home/runner/work/FAR-Lab/FAR-Lab/tests/protocol-execute-stage.test.ts,title=tests/protocol-execute-stage.test.ts > execute stage%3A protocol fallback (paradigm-honest execution) > without a protocol the unexecuted leg still re-arms (compatibility control),line=241,column=31::AssertionError: expected 'stop' to be 'continue' // Object.is equality%0A%0AExpected: "continue"%0AReceived: "stop"%0A%0A ❯ tests/protocol-execute-stage.test.ts:241:31%0A%0A
