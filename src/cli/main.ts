@@ -324,6 +324,23 @@ const main = async (): Promise<void> => {
     return;
   }
 
+  if (cmd === 'protocol') {
+    // Paradigm-honest execution ledger (slice 3): the human-attested protocol
+    // surface (show/record). Own module so this router stays a one-line hook.
+    const { protocolCommand } = await import('./protocol.js');
+    const args = process.argv.slice(4).filter((x) => !x.startsWith('--') && x !== sub);
+    const result = await protocolCommand(sub, {
+      dataDir: arg('--data-dir') ?? '.far-run',
+      positional: args[0],
+      flag,
+      arg,
+    });
+    if (json() && result.json !== undefined) jsonOutput(result.json);
+    else if (result.text !== undefined) out(result.text);
+    if (result.code !== 0) process.exitCode = result.code;
+    return;
+  }
+
   if (cmd === 'campaign') {
     // RU-8 campaign surface: preregistered multi-experiment decision campaigns.
     const { campaignCommand } = await import('./campaign.js');
