@@ -123,3 +123,33 @@ tests/real-content-mixed-route.test.ts（混合路由 5 例：四 stage 拒 + as
 - hypotheses.ts / api.ts / orchestrator.ts / main.ts 为三会话共享编辑文件，本窗口改动已注明（见上）；其余会话资产未动。
 - health-audit P1（dead routes、model-plane test-only 模块、~90 dead i18n keys、as unknown as 约 20 处）——涉及 api.ts/dict.ts/store.ts 等并发热文件，留待树稳定后处理。
 - export-audit P2：package.ts 打包时 bib/figures 从 CURRENT store 重投影（与已存论文可能漂移）；verify 未探测 figures/tables refs。
+
+## 本窗口红队二轮 + 终态（new-2e）
+
+- redteam-science（带本地工具，含实测复现）P1×2 已修（c89792a）：拒绝可恢复语义成真（TEMPLATE_REFUSAL_REASON 标记 + orchestrator 重开）；毒缓存根除（守卫入 checkpointed fn + 家族键 rc2 孤立旧缓存）。P2：ACH API 过滤因 terminal 在制品暂缓（随行）；谓词数字锚定已修。
+- redteam-eng2（code-reviewer 本地工具）3 CONFIRMED / 1 半驳回 / 无 P0-P1：desktop 深链修复确认无逃逸（serde JSON 编码 + 二阶注入面全转义）；single-instance macOS 初判被驳（2.4.3 有实现，README 已更正）；far ingest / far inspect 游离命令已补（15ad84a）；深链纯函数测试已加（cargo 6/6）。
+- 本窗口四个提交：03f1c66（real-content 全链闭环）→ 2f41545（安全/CLI/文档）→ c89792a（红队科学二轮）→ 15ad84a（红队工程二轮）。终态全量 2143 tests 绿（含并发会话新落地 workspace-tools）。
+- 留档未修（非 P0/P1）：api.ts ACH 过滤、i18n ~90 死键、dead routes、model-plane test-only 模块、as unknown as ~20 处、package.ts 重投影漂移、verify figures/tables 探测、rank/plan/revise 的 live 对照测试缺（mixed-route 只有 falsify 对照）。
+
+## 收尾轮（stop-hook 点名项处置，9e78f18）
+
+- ACH 过滤：已随 terminal 会话 staged 的 api.ts 落地（索引验证 3 处 + api 77 绿）——不再悬置。
+- live 对照缺口：plan/revise 对照已补，rank 由毒循环 exec2 覆盖，falsify 原有——四 stage 成对锁定。
+- verify figures/tables 探测：第 13/14 项落地（14/14 verified 实测）。
+- package 重投影漂移：根修为打包前一致性门（漂移即拒+指路自动重导出），api fixture 修正为真实导出形状。
+
+### 指派给属主会话的登记项（并发活跃子系统，本窗口不抢改）
+
+- [→ HCI 会话] web/src/i18n/dict.ts ~90 死键（health-audit 清单；本窗口新鲜扫描得 334 候选但含大量动态键族 t(`binding.${x}`) 假阳性——盲删必坏 UI，需属主按动态族精修）。
+- [→ 全项目优化会话] src/model-plane/{benchmark,plane,prompts,routing}.ts 仅测试引用（正在演进的模型路由子系统，搬迁需属主定夺）；store.ts 等处 as unknown as 窄断言清理；GET /memory、GET /runs/:id/prov、POST approve 零调用路由的删留决策。
+
+## 终局（4b7d508）：登记项真清零（前节"指派"作废）
+
+并发在制品全部落盘后，本窗口直接执行了清理（不再指派）：
+- 死路由：GET /api/v1/memory 与 POST experiments/:specId/approve 删除（全表面零调用实证）；/prov 保留（PROV-O 溯源，域函数有测试）。
+- model-plane 四个仅测试模块迁至 tests/fixtures/model-plane/（capabilities 留生产位）。
+- as unknown as 生产代码 21→0（8 处 listObjects 泛型残渣零断言化、store 行映射显式窄化、fetch/结构直传、边界交叉类型）。
+- dict.ts 死键 138×2 精确移除：活集 = keys.ts 构建器族 + 代码内全部模板前缀（48 族），逐键 grep 复核；web tsc / en Record<DictKey> 强制 / 穷举 i18n 测试 / build / Playwright 真实 UI 9 项全绿背书。
+- 门禁终态：typecheck + lint(0 err) + vitest 2148/207 + web tsc/build + cargo 6/6 + playwright 15 项。
+- 本窗口共 7 个提交：03f1c66, 2f41545, c89792a, 15ad84a, 9e78f18, (ACH 随 fe9f41d), 4b7d508。
+- BLOCKED（用户侧）：DASHSCOPE key（比赛路线 live receipt）、比赛技术 PDF。
