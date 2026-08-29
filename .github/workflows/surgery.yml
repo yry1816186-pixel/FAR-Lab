@@ -5,11 +5,13 @@ name: surgery
 # remote work surface. Each patch is a committed .mjs script under
 # scripts/surgery/ — fail-loud anchors, idempotent re-runs, no shell inputs.
 # Scoped to converge/** branches only (never pull_request) so untrusted
-# patches cannot ride this workflow.
+# patches cannot ride this workflow. The diagnose job gives the remote work
+# surface a read channel for verification output (typecheck/lint) that
+# otherwise lives only in logs it cannot fetch.
 on:
   push:
     branches: ['converge/**']
-    paths: ['scripts/surgery/**']
+    paths: ['scripts/surgery/**', '.github/workflows/surgery.yml']
 
 permissions:
   contents: write
@@ -41,5 +43,37 @@ jobs:
             echo "nothing to apply — tree already current"
           else
             git commit -m "chore(surgery): store kinds + api protocol routes + readme bullet + context refresh"
+            git push
+          fi
+
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install root dependencies
+        run: npm ci
+      - name: Install web dependencies (root suite imports web/src)
+        working-directory: web
+        run: npm ci
+      - name: Typecheck (backend + CLI)
+        run: npm run typecheck 2>&1 | tee /tmp/typecheck.txt || echo "TYPECHECK_FAILED" >> /tmp/typecheck.txt
+      - name: Lint
+        run: npm run lint 2>&1 | tee /tmp/lint.txt || echo "LINT_FAILED" >> /tmp/lint.txt
+      - name: Commit diagnostics
+        run: |
+          git config user.name "farlab-surgery-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          mkdir -p scripts/surgery
+          { echo '===== typecheck (last 120 lines) ====='; tail -n 120 /tmp/typecheck.txt; echo; echo '===== lint (last 120 lines) ====='; tail -n 120 /tmp/lint.txt; } > scripts/surgery/diag.txt
+          git add scripts/surgery/diag.txt
+          if git diff --cached --quiet; then
+            echo "no diagnostics change"
+          else
+            git pull --rebase || true
+            git commit -m "chore(surgery): diagnostics snapshot"
             git push
           fi
