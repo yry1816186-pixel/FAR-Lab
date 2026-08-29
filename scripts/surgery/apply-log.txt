@@ -1,0 +1,15 @@
+===== node scripts/surgery/apply-store-protocol.mjs =====
+[surgery] store.ts already carries protocol kinds — nothing to do
+===== node scripts/surgery/apply-api-protocol.mjs =====
+[surgery:api] protocol routes already mounted — nothing to do
+===== node scripts/surgery/apply-readme-protocol.mjs =====
+[surgery:readme] protocol bullet already present — nothing to do
+===== node scripts/surgery/apply-web-protocol.mjs =====
+[surgery:web] protocol band already correctly placed
+[surgery:web] dict already has map.protocol.* keys in both languages
+[surgery:web] lab.css already has protocol styles
+===== node scripts/surgery/fix-dict-zh-ethics-key.mjs =====
+[surgery:dict-fix] unexpected drift: en-minus-zh = ["map.protocol.ethicsApprovalBody","feedback.intro"], zh-minus-en = []
+===== node scripts/surgery/dump-api-context.mjs =====
+[surgery] api-context.txt written
+APPLY_RC=0
