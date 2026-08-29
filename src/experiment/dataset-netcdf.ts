@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
+import nodePath from 'node:path';
 import type { Store } from '../persistence/store.js';
 import type { ArtifactStore } from '../shared/ports.js';
 import { DatasetRecord, newId, type RunId } from '../domain/index.js';
@@ -116,6 +117,8 @@ export interface NetcdfExtractOptions {
   now?: () => string;
   timeoutMs?: number;
   maxRows?: number;
+  /** When set, the derived CSV is ALSO written to <dir>/<recordId>.csv and source.path points there (operator-vouched real file the EEL local-dataset leg can consume). */
+  materializeDir?: string;
 }
 
 export type NetcdfFeatureMode = 'global_mean_timeseries' | 'monthly_mean_per_gridpoint' | 'flatten_all';
@@ -150,13 +153,20 @@ export const extractNetcdfFeatures = async (
     sidecar.close();
   }
   const ref = (await artifacts.put(csv)).ref;
+  const recordId = newId('ds') as DatasetRecord['id'];
+  let localPath = `${rawRecord.source.path}#${mode}`;
+  if (opts.materializeDir !== undefined) {
+    fs.mkdirSync(opts.materializeDir, { recursive: true });
+    localPath = nodePath.join(opts.materializeDir, `${recordId}.csv`);
+    fs.writeFileSync(localPath, csv, 'utf8');
+  }
   const header = csv.split('\n')[0]?.trim() ?? '';
   const columns = header.split(',').map((c) => c.trim()).filter((c) => c.length > 0);
   const record = DatasetRecord.parse({
-    id: newId('ds') as DatasetRecord['id'],
+    id: recordId,
     runId: rawRecord.runId,
     name: `${rawRecord.source.variable}:${mode}`,
-    source: { resolver: 'local', path: `${rawRecord.source.path}#${mode}` },
+    source: { resolver: 'local', path: localPath },
     license: rawRecord.license,
     format: 'csv',
     contentRef: ref,
@@ -179,3 +189,4 @@ export const extractNetcdfFeatures = async (
   }, now());
   return { record, csv };
 };
+
