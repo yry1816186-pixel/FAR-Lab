@@ -9,7 +9,7 @@ found 0 vulnerabilities
 
 ===== desktop install (last 20 lines) =====
 
-added 3 packages, and audited 4 packages in 688ms
+added 3 packages, and audited 4 packages in 732ms
 
 1 package is looking for funding
   run `npm fund` for details
@@ -21,18 +21,12 @@ found 0 vulnerabilities
 > far-lab@0.1.0 build
 > tsc -p tsconfig.json
 
-src/pipeline/stages/export.ts(860,119): error TS2448: Block-scoped variable 'protocolLimitationLines' used before its declaration.
-src/pipeline/stages/export.ts(860,119): error TS2454: Variable 'protocolLimitationLines' is used before being assigned.
-BUILD_FAILED
 
 ===== typecheck (last 30 lines) =====
 
 > far-lab@0.1.0 typecheck
 > tsc -p tsconfig.json --noEmit
 
-src/pipeline/stages/export.ts(860,119): error TS2448: Block-scoped variable 'protocolLimitationLines' used before its declaration.
-src/pipeline/stages/export.ts(860,119): error TS2454: Variable 'protocolLimitationLines' is used before being assigned.
-TYPECHECK_FAILED
 
 ===== lint (last 30 lines) =====
 
@@ -50,6 +44,278 @@ TYPECHECK_FAILED
 
 
 ===== FULL vitest (last 400 lines) =====
+#5 18.07 Setting up libedit2:amd64 (3.1-20221030-2) ...
+#5 18.08 Setting up libreadline8:amd64 (8.2-1.3) ...
+#5 18.08 Setting up libgprofng0:amd64 (2.40-2) ...
+#5 18.08 Setting up libgcc-12-dev:amd64 (12.2.0-14+deb12u1) ...
+#5 18.09 Setting up libgssapi-krb5-2:amd64 (1.20.1-2+deb12u5) ...
+#5 18.09 Setting up ucf (3.0043+nmu1+deb12u1) ...
+#5 18.15 debconf: unable to initialize frontend: Dialog
+#5 18.15 debconf: (TERM is not set, so the dialog frontend is not usable.)
+#5 18.15 debconf: falling back to frontend: Readline
+#5 18.16 debconf: unable to initialize frontend: Readline
+#5 18.16 debconf: (Can't locate Term/ReadLine.pm in @INC (you may need to install the Term::ReadLine module) (@INC contains: /etc/perl /usr/local/lib/x86_64-linux-gnu/perl/5.36.0 /usr/local/share/perl/5.36.0 /usr/lib/x86_64-linux-gnu/perl5/5.36 /usr/share/perl5 /usr/lib/x86_64-linux-gnu/perl-base /usr/lib/x86_64-linux-gnu/perl/5.36 /usr/share/perl/5.36 /usr/local/lib/site_perl) at /usr/share/perl5/Debconf/FrontEnd/Readline.pm line 7.)
+#5 18.16 debconf: falling back to frontend: Teletype
+#5 18.18 Setting up libjs-sphinxdoc (5.3.0-4) ...
+#5 18.18 Setting up libopenblas0:amd64 (0.3.21+ds-4) ...
+#5 18.18 Setting up cpp (4:12.2.0-3) ...
+#5 18.19 Setting up liblbfgsb0:amd64 (3.0+dfsg.4-1) ...
+#5 18.19 Setting up binutils-x86-64-linux-gnu (2.40-2) ...
+#5 18.19 Setting up libopenblas-pthread-dev:amd64 (0.3.21+ds-4) ...
+#5 18.20 update-alternatives: using /usr/lib/x86_64-linux-gnu/openblas-pthread/libblas.so to provide /usr/lib/x86_64-linux-gnu/libblas.so (libblas.so-x86_64-linux-gnu) in auto mode
+#5 18.20 update-alternatives: using /usr/lib/x86_64-linux-gnu/openblas-pthread/liblapack.so to provide /usr/lib/x86_64-linux-gnu/liblapack.so (liblapack.so-x86_64-linux-gnu) in auto mode
+#5 18.20 update-alternatives: using /usr/lib/x86_64-linux-gnu/openblas-pthread/libopenblas.so to provide /usr/lib/x86_64-linux-gnu/libopenblas.so (libopenblas.so-x86_64-linux-gnu) in auto mode
+#5 18.21 Setting up libtirpc3:amd64 (1.3.3+ds-1) ...
+#5 18.21 Setting up openssh-client (1:9.2p1-2+deb12u10) ...
+#5 18.27 Setting up binutils (2.40-2) ...
+#5 18.27 Setting up libopenblas-dev:amd64 (0.3.21+ds-4) ...
+#5 18.28 Setting up libtirpc-dev:amd64 (1.3.3+ds-1) ...
+#5 18.28 Setting up gcc-12 (12.2.0-14+deb12u1) ...
+#5 18.28 Setting up libnsl2:amd64 (1.3.0-2) ...
+#5 18.29 Setting up openssh-sftp-server (1:9.2p1-2+deb12u10) ...
+#5 18.29 Setting up libpython3.11-stdlib:amd64 (3.11.2-6+deb12u8) ...
+#5 18.35 Setting up gcc (4:12.2.0-3) ...
+#5 18.36 Setting up libwrap0:amd64 (7.6.q-32) ...
+#5 18.36 Setting up libnsl-dev:amd64 (1.3.0-2) ...
+#5 18.37 Setting up libc6-dev:amd64 (2.36-9+deb12u14) ...
+#5 18.37 Setting up libpython3-stdlib:amd64 (3.11.2-1+b1) ...
+#5 18.37 Setting up python3.11 (3.11.2-6+deb12u8) ...
+#5 18.95 Setting up libpython3.11:amd64 (3.11.2-6+deb12u8) ...
+#5 18.95 Setting up openssh-server (1:9.2p1-2+deb12u10) ...
+#5 19.02 debconf: unable to initialize frontend: Dialog
+#5 19.02 debconf: (TERM is not set, so the dialog frontend is not usable.)
+#5 19.02 debconf: falling back to frontend: Readline
+#5 19.02 debconf: unable to initialize frontend: Readline
+#5 19.02 debconf: (Can't locate Term/ReadLine.pm in @INC (you may need to install the Term::ReadLine module) (@INC contains: /etc/perl /usr/local/lib/x86_64-linux-gnu/perl/5.36.0 /usr/local/share/perl/5.36.0 /usr/lib/x86_64-linux-gnu/perl5/5.36 /usr/share/perl5 /usr/lib/x86_64-linux-gnu/perl-base /usr/lib/x86_64-linux-gnu/perl/5.36 /usr/share/perl/5.36 /usr/local/lib/site_perl) at /usr/share/perl5/Debconf/FrontEnd/Readline.pm line 7.)
+#5 19.02 debconf: falling back to frontend: Teletype
+#5 19.08 
+#5 19.08 Creating config file /etc/ssh/sshd_config with new version
+#5 19.10 Creating SSH2 RSA key; this may take some time ...
+#5 19.60 3072 SHA256:3LYlQSJ1qcp3glEdLzVKHYEyM9fu/Ob3hf3JD2v8MiU root@buildkitsandbox (RSA)
+#5 19.60 Creating SSH2 ECDSA key; this may take some time ...
+#5 19.61 256 SHA256:9PjiaOXlI5Z1/JSKH3wtSdzikMQr8vzGo+EQ6A7jDCE root@buildkitsandbox (ECDSA)
+#5 19.61 Creating SSH2 ED25519 key; this may take some time ...
+#5 19.62 256 SHA256:Gx/6z/0Em1VzS/TCXTy9qbmV7yUco9xO+NHRPSNDnR8 root@buildkitsandbox (ED25519)
+#5 19.67 invoke-rc.d: could not determine current runlevel
+#5 19.67 invoke-rc.d: policy-rc.d denied execution of start.
+#5 19.85 Setting up libstdc++-12-dev:amd64 (12.2.0-14+deb12u1) ...
+#5 19.85 Setting up python3 (3.11.2-1+b1) ...
+#5 19.86 running python rtupdate hooks for python3.11...
+#5 19.86 running python post-rtupdate hooks for python3.11...
+#5 19.93 Setting up python3-decorator (5.1.1-3) ...
+#5 20.04 Setting up libexpat1-dev:amd64 (2.5.0-1+deb12u2) ...
+#5 20.06 Setting up zlib1g-dev:amd64 (1:1.2.13.dfsg-1) ...
+#5 20.06 Setting up python3-lib2to3 (3.11.2-3) ...
+#5 20.14 Setting up g++-12 (12.2.0-14+deb12u1) ...
+#5 20.15 Setting up python3-pkg-resources (66.1.1-1+deb12u2) ...
+#5 20.36 Setting up python3-distutils (3.11.2-3) ...
+#5 20.46 Setting up libboost1.74-dev:amd64 (1.74.0+ds1-21) ...
+#5 20.47 Setting up python3-joblib (1.2.0-4+deb12u1) ...
+#5 20.67 Setting up python3-ply (3.11-5) ...
+#5 20.80 Setting up python3-threadpoolctl (3.1.0-1) ...
+#5 20.90 Setting up python3-gast (0.5.2-2) ...
+#5 21.05 Setting up python3-all (3.11.2-1+b1) ...
+#5 21.05 Setting up python3-beniget (0.4.1-3) ...
+#5 21.16 Setting up libpython3.11-dev:amd64 (3.11.2-6+deb12u8) ...
+#5 21.16 Setting up python3-numpy (1:1.24.2-1+deb12u1) ...
+#5 22.44 Setting up g++ (4:12.2.0-3) ...
+ [32m✓[39m tests/exploration-runner.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 4588[2mms[22m[39m
+   [33m[2m✓[22m[39m runExploration (real sidecar)[2m > [22mexecutes gated analysis code and persists artifact + receipt + event [33m 1159[2mms[22m[39m
+   [33m[2m✓[22m[39m runExploration (real sidecar)[2m > [22mrecords runtime failures inside the sandbox as visible candidate findings [33m 1133[2mms[22m[39m
+   [33m[2m✓[22m[39m runExploration (real sidecar)[2m > [22mdunder-traversal escape is refused before spawn AND mirrored at the Python AST layer [33m 1209[2mms[22m[39m
+   [33m[2m✓[22m[39m runExploration (real sidecar)[2m > [22mnumpy-lazy-submodule payloads execute (14-F2 regression: np ops that lazily import internals) [33m 1078[2mms[22m[39m
+#5 22.44 update-alternatives: using /usr/bin/g++ to provide /usr/bin/c++ (c++) in auto mode
+#5 22.45 Setting up libboost-dev:amd64 (1.74.0.3) ...
+#5 22.45 Setting up libpython3-dev:amd64 (3.11.2-1+b1) ...
+#5 22.45 Setting up python3.11-dev (3.11.2-6+deb12u8) ...
+#5 22.45 Setting up python3-sklearn-lib:amd64 (1.2.1+dfsg-1) ...
+#5 22.46 Setting up libpython3-all-dev:amd64 (3.11.2-1+b1) ...
+#5 22.46 Setting up python3-dev (3.11.2-1+b1) ...
+#5 22.46 Setting up python3-all-dev (3.11.2-1+b1) ...
+#5 22.47 Setting up python3-pythran (0.11.0+ds-7) ...
+ [32m✓[39m tests/ingest-pdftext.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+#5 22.78 Setting up python3-scipy (1.10.1-2) ...
+ [32m✓[39m tests/science-retrieval-bench.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m tests/ingest-pptx.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+#5 24.76 Setting up python3-sklearn (1.2.1+dfsg-1) ...
+ [32m✓[39m tests/net-env.test.ts [2m([22m[2m12 tests[22m[2m)[22m[33m 2515[2mms[22m[39m
+   [33m[2m✓[22m[39m probeNetwork (real loopback self-test)[2m > [22mvalidates the CA and tunnels a real fetch through a real CONNECT proxy [33m 684[2mms[22m[39m
+   [33m[2m✓[22m[39m selfTestMaterial (fresh-clone path: no committed private key)[2m > [22mgenerates an ephemeral throwaway CA+server pair when fixtures lack the key [33m 463[2mms[22m[39m
+   [33m[2m✓[22m[39m boot re-exec (compiled CLI, real child process)[2m > [22mfar probe net reports the configured proxy and passes the loopback self-test [33m 897[2mms[22m[39m
+   [33m[2m✓[22m[39m boot re-exec (compiled CLI, real child process)[2m > [22ma non-probe command re-execs exactly once with the proxy env applied (observable on stderr) [33m 460[2mms[22m[39m
+#5 26.08 Processing triggers for libc-bin (2.36-9+deb12u14) ...
+ [32m✓[39m tests/run-deletion.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 317[2mms[22m[39m
+#5 DONE 27.5s
+ [32m✓[39m tests/protocol-ops.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 294[2mms[22m[39m
+
+#6 exporting to image
+#6 exporting layers
+ [32m✓[39m tests/ingest-docx.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m tests/custom-provider.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32m✓[39m tests/agent-mcp.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 778[2mms[22m[39m
+   [33m[2m✓[22m[39m MCP client pagination + tools/list_changed (real child process)[2m > [22mnotifications/tools/list_changed reaches subscribers (previously dropped at the dispatch guard) [33m 436[2mms[22m[39m
+ [32m✓[39m tests/ingest-svgplot.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32m✓[39m tests/reasoning-wire.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m tests/ingest-md-latex.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m tests/agent-permissions.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+#6 exporting layers 4.8s done
+#6 writing image sha256:0a3f791b5c4a202b8f6eb95f4974dd922b8faf3b71030b5482f29875faa03a86 done
+#6 naming to docker.io/library/farlab-ssh-target done
+#6 DONE 4.8s
+ [32m✓[39m tests/api-tools.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 2234[2mms[22m[39m
+   [33m[2m✓[22m[39m tool integrations API[2m > [22mtest route: real stdio round-trip persisted as lastTest; failures honest; non-MCP 400 [33m 2091[2mms[22m[39m
+ [32m✓[39m tests/lineage-storage.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 48[2mms[22m[39m
+ [32m✓[39m tests/json-repair.test.ts [2m([22m[2m95 tests[22m[2m)[22m[32m 35[2mms[22m[39m
+ [32m✓[39m tests/api-actions.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 162[2mms[22m[39m
+ [32m✓[39m tests/gateway.test.ts [2m([22m[2m2 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 32445[2mms[22m[39m
+   [33m[2m✓[22m[39m P3 ssh2-gateway on a real Docker/WSL2 Linux target (D-084)[2m > [22mreal Linux target: key-only SSH, remote training, host-key pinning [33m 32266[2mms[22m[39m
+ [32m✓[39m tests/ingest-tei.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m tests/storage-hardening.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 793[2mms[22m[39m
+   [33m[2m✓[22m[39m RU-7.1 backup CLI verb (far backup)[2m > [22mend-to-end via main(): writes a restorable snapshot under backup/, refuses overwrite [33m 731[2mms[22m[39m
+ [32m✓[39m tests/scheduler-dlq.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 74[2mms[22m[39m
+ [32m✓[39m tests/remote-executor.test.ts [2m([22m[2m2 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 44762[2mms[22m[39m
+   [33m[2m✓[22m[39m P3 remote executor: device-bound queue -> remote training -> local verdicts[2m > [22mworker on the ssh device executes the full chain [33m 44584[2mms[22m[39m
+ [32m✓[39m tests/lineage.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 62[2mms[22m[39m
+ [32m✓[39m tests/mcp-manager.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 4250[2mms[22m[39m
+   [33m[2m✓[22m[39m McpManager (real child processes)[2m > [22mconnects enabled servers, skips disabled, records failures honestly [33m 2065[2mms[22m[39m
+   [33m[2m✓[22m[39m McpManager (real child processes)[2m > [22mtestIntegration: ok path summarizes tools + latency, failure path returns the error [33m 2051[2mms[22m[39m
+ [32m✓[39m tests/spend-limit.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 149[2mms[22m[39m
+ [32m✓[39m tests/campaign-runtime.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m tests/bilingual-zh.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 63[2mms[22m[39m
+ [32m✓[39m tests/orchestrator-loop-guidance.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 180[2mms[22m[39m
+ [32m✓[39m tests/orchestrator-attempt.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 106[2mms[22m[39m
+ [32m✓[39m tests/tool-proposals.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 166[2mms[22m[39m
+ [32m✓[39m tests/migrations-upgrade.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 124[2mms[22m[39m
+ [32m✓[39m tests/prediction-ledger.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m tests/run-fork.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 33[2mms[22m[39m
+ [32m✓[39m tests/ingest-latexml.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m tests/ingest-dataset.test.ts [2m([22m[2m18 tests[22m[2m)[22m[33m 1807[2mms[22m[39m
+   [33m[2m✓[22m[39m large-spreadsheet stress (BENCHMARK.md gap closed 2026-08-24)[2m > [22mprofiles 150k rows correctly (types, stats, no truncation) [33m 849[2mms[22m[39m
+   [33m[2m✓[22m[39m large-spreadsheet stress (BENCHMARK.md gap closed 2026-08-24)[2m > [22mrow cap 200k fires honestly past the limit [33m 945[2mms[22m[39m
+ [32m✓[39m tests/campaign-spec.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m tests/spec-from-plan.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 145[2mms[22m[39m
+ [32m✓[39m tests/agent-resume.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32m✓[39m tests/cli-term.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 325[2mms[22m[39m
+   [33m[2m✓[22m[39m cli vendored picocolors: color discipline[2m > [22mcolors follow the vendored contract under controlled env (15→03: ambient worker env drift made the in-process assertion a hosted-CI red) [33m 314[2mms[22m[39m
+ [32m✓[39m tests/model-plane-failures.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m tests/mcp-http.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 445[2mms[22m[39m
+   [33m[2m✓[22m[39m MCP streamable-HTTP client (real local server)[2m > [22msurfaces per-request timeouts as honest errors [33m 321[2mms[22m[39m
+ [32m✓[39m tests/agent-subagents.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+ [32m✓[39m tests/web-i18n-keys.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m tests/ingest-code-nb.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m tests/lit-graph.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+ [32m✓[39m tests/hooks-compose.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m tests/agent-rollout.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m tests/experiment-screening.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m tests/experiment-mde-gate.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m tests/research-tools.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 1558[2mms[22m[39m
+   [33m[2m✓[22m[39m explore_code tool (real sidecar)[2m > [22mruns gated analysis end-to-end and returns candidate findings with audit chain [33m 1519[2mms[22m[39m
+ [32m✓[39m tests/ingest-epub.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m tests/tool-integration.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m tests/minhash.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m tests/outbox.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 79[2mms[22m[39m
+ [32m✓[39m tests/ingest-html.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m tests/agent-compaction.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m tests/evidence-debt-reopen.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 43[2mms[22m[39m
+ [32m✓[39m tests/cache-layout.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/numeric-provenance.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m tests/research-query.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 62[2mms[22m[39m
+ [32m✓[39m tests/plan-viz.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m tests/cli-extensibility.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 5203[2mms[22m[39m
+   [33m[2m✓[22m[39m far mcp (real store + real MCP round trip)[2m > [22madd stages DISABLED, list shows it, enable flips it [33m 1333[2mms[22m[39m
+   [33m[2m✓[22m[39m far mcp (real store + real MCP round trip)[2m > [22mprobe does a REAL initialize + tools/list round trip and persists lastTest [33m 603[2mms[22m[39m
+   [33m[2m✓[22m[39m far mcp (real store + real MCP round trip)[2m > [22mprobe of a dead server fails honestly with a nonzero exit [33m 2621[2mms[22m[39m
+   [33m[2m✓[22m[39m far plugin (real local plugin import)[2m > [22minstall expands far-plugin.json into disabled integrations; list shows provenance [33m 642[2mms[22m[39m
+ [32m✓[39m tests/audit-chain.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 62[2mms[22m[39m
+ [32m✓[39m tests/agent-policy.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 183[2mms[22m[39m
+ [32m✓[39m tests/terminal-api.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 421[2mms[22m[39m
+   [33m[2m✓[22m[39m terminal sessions API (real shells)[2m > [22mcreates a session, streams output over SSE, accepts input, kills [33m 327[2mms[22m[39m
+ [32m✓[39m tests/exploratory-codeact.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32m✓[39m tests/stage-reasoning.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m tests/revision-predicates.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m tests/response-cache.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 36[2mms[22m[39m
+ [32m✓[39m tests/agent-skills.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m tests/claim-match.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/ingest-routing.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32m✓[39m tests/ingest-service.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32m✓[39m tests/web-revision-decisions.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m tests/supervisor-integration.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 155[2mms[22m[39m
+ [32m✓[39m tests/reasoning-gear.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32m✓[39m tests/experiment-viz.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m tests/supervisor-p1-fix.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 43[2mms[22m[39m
+ [32m✓[39m tests/time-travel.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 484[2mms[22m[39m
+   [33m[2m✓[22m[39m stateAtSeq (time travel)[2m > [22mAPI surface contract: GET /runs/:id/state-at/:seq (400 bad seq, 404 unknown run) [33m 453[2mms[22m[39m
+ [32m✓[39m tests/evaluators.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 47[2mms[22m[39m
+ [32m✓[39m tests/platform/dotenv.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m tests/far-search-trigram.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 46[2mms[22m[39m
+ [32m✓[39m tests/exploration-feasibility.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 1592[2mms[22m[39m
+   [33m[2m✓[22m[39m exploratory CodeAct environment feasibility (real sidecar)[2m > [22mruns gated analysis code through the real sidecar and lands full audit chain [33m 1590[2mms[22m[39m
+ [32m✓[39m tests/hypothesis-dedup.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32m✓[39m tests/cross-viz.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m tests/reliability-artifact-atomicity.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32m✓[39m tests/zip.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m tests/server-hardening.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 89[2mms[22m[39m
+ [32m✓[39m tests/model-config-e2e.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 127[2mms[22m[39m
+[90mstdout[2m | tests/report-pandoc.test.ts[2m > [22m[2mdetectPandoc[2m > [22m[2mreturns a parsed semver or null (never throws)
+[22m[39mpandoc absent on this machine — conversion tests below are SKIPPED (honest skip, not a pass)
+
+ [32m✓[39m tests/report-pandoc.test.ts [2m([22m[2m6 tests[22m[2m | [22m[33m3 skipped[39m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m tests/ingest-xml.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m tests/context-compiler.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 42[2mms[22m[39m
+ [32m✓[39m tests/artifact-diff.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m tests/counter-evidence-metric.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m tests/stage-viz.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [2m[90m↓[39m[22m tests/memory-live-check.test.ts [2m([22m[2m1 test[22m[2m | [22m[33m1 skipped[39m[2m)[22m
+ [32m✓[39m tests/search-conversations.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 174[2mms[22m[39m
+ [32m✓[39m tests/corpus-items.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 33[2mms[22m[39m
+ [32m✓[39m tests/server-bind-guard.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 623[2mms[22m[39m
+   [33m[2m✓[22m[39m server bind guard (F-3)[2m > [22mrefuses HOST=0.0.0.0 without FARLAB_ALLOW_REMOTE, names the remedy, exits 1 [33m 304[2mms[22m[39m
+   [33m[2m✓[22m[39m server bind guard (F-3)[2m > [22mloopback HOST passes the guard (server reaches listening state) [33m 316[2mms[22m[39m
+ [32m✓[39m tests/dictation.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m tests/judge-temp-pin.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m tests/cli-dist-freshness.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/recovery.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 57[2mms[22m[39m
+ [32m✓[39m tests/citation-entries.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 179[2mms[22m[39m
+ [32m✓[39m tests/judge-votes.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m tests/event-stream-tracker.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m tests/dataset-audit.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 6594[2mms[22m[39m
+   [33m[2m✓[22m[39m RU-8 GO1 dataset audit (real sidecar, cleanlab)[2m > [22mclean dataset -> verdict ok, zero findings [33m 2142[2mms[22m[39m
+   [33m[2m✓[22m[39m RU-8 GO1 dataset audit (real sidecar, cleanlab)[2m > [22mleakage and duplicates are detected exactly and degrade the verdict [33m 2097[2mms[22m[39m
+   [33m[2m✓[22m[39m RU-8 GO1 dataset audit (real sidecar, cleanlab)[2m > [22mplanted label errors are surfaced (advisory, count > 0) [33m 2353[2mms[22m[39m
+ [32m✓[39m tests/reliability-db-guards.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m tests/codeact-escape-regression.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m tests/protocol-web.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m tests/gateway-discipline.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m tests/web-normalize.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/health.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m tests/identifier-extract.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/file-ingest.test.ts [2m([22m[2m13 tests[22m[2m)[22m[33m 322[2mms[22m[39m
+[90mstderr[2m | tests/ingest-pdf-e2e.test.ts[2m > [22m[2mdense synthetic paper end-to-end — collect → validate → understand → SDM[2m > [22m[2mcollects a dense text layer, validates, and builds structured SDM with provenance
+[22m[39mWarning: Font "F1" is not available -- attempting to fallback to a default font.
+
+[90mstderr[2m | tests/ingest-pdf-e2e.test.ts[2m > [22m[2mdense synthetic paper end-to-end — collect → validate → understand → SDM[2m > [22m[2mcollects a dense text layer, validates, and builds structured SDM with provenance
+[22m[39mWarning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+
+[90mstderr[2m | tests/ingest-pdf-e2e.test.ts[2m > [22m[2mdense synthetic paper end-to-end — collect → validate → understand → SDM[2m > [22m[2mreading order on page 1: single column keeps blocks in y order
+[22m[39mWarning: Font "F1" is not available -- attempting to fallback to a default font.
+
+[90mstderr[2m | tests/ingest-pdf-e2e.test.ts[2m > [22m[2mdense synthetic paper end-to-end — collect → validate → understand → SDM[2m > [22m[2mreading order on page 1: single column keeps blocks in y order
+[22m[39mWarning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+
+[90mstderr[2m | tests/ingest-pdf-e2e.test.ts[2m > [22m[2mpayload integrity[2m > [22m[2mcollector sha256 matches the shared hasher
+[22m[39mWarning: Indexing all PDF objects
+
+ [32m✓[39m tests/ingest-pdf-e2e.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 830[2mms[22m[39m
+   [33m[2m✓[22m[39m dense synthetic paper end-to-end — collect → validate → understand → SDM[2m > [22mcollects a dense text layer, validates, and builds structured SDM with provenance [33m 775[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 2 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/api.test.ts[2m > [22mGET /api/v1/verify/:bundleId[2m > [22mreturns a real VerificationReport for the seeded bundle (lock drift => degraded)
+[31m[1mAssertionError[22m: expected [ { …(3) }, { …(3) }, { …(3) }, …(12) ] to have a length of 14 but got 15[39m
+
+- Expected
++ Received
+
 - 14
 + 15
 
@@ -61,429 +327,157 @@ TYPECHECK_FAILED
     [90m1311| [39m    expect(body.checks.map((c: { name: string }) => c.name)[0]).toBe('…
     [90m1312| [39m    expect(body.checks.every((c: { passed: boolean; detail: string }) …
 
-[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/25]⎯[22m[39m
-
-[41m[1m FAIL [22m[49m tests/experiment.test.ts[2m > [22mEEL executor end-to-end (real uv sidecar)[2m > [22mexport integration: executed experiment renders into report §7a and bundle experimentEvidence (ACC-26)
-[31m[1mReferenceError[22m: Cannot access 'protocolLimitationLines' before initialization[39m
-[36m [2m❯[22m Object.execute src/pipeline/stages/export.ts:[2m860:119[22m[39m
-    [90m858| [39m      '模型环节为 LLM 生成、具有非确定性：bundle 可复放的是输入快照、模型元数据、receipts 与工件哈希，不保证重新…
-    [90m859| [39m      ...(truthAll.klass !== 'live' ? [truthDisclosureLine(truthAll)] …
-    [90m860| [39m      ...collectMissing(inputs, { lockMissing, receipts: allReceipts, …
-    [90m   | [39m                                                                                                                      [31m^[39m
-    [90m861| [39m
-    [90m862| [39m    ][33m;[39m
-[90m [2m❯[22m tests/experiment.test.ts:[2m508:23[22m[39m
-
-[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/25]⎯[22m[39m
-
-[41m[1m FAIL [22m[49m tests/export-quality.test.ts[2m > [22mexport report quality (W2)[2m > [22mrenders counter-evidence lines with claim text (120-char cap) and source title (40-char cap)
-[31m[1mReferenceError[22m: Cannot access 'protocolLimitationLines' before initialization[39m
-[36m [2m❯[22m Object.execute src/pipeline/stages/export.ts:[2m860:119[22m[39m
-    [90m858| [39m      '模型环节为 LLM 生成、具有非确定性：bundle 可复放的是输入快照、模型元数据、receipts 与工件哈希，不保证重新…
-    [90m859| [39m      ...(truthAll.klass !== 'live' ? [truthDisclosureLine(truthAll)] …
-    [90m860| [39m      ...collectMissing(inputs, { lockMissing, receipts: allReceipts, …
-    [90m   | [39m                                                                                                                      [31m^[39m
-    [90m861| [39m
-    [90m862| [39m    ][33m;[39m
-[90m [2m❯[22m renderPreW2Report tests/export-quality.test.ts:[2m241:19[22m[39m
-[90m [2m❯[22m tests/export-quality.test.ts:[2m250:24[22m[39m
-
-[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/25]⎯[22m[39m
-
-[41m[1m FAIL [22m[49m tests/export-quality.test.ts[2m > [22mexport report quality (W2)[2m > [22mrenders source-level counter relations (no claimId) by source title
-[31m[1mReferenceError[22m: Cannot access 'protocolLimitationLines' before initialization[39m
-[36m [2m❯[22m Object.execute src/pipeline/stages/export.ts:[2m860:119[22m[39m
-    [90m858| [39m      '模型环节为 LLM 生成、具有非确定性：bundle 可复放的是输入快照、模型元数据、receipts 与工件哈希，不保证重新…
-    [90m859| [39m      ...(truthAll.klass !== 'live' ? [truthDisclosureLine(truthAll)] …
-    [90m860| [39m      ...collectMissing(inputs, { lockMissing, receipts: allReceipts, …
-    [90m   | [39m                                                                                                                      [31m^[39m
-    [90m861| [39m
-    [90m862| [39m    ][33m;[39m
-[90m [2m❯[22m renderPreW2Report tests/export-quality.test.ts:[2m241:19[22m[39m
-[90m [2m❯[22m tests/export-quality.test.ts:[2m259:24[22m[39m
-
-[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/25]⎯[22m[39m
-
-[41m[1m FAIL [22m[49m tests/export-quality.test.ts[2m > [22mexport report quality (W2)[2m > [22mdefends §7 against invalid task refs from pre-sanitization plans (marker instead of raw id)
-[31m[1mReferenceError[22m: Cannot access 'protocolLimitationLines' before initialization[39m
-[36m [2m❯[22m Object.execute src/pipeline/stages/export.ts:[2m860:119[22m[39m
-    [90m858| [39m      '模型环节为 LLM 生成、具有非确定性：bundle 可复放的是输入快照、模型元数据、receipts 与工件哈希，不保证重新…
-    [90m859| [39m      ...(truthAll.klass !== 'live' ? [truthDisclosureLine(truthAll)] …
-    [90m860| [39m      ...collectMissing(inputs, { lockMissing, receipts: allReceipts, …
-    [90m   | [39m                                                                                                                      [31m^[39m
-    [90m861| [39m
-    [90m862| [39m    ][33m;[39m
-[90m [2m❯[22m renderPreW2Report tests/export-quality.test.ts:[2m241:19[22m[39m
-[90m [2m❯[22m tests/export-quality.test.ts:[2m266:24[22m[39m
-
-[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/25]⎯[22m[39m
-
-[41m[1m FAIL [22m[49m tests/export-quality.test.ts[2m > [22mexport report quality (W2)[2m > [22mstill lists resolved_unaligned claims with full per-item text in §3 (regression)
-[31m[1mReferenceError[22m: Cannot access 'protocolLimitationLines' before initialization[39m
-[36m [2m❯[22m Object.execute src/pipeline/stages/export.ts:[2m860:119[22m[39m
-    [90m858| [39m      '模型环节为 LLM 生成、具有非确定性：bundle 可复放的是输入快照、模型元数据、receipts 与工件哈希，不保证重新…
-    [90m859| [39m      ...(truthAll.klass !== 'live' ? [truthDisclosureLine(truthAll)] …
-    [90m860| [39m      ...collectMissing(inputs, { lockMissing, receipts: allReceipts, …
-    [90m   | [39m                                                                                                                      [31m^[39m
-    [90m861| [39m
-    [90m862| [39m    ][33m;[39m
-[90m [2m❯[22m renderPreW2Report tests/export-quality.test.ts:[2m241:19[22m[39m
-[90m [2m❯[22m tests/export-quality.test.ts:[2m275:38[22m[39m
-
-[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/25]⎯[22m[39m
-
-[41m[1m FAIL [22m[49m tests/export-quality.test.ts[2m > [22mexport report quality (W2)[2m > [22mkeeps the claim-id prefix on every §8 uncertainty line (regression)
-[31m[1mReferenceError[22m: Cannot access 'protocolLimitationLines' before initialization[39m
-[36m [2m❯[22m Object.execute src/pipeline/stages/export.ts:[2m860:119[22m[39m
-    [90m858| [39m      '模型环节为 LLM 生成、具有非确定性：bundle 可复放的是输入快照、模型元数据、receipts 与工件哈希，不保证重新…
-    [90m859| [39m      ...(truthAll.klass !== 'live' ? [truthDisclosureLine(truthAll)] …
-    [90m860| [39m      ...collectMissing(inputs, { lockMissing, receipts: allReceipts, …
-    [90m   | [39m                                                                                                                      [31m^[39m
-    [90m861| [39m
-    [90m862| [39m    ][33m;[39m
-[90m [2m❯[22m renderPreW2Report tests/export-quality.test.ts:[2m241:19[22m[39m
-[90m [2m❯[22m tests/export-quality.test.ts:[2m280:33[22m[39m
-
-[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/25]⎯[22m[39m
-
-[41m[1m FAIL [22m[49m tests/export-quality.test.ts[2m > [22mexport report quality (W2)[2m > [22mW5/S5: appends the evidence-ceiling declaration to §7 with store-computed counts
-[31m[1mReferenceError[22m: Cannot access 'protocolLimitationLines' before initialization[39m
-[36m [2m❯[22m Object.execute src/pipeline/stages/export.ts:[2m860:119[22m[39m
-    [90m858| [39m      '模型环节为 LLM 生成、具有非确定性：bundle 可复放的是输入快照、模型元数据、receipts 与工件哈希，不保证重新…
-    [90m859| [39m      ...(truthAll.klass !== 'live' ? [truthDisclosureLine(truthAll)] …
-    [90m860| [39m      ...collectMissing(inputs, { lockMissing, receipts: allReceipts, …
-    [90m   | [39m                                                                                                                      [31m^[39m
-    [90m861| [39m
-    [90m862| [39m    ][33m;[39m
-[90m [2m❯[22m renderPreW2Report tests/export-quality.test.ts:[2m241:19[22m[39m
-[90m [2m❯[22m tests/export-quality.test.ts:[2m285:24[22m[39m
-
-[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/25]⎯[22m[39m
-
-[41m[1m FAIL [22m[49m tests/export-quality.test.ts[2m > [22mexport report quality (W2)[2m > [22mW5/S3: pre-W5 specs without decisionRuleProvenance render「来源未声明」(no invented source)
-[31m[1mReferenceError[22m: Cannot access 'protocolLimitationLines' before initialization[39m
-[36m [2m❯[22m Object.execute src/pipeline/stages/export.ts:[2m860:119[22m[39m
-    [90m858| [39m      '模型环节为 LLM 生成、具有非确定性：bundle 可复放的是输入快照、模型元数据、receipts 与工件哈希，不保证重新…
-    [90m859| [39m      ...(truthAll.klass !== 'live' ? [truthDisclosureLine(truthAll)] …
-    [90m860| [39m      ...collectMissing(inputs, { lockMissing, receipts: allReceipts, …
-    [90m   | [39m                                                                                                                      [31m^[39m
-    [90m861| [39m
-    [90m862| [39m    ][33m;[39m
-[90m [2m❯[22m tests/export-quality.test.ts:[2m331:21[22m[39m
-
-[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/25]⎯[22m[39m
-
-[41m[1m FAIL [22m[49m tests/offline-dev-run.test.ts[2m > [22moffline dev run: full journey through the real orchestrator[2m > [22mreal-content discipline: real retrieval stands, deterministic-wire science is refused honestly (all receipts test-mode, zero live calls)
-[31m[1mAssertionError[22m: expected 'partial' to be 'completed' // Object.is equality[39m
-
-Expected: "completed"
-Received: "partial"
-
-[36m [2m❯[22m tests/offline-dev-run.test.ts:[2m166:28[22m[39m
-    [90m164| [39m    [35masync[39m () [33m=>[39m {
-    [90m165| [39m      [35mconst[39m final [33m=[39m [35mawait[39m [34mrunOffline[39m()[33m;[39m
-    [90m166| [39m      [34mexpect[39m(final[33m.[39mstatus)[33m.[39m[34mtoBe[39m([32m'completed'[39m)[33m;[39m
-    [90m   | [39m                           [31m^[39m
-    [90m167| [39m      [34mexpect[39m(final[33m.[39mlastError [33m??[39m [32m''[39m)[33m.[39m[34mtoBe[39m([32m''[39m)[33m;[39m
-    [90m168| [39m      [90m// No stage may FAIL; visible skips are the honest vocabulary.[39m
-
-[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/25]⎯[22m[39m
-
-[41m[1m FAIL [22m[49m tests/paper-outline.test.ts[2m > [22mexport stage paper artifact (BP-3 wiring)[2m > [22mpersists the paper markdown as a third artifact and hashes it into the bundle
-[31m[1mReferenceError[22m: Cannot access 'protocolLimitationLines' before initialization[39m
-[36m [2m❯[22m Object.execute src/pipeline/stages/export.ts:[2m860:119[22m[39m
-    [90m858| [39m      '模型环节为 LLM 生成、具有非确定性：bundle 可复放的是输入快照、模型元数据、receipts 与工件哈希，不保证重新…
-    [90m859| [39m      ...(truthAll.klass !== 'live' ? [truthDisclosureLine(truthAll)] …
-    [90m860| [39m      ...collectMissing(inputs, { lockMissing, receipts: allReceipts, …
-    [90m   | [39m                                                                                                                      [31m^[39m
-    [90m861| [39m
-    [90m862| [39m    ][33m;[39m
-[90m [2m❯[22m tests/paper-outline.test.ts:[2m565:21[22m[39m
-
-[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/25]⎯[22m[39m
-
-[41m[1m FAIL [22m[49m tests/pipeline-export.test.ts[2m > [22mexport stage[2m > [22mis applicable before the bundle exists and not after
-[31m[1mReferenceError[22m: Cannot access 'protocolLimitationLines' before initialization[39m
-[36m [2m❯[22m Object.execute src/pipeline/stages/export.ts:[2m860:119[22m[39m
-    [90m858| [39m      '模型环节为 LLM 生成、具有非确定性：bundle 可复放的是输入快照、模型元数据、receipts 与工件哈希，不保证重新…
-    [90m859| [39m      ...(truthAll.klass !== 'live' ? [truthDisclosureLine(truthAll)] …
-    [90m860| [39m      ...collectMissing(inputs, { lockMissing, receipts: allReceipts, …
-    [90m   | [39m                                                                                                                      [31m^[39m
-    [90m861| [39m
-    [90m862| [39m    ][33m;[39m
-[90m [2m❯[22m runPlanThenExport tests/pipeline-export.test.ts:[2m521:21[22m[39m
-[90m [2m❯[22m tests/pipeline-export.test.ts:[2m527:36[22m[39m
-
-[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/25]⎯[22m[39m
-
-[41m[1m FAIL [22m[49m tests/pipeline-export.test.ts[2m > [22mexport stage[2m > [22mre-exports when the corpus grew beyond the bundle's covered sources (§5.2 evidence debt, audit P1-1)
-[31m[1mReferenceError[22m: Cannot access 'protocolLimitationLines' before initialization[39m
-[36m [2m❯[22m Object.execute src/pipeline/stages/export.ts:[2m860:119[22m[39m
-    [90m858| [39m      '模型环节为 LLM 生成、具有非确定性：bundle 可复放的是输入快照、模型元数据、receipts 与工件哈希，不保证重新…
-    [90m859| [39m      ...(truthAll.klass !== 'live' ? [truthDisclosureLine(truthAll)] …
-    [90m860| [39m      ...collectMissing(inputs, { lockMissing, receipts: allReceipts, …
-    [90m   | [39m                                                                                                                      [31m^[39m
-    [90m861| [39m
-    [90m862| [39m    ][33m;[39m
-[90m [2m❯[22m runPlanThenExport tests/pipeline-export.test.ts:[2m521:21[22m[39m
-[90m [2m❯[22m tests/pipeline-export.test.ts:[2m534:27[22m[39m
-
-[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/25]⎯[22m[39m
-
-[41m[1m FAIL [22m[49m tests/pipeline-export.test.ts[2m > [22mexport stage[2m > [22mrenders all 9 report sections strictly from stored objects
-[31m[1mReferenceError[22m: Cannot access 'protocolLimitationLines' before initialization[39m
-[36m [2m❯[22m Object.execute src/pipeline/stages/export.ts:[2m860:119[22m[39m
-    [90m858| [39m      '模型环节为 LLM 生成、具有非确定性：bundle 可复放的是输入快照、模型元数据、receipts 与工件哈希，不保证重新…
-    [90m859| [39m      ...(truthAll.klass !== 'live' ? [truthDisclosureLine(truthAll)] …
-    [90m860| [39m      ...collectMissing(inputs, { lockMissing, receipts: allReceipts, …
-    [90m   | [39m                                                                                                                      [31m^[39m
-    [90m861| [39m
-    [90m862| [39m    ][33m;[39m
-[90m [2m❯[22m runPlanThenExport tests/pipeline-export.test.ts:[2m521:21[22m[39m
-[90m [2m❯[22m tests/pipeline-export.test.ts:[2m551:25[22m[39m
-
-[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/25]⎯[22m[39m
-
-[41m[1m FAIL [22m[49m tests/pipeline-export.test.ts[2m > [22mexport stage[2m > [22mbuilds an honest replay bundle (hashes, limitations, unknown revision, env, lock)
-[31m[1mReferenceError[22m: Cannot access 'protocolLimitationLines' before initialization[39m
-[36m [2m❯[22m Object.execute src/pipeline/stages/export.ts:[2m860:119[22m[39m
-    [90m858| [39m      '模型环节为 LLM 生成、具有非确定性：bundle 可复放的是输入快照、模型元数据、receipts 与工件哈希，不保证重新…
-    [90m859| [39m      ...(truthAll.klass !== 'live' ? [truthDisclosureLine(truthAll)] …
-    [90m860| [39m      ...collectMissing(inputs, { lockMissing, receipts: allReceipts, …
-    [90m   | [39m                                                                                                                      [31m^[39m
-    [90m861| [39m
-    [90m862| [39m    ][33m;[39m
-[90m [2m❯[22m runPlanThenExport tests/pipeline-export.test.ts:[2m521:21[22m[39m
-[90m [2m❯[22m tests/pipeline-export.test.ts:[2m624:25[22m[39m
-
-[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/25]⎯[22m[39m
-
-[41m[1m FAIL [22m[49m tests/pipeline-export.test.ts[2m > [22mplan + export — RU-1 memory conditioning[2m > [22mplan receives prior failed outcomes with trust labels; event + summary disclose; export renders the §9 line
-[31m[1mReferenceError[22m: Cannot access 'protocolLimitationLines' before initialization[39m
-[36m [2m❯[22m Object.execute src/pipeline/stages/export.ts:[2m860:119[22m[39m
-    [90m858| [39m      '模型环节为 LLM 生成、具有非确定性：bundle 可复放的是输入快照、模型元数据、receipts 与工件哈希，不保证重新…
-    [90m859| [39m      ...(truthAll.klass !== 'live' ? [truthDisclosureLine(truthAll)] …
-    [90m860| [39m      ...collectMissing(inputs, { lockMissing, receipts: allReceipts, …
-    [90m   | [39m                                                                                                                      [31m^[39m
-    [90m861| [39m
-    [90m862| [39m    ][33m;[39m
-[90m [2m❯[22m tests/pipeline-export.test.ts:[2m727:27[22m[39m
-
-[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/25]⎯[22m[39m
-
-[41m[1m FAIL [22m[49m tests/pipeline-export.test.ts[2m > [22mplan + export — RU-1 memory conditioning[2m > [22mcontrol: no memory -> plan payload lacks the block; no event; no export line
-[31m[1mReferenceError[22m: Cannot access 'protocolLimitationLines' before initialization[39m
-[36m [2m❯[22m Object.execute src/pipeline/stages/export.ts:[2m860:119[22m[39m
-    [90m858| [39m      '模型环节为 LLM 生成、具有非确定性：bundle 可复放的是输入快照、模型元数据、receipts 与工件哈希，不保证重新…
-    [90m859| [39m      ...(truthAll.klass !== 'live' ? [truthDisclosureLine(truthAll)] …
-    [90m860| [39m      ...collectMissing(inputs, { lockMissing, receipts: allReceipts, …
-    [90m   | [39m                                                                                                                      [31m^[39m
-    [90m861| [39m
-    [90m862| [39m    ][33m;[39m
-[90m [2m❯[22m tests/pipeline-export.test.ts:[2m746:27[22m[39m
-
-[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/25]⎯[22m[39m
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
 
 [41m[1m FAIL [22m[49m tests/protocol-export.test.ts[2m > [22mprotocol chain in the export plane (slice 4)[2m > [22mmints protocolEvidence + verbatim limitations line, verifies, and packages the ledger
-[31m[1mReferenceError[22m: Cannot access 'protocolLimitationLines' before initialization[39m
-[36m [2m❯[22m Object.execute src/pipeline/stages/export.ts:[2m860:119[22m[39m
-    [90m858| [39m      '模型环节为 LLM 生成、具有非确定性：bundle 可复放的是输入快照、模型元数据、receipts 与工件哈希，不保证重新…
-    [90m859| [39m      ...(truthAll.klass !== 'live' ? [truthDisclosureLine(truthAll)] …
-    [90m860| [39m      ...collectMissing(inputs, { lockMissing, receipts: allReceipts, …
-    [90m   | [39m                                                                                                                      [31m^[39m
-    [90m861| [39m
-    [90m862| [39m    ][33m;[39m
-[90m [2m❯[22m tests/protocol-export.test.ts:[2m325:21[22m[39m
+[31m[1mAssertionError[22m: expected '# Why do CRISPR base editors cause of…' to contain 'Human-attested ledger'[39m
 
-[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/25]⎯[22m[39m
+- Expected
++ Received
 
-[41m[1m FAIL [22m[49m tests/protocol-export.test.ts[2m > [22mprotocol chain in the export plane (slice 4)[2m > [22mlegacy bundle without protocolEvidence passes the new check with an absence note
-[31m[1mReferenceError[22m: Cannot access 'protocolLimitationLines' before initialization[39m
-[36m [2m❯[22m Object.execute src/pipeline/stages/export.ts:[2m860:119[22m[39m
-    [90m858| [39m      '模型环节为 LLM 生成、具有非确定性：bundle 可复放的是输入快照、模型元数据、receipts 与工件哈希，不保证重新…
-    [90m859| [39m      ...(truthAll.klass !== 'live' ? [truthDisclosureLine(truthAll)] …
-    [90m860| [39m      ...collectMissing(inputs, { lockMissing, receipts: allReceipts, …
-    [90m   | [39m                                                                                                                      [31m^[39m
-    [90m861| [39m
-    [90m862| [39m    ][33m;[39m
-[90m [2m❯[22m tests/protocol-export.test.ts:[2m411:21[22m[39m
+- Human-attested ledger
++ # Why do CRISPR base editors cause off-target edits?
++
++ > Standing disclosure: all LLM-produced judgments in this product (scorecard scores, novelty labels, relation rationales) are UNCALIBRATED decision aids — inspectable inputs to a decision, not objective probabilities or established facts.
++
++ Run `run_z90qq90c43mtkmvtsk53hppze5` · deterministic render (zero LLM calls) · generated 2026-08-29T00:00:00.000Z
++
++ ## Abstract
++
++ - Top-ranked hypothesis (rank 1): Off-targeting is driven by deaminase exposure duration (source: hypothesis `hyp_3t3amd4q2gpxgg8tvqkjj1gr49`)
++ - Grounded in verified literature claim: CBE causes C-to-T off-target mutations at specific motifs (source: claim `clm_f8qj6y58qp1b57vn8rgpn14rqa` [@Researcher2024Resolved])
++
++ ## 1 Introduction
++
++ **Gap.** Within this run's retrieved corpus (1 sources, 1 claims), the question "Why do CRISPR base editors cause off-target edits?" remains open: 1 supporting and 0 counter-evidence relations are on record against its hypotheses.
++
++ **Contributions.**
++
++ 1. Off-targeting is driven by deaminase exposure duration (hypothesis `hyp_3t3amd4q2gpxgg8tvqkjj1gr49`)
++
++ **Related work (retrieved corpus).**
++
++ - [@Researcher2024Resolved] Resolved study of off-target editing (2024; no venue on file; depth=abstract; identifier resolved=true)
++
++ Related-work scope is THIS run's retrieved corpus only — it is not a systematic literature review.
++
++
++ ## 2 Methods
++
++ - Research plan: none stored for this run (the plan stage did not produce an object).
++ - Steps: none recorded.
++ - Preregistration: frozen=false
++
++ ## 3 Results
++
++ > Ranking quantities (Bradley-Terry scores, win rates, evidence bands) are uncalibrated decision aids, not probabilities.
++
++ ### Hypothesis `hyp_3t3amd4q2gpxgg8tvqkjj1gr49` (rank 1)
++
++ - Statement: Off-targeting is driven by deaminase exposure duration
++ - Bradley-Terry: null (not contested) · win rate: null (not contested) · evidence band: null (no evidence body stored)
++ - Experiment verdicts: none persisted for this hypothesis.
++
++ ## 4 Discussion
++
++ **Ordering interpretation.** No ACH analysis object is stored for this run: hypothesis-ordering fragility (diagnosticity and removal sensitivity) could not be assessed.
++
++ **Counter-evidence highlights.**
++
++ (No counter-evidence relations target the ranked hypotheses within this run's retrieved corpus — absence within retrieval scope, not evidence of absence.)
++
++ ## 5 Limitations
++
++ - **execution_truth** — 执行真实性：empty —— live 模型调用 0 次、确定性测试调用 0 次、live 检索 0 次、缓存命中 0 次、过期缓存 0 次、记录重放 0 次（共 2 条回执） — deterministic test calls are not real model judgment; treat the affected rankings and analyses accordingly. (counts: totalReceipts=2, liveModelCalls=0, testModelCalls=0, liveRetrievals=0)
++ - **evidence_ceiling** — 0 metadata-only and 1 abstract-only of 1 retrieved sources; only 0 reached full-text/data depth. Claim extraction and every downstream judgment are capped at that depth. (counts: sources=1, metadataOnly=0, abstractOnly=1, fullTextOrData=0)
++ - **uncalibrated_judgment_density** — 1/1 scorecard dimension scores carry calibration='uncalibrated_llm_judgment' (100%): inspectable decision aids, not calibrated probabilities. (counts: dimensions=1, uncalibratedLlmJudgment=1)
++ - **stipulated_thresholds** — 0/1 hypotheses have decision-rule thresholds of model-stipulated or mixed provenance (0 model-stipulated, 0 mixed) — such thresholds carry no evidence source. (counts: hypotheses=1, modelStipulated=0, mixed=0)
++ - **unresolved_source_verification** — 1/1 claims are bindingStatus='verified'; 0 are not: 0 resolved_unaligned (source resolved but retrieved content does not cover the claim — called out separately), 0 unresolved, 0 missing. (counts: claims=1, verified=1, resolvedUnaligned=0, unresolved=0, missing=0)
++ - **single_source_evidence_bodies** — 0/0 evidence bodies rest on fewer than 2 independent sources; single-source evidence is explicitly downgraded, never presented as independent confirmation. (counts: evidenceBodies=0, singleSource=0)
++ - **experiment_coverage** — Only 0/1 ranked hypotheses have any persisted experiment verdict (stat_report); the remaining 1 are ranked on literature evidence alone. (counts: rankedHypotheses=1, withExperimentVerdict=0, withoutExperimentVerdict=1)
++ - **uncertainty_inventory** — 0 uncertainty entries across 0 hypotheses remain open; they are monotonic (never silently resolved) and carried verbatim in Section 6. (counts: hypotheses=1, hypothesesWithUncertainties=0, uncertaintyEntries=0)
++ - **protocol_deviations** — 1 pre-registered protocol(s) with 1 human-attested ledger(s): 1 recorded deviation(s) and 1 QC-failed measurement(s). Physical-world execution is attested by named actors, not machine-verified; the ledgers and frozen specs ship verbatim in the reproducibility bundle. (counts: protocols=1, ledgers=1, deviations=1, qcFailedMeasurements=1)
++
++ ## 6 Conclusion and Future Work
++
++ **Open falsification conditions.**
++
++ (No falsification specs are stored for the ranked hypotheses.)
++
++ **Uncertainty inventory (monotonic — preserved in full, never silently resolved).**
++
++ (No uncertainty entries are recorded on the stored hypotheses.)
++
++ ## References
++
++ > Inline citations use Pandoc-style keys `[@key]`; render with `pandoc --citeproc` for formatted citations.
++
++ ```bibtex
++ @misc{Researcher2024Resolved,
++   author = {A. Researcher},
++   title = {Resolved study of off-target editing},
++   year = {2024},
++   doi = {10.1000/example-resolved},
++   note = {no additional publication metadata on file}
++ }
++ ```
++
 
-[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/25]⎯[22m[39m
+[36m [2m❯[22m tests/protocol-export.test.ts:[2m369:21[22m[39m
+    [90m367| [39m    [35mconst[39m paperMd [33m=[39m [34mrenderPaperMarkdown[39m(outline)[33m;[39m
+    [90m368| [39m    [34mexpect[39m(paperMd)[33m.[39m[34mtoContain[39m([32m'**protocol_deviations**'[39m)[33m;[39m
+    [90m369| [39m    [34mexpect[39m(paperMd)[33m.[39m[34mtoContain[39m([32m'Human-attested ledger'[39m)[33m;[39m
+    [90m   | [39m                    [31m^[39m
+    [90m370| [39m    [34mexpect[39m(paperMd)[33m.[39m[34mtoContain[39m([32m'1 recorded deviation(s)'[39m)[33m;[39m
+    [90m371| [39m
 
-[41m[1m FAIL [22m[49m tests/real-content-export-filter.test.ts[2m > [22mreal-content discipline: legacy template hypotheses never project into the export chain[2m > [22mexport stage: report, paper markdown and bundle JSON-LD exclude template hypotheses; missing-items disclose the count
-[31m[1mReferenceError[22m: Cannot access 'protocolLimitationLines' before initialization[39m
-[36m [2m❯[22m Object.execute src/pipeline/stages/export.ts:[2m860:119[22m[39m
-    [90m858| [39m      '模型环节为 LLM 生成、具有非确定性：bundle 可复放的是输入快照、模型元数据、receipts 与工件哈希，不保证重新…
-    [90m859| [39m      ...(truthAll.klass !== 'live' ? [truthDisclosureLine(truthAll)] …
-    [90m860| [39m      ...collectMissing(inputs, { lockMissing, receipts: allReceipts, …
-    [90m   | [39m                                                                                                                      [31m^[39m
-    [90m861| [39m
-    [90m862| [39m    ][33m;[39m
-[90m [2m❯[22m tests/real-content-export-filter.test.ts:[2m195:21[22m[39m
-
-[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/25]⎯[22m[39m
-
-[41m[1m FAIL [22m[49m tests/report-package.test.ts[2m > [22mbuildReproducibilityPackage (full study, real paths)[2m > [22massembles a verified package: stored artifacts, manifest, ro-crate, citations, pandoc
-[31m[1mReferenceError[22m: Cannot access 'protocolLimitationLines' before initialization[39m
-[36m [2m❯[22m Object.execute src/pipeline/stages/export.ts:[2m860:119[22m[39m
-    [90m858| [39m      '模型环节为 LLM 生成、具有非确定性：bundle 可复放的是输入快照、模型元数据、receipts 与工件哈希，不保证重新…
-    [90m859| [39m      ...(truthAll.klass !== 'live' ? [truthDisclosureLine(truthAll)] …
-    [90m860| [39m      ...collectMissing(inputs, { lockMissing, receipts: allReceipts, …
-    [90m   | [39m                                                                                                                      [31m^[39m
-    [90m861| [39m
-    [90m862| [39m    ][33m;[39m
-[90m [2m❯[22m runExport tests/report-package.test.ts:[2m108:3[22m[39m
-[90m [2m❯[22m tests/report-package.test.ts:[2m121:23[22m[39m
-
-[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/25]⎯[22m[39m
-
-[41m[1m FAIL [22m[49m tests/report-package.test.ts[2m > [22mbuildReproducibilityPackage (full study, real paths)[2m > [22mis byte-deterministic: two builds of the same bundle produce identical files
-[31m[1mReferenceError[22m: Cannot access 'protocolLimitationLines' before initialization[39m
-[36m [2m❯[22m Object.execute src/pipeline/stages/export.ts:[2m860:119[22m[39m
-    [90m858| [39m      '模型环节为 LLM 生成、具有非确定性：bundle 可复放的是输入快照、模型元数据、receipts 与工件哈希，不保证重新…
-    [90m859| [39m      ...(truthAll.klass !== 'live' ? [truthDisclosureLine(truthAll)] …
-    [90m860| [39m      ...collectMissing(inputs, { lockMissing, receipts: allReceipts, …
-    [90m   | [39m                                                                                                                      [31m^[39m
-    [90m861| [39m
-    [90m862| [39m    ][33m;[39m
-[90m [2m❯[22m runExport tests/report-package.test.ts:[2m108:3[22m[39m
-[90m [2m❯[22m tests/report-package.test.ts:[2m196:23[22m[39m
-
-[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/25]⎯[22m[39m
-
-[41m[1m FAIL [22m[49m tests/report-package.test.ts[2m > [22mbuildReproducibilityPackage (failure paths — fail closed, never silently partial)[2m > [22mrejects when a stored artifact the bundle declares is unavailable on disk
-[31m[1mReferenceError[22m: Cannot access 'protocolLimitationLines' before initialization[39m
-[36m [2m❯[22m Object.execute src/pipeline/stages/export.ts:[2m860:119[22m[39m
-    [90m858| [39m      '模型环节为 LLM 生成、具有非确定性：bundle 可复放的是输入快照、模型元数据、receipts 与工件哈希，不保证重新…
-    [90m859| [39m      ...(truthAll.klass !== 'live' ? [truthDisclosureLine(truthAll)] …
-    [90m860| [39m      ...collectMissing(inputs, { lockMissing, receipts: allReceipts, …
-    [90m   | [39m                                                                                                                      [31m^[39m
-    [90m861| [39m
-    [90m862| [39m    ][33m;[39m
-[90m [2m❯[22m runExport tests/report-package.test.ts:[2m108:3[22m[39m
-[90m [2m❯[22m tests/report-package.test.ts:[2m228:23[22m[39m
-
-[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/25]⎯[22m[39m
-
-[41m[1m FAIL [22m[49m tests/report-package.test.ts[2m > [22mbuildReproducibilityPackage (failure paths — fail closed, never silently partial)[2m > [22mrejects an unknown pandoc format name
-[31m[1mReferenceError[22m: Cannot access 'protocolLimitationLines' before initialization[39m
-[36m [2m❯[22m Object.execute src/pipeline/stages/export.ts:[2m860:119[22m[39m
-    [90m858| [39m      '模型环节为 LLM 生成、具有非确定性：bundle 可复放的是输入快照、模型元数据、receipts 与工件哈希，不保证重新…
-    [90m859| [39m      ...(truthAll.klass !== 'live' ? [truthDisclosureLine(truthAll)] …
-    [90m860| [39m      ...collectMissing(inputs, { lockMissing, receipts: allReceipts, …
-    [90m   | [39m                                                                                                                      [31m^[39m
-    [90m861| [39m
-    [90m862| [39m    ][33m;[39m
-[90m [2m❯[22m runExport tests/report-package.test.ts:[2m108:3[22m[39m
-[90m [2m❯[22m tests/report-package.test.ts:[2m237:23[22m[39m
-
-[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/25]⎯[22m[39m
-
-[41m[1m FAIL [22m[49m tests/report-package.test.ts[2m > [22mbuildReproducibilityPackage (partial study — honest emptiness)[2m > [22mpackages a question-only run with disclosed empty sections
-[31m[1mReferenceError[22m: Cannot access 'protocolLimitationLines' before initialization[39m
-[36m [2m❯[22m Object.execute src/pipeline/stages/export.ts:[2m860:119[22m[39m
-    [90m858| [39m      '模型环节为 LLM 生成、具有非确定性：bundle 可复放的是输入快照、模型元数据、receipts 与工件哈希，不保证重新…
-    [90m859| [39m      ...(truthAll.klass !== 'live' ? [truthDisclosureLine(truthAll)] …
-    [90m860| [39m      ...collectMissing(inputs, { lockMissing, receipts: allReceipts, …
-    [90m   | [39m                                                                                                                      [31m^[39m
-    [90m861| [39m
-    [90m862| [39m    ][33m;[39m
-[90m [2m❯[22m runExport tests/report-package.test.ts:[2m108:3[22m[39m
-[90m [2m❯[22m tests/report-package.test.ts:[2m251:23[22m[39m
-
-[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[25/25]⎯[22m[39m
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
 
 
-[2m Test Files [22m [1m[31m9 failed[39m[22m[2m | [22m[1m[32m208 passed[39m[22m[2m | [22m[33m1 skipped[39m[90m (218)[39m
-[2m      Tests [22m [1m[31m25 failed[39m[22m[2m | [22m[1m[32m2186 passed[39m[22m[2m | [22m[33m7 skipped[39m[90m (2218)[39m
-[2m   Start at [22m 14:57:33
-[2m   Duration [22m 96.25s[2m (transform 5.84s, setup 0ms, collect 35.94s, tests 199.34s, environment 635ms, prepare 16.80s)[22m
+[2m Test Files [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m215 passed[39m[22m[2m | [22m[33m1 skipped[39m[90m (218)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m2209 passed[39m[22m[2m | [22m[33m7 skipped[39m[90m (2218)[39m
+[2m   Start at [22m 15:04:34
+[2m   Duration [22m 98.41s[2m (transform 5.58s, setup 0ms, collect 36.00s, tests 203.93s, environment 676ms, prepare 17.17s)[22m
 
 
 ::error file=/home/runner/work/FAR-Lab/FAR-Lab/tests/api.test.ts,title=tests/api.test.ts > GET /api/v1/verify/%3AbundleId > returns a real VerificationReport for the seeded bundle (lock drift => degraded),line=1310,column=25::AssertionError: expected [ { …(3) }, { …(3) }, { …(3) }, …(12) ] to have a length of 14 but got 15%0A%0A- Expected%0A+ Received%0A%0A- 14%0A+ 15%0A%0A ❯ tests/api.test.ts:1310:25%0A%0A
 
-::error file=/home/runner/work/FAR-Lab/FAR-Lab/src/pipeline/stages/export.ts,title=tests/experiment.test.ts > EEL executor end-to-end (real uv sidecar) > export integration%3A executed experiment renders into report §7a and bundle experimentEvidence (ACC-26),line=860,column=119::ReferenceError: Cannot access 'protocolLimitationLines' before initialization%0A ❯ Object.execute src/pipeline/stages/export.ts:860:119%0A ❯ tests/experiment.test.ts:508:23%0A%0A
-
-::error file=/home/runner/work/FAR-Lab/FAR-Lab/src/pipeline/stages/export.ts,title=tests/export-quality.test.ts > export report quality (W2) > renders counter-evidence lines with claim text (120-char cap) and source title (40-char cap),line=860,column=119::ReferenceError: Cannot access 'protocolLimitationLines' before initialization%0A ❯ Object.execute src/pipeline/stages/export.ts:860:119%0A ❯ renderPreW2Report tests/export-quality.test.ts:241:19%0A ❯ tests/export-quality.test.ts:250:24%0A%0A
-
-::error file=/home/runner/work/FAR-Lab/FAR-Lab/src/pipeline/stages/export.ts,title=tests/export-quality.test.ts > export report quality (W2) > renders source-level counter relations (no claimId) by source title,line=860,column=119::ReferenceError: Cannot access 'protocolLimitationLines' before initialization%0A ❯ Object.execute src/pipeline/stages/export.ts:860:119%0A ❯ renderPreW2Report tests/export-quality.test.ts:241:19%0A ❯ tests/export-quality.test.ts:259:24%0A%0A
-
-::error file=/home/runner/work/FAR-Lab/FAR-Lab/src/pipeline/stages/export.ts,title=tests/export-quality.test.ts > export report quality (W2) > defends §7 against invalid task refs from pre-sanitization plans (marker instead of raw id),line=860,column=119::ReferenceError: Cannot access 'protocolLimitationLines' before initialization%0A ❯ Object.execute src/pipeline/stages/export.ts:860:119%0A ❯ renderPreW2Report tests/export-quality.test.ts:241:19%0A ❯ tests/export-quality.test.ts:266:24%0A%0A
-
-::error file=/home/runner/work/FAR-Lab/FAR-Lab/src/pipeline/stages/export.ts,title=tests/export-quality.test.ts > export report quality (W2) > still lists resolved_unaligned claims with full per-item text in §3 (regression),line=860,column=119::ReferenceError: Cannot access 'protocolLimitationLines' before initialization%0A ❯ Object.execute src/pipeline/stages/export.ts:860:119%0A ❯ renderPreW2Report tests/export-quality.test.ts:241:19%0A ❯ tests/export-quality.test.ts:275:38%0A%0A
-
-::error file=/home/runner/work/FAR-Lab/FAR-Lab/src/pipeline/stages/export.ts,title=tests/export-quality.test.ts > export report quality (W2) > keeps the claim-id prefix on every §8 uncertainty line (regression),line=860,column=119::ReferenceError: Cannot access 'protocolLimitationLines' before initialization%0A ❯ Object.execute src/pipeline/stages/export.ts:860:119%0A ❯ renderPreW2Report tests/export-quality.test.ts:241:19%0A ❯ tests/export-quality.test.ts:280:33%0A%0A
-
-::error file=/home/runner/work/FAR-Lab/FAR-Lab/src/pipeline/stages/export.ts,title=tests/export-quality.test.ts > export report quality (W2) > W5/S5%3A appends the evidence-ceiling declaration to §7 with store-computed counts,line=860,column=119::ReferenceError: Cannot access 'protocolLimitationLines' before initialization%0A ❯ Object.execute src/pipeline/stages/export.ts:860:119%0A ❯ renderPreW2Report tests/export-quality.test.ts:241:19%0A ❯ tests/export-quality.test.ts:285:24%0A%0A
-
-::error file=/home/runner/work/FAR-Lab/FAR-Lab/src/pipeline/stages/export.ts,title=tests/export-quality.test.ts > export report quality (W2) > W5/S3%3A pre-W5 specs without decisionRuleProvenance render「来源未声明」(no invented source),line=860,column=119::ReferenceError: Cannot access 'protocolLimitationLines' before initialization%0A ❯ Object.execute src/pipeline/stages/export.ts:860:119%0A ❯ tests/export-quality.test.ts:331:21%0A%0A
-
-::error file=/home/runner/work/FAR-Lab/FAR-Lab/tests/offline-dev-run.test.ts,title=tests/offline-dev-run.test.ts > offline dev run%3A full journey through the real orchestrator > real-content discipline%3A real retrieval stands%2C deterministic-wire science is refused honestly (all receipts test-mode%2C zero live calls),line=166,column=28::AssertionError: expected 'partial' to be 'completed' // Object.is equality%0A%0AExpected: "completed"%0AReceived: "partial"%0A%0A ❯ tests/offline-dev-run.test.ts:166:28%0A%0A
-
-::error file=/home/runner/work/FAR-Lab/FAR-Lab/src/pipeline/stages/export.ts,title=tests/paper-outline.test.ts > export stage paper artifact (BP-3 wiring) > persists the paper markdown as a third artifact and hashes it into the bundle,line=860,column=119::ReferenceError: Cannot access 'protocolLimitationLines' before initialization%0A ❯ Object.execute src/pipeline/stages/export.ts:860:119%0A ❯ tests/paper-outline.test.ts:565:21%0A%0A
-
-::error file=/home/runner/work/FAR-Lab/FAR-Lab/src/pipeline/stages/export.ts,title=tests/pipeline-export.test.ts > export stage > is applicable before the bundle exists and not after,line=860,column=119::ReferenceError: Cannot access 'protocolLimitationLines' before initialization%0A ❯ Object.execute src/pipeline/stages/export.ts:860:119%0A ❯ runPlanThenExport tests/pipeline-export.test.ts:521:21%0A ❯ tests/pipeline-export.test.ts:527:36%0A%0A
-
-::error file=/home/runner/work/FAR-Lab/FAR-Lab/src/pipeline/stages/export.ts,title=tests/pipeline-export.test.ts > export stage > re-exports when the corpus grew beyond the bundle's covered sources (§5.2 evidence debt%2C audit P1-1),line=860,column=119::ReferenceError: Cannot access 'protocolLimitationLines' before initialization%0A ❯ Object.execute src/pipeline/stages/export.ts:860:119%0A ❯ runPlanThenExport tests/pipeline-export.test.ts:521:21%0A ❯ tests/pipeline-export.test.ts:534:27%0A%0A
-
-::error file=/home/runner/work/FAR-Lab/FAR-Lab/src/pipeline/stages/export.ts,title=tests/pipeline-export.test.ts > export stage > renders all 9 report sections strictly from stored objects,line=860,column=119::ReferenceError: Cannot access 'protocolLimitationLines' before initialization%0A ❯ Object.execute src/pipeline/stages/export.ts:860:119%0A ❯ runPlanThenExport tests/pipeline-export.test.ts:521:21%0A ❯ tests/pipeline-export.test.ts:551:25%0A%0A
-
-::error file=/home/runner/work/FAR-Lab/FAR-Lab/src/pipeline/stages/export.ts,title=tests/pipeline-export.test.ts > export stage > builds an honest replay bundle (hashes%2C limitations%2C unknown revision%2C env%2C lock),line=860,column=119::ReferenceError: Cannot access 'protocolLimitationLines' before initialization%0A ❯ Object.execute src/pipeline/stages/export.ts:860:119%0A ❯ runPlanThenExport tests/pipeline-export.test.ts:521:21%0A ❯ tests/pipeline-export.test.ts:624:25%0A%0A
-
-::error file=/home/runner/work/FAR-Lab/FAR-Lab/src/pipeline/stages/export.ts,title=tests/pipeline-export.test.ts > plan + export — RU-1 memory conditioning > plan receives prior failed outcomes with trust labels; event + summary disclose; export renders the §9 line,line=860,column=119::ReferenceError: Cannot access 'protocolLimitationLines' before initialization%0A ❯ Object.execute src/pipeline/stages/export.ts:860:119%0A ❯ tests/pipeline-export.test.ts:727:27%0A%0A
-
-::error file=/home/runner/work/FAR-Lab/FAR-Lab/src/pipeline/stages/export.ts,title=tests/pipeline-export.test.ts > plan + export — RU-1 memory conditioning > control%3A no memory -> plan payload lacks the block; no event; no export line,line=860,column=119::ReferenceError: Cannot access 'protocolLimitationLines' before initialization%0A ❯ Object.execute src/pipeline/stages/export.ts:860:119%0A ❯ tests/pipeline-export.test.ts:746:27%0A%0A
-
-::error file=/home/runner/work/FAR-Lab/FAR-Lab/src/pipeline/stages/export.ts,title=tests/protocol-export.test.ts > protocol chain in the export plane (slice 4) > mints protocolEvidence + verbatim limitations line%2C verifies%2C and packages the ledger,line=860,column=119::ReferenceError: Cannot access 'protocolLimitationLines' before initialization%0A ❯ Object.execute src/pipeline/stages/export.ts:860:119%0A ❯ tests/protocol-export.test.ts:325:21%0A%0A
-
-::error file=/home/runner/work/FAR-Lab/FAR-Lab/src/pipeline/stages/export.ts,title=tests/protocol-export.test.ts > protocol chain in the export plane (slice 4) > legacy bundle without protocolEvidence passes the new check with an absence note,line=860,column=119::ReferenceError: Cannot access 'protocolLimitationLines' before initialization%0A ❯ Object.execute src/pipeline/stages/export.ts:860:119%0A ❯ tests/protocol-export.test.ts:411:21%0A%0A
-
-::error file=/home/runner/work/FAR-Lab/FAR-Lab/src/pipeline/stages/export.ts,title=tests/real-content-export-filter.test.ts > real-content discipline%3A legacy template hypotheses never project into the export chain > export stage%3A report%2C paper markdown and bundle JSON-LD exclude template hypotheses; missing-items disclose the count,line=860,column=119::ReferenceError: Cannot access 'protocolLimitationLines' before initialization%0A ❯ Object.execute src/pipeline/stages/export.ts:860:119%0A ❯ tests/real-content-export-filter.test.ts:195:21%0A%0A
-
-::error file=/home/runner/work/FAR-Lab/FAR-Lab/src/pipeline/stages/export.ts,title=tests/report-package.test.ts > buildReproducibilityPackage (full study%2C real paths) > assembles a verified package%3A stored artifacts%2C manifest%2C ro-crate%2C citations%2C pandoc,line=860,column=119::ReferenceError: Cannot access 'protocolLimitationLines' before initialization%0A ❯ Object.execute src/pipeline/stages/export.ts:860:119%0A ❯ runExport tests/report-package.test.ts:108:3%0A ❯ tests/report-package.test.ts:121:23%0A%0A
-
-::error file=/home/runner/work/FAR-Lab/FAR-Lab/src/pipeline/stages/export.ts,title=tests/report-package.test.ts > buildReproducibilityPackage (full study%2C real paths) > is byte-deterministic%3A two builds of the same bundle produce identical files,line=860,column=119::ReferenceError: Cannot access 'protocolLimitationLines' before initialization%0A ❯ Object.execute src/pipeline/stages/export.ts:860:119%0A ❯ runExport tests/report-package.test.ts:108:3%0A ❯ tests/report-package.test.ts:196:23%0A%0A
-
-::error file=/home/runner/work/FAR-Lab/FAR-Lab/src/pipeline/stages/export.ts,title=tests/report-package.test.ts > buildReproducibilityPackage (failure paths — fail closed%2C never silently partial) > rejects when a stored artifact the bundle declares is unavailable on disk,line=860,column=119::ReferenceError: Cannot access 'protocolLimitationLines' before initialization%0A ❯ Object.execute src/pipeline/stages/export.ts:860:119%0A ❯ runExport tests/report-package.test.ts:108:3%0A ❯ tests/report-package.test.ts:228:23%0A%0A
-
-::error file=/home/runner/work/FAR-Lab/FAR-Lab/src/pipeline/stages/export.ts,title=tests/report-package.test.ts > buildReproducibilityPackage (failure paths — fail closed%2C never silently partial) > rejects an unknown pandoc format name,line=860,column=119::ReferenceError: Cannot access 'protocolLimitationLines' before initialization%0A ❯ Object.execute src/pipeline/stages/export.ts:860:119%0A ❯ runExport tests/report-package.test.ts:108:3%0A ❯ tests/report-package.test.ts:237:23%0A%0A
-
-::error file=/home/runner/work/FAR-Lab/FAR-Lab/src/pipeline/stages/export.ts,title=tests/report-package.test.ts > buildReproducibilityPackage (partial study — honest emptiness) > packages a question-only run with disclosed empty sections,line=860,column=119::ReferenceError: Cannot access 'protocolLimitationLines' before initialization%0A ❯ Object.execute src/pipeline/stages/export.ts:860:119%0A ❯ runExport tests/report-package.test.ts:108:3%0A ❯ tests/report-package.test.ts:251:23%0A%0A
+::error file=/home/runner/work/FAR-Lab/FAR-Lab/tests/protocol-export.test.ts,title=tests/protocol-export.test.ts > protocol chain in the export plane (slice 4) > mints protocolEvidence + verbatim limitations line%2C verifies%2C and packages the ledger,line=369,column=21::AssertionError: expected '# Why do CRISPR base editors cause of…' to contain 'Human-attested ledger'%0A%0A- Expected%0A+ Received%0A%0A- Human-attested ledger%0A+ # Why do CRISPR base editors cause off-target edits?%0A+%0A+ > Standing disclosure: all LLM-produced judgments in this product (scorecard scores, novelty labels, relation rationales) are UNCALIBRATED decision aids — inspectable inputs to a decision, not objective probabilities or established facts.%0A+%0A+ Run `run_z90qq90c43mtkmvtsk53hppze5` · deterministic render (zero LLM calls) · generated 2026-08-29T00:00:00.000Z%0A+%0A+ ## Abstract%0A+%0A+ - Top-ranked hypothesis (rank 1): Off-targeting is driven by deaminase exposure duration (source: hypothesis `hyp_3t3amd4q2gpxgg8tvqkjj1gr49`)%0A+ - Grounded in verified literature claim: CBE causes C-to-T off-target mutations at specific motifs (source: claim `clm_f8qj6y58qp1b57vn8rgpn14rqa` [@Researcher2024Resolved])%0A+%0A+ ## 1 Introduction%0A+%0A+ **Gap.** Within this run's retrieved corpus (1 sources, 1 claims), the question "Why do CRISPR base editors cause off-target edits?" remains open: 1 supporting and 0 counter-evidence relations are on record against its hypotheses.%0A+%0A+ **Contributions.**%0A+%0A+ 1. Off-targeting is driven by deaminase exposure duration (hypothesis `hyp_3t3amd4q2gpxgg8tvqkjj1gr49`)%0A+%0A+ **Related work (retrieved corpus).**%0A+%0A+ - [@Researcher2024Resolved] Resolved study of off-target editing (2024; no venue on file; depth=abstract; identifier resolved=true)%0A+%0A+ Related-work scope is THIS run's retrieved corpus only — it is not a systematic literature review.%0A+%0A+%0A+ ## 2 Methods%0A+%0A+ - Research plan: none stored for this run (the plan stage did not produce an object).%0A+ - Steps: none recorded.%0A+ - Preregistration: frozen=false%0A+%0A+ ## 3 Results%0A+%0A+ > Ranking quantities (Bradley-Terry scores, win rates, evidence bands) are uncalibrated decision aids, not probabilities.%0A+%0A+ ### Hypothesis `hyp_3t3amd4q2gpxgg8tvqkjj1gr49` (rank 1)%0A+%0A+ - Statement: Off-targeting is driven by deaminase exposure duration%0A+ - Bradley-Terry: null (not contested) · win rate: null (not contested) · evidence band: null (no evidence body stored)%0A+ - Experiment verdicts: none persisted for this hypothesis.%0A+%0A+ ## 4 Discussion%0A+%0A+ **Ordering interpretation.** No ACH analysis object is stored for this run: hypothesis-ordering fragility (diagnosticity and removal sensitivity) could not be assessed.%0A+%0A+ **Counter-evidence highlights.**%0A+%0A+ (No counter-evidence relations target the ranked hypotheses within this run's retrieved corpus — absence within retrieval scope, not evidence of absence.)%0A+%0A+ ## 5 Limitations%0A+%0A+ - **execution_truth** — 执行真实性：empty —— live 模型调用 0 次、确定性测试调用 0 次、live 检索 0 次、缓存命中 0 次、过期缓存 0 次、记录重放 0 次（共 2 条回执） — deterministic test calls are not real model judgment; treat the affected rankings and analyses accordingly. (counts: totalReceipts=2, liveModelCalls=0, testModelCalls=0, liveRetrievals=0)%0A+ - **evidence_ceiling** — 0 metadata-only and 1 abstract-only of 1 retrieved sources; only 0 reached full-text/data depth. Claim extraction and every downstream judgment are capped at that depth. (counts: sources=1, metadataOnly=0, abstractOnly=1, fullTextOrData=0)%0A+ - **uncalibrated_judgment_density** — 1/1 scorecard dimension scores carry calibration='uncalibrated_llm_judgment' (100%25): inspectable decision aids, not calibrated probabilities. (counts: dimensions=1, uncalibratedLlmJudgment=1)%0A+ - **stipulated_thresholds** — 0/1 hypotheses have decision-rule thresholds of model-stipulated or mixed provenance (0 model-stipulated, 0 mixed) — such thresholds carry no evidence source. (counts: hypotheses=1, modelStipulated=0, mixed=0)%0A+ - **unresolved_source_verification** — 1/1 claims are bindingStatus='verified'; 0 are not: 0 resolved_unaligned (source resolved but retrieved content does not cover the claim — called out separately), 0 unresolved, 0 missing. (counts: claims=1, verified=1, resolvedUnaligned=0, unresolved=0, missing=0)%0A+ - **single_source_evidence_bodies** — 0/0 evidence bodies rest on fewer than 2 independent sources; single-source evidence is explicitly downgraded, never presented as independent confirmation. (counts: evidenceBodies=0, singleSource=0)%0A+ - **experiment_coverage** — Only 0/1 ranked hypotheses have any persisted experiment verdict (stat_report); the remaining 1 are ranked on literature evidence alone. (counts: rankedHypotheses=1, withExperimentVerdict=0, withoutExperimentVerdict=1)%0A+ - **uncertainty_inventory** — 0 uncertainty entries across 0 hypotheses remain open; they are monotonic (never silently resolved) and carried verbatim in Section 6. (counts: hypotheses=1, hypothesesWithUncertainties=0, uncertaintyEntries=0)%0A+ - **protocol_deviations** — 1 pre-registered protocol(s) with 1 human-attested ledger(s): 1 recorded deviation(s) and 1 QC-failed measurement(s). Physical-world execution is attested by named actors, not machine-verified; the ledgers and frozen specs ship verbatim in the reproducibility bundle. (counts: protocols=1, ledgers=1, deviations=1, qcFailedMeasurements=1)%0A+%0A+ ## 6 Conclusion and Future Work%0A+%0A+ **Open falsification conditions.**%0A+%0A+ (No falsification specs are stored for the ranked hypotheses.)%0A+%0A+ **Uncertainty inventory (monotonic — preserved in full, never silently resolved).**%0A+%0A+ (No uncertainty entries are recorded on the stored hypotheses.)%0A+%0A+ ## References%0A+%0A+ > Inline citations use Pandoc-style keys `[@key]`; render with `pandoc --citeproc` for formatted citations.%0A+%0A+ ```bibtex%0A+ @misc{Researcher2024Resolved,%0A+   author = {A. Researcher},%0A+   title = {Resolved study of off-target editing},%0A+   year = {2024},%0A+   doi = {10.1000/example-resolved},%0A+   note = {no additional publication metadata on file}%0A+ }%0A+ ```%0A+%0A%0A ❯ tests/protocol-export.test.ts:369:21%0A%0A
 VITEST_FAILED
 
 ===== tui test (last 40 lines) =====
-✔ e2e chat: post → agent reply; proposal card carries server-computed risk/args; approve executes it (33.296611ms)
-✔ e2e chat: provider failure keeps the researcher message with replyError (12.202534ms)
-✔ e2e control: cancel answers with the honest requested/reason contract (5.923648ms)
-✔ parseSseChunk: complete frames in one chunk (1.44042ms)
-✔ parseSseChunk: frames split across chunks reassemble (id/data/blank-line splits) (2.452525ms)
-✔ parseSseChunk: CRLF wires parse identically; multi-line data joins with \n (0.212901ms)
-✔ parseSseChunk: comment-only keep-alives produce no messages; unknown fields ignored (0.24397ms)
-✔ backoffDelayMs: 500ms base, doubling, capped at 8s (0.259839ms)
-✔ applyEventToStages: incremental merge equals the full-list derivation (1.592507ms)
-✔ applyEventToStages: input map is never mutated (pure) (0.365738ms)
-✔ App: [2] switches to the conversations workspace and renders rows (245.83821ms)
-✔ App: conversation list rows show title, turns, and recency (115.091501ms)
-✔ ChatView: renders turns, failed-turn banner, tool bar, pending card with risk + argSummary (116.900014ms)
-✔ ChatView: y approves without remember; a approves with remember; n rejects (699.20635ms)
-✔ ChatView: n opens the chat composer; confirm sends the REAL message via deps.post (502.305291ms)
-✔ ChatView: launch composer stops at READY without FAR_ALLOW_LIVE (no launch call) (468.584243ms)
-✔ ChatView: s attaches a local file that rides the next posted message (783.882685ms)
-✔ ChatView: s with an unreadable path surfaces the honest error and keeps composing (389.2605ms)
-✔ RunDetailView live: initial snapshot renders, subscription events update stages + conn state (298.997591ms)
-✔ RunDetailView live: c→y requests cancel through deps; f→y forks and reports the new id (638.016554ms)
-✔ RunDetailView live: h/e/l sub-views render narrowed objects; Esc returns (780.452167ms)
-✔ RunDetailView static (injected events): no subscription, no conn state, stages render (176.00675ms)
-✔ App renders study list from injected runs (no network) (48.723492ms)
-✔ App detail view renders the stage narrative from injected events (185.839906ms)
-✔ Composer: typing, enter → confirm view, y → submitted-ready (no POST path) (272.690075ms)
-✔ Composer: q in confirm cancels; n returns to editing (431.315974ms)
-✔ App "n" opens the composer view (109.645712ms)
-✔ readSeedFile: text file becomes a seed with filename title + full text (1.727991ms)
-✔ readSeedFile: missing file fails with the actionable cause (0.460286ms)
-✔ readSeedFile: directory is refused honestly (0.213402ms)
-✔ readSeedFile: oversized text is refused (50k contract) (0.415842ms)
-✔ readSeedFile: empty path is refused (0.341022ms)
+✔ e2e chat: post → agent reply; proposal card carries server-computed risk/args; approve executes it (33.883069ms)
+✔ e2e chat: provider failure keeps the researcher message with replyError (11.850998ms)
+✔ e2e control: cancel answers with the honest requested/reason contract (6.026026ms)
+✔ parseSseChunk: complete frames in one chunk (1.781573ms)
+✔ parseSseChunk: frames split across chunks reassemble (id/data/blank-line splits) (2.631063ms)
+✔ parseSseChunk: CRLF wires parse identically; multi-line data joins with \n (0.233735ms)
+✔ parseSseChunk: comment-only keep-alives produce no messages; unknown fields ignored (0.261226ms)
+✔ backoffDelayMs: 500ms base, doubling, capped at 8s (0.316348ms)
+✔ applyEventToStages: incremental merge equals the full-list derivation (2.007593ms)
+✔ applyEventToStages: input map is never mutated (pure) (0.370068ms)
+✔ App: [2] switches to the conversations workspace and renders rows (237.381226ms)
+✔ App: conversation list rows show title, turns, and recency (113.336157ms)
+✔ ChatView: renders turns, failed-turn banner, tool bar, pending card with risk + argSummary (114.721567ms)
+✔ ChatView: y approves without remember; a approves with remember; n rejects (704.096061ms)
+✔ ChatView: n opens the chat composer; confirm sends the REAL message via deps.post (505.024928ms)
+✔ ChatView: launch composer stops at READY without FAR_ALLOW_LIVE (no launch call) (469.080586ms)
+✔ ChatView: s attaches a local file that rides the next posted message (780.488345ms)
+✔ ChatView: s with an unreadable path surfaces the honest error and keeps composing (390.322957ms)
+✔ RunDetailView live: initial snapshot renders, subscription events update stages + conn state (298.924608ms)
+✔ RunDetailView live: c→y requests cancel through deps; f→y forks and reports the new id (638.441777ms)
+✔ RunDetailView live: h/e/l sub-views render narrowed objects; Esc returns (777.573961ms)
+✔ RunDetailView static (injected events): no subscription, no conn state, stages render (179.448531ms)
+✔ App renders study list from injected runs (no network) (50.532751ms)
+✔ App detail view renders the stage narrative from injected events (188.528875ms)
+✔ Composer: typing, enter → confirm view, y → submitted-ready (no POST path) (273.599754ms)
+✔ Composer: q in confirm cancels; n returns to editing (432.347408ms)
+✔ App "n" opens the composer view (113.436454ms)
+✔ readSeedFile: text file becomes a seed with filename title + full text (1.768138ms)
+✔ readSeedFile: missing file fails with the actionable cause (0.659687ms)
+✔ readSeedFile: directory is refused honestly (0.270183ms)
+✔ readSeedFile: oversized text is refused (50k contract) (0.594045ms)
+✔ readSeedFile: empty path is refused (0.356814ms)
 ℹ tests 49
 ℹ suites 0
 ℹ pass 49
@@ -491,7 +485,7 @@ VITEST_FAILED
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 6078.013629
+ℹ duration_ms 6103.255036
 
 ===== cli smoke (last 20 lines) =====
   far data obs [--json]                          Reliability observability: process/storage state,
@@ -645,4 +639,4 @@ license ledger: PASS (4 workspaces audited, 1 allowed exception(s))
 - Using dynamic import() to code-split the application
 - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
-[32m✓ built in 16.01s[39m
+[32m✓ built in 16.24s[39m
