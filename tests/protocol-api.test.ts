@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { ProtocolSpec, newProtocolExecution, newId } from '../src/domain/index.js';
+import { ProtocolSpec, newProtocolExecution, newId, type ProtocolExecution } from '../src/domain/index.js';
 
 /**
  * Protocol-plane HTTP surface contract (web slice 2): the routes the StudyMap
@@ -14,7 +14,7 @@ import { ProtocolSpec, newProtocolExecution, newId } from '../src/domain/index.j
 
 const AT = '2026-08-29T07:30:00.000Z';
 
-const seedProtocol = (runId: string): { protocolId: string; executionId: string } => {
+const seedProtocol = (runId: string): { spec: ProtocolSpec; execution: ProtocolExecution } => {
   // Minimal-but-valid preregistration: bench paradigm, no approval gate,
   // two ordered steps, one range-QC'd numeric variable.
   const spec = ProtocolSpec.parse({
@@ -37,14 +37,14 @@ const seedProtocol = (runId: string): { protocolId: string; executionId: string 
     allocation: { scheme: 'none', rationale: 'observational pilot, no randomization' },
     steps: [
       {
-        id: 'ps1', planStepId: newId('tsk'), title: 'prepare coupons',
+        id: 'ps1', planStepId: newId('task'), title: 'prepare coupons',
         action: 'weigh, label and mount the four coupons before bath exposure',
         actor: 'researcher', materials: [], instruments: [],
         duration: { value: 30, unit: 'minutes' }, conditions: 'gloves, fume hood',
         producesMeasurements: [], confirmation: 'human_signed', dependsOn: [],
       },
       {
-        id: 'ps2', planStepId: newId('tsk'), title: 'record yield',
+        id: 'ps2', planStepId: newId('task'), title: 'record yield',
         action: 'after exposure, dry and re-weigh each coupon, enter yield percent',
         actor: 'researcher', materials: [], instruments: [],
         duration: { value: 15, unit: 'minutes' }, conditions: '',
@@ -144,7 +144,7 @@ describe('protocol HTTP surface (real server)', () => {
       const early = await post({ actor: 'Dr. Chen', kind: 'step_started', stepId: 'ps2' });
       expect(early.status).toBe(409);
       const earlyBody = (await early.json()) as { error: { code: string; message: string } };
-      expect(earlyBody.error.code).toBe('validation');
+      expect(earlyBody.error.code).toBe('state_conflict');
       expect(earlyBody.error.message).toContain('depends on ps1');
 
       // invalid body: actor missing → 400
