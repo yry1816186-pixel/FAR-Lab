@@ -1,4 +1,1 @@
-dormant — slice 3 (converge/protocol-cli, PR #134) closed 2026-08-29.
-surgery.yml is workflow_dispatch-only (single no-op job). Editing this file
-while the workflow carries its push trigger would re-arm the patch plane —
-do not touch without restoring the branch-scoped trigger first.
+bump: 1
