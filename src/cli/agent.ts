@@ -34,13 +34,24 @@ export async function agentCommand(sub: string | undefined, opts: AgentCommandOp
     return { code: 2, text: 'far agent refine requires a run id (run_<26-char id>)' };
   }
   const resume = opts.arg('--resume');
-  const parseIntArg = (name: string): number | undefined => {
-    const raw = opts.arg(name);
-    if (raw === undefined) return undefined;
+  // Validate numeric flags up front: a silently-dropped invalid value would run the
+  // refinement with hidden defaults (adversarial round-2 NUJ-4) — fail fast instead.
+  const NUMERIC_FLAGS = ['--turns', '--top-k', '--max-concurrent'] as const;
+  for (const flag of NUMERIC_FLAGS) {
+    const raw = opts.arg(flag);
+    if (raw === undefined) continue;
     const n = Number(raw);
-    if (!Number.isInteger(n) || n < 1 || n > 64) return undefined;
-    return n;
+    if (!Number.isInteger(n) || n < 1 || n > 64) {
+      return { code: 2, text: `invalid value for ${flag}: '${raw}' — expected an integer 1..64` };
+    }
+  }
+  const numFlag = (flag: string): number | undefined => {
+    const raw = opts.arg(flag);
+    return raw === undefined ? undefined : Number(raw);
   };
+  const turns = numFlag('--turns');
+  const topK = numFlag('--top-k');
+  const maxConcurrent = numFlag('--max-concurrent');
   if (resume !== undefined && !/^ags_[0-9a-z]{20,32}$/.test(resume)) {
     return { code: 2, text: `invalid --resume session id: ${resume} (expected ags_<26-char id>)` };
   }
@@ -50,9 +61,9 @@ export async function agentCommand(sub: string | undefined, opts: AgentCommandOp
       { store: app.store, artifacts: app.artifacts, provider: app.provider, sourceFor: (f) => sourceAdapterFor(f), rolloutDir: path.join(app.dataDir, 'agent-sessions') },
       runId,
       {
-        ...(parseIntArg('--turns') !== undefined ? { maxTurns: parseIntArg('--turns') } : {}),
-        ...(parseIntArg('--top-k') !== undefined ? { topK: parseIntArg('--top-k') } : {}),
-        ...(parseIntArg('--max-concurrent') !== undefined ? { maxConcurrent: parseIntArg('--max-concurrent') } : {}),
+        ...(turns !== undefined ? { maxTurns: turns } : {}),
+        ...(topK !== undefined ? { topK } : {}),
+        ...(maxConcurrent !== undefined ? { maxConcurrent } : {}),
         ...(resume !== undefined ? { resumeSessionId: resume } : {}),
       },
     );

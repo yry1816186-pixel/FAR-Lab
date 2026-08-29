@@ -73,6 +73,17 @@ describe.skipIf(!distBuilt())('far (compiled binary): scriptability contract', (
     expect(e.stderr ?? '').toMatch(/unknown command|far --help/);
   });
 
+  it('exit 2 for a typoed --stop-after stage name — never a silent full-pipeline run', async () => {
+    // Adversarial round-2: the old `as never` cast meant an unmatched stage name
+    // silently resumed the WHOLE pipeline; validation must fail fast with the
+    // valid stage list. Format-valid run id (no db lookup happens before the check).
+    const err = await run(['research', 'resume', 'run_aaaaaaaaaaaaaaaaaaaaaaaaaa', '--stop-after', 'ranking']).catch((e: unknown) => e);
+    const e = err as { code?: number; stdout?: string; stderr?: string };
+    expect(e.code).toBe(2);
+    expect(e.stderr ?? '').toMatch(/unknown --stop-after stage 'ranking'/);
+    expect(e.stderr ?? '').toMatch(/scope/); // the valid-stage list is in the message
+  });
+
   it('exit 2 (usage) for a malformed run id: diagnostics on stderr, stdout clean', async () => {
     const err = await run(['research', 'status', 'not-a-run-id']).catch((e: unknown) => e);
     const e = err as { code?: number; stdout?: string; stderr?: string };

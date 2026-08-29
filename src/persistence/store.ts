@@ -916,10 +916,19 @@ export class Store {
    * (P1): a dead worker holds no live lease. Threshold is absolute (ISO) so callers
    * control the grace window.
    */
-  listExpiredLeaseRuns(nowIso: string): { id: string; currentStage: string; leaseHolder: string | null }[] {
+  listExpiredLeaseRuns(nowIso: string): { id: string; currentStage: string; leaseHolder: string | null; tags: string[] }[] {
     return this.db.prepare(
-      "SELECT id, current_stage, lease_holder FROM runs WHERE status='running' AND (lease_expires_at IS NULL OR lease_expires_at <= ?)",
-    ).all(nowIso).map((r) => ({ id: String(r.id), currentStage: String(r.current_stage), leaseHolder: r.lease_holder === null ? null : String(r.lease_holder) }));
+      "SELECT id, current_stage, lease_holder, json_extract(doc, '$.tags') AS tags FROM runs WHERE status='running' AND (lease_expires_at IS NULL OR lease_expires_at <= ?)",
+    ).all(nowIso).map((r) => {
+      // node:sqlite returns json_extract array results as JSON TEXT, not parsed
+      // arrays — guard on the '[' prefix so a malformed doc surfaces to the
+      // sweep's own error handling instead of silently reading as untagged.
+      const raw: unknown = r.tags;
+      const tags = typeof raw === 'string' && raw.startsWith('[')
+        ? JSON.parse(raw).map(String)
+        : Array.isArray(raw) ? raw.map(String) : [];
+      return { id: String(r.id), currentStage: String(r.current_stage), leaseHolder: r.lease_holder === null ? null : String(r.lease_holder), tags };
+    });
   }
 
   /**
@@ -930,6 +939,21 @@ export class Store {
   requestCancel(runId: string): boolean {
     const res = this.db.prepare("UPDATE runs SET doc = json_set(doc, '$.cancelRequested', json('true')), updated_at = updated_at WHERE id=? AND status IN ('created','queued','running','paused','partial')")
       .run(runId);
+    return Number(res.changes) === 1;
+  }
+
+  /**
+   * Atomic fire-claim for automations (cross-process double-fire guard, adversarial
+   * round-2 REL-3): the engine's `busy` flag is process-local, so two processes
+   * (desktop + serve) against the same data dir both fired a due trigger and both
+   * paid a model turn. This advances lastFiredAt via compare-and-set on the OBSERVED
+   * value in one statement — only one caller can win. `json_extract(...) IS ?` with
+   * a null parameter compares as IS NULL, matching a never-fired automation.
+   */
+  claimAutomationFire(id: string, observedLastFiredAt: string | null, ts: string | null): boolean {
+    const res = this.db.prepare(
+      "UPDATE objects SET json = json_set(json, '$.lastFiredAt', ?, '$.updatedAt', ?) WHERE kind='automation' AND id=? AND run_id='__none__' AND json_extract(json, '$.lastFiredAt') IS ?",
+    ).run(ts, ts, id, observedLastFiredAt);
     return Number(res.changes) === 1;
   }
 

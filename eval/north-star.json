@@ -10,7 +10,7 @@
         "detail": "v2.2 RECALIBRATION COMPLETE 2026-08-29 (same frozen artifacts/GT, instrument-only changes): (1) REAL BUG — glm-5.3 intermittently returned object-shaped verdicts [{k,verdict}] that the length-only validator passed and the consumer silently mapped to false votes (whole batches 0/5 on paraphrases); boolean-strict validation now fails these visible. (2) NEW gold batch claim-pair-gold-v21.jsonl (53 pairs from the below-floor zone the 08-22 gold never sampled; 3 true pairs at 0.110-0.119) → floor 0.12→0.10, votes 3→5, zero gold errors on 157 pairs. Measurement: 0.14→0.226 (crc 0.612, crispr 0.364, cdiff 0.154, arg/egfr 0). The 2026-08-22 \"0.58\" was judge LENIENCY, not rediscovery: on the same artifacts the old uncalibrated LLM matcher scored arg 0.50/cdiff 1.00 while the agent hypotheses are topically disjoint from GT (biofilms vs hospital plasmid epidemiology; lineage plasticity vs T790M) — see evidence/W-EV2/rediscovery.md. Remaining gap is product-level: 2/5 top hypotheses propose a different mechanism than the established finding (novelty-vs-rediscovery tension, disclosed).",
         "at": "2026-08-29",
         "evidence": "eval/results/rediscovery.jsonl (v2.2) vs rediscovery-buggy-verdicts-20260829.jsonl vs rediscovery-pre-v22-20260829.jsonl; gold: eval/claim-pair-gold.jsonl + eval/claim-pair-gold-v21.jsonl; calibration: eval/claim-match-calibrate.mjs",
-        "note": "target 0.7 unchanged (anti-inflation rule); closing it requires hypothesis-anchoring changes in the PRODUCT (top hypothesis converging on established findings), not further judge work — judge layers are now deterministic-locked (zero gold error) and boolean-strict"
+        "note": "target 0.7 unchanged (anti-inflation rule); judge layers: deterministic extremes zero-gold-error locked; LLM band (0.10-0.40) ACCURACY MEASURED 2026-08-29 at 0.826 (TPR 0.919 / FPR 0.222, n=109 in-band gold pairs, eval/adjudication-accuracy.mjs + eval/results/adjudication-accuracy.json) — leniency residue: directional-entailment FPs; strictness residue: negation/complement FNs"
       },
       "target": 0.7,
       "stretch": 0.8,
@@ -101,7 +101,8 @@
       "current": {
         "value": 0.9667,
         "at": "2026-08-21",
-        "evidence": "eval/results/metrics-ev1.json MISSING since the 2026-08-24 repo-source cleanup (raw file deleted; number stands on the recorded receipt-era measurement — W4R 2026-08-29 re-measured srcVer 72/72=100% on eval/results/metrics-w4-refresh.json, superseding this entry on next ledger pass)"
+        "evidence": "eval/results/metrics-w4-refresh-postgate.json (srcVer per-run 12/12 x 6)",
+        "detail": "undefined SUPERSEDED 2026-08-29: W4R refresh (current spine) measured srcVer 72/72 (100%) across 6 runs incl. the P5 gated re-run — current value 1.0 with this evidence; the 0.9667 figure is the pre-spine W4 era."
       },
       "target": 0.98,
       "stretch": 0.995,
@@ -115,9 +116,9 @@
       "what": "Counter-evidence seats whose relation survives blind re-judging as genuine counter signal (NEW metric: define in W-P2, backfill historical)",
       "current": {
         "value": 0.867,
-        "detail": "strict (judge in contradicts/weakens) POOLED across two post-fix live problems: 26/30 (far-transfer 21/24=0.875 + probiotics replication 5/6=0.833). Pre-fix same-day baseline (identical question/route, run_498s42b8): 15/24=0.625, ALL 9 misses inverted (null-side hypotheses supported by no-effect claims labelled counter). Historical: 0.143 (2026-08-22 W9, misses mostly EMPTY). HONEST LIMITS: same-family judge (glm-4.6 judging glm-4.6, upper bound), n=30, 2 problems; direction anchoring (commit 2ce7c29) is the mechanism.",
+        "detail": "strict (judge in contradicts/weakens) POOLED across two post-fix live problems: 26/30 (far-transfer 21/24=0.875 + probiotics replication 5/6=0.833). Pre-fix same-day baseline (identical question/route, run_498s42b8): 15/24=0.625, ALL 9 misses inverted (null-side hypotheses supported by no-effect claims labelled counter). Historical: 0.143 (2026-08-22 W9, misses mostly EMPTY). HONEST LIMITS: same-family judge (glm-4.6 judging glm-4.6, upper bound), n=30, 2 problems; direction anchoring (commit 2ce7c29) is the mechanism. DUAL-NUMBER DISCLOSURE (adversarial round-2, 2026-08-29): 0.867 is POLARITY-RETENTION (blind re-judge stays counter-directional); EXACT-LABEL agreement on the same 30 rows is 0.467 (14/30) — 9 label changes within the counter family, 4 outright inversions. Cite BOTH numbers; 0.867 is an upper bound on a same-family judge.",
         "at": "2026-08-29",
-        "evidence": "eval/results/relation-precision-fartransfer{,-postfix}-20260829.jsonl + relation-precision-probiotic-replication-20260829.jsonl; runs run_498s42b8…/run_jezdcm3q…/run_tyxayqa3c94kh32xcv3v5kcvqq (probiotics)",
+        "evidence": "eval/results/relation-precision-fartransfer{,-postfix}-20260829.jsonl + relation-precision-probiotic-replication-20260829.jsonl; runs run_498s42b8…/run_jezdcm3q…/run_tyxayqa3c94kh32xcv3v5kcvqq (probiotics); adjudication-accuracy.json",
         "note": "target 0.70 MET on this sample; not claimed as converged — multi-problem replication is the next lever"
       },
       "target": 0.7,
@@ -165,7 +166,8 @@
       "current": {
         "value": "5/5",
         "at": "2026-08-21",
-        "evidence": "eval/results/metrics-ev1.json MISSING since the 2026-08-24 repo-source cleanup (raw file deleted; W4R 2026-08-29 re-measured 6/6 on eval/results/metrics-w4-refresh.json — FAR-Lab side; baseline planExec comparability fixed same day, see evidence/W4R/evaluation-report.md)"
+        "evidence": "eval/results/metrics-w4-refresh-postgate.json; eval/results/problems-w4-refresh.json; evidence/W4R/evaluation-report.md",
+        "detail": "undefined POST-GATE QUALIFICATION (2026-08-29, adversarial round-2): the 6/6 aggregate previously included P5 (honesty-probe run that fabricated 10 hypotheses pre-gate, 80dc2dd). P5 re-run on the gated system (run_xag5mwkywpsfzrhp65qz1kbmde) now correctly ABSTAINS (evidence-insufficient tag, hypotheses+plan refused) — planExec=null. Post-gate honest framing: real questions 5/5 planExec + 1/1 correct refusal on the planted probe (baselines cannot abstain: direct still plans over the fabricated taxon). metrics re-pinned via eval/results/problems-w4-refresh.json, recomputed in metrics-w4-refresh-postgate.json."
       },
       "target": "held at 5/5 under multiple-testing gate",
       "stretch": "external reviewer sample rates plans >=8/10 executable",

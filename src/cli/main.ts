@@ -7,6 +7,7 @@ import { readFile } from 'node:fs/promises';
 import { ingestSdm, ingestTextToSdm, ingestBytes, ingestSvgPlot, persistDatasetProfile, type TextIngestResult, type BytesIngestResult } from '../ingest/service.js';
 import { FeedbackSignal, FeedbackSourceKind, ObjectRef, ResearchQuestion, ScientificGoalType, newId, runProgress } from '../domain/index.js';
 import type { ResearchRun } from '../domain/index.js';
+import { STAGE_ORDER } from '../domain/run.js';
 import { completionScript } from './completion.js';
 import { HELP } from './help.js';
 import { staleDistFiles } from './dist-freshness.js';
@@ -991,7 +992,20 @@ const main = async (): Promise<void> => {
     const app = await createApp();
     try {
       const stopAfter = arg('--stop-after');
-      const run = await app.orchestrator.execute(rid, stopAfter ? { stopAfter: stopAfter as never } : undefined);
+      // A typo'd stage name must never silently run the whole pipeline (adversarial
+      // round-2): the old `as never` cast made an unmatched name a full resume.
+      if (stopAfter !== undefined && !(STAGE_ORDER as readonly string[]).includes(stopAfter)) {
+        die(`unknown --stop-after stage '${stopAfter}' — valid stages: ${STAGE_ORDER.join(', ')}`, 2);
+      }
+      if (stopAfter !== undefined) {
+        // Crash guard (mirror of scopeProposal's): a stop-after run tagged 'parking:*'
+        // before execution is never watchdog-adopted if this CLI dies before the park.
+        const tagged = app.store.getRun(rid);
+        if (tagged !== null && !tagged.tags.includes('parking:cli-stop-after')) {
+          app.store.updateRun({ ...tagged, tags: [...tagged.tags, 'parking:cli-stop-after'] });
+        }
+      }
+      const run = await app.orchestrator.execute(rid, stopAfter !== undefined ? { stopAfter: stopAfter as (typeof STAGE_ORDER)[number] } : undefined);
       printRun(run);
       process.exitCode = run.status === 'completed' ? 0 : 1;
     } finally { app.close(); }

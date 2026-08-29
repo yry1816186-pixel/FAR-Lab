@@ -1,15 +1,18 @@
 {
- "schemaVersion": 1,
- "declaredAt": "2026-08-29T23:30:00.000Z",
- "selectionRule": "Honesty-gate regime probes (round-2 Q2): the sparse-NONZERO middle ground between dense-literature P1-P6 and zero-coverage P5. Sparse-but-covered subjects must NOT be refused; uncovered subjects (P5) must. Pre-declared before any run.",
- "problems": [
-  {
-   "id": "H1",
-   "text": "What drives the unusually low spontaneous mutation rate of the hyperthermophilic archaeon Thermococcus eurythermalis?",
-   "domain": "marine microbiology",
-   "goalType": "explanatory",
-   "type": "sparse_covered",
-   "rationale": "Real organism with genuine but THIN direct literature (a handful of mutation-rate papers). The subject IS covered — the 2-of-2 gate must NOT refuse; hypotheses should generate from the sparse corpus. The untested middle regime."
-  }
- ]
+  "schemaVersion": 1,
+  "declaredAt": "2026-08-29T06:57:47+08:00",
+  "selectionRule": "Honesty-gate regime probes (round-2 Q2): the sparse-NONZERO middle ground between dense-literature P1-P6 and zero-coverage P5. Sparse-but-covered subjects must NOT be refused; uncovered subjects (P5) must. Pre-declared before any run.",
+  "problems": [
+    {
+      "id": "H1",
+      "text": "What drives the unusually low spontaneous mutation rate of the hyperthermophilic archaeon Thermococcus eurythermalis?",
+      "domain": "marine microbiology",
+      "goalType": "explanatory",
+      "type": "sparse_covered",
+      "rationale": "Real organism with genuine but THIN direct literature (a handful of mutation-rate papers). The subject IS covered — the 2-of-2 gate must NOT refuse; hypotheses should generate from the sparse corpus. The untested middle regime.",
+      "verifiedRunId": "run_pzz9z54c073zpzv06th3279b8g",
+      "verifiedNote": "completed with NO evidence-insufficient tag (sparse-but-covered -> generation allowed). HONEST TIMELINE: this run (06:52:45 +08) predates the file first commit (06:57:47 +08) by 5 min, so strict pre-declaration for H1 is UNVERIFIABLE — the sparse-allow direction is verified as a behavior, not as a pre-registered prediction; P5 rejection and P1 dense-allow were verified after the commit."
+    }
+  ],
+  "declaredAtNote": "git-anchored: first-commit timestamp of this file (the prior literal 2026-08-29T23:30:00.000Z mixed a local date with a Z suffix — adversarial round-2 P3; corrected to the verifiable anchor, which is the honest lower bound of declaration)"
 }

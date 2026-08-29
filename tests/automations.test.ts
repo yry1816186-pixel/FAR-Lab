@@ -57,6 +57,40 @@ const seedCompletedRun = (createdAt: Date): string => {
 };
 
 describe('automation engine (offline, scripted kernel turns)', () => {
+  it('cross-process double-fire: two engines sharing one store fire a due trigger exactly once (claim-before-fire)', async () => {
+    // Adversarial round-2 REL-3: the old order (await fire -> markFired) left the
+    // whole model-turn window open — desktop + serve against the same data dir both
+    // fired and both paid. The compare-and-set claim on lastFiredAt arbitrates even
+    // for CONCURRENT ticks; the loser skips this pass entirely.
+    const steps: StubStep[] = [finishTurn('仅一次的巡检简评。')];
+    app = await createApp({ dataDir: fs.mkdtempSync(path.join(os.tmpdir(), 'farlab-auto-')), providerOverride: createTestStubProvider(steps) });
+    const conv = createConversation(app, { title: '双引擎并发' });
+    const created = at(0);
+    app.store.putObject('automation', {
+      id: 'auto_dualfiretest00000000000', conversationId: conv.id, label: '并发巡检',
+      trigger: { kind: 'schedule', intervalMinutes: 1 }, task: '给一句话工作区状态简评',
+      enabled: true, maxTurnsPerFire: 4, fireCount: 0, notifiedRunIds: [],
+      createdAt: created.toISOString(), updatedAt: created.toISOString(),
+    });
+    const mkEngine = () => startAutomationEngine(app, {
+      createRun: async () => { throw new Error('not needed in this test'); },
+      now: () => at(61_000),
+    });
+    const a = mkEngine();
+    const b = mkEngine();
+    engines.push(a.stop, b.stop);
+    const [firedA, firedB] = await Promise.all([a.tick(at(61_000)), b.tick(at(61_000))]);
+    expect(firedA + firedB).toBe(1); // exactly one engine won the claim
+    const auto = app.store.getObject('automation', 'auto_dualfiretest00000000000')!;
+    expect(auto.fireCount).toBe(1);
+    const convDoc = app.store.getObject('conversation', conv.id)!;
+    expect(convDoc.messages.filter((m) => m.role === 'automation')).toHaveLength(1);
+    // the CAS itself: a second claim against the observed pre-fire value loses
+    expect(app.store.claimAutomationFire('auto_dualfiretest00000000000', null, at(62_000).toISOString())).toBe(false);
+    expect(app.store.claimAutomationFire('auto_dualfiretest00000000000', auto.lastFiredAt ?? null, at(63_000).toISOString())).toBe(true);
+    expect(app.store.getObject('automation', 'auto_dualfiretest00000000000')!.lastFiredAt).toBe(at(63_000).toISOString());
+  });
+
   it('fires schedule automations only when due, records visible turns, resumes from persisted clock', async () => {
     const steps: StubStep[] = [finishTurn('定时简评：一切正常。')];
     app = await createApp({ dataDir: fs.mkdtempSync(path.join(os.tmpdir(), 'farlab-auto-')), providerOverride: createTestStubProvider(steps) });

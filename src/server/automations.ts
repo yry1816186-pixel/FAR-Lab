@@ -135,21 +135,32 @@ export function startAutomationEngine(app: App, deps: AutomationEngineDeps): Aut
         if (automation.trigger.kind === 'schedule') {
           const dueAt = Date.parse(automation.lastFiredAt ?? automation.createdAt) + automation.trigger.intervalMinutes * 60_000;
           if (now.getTime() < dueAt) continue;
+          // Cross-process claim BEFORE the paid model turn (round-2 REL-3): the old
+          // fire-then-markFired order left the whole turn-length window open to a
+          // second process firing the same trigger. Lost claim -> skip this tick.
+          const observed = automation.lastFiredAt ?? null;
+          if (!app.store.claimAutomationFire(automation.id, observed, now.toISOString())) continue;
           if (await fire(automation, '定时触发', now)) {
             markFired(app, automation, [], now);
             fired += 1;
+          } else {
+            app.store.claimAutomationFire(automation.id, now.toISOString(), observed); // rewind -> retried next tick
           }
         } else {
           const boundary = Date.parse(automation.createdAt);
           const completed = app.store.listRuns(60)
             .filter((r) => r.status === 'completed' && !automation.notifiedRunIds.includes(r.id) && Date.parse(r.createdAt) >= boundary);
           if (completed.length === 0) continue;
+          const observed = automation.lastFiredAt ?? null;
+          if (!app.store.claimAutomationFire(automation.id, observed, now.toISOString())) continue;
           const notice = completed.length === 1
             ? `研究 ${completed[0]!.id} 已完成`
             : `${completed.length} 项研究已完成：${completed.map((r) => r.id).join('、')}`;
           if (await fire(automation, notice, now)) {
             markFired(app, automation, completed.map((r) => r.id), now);
             fired += 1;
+          } else {
+            app.store.claimAutomationFire(automation.id, now.toISOString(), observed); // rewind -> retried next tick
           }
         }
       }
