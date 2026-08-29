@@ -1,6 +1,6 @@
 name: surgery
 
-# Dormant (slice 4 closed — converge/export-protocol). Remote-surgery patch plane:
+# Dormant (slice 5 closed — converge/theory-executor). Remote-surgery patch plane:
 # anchored .mjs scripts applied inside CI for large files this repo cannot rewrite
 # wholesale from the remote plane. Re-activate per slice by restoring the push
 # trigger (branches + paths: ['scripts/surgery/.diag-trigger']) and the apply/diagnose

@@ -1,13 +1,13 @@
-===== node scripts/surgery/apply-protocol-export.mjs =====
-[surgery:protocol-export] provenance.ts already carries protocolEvidence — nothing to do
-[surgery:protocol-export] verify.ts already carries the protocol check — nothing to do
-[surgery:protocol-export] export.ts already carries the protocol chain — nothing to do
-[surgery:protocol-export] paper-outline.ts already carries the protocol category — nothing to do
-[surgery:protocol-export] package.ts already writes protocol files — nothing to do
-[surgery:protocol-export] all edits done
-===== node scripts/surgery/apply-protocol-export-fix.mjs =====
-[surgery:protocol-export-fix] declaration block already sits above the limitations array — nothing to do
-===== node scripts/surgery/apply-protocol-export-tests.mjs =====
-[surgery:protocol-export-tests] api count assertion already 15 — nothing to do
-[surgery:protocol-export-tests] paper assertion already lowercase — nothing to do
-APPLY_RC=0
+===== node scripts/surgery/apply-theory-executor.mjs =====
+SKIP src/domain/index.ts: theory export present
+SKIP src/domain/experiment.ts: both contract members present
+SKIP experiment-runtime/farlab_experiment_runtime/ops.py: op_identity_check present
+SKIP src/experiment/spec-from-plan.ts: theory drafter present
+SKIP src/pipeline/stages/execute.ts: theory leg present
+SKIP src/providers/offline.ts: theory handler present
+store.ts kind registration: delegated to apply-theory-store.mjs
+APPLY-THEORY-FAILED: invariant: ops.py identity_check wiring != def+registry
+SCRIPT FAILED: apply-theory-executor
+===== node scripts/surgery/apply-theory-store.mjs =====
+SKIP src/persistence/store.ts: theory_spec registered
+APPLY_RC=1

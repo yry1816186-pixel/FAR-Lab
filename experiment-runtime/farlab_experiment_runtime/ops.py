@@ -372,6 +372,99 @@ def op_simulate(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def op_identity_check(payload: dict[str, Any]) -> dict[str, Any]:
+    """Slice-5 theory identity check: evaluate lhs/rhs expression DATA over the
+    preregistered variable grid and report residual statistics.
+
+    Expressions are parsed with the stdlib ast module into a strict whitelist
+    (numeric literals, arithmetic, whitelisted numpy functions, grid variables
+    and the constants pi/e) — never eval(), never attribute access (exploration.py
+    P0 lesson: attribute traversal reaches os/sys through auto-imported submodules).
+    The TS validator gates first (lexical + free-variable); this is the
+    authoritative fail-closed second gate. Verdicts are computed by TS.
+    """
+    import ast as _ast
+
+    allowed_funcs = {
+        "exp": np.exp, "log": np.log, "log2": np.log2, "log10": np.log10, "sqrt": np.sqrt,
+        "sin": np.sin, "cos": np.cos, "tan": np.tan,
+        "sinh": np.sinh, "cosh": np.cosh, "tanh": np.tanh,
+        "arcsin": np.arcsin, "arccos": np.arccos, "arctan": np.arctan, "arctan2": np.arctan2,
+        "abs": np.abs, "floor": np.floor, "ceil": np.ceil,
+        "min": np.minimum, "max": np.maximum,
+    }
+    allowed_consts = {"pi": np.pi, "e": np.e}
+    bin_ops = {_ast.Add: np.add, _ast.Sub: np.subtract, _ast.Mult: np.multiply,
+               _ast.Div: np.true_divide, _ast.Pow: np.power, _ast.Mod: np.mod, _ast.FloorDiv: np.floor_divide}
+    unary_ops = {_ast.UAdd: lambda v: v, _ast.USub: np.negative}
+
+    def evaluate(node, env):
+        if isinstance(node, _ast.Expression):
+            return evaluate(node.body, env)
+        if isinstance(node, _ast.Constant):
+            if isinstance(node.value, bool) or not isinstance(node.value, (int, float)):
+                raise ValueError(f"identity expression: non-numeric constant {node.value!r}")
+            return np.asarray(node.value, dtype=np.float64)
+        if isinstance(node, _ast.Name):
+            if node.id in env:
+                return env[node.id]
+            raise ValueError(f"identity expression: unknown variable {node.id!r} (grid: {sorted(env)})")
+        if isinstance(node, _ast.BinOp) and type(node.op) in bin_ops:
+            return bin_ops[type(node.op)](evaluate(node.left, env), evaluate(node.right, env))
+        if isinstance(node, _ast.UnaryOp) and type(node.op) in unary_ops:
+            return unary_ops[type(node.op)](evaluate(node.operand, env))
+        if isinstance(node, _ast.Call):
+            if not isinstance(node.func, _ast.Name) or node.func.id not in allowed_funcs:
+                raise ValueError("identity expression: only whitelisted plain-named functions may be called")
+            if node.keywords:
+                raise ValueError("identity expression: keyword arguments are not allowed")
+            args = [evaluate(a, env) for a in node.args]
+            return allowed_funcs[node.func.id](*args)
+        raise ValueError(f"identity expression: node {type(node).__name__} is outside the whitelist")
+
+    def parse_expr(text):
+        try:
+            tree = _ast.parse(text, mode="eval")
+        except SyntaxError as exc:
+            raise ValueError(f"identity expression does not parse: {exc}") from exc
+        for node in _ast.walk(tree):
+            if isinstance(node, _ast.Attribute):
+                raise ValueError("Attribute access is forbidden in identity expressions (sandbox-escape chain)")
+        return tree
+
+    variables = payload.get("variables") or []
+    if not variables:
+        raise ValueError("identity_check requires at least one grid variable")
+    grids = {v["name"]: np.linspace(float(v["low"]), float(v["high"]), int(v["n"])) for v in variables}
+    n_points = int(np.prod([int(v["n"]) for v in variables]))
+    if n_points > 20000:
+        raise ValueError(f"identity grid too large: {n_points} points > 20000 (preregistered cap)")
+    mesh = np.meshgrid(*[grids[v["name"]] for v in variables], indexing="ij")
+    # Grid variables shadow the whitelisted constants (TS rejects variables named pi/e).
+    env = {**allowed_consts, **{v["name"]: mesh[i] for i, v in enumerate(variables)}}
+
+    lhs = evaluate(parse_expr(payload["lhs"]), env)
+    rhs = evaluate(parse_expr(payload["rhs"]), env)
+    residual = np.abs(lhs - rhs)
+    finite = np.isfinite(residual)
+    non_finite = int((~finite).sum())
+    if not finite.any():
+        raise ValueError("identity expressions produced no finite evaluation points on this grid (domain error)")
+    fin = residual[finite]
+    worst = int(np.argmax(np.where(finite, residual, -np.inf)))  # non-finite points never win the max
+    worst_point = {v["name"]: float(mesh[i].flat[worst]) for i, v in enumerate(variables)}
+    worst_point["lhs"] = float(lhs.flat[worst])
+    worst_point["rhs"] = float(rhs.flat[worst])
+    return {
+        "maxAbsResidual": float(fin.max()),
+        "meanAbsResidual": float(fin.mean()),
+        "nPoints": n_points,
+        "nonFinitePoints": non_finite,
+        "worstPoint": worst_point,
+        "residuals": fin.tolist()[:20000],
+    }
+
+
 OPS = {
     "env_info": op_env_info,
     "dataset_audit": op_dataset_audit,
@@ -383,4 +476,6 @@ OPS = {
     "run_exploration": op_run_exploration,
     # R2-10: reviewed simulation template (per-replicate outcomes -> shared stats chain).
     "simulate": op_simulate,
+    # Slice-5: theory identity check (whitelisted-AST expressions on a grid).
+    "identity_check": op_identity_check,
 }

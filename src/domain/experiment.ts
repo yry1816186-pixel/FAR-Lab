@@ -163,6 +163,8 @@ export const MetricKey = z.enum([
   'pooled_log_or', 'pooled_log_rr', 'pooled_smd',
   // R2-10 simulation reports: per-replicate Monte-Carlo statistics.
   'sim_mean', 'sim_variance', 'sim_threshold_prob',
+  // Slice-5 theory identity reports: max |lhs-rhs| over the preregistered grid.
+  'identity_max_abs_residual',
 ]);
 export type MetricKey = z.infer<typeof MetricKey>;
 
@@ -431,7 +433,7 @@ export const StatReport = z.object({
   pointEstimate: z.number(),
   ci: z.object({ level: z.number(), low: z.number(), high: z.number() }),
   test: z.object({
-    kind: z.union([StatisticsPlan.shape.test, z.enum(['meta_iv_fixed', 'meta_iv_random_dl'])]),
+    kind: z.union([StatisticsPlan.shape.test, z.enum(['meta_iv_fixed', 'meta_iv_random_dl']), z.literal('identity_grid')]),
     alpha: z.number(),
     pValue: z.number().optional(),
     nBoot: z.number().int().optional(),

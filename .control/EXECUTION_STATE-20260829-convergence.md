@@ -218,21 +218,92 @@ ci (pull_request) 于 29e3f56 全绿（verify success 8m13s，零失败注解）
 - bump-7 诊断（b02b7fe）：BUILD/typecheck/lint 全绿 + 2218 用例 2209 过 7 跳
   2 败（根因十一/十二，均测试侧）
 - **修复树终裁：29e3f56 ci (pull_request) verify success 8m13s 零注解**
-  （含 e7b91bd 两处测试同步的全门禁绿；run-b9 diagnose 快照作为补充证据
-  落库后不再另行解读，其内容与该 ci 绿互证）
-- **最终合并门 = 本末位提交（surgery 休眠 + 控制面终稿）head 上的 ci 单次
-  全绿，此后无任何推送**
+  （含 e7b91bd 两处测试同步的全门禁绿）
+- **合并已兑现**：PR #135 squash → main c017409（签名）；1f1e516 闭尾 ci verify
+  3m18s 全绿 + main 合并后 ci verify 3m5s 全绿（唯一注解为既有 Node 20 弃用警告）
+
+## 切片 5（converge/theory-executor，PR #136）——theory 数值恒等验证腿
+
+1. **域**（src/domain/theory.ts，新）：TheorySpec/TheoryClaim/TheoryVariable 预注册
+   ——闭合表达式空间（长度/字符/括号门 + 自由标识符⊆网格变量 + 函数白名单 +
+   pi/e 常量与变量名冲突拒绝）、网格点上限 20k（TS+python 双侧）、
+   checkTheorySpec fail-closed（绑定审批覆盖门/探索性显式门）、
+   theoryIdentityVerdict 机械判决（非有限格点=insufficient_data；
+   残差<容差=supports 否则 falsifies）
+2. **草案**（spec-from-plan.ts +draftTheorySpecFromPlan）：LLM 仅提议变量范围与
+   lhs/rhs 表达式（闭合空间 prompt）；确定性代码拥有容差 1e-6/网格分辨率表
+   {1:41,2:23,3:13,4:9}/claim id/primary/thresholdProvenance='model-stipulated'
+3. **执行**（src/experiment/executor-theory.ts，新）：镜像 executor-meta/
+   executor-simulation 权威结构——specHash 绑定、真实 sidecar identity_check
+   逐 claim 求值、点数一致性断言、退化区间 StatReport（identity_max_abs_residual/
+   identity_grid/level=1）、内容寻址残差数组、hash 域序贯守卫、
+   逐字披露 "NUMERICAL SPOT-CHECK on the preregistered grid, not a symbolic proof"
+4. **sidecar**（ops.py +op_identity_check）：stdlib ast 白名单解析（数值常量/算术/
+   白名单 numpy 函数/网格变量；attribute 访问拒绝=exploration.py P0 教训镜像；
+   绝不 eval）、linspace 笛卡尔网格、非有限点计数与 worst-point 定位
+5. **接线**（execute.ts 第 2.5 层）：tabular → literature-pool → theory identity →
+   protocol fallback；refuseTemplateMode 镜像协议路径；skip 理由串含 theory 段；
+   offline 路由显式拒绝（不伪造 theory 实验）
+6. **契约扩展**：MetricKey + identity_max_abs_residual；StatReport.test.kind +
+   identity_grid（镜像 meta_iv_* 先例）；store KIND_SCHEMAS + theory_spec
+7. **测试**（tests/executor-theory.test.ts，新）：确定性双（bound 判决三态/
+   无审批 fail-closed/词法门）+ 真实 sidecar（真恒等式 machine-epsilon 残差、
+   attribute/不可解析/未知变量三重拒绝）+ execute 三层路由端到端（真实 sidecar）
+8. **落地机制**：新文件整推（a8b59e0）+ apply-theory-executor.mjs 七文件锚点
+   集成（bot dcc16a8）+ apply-theory-store.mjs（bot 3e98c46，bump-3）
+
+## 切片 5 迭代史（诚实）
+
+1. **根因十三（bump-1 产物回读定位）**：apply 脚本 DRAFT_BLOCK 生成的
+   THEORY_SYSTEM_PROMPT 是多行数组字面量但元素行缺尾逗号，且函数清单行未
+   引用——spec-from-plan.ts 落地即语法错误（node 执行 apply 成功 ≠ 产物 TS 合法）。
+   修复 5e03440：拼接语句镜像 SYSTEM_PROMPT/META_SYSTEM_PROMPT 既有形态。
+   教训：**生成代码块中的多行数组字面量必须逐元素尾逗号，或改用拼接语句**
+2. **预检修复（免烧整轮 CI）**：路由夹具 hypothesisIds: [] 违反
+   ResearchPlan z.array(HypothesisId).min(1)（与根因一/根因七同型：schema 约束
+   不查证就写夹具）——c06a934 接真实 hypothesis；0538641 顺带合并 theory.ts
+   重复 import（import/no-duplicates 预防）
+3. **根因十四（bump-2 apply-log + 事后取证）**：编辑七假设 KIND_SCHEMAS 的
+   protocol_execution 是末位条目（断言下行 };）——实际其后还有 feedback 等
+   条目，两次 bump 均在断言失败，store 注册从未落地；if:always() 把部分成果
+   照常提交，dcc16a8“七文件”实为六文件，掩盖失败。修复 apply-theory-store.mjs
+   （唯一锚插入不做末位断言；bot 3e98c46）。教训：**对未见结构断言“末位”前必须
+   取证；workflow if:always() 会把部分成功伪装成整体成功——APPLY_RC 才是真相**
+4. **bump-2 “重复编辑”假象取证**：apply-log 显示 EDITED execute/offline 但现树
+   无重复损伤——实为 apply 在无编辑基树上全新单次应用，同内容补丁 rebase 自动
+   合流。教训：**apply-log 的 EDITED/SKIP 只对它当时检出的树负责，与分支 head
+   的关系要靠 bot 提交 diff 取证，不能从日志字面推断**
+5. **根因十五/十六（bump-4 diag a8a1bef 裁决，树=1d9d7bc）**：
+   ①executor-theory.ts:183 TS1361——FeedbackSignal 被 import type 导入却作值用
+   （.parse）——修复 fd4487e 值导入（zod schema 既类型又值：凡 .parse 必值导入）
+   ②apply-theory-executor.mjs:404 no-unused-vars 死变量 OLD_KIND——同提交清除
+   并重构 DRAFT_BLOCK 生成链（.map/idxFix 补丁→直接 concat 终形态）、编辑七
+   显式委托 apply-theory-store.mjs；同快照 theory_spec TS2345 在注册树已消
+6. **脚本终局不变量误报（bump-4 apply-log）**：countOf('identity_check')===2
+   忽略 op 内错误消息字符串（实际 3 处）→ 健康树假红（树无损，仅手术 job 显红）。
+   已登记未修（脚本已休眠不再执行；修复配方：改为 def 行+注册行两条精确断言）
+7. **取证通道更新**：checks 页懒加载态在运行中无法裁决且重复 URL 命中读取
+   缓存（同 request-id）；新鲜缓存键（短 sha/新 sha URL）或 sha 锁定 raw 直读
+   才可靠；大文件 diag.txt（54KB）超出读取服务内联阈值被存盘不可读——vitest
+   段裁决须靠 ci 检查页完成后渲染或后续 bump 的分段落库
+
+## 切片 5 验证状态（诚实）
+
+- bump-4 diag（d3f85da，树=b6631a8=fd4487e 源）：BUILD ✓ / typecheck ✓ /
+  lint 0 错误（仅 main 既有 3 警告）/ vitest 段未及读取（54KB 落盘限制）
+- **最终合并门 = 本末位提交（surgery 休眠 + 控制面切片 5 记录）head 上的
+  ci 单次全绿，此后无任何推送**（bot 推送不触发 ci，不作为门）
 
 ## 登记未做（后续切片，非本 PR 声称范围）
 
-- 范式覆盖深化：theory（数值验证腿——ops.py 新增 identity_check：JSON DSL
-  两条表达式+变量网格→numpy 格点残差，TS 机械判决；执行器镜像 executor-meta
-  的 LLM 提议+确定性准入模式；诚实披露“数值抽查验证，非符号证明”；
-  加新依赖需重生成 uv.lock，远程不可行，故限定既有 numpy 栈）、archive
-  （登记库检索接口）——侦察完成（python.ts sidecar 契约/ops.py 注册表/
-  executor-meta.ts 模式/devices.ts=计算目标而非仪器面）
-- 手术面改进：apply no-op 时提交信息应区分（当前硬编码修复文案，57cb00a/
-  cbc410a 均为误导性 no-op 日志提交）；apply-log/diag 保留策略
+- 范式覆盖深化：archive（登记库检索腿，切片 6——侦察完成：SourceFamily 枚举
+  [openalex/arxiv/crossref/europepmc/user_provided] + sources/index.ts FACTORIES/
+  SOURCE_FAMILIES/sourceAdapterFor + verification.method 枚举 + PublicationType
+  映射 + retrieve.ts 家族规划 + 新适配器如 ClinicalTrials.gov/OSF）
+- 手术面改进：apply no-op 时提交信息应区分（c937031/adc3fa8 均为误导性
+  no-op 日志提交）；apply-theory-executor.mjs 终局不变量 countOf 误报修复
+  （见切片 5 迭代史 #6）；apply-log/diag 保留策略；diag.txt 分段落库
+  （54KB 超读取服务内联阈值，全量单文件不可读）
 - 手术 workflow 在 main 保持休眠（workflow_dispatch + 单 no-op job 合法形态）；
   apply-log.txt / diag.txt 留树内作为切片取证记录（path-hygiene 允许）
 - 既有 cosmetic：tests/memory-live-check.test.ts 三条 unused eslint-disable 警告

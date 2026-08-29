@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { newId, ExperimentSpec } from '../domain/index.js';
 import { MetaAnalysisSpec } from '../domain/meta.js';
+import { TheorySpec, THEORY_GRID_POINTS, THEORY_DEFAULT_TOLERANCE } from '../domain/theory.js';
 import type { ResearchPlan } from '../domain/plan.js';
 import { invokeStructured, type ModelPlaneDeps } from '../pipeline/llm.js';
 import { RunBudgetExhaustedError } from '../app/run-budget.js';
@@ -285,4 +286,106 @@ export const draftMetaSpecFromPlan = async (
     createdAt: new Date().toISOString(),
   });
   return { kind: 'meta', spec };
+};
+
+// ---- Slice-5: theory-type (numerical identity verification) drafting ----
+
+export type TheorySpecDraftOutcome =
+  | { kind: 'theory'; spec: TheorySpec; executionMode: 'live' | 'test' }
+  | { kind: 'skip'; reason: string };
+
+const TheoryDraftOut = z.object({
+  /** false = the plan is not testable by numerically checking claimed closed-form identities. */
+  feasible: z.boolean(),
+  skipReason: z.string().min(10).optional(),
+  variables: z.array(z.object({
+    name: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_]{0,30}$/),
+    low: z.number().finite(),
+    high: z.number().finite(),
+  })).min(1).max(4).optional(),
+  claims: z.array(z.object({
+    label: z.string().min(3).max(200),
+    lhs: z.string().min(1).max(300),
+    rhs: z.string().min(1).max(300),
+  })).min(1).max(8).optional(),
+}).superRefine((d, ctx) => {
+  if (d.feasible && (d.variables === undefined || d.claims === undefined)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'feasible=true requires variables and claims' });
+  }
+});
+
+const THEORY_SYSTEM_PROMPT =
+  'You convert a research plan into ONE theory-identity verification spec draft, or declare it infeasible. ' +
+  'Feasible ONLY when the plan\'s falsifiable content is a claimed closed-form mathematical identity or bound ' +
+  'that can be checked NUMERICALLY on a small grid (trigonometric identities, algebraic equivalences, ' +
+  'derived analytic formulas stated as lhs == rhs). ' +
+  'Expressions are Python-syntax numeric expressions over the declared variables, using ONLY: ' +
+  '+ - * / % ** ( ), numbers, the functions exp log log2 log10 sqrt sin cos tan sinh cosh tanh ' +
+  'arcsin arccos arctan arctan2 abs floor ceil min max, and the constants pi e. ' +
+  'No imports, no attribute access, no other names. ' +
+  'variables: 1-4 grid variables with honest numeric ranges covering the domain the identity is claimed on. ' +
+  'claims: the plan\'s claimed identities; lhs and rhs are each ONE expression in those variables. ' +
+  'If the plan needs physical experiments, datasets, or literature pooling rather than a checkable symbolic ' +
+  'claim, set feasible=false with a skipReason naming what is missing. Output JSON only.';
+
+export const draftTheorySpecFromPlan = async (
+  plan: ResearchPlan,
+  questionText: string,
+  plane: ModelPlaneDeps,
+): Promise<TheorySpecDraftOutcome> => {
+  let draft: z.infer<typeof TheoryDraftOut>;
+  let executionMode: 'live' | 'test';
+  try {
+    const res = await invokeStructured<z.infer<typeof TheoryDraftOut>>(plane, {
+      stage: 'execute',
+      purpose: 'theory-spec-draft',
+      systemPrompt: THEORY_SYSTEM_PROMPT,
+      payload: {
+        researchQuestion: questionText,
+        objective: plan.objective,
+        variables: plan.variables,
+        decisionRules: { success: plan.decisionRules.successCriterion, falsification: plan.decisionRules.falsificationCriterion },
+        hypothesisIds: plan.hypothesisIds,
+      },
+      schema: TheoryDraftOut,
+      temperature: 0.1,
+      maxTokens: 2048,
+    });
+    draft = res.data;
+    executionMode = res.executionMode;
+  } catch (e) {
+    if (e instanceof RunBudgetExhaustedError) throw e;
+    return { kind: 'skip', reason: `theory spec drafting failed: ${(e instanceof Error ? e.message : String(e)).slice(0, 180)}` };
+  }
+  if (!draft.feasible || draft.variables === undefined || draft.claims === undefined) {
+    return { kind: 'skip', reason: draft.skipReason ?? 'plan is not testable by numerical identity verification' };
+  }
+  // Deterministic discipline (the model never picks these): grid resolution from
+  // the variable-count table, preregistered default tolerance, model-stipulated
+  // threshold provenance, first claim primary, exploratory until an operator binds.
+  const gridN = THEORY_GRID_POINTS[draft.variables.length] ?? 9;
+  const spec = TheorySpec.parse({
+    id: newId('xsp'),
+    runId: plan.runId,
+    planId: plan.id,
+    planStepId: plan.steps[0]?.id ?? newId('task'),
+    question: questionText.slice(0, 500),
+    experimentType: 'theory_identity',
+    variables: draft.variables.map((v) => ({ name: v.name, low: v.low, high: v.high, n: gridN })),
+    claims: draft.claims.map((c, i) => ({
+      id: `claim_${i + 1}`,
+      label: c.label,
+      lhs: c.lhs,
+      rhs: c.rhs,
+      tolerance: THEORY_DEFAULT_TOLERANCE,
+      thresholdProvenance: 'model-stipulated',
+      primary: i === 0,
+    })),
+    compute: { device: 'local', maxParallel: 1, timeoutMs: 300_000 },
+    approvals: [],
+    exploratoryNote: `Plan-drafted exploratory identity check for ${plan.id}: tolerance is model-stipulated; hypothesis-bound theory specs require operator approval.`,
+    validation: { passed: false, missing: ['pending deterministic validation at execution'] },
+    createdAt: new Date().toISOString(),
+  });
+  return { kind: 'theory', spec, executionMode };
 };

@@ -17,6 +17,7 @@ import {
   ScreeningSession,
   ScreeningDecision,
   ProtocolSpec, ProtocolExecution,
+  TheorySpec,
 } from '../domain/index.js';
 import { z } from 'zod';
 import { STAGE_ORDER } from '../domain/run.js';
@@ -38,6 +39,7 @@ const KIND_SCHEMAS = {
   plan: ResearchPlan,
   protocol: ProtocolSpec,
   protocol_execution: ProtocolExecution,
+  theory_spec: TheorySpec,
   feedback: FeedbackSignal,
   revision: Revision,
   version_diff: VersionDiff,
