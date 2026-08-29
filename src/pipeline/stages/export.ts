@@ -614,7 +614,16 @@ const buildReport = (d: ExportInputs, missingItems: string[], truth: RunTruthPro
   // RU-1 cross-run memory disclosure: what conditioned generation, with labels.
   if (d.memoryConditioning.length > 0) {
     const memTotal = d.memoryConditioning.reduce((a, m) => a + m.items.length, 0);
-    const stages = [...new Set(d.memoryConditioning.map((m) => m.stage))].join('、');
+    // Researcher language for the stage enums (display only; the raw value
+    // rides the same line in parentheses for audit parity).
+    const STAGE_ZH: Record<string, string> = {
+      scope: '范围界定', retrieve: '文献检索', verify_sources: '来源核验', build_evidence: '证据构建',
+      generate_hypotheses: '假设生成', critique_falsify: '批判与证伪', rank: '排序评分', plan: '研究计划',
+      execute: '实验执行', feedback: '反馈', revise: '修订', export: '导出',
+    };
+    const stages = [...new Set(d.memoryConditioning.map((m) => m.stage))]
+      .map((s) => `${STAGE_ZH[s] ?? s}(${s})`)
+      .join('、');
     push(`- 工作区记忆调节：${memTotal} 条既往实验结果（信任标签随行）作为数据注入 ${stages} 生成——非本轮证据（RU-1）`);
   }
   push(`- 缺失项：${missingItems.length === 0 ? '无已知缺失项' : missingItems.join('；')}`);

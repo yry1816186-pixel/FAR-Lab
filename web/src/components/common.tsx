@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
+import { toast } from 'sonner';
 import {
-  BookMarked, BookOpen, FileJson, FileSpreadsheet, FileText, Globe, Link2, Presentation,
+  BookMarked, BookOpen, Copy, FileJson, FileSpreadsheet, FileText, Globe, Link2, Presentation,
 } from 'lucide-react';
 import { ApiError } from '../api/client';
 import { useI18n } from '../i18n/LanguageContext';
@@ -130,9 +131,21 @@ export function Section({
 
 /** Monospace identifier with the full value in a title tooltip. */
 export function IdText({ value, className }: { value: string; className?: string }): JSX.Element {
+  const { t } = useI18n();
+  const copy = (): void => {
+    // Clipboard may be denied (insecure context, permission) — degrade to a
+    // visible failure, never a silent no-op.
+    void navigator.clipboard.writeText(value)
+      .then(() => toast.success(t('common.idCopied', { id: value.slice(0, 10) })))
+      .catch(() => toast.error(t('common.idCopyFailed')));
+  };
   return (
     <span className={`mono id-text${className !== undefined ? ` ${className}` : ''}`} title={value}>
-      {value}
+      {value.length > 14 ? `${value.slice(0, 14)}…` : value}
+      {' '}
+      <button type="button" className="id-copy" aria-label={t('common.idCopyLabel')} title={t('common.idCopyLabel')} onClick={copy}>
+        <Copy size={10} aria-hidden="true" />
+      </button>
     </span>
   );
 }

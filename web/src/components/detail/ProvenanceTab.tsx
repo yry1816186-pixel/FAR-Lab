@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { Download, FileText, PackageOpen, RefreshCw, ScrollText } from 'lucide-react';
 import { ApiError, isNotFound, withTimeout } from '../../api/client';
 import { getBundles, getEvidence, getHypotheses, getPaper, getReceipts, getReport, reexportRun, verifyBundle } from '../../api/endpoints';
-import type { ProvenanceReceipt, ResearchRun, VerificationReport } from '../../api/types';
+import type { ProvenanceReceipt, ReceiptKind, ResearchRun, VerificationReport } from '../../api/types';
 
 /** Receipt stage values in practice: the 12 RunStageName values or 'agent:*'
  * kernel stages (those render raw, honestly — they name a capability, not a
@@ -69,9 +69,33 @@ export function ProvenanceTab({ run, events, onMutated }: { run: ResearchRun; ev
   const modelCalls = (receiptsRes.data ?? []).filter((r) => r.kind === 'model_call');
   const nonLive = (receiptsRes.data ?? []).filter((r) => r.executionMode !== 'live');
   const bundles = bundlesRes.data ?? [];
+  const latestBundle = bundles.length > 0 ? bundles[bundles.length - 1]! : null;
 
   return (
     <>
+      {/* First-screen actions (verify-panel review 2026-08-29): the verify /
+          download affordances used to sit below 120 receipt rows. The strip
+          keeps them one glance away; the full forms stay in their sections. */}
+      <div className="prov-quick">
+        <span className="prov-quick-label">{t('prov.quick.label')}</span>
+        {latestBundle !== null ? (
+          <>
+            <span className="mono small" title={`${latestBundle.createdAt} · ${latestBundle.evidenceLevel}`}>{latestBundle.id}</span>
+            <a className="btn btn--small" href={`/api/v1/runs/${encodeURIComponent(run.id)}/package`} title={t('report.packageHint')}>
+              <PackageOpen size={12} aria-hidden="true" /> {t('report.downloadPackage')}
+            </a>
+          </>
+        ) : (
+          <span className="muted small">{t('prov.quick.noBundle', { stage: t(stageKey(run.currentStage)) })}</span>
+        )}
+        <a className="btn btn--small" href="#prov-verify-anchor" onClick={(e) => { e.preventDefault(); document.getElementById('prov-verify-anchor')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>
+          <ScrollText size={12} aria-hidden="true" /> {t('prov.quick.verify')}
+        </a>
+        {nonLive.length === 0 && receiptsRes.data !== null && receiptsRes.data.length > 0 && (
+          <Badge tone="ok">{t('prov.quick.allLive', { n: receiptsRes.data.length })}</Badge>
+        )}
+      </div>
+
       <Section title={t('prov.receipts', { n: receiptsRes.data?.length ?? 0 })}>
         {receiptsRes.loading ? (
           <Skeleton lines={4} />
@@ -92,6 +116,7 @@ export function ProvenanceTab({ run, events, onMutated }: { run: ResearchRun; ev
       </Section>
 
       <Section title={t('bundle.title')}>
+        <span id="prov-verify-anchor" className="sr-only">{t('bundle.title')}</span>
         <BundleVerify bundles={bundles} fallbackIds={discovered} run={run} onMutated={onMutated} bundlesLoading={bundlesRes.loading} />
       </Section>
 
@@ -140,12 +165,48 @@ function ReceiptTotalsStrip({ receipts }: { receipts: ProvenanceReceipt[] }): JS
 function ReceiptsTable({ receipts }: { receipts: ProvenanceReceipt[] }): JSX.Element {
   const { t } = useI18n();
   const [openId, setOpenId] = useState<string | null>(null);
+  const [kindFilter, setKindFilter] = useState<'all' | ReceiptKind>('all');
   if (receipts.length === 0) return <EmptyState titleKey="prov.none" />;
 
+  const filtered = kindFilter === 'all' ? receipts : receipts.filter((r) => r.kind === kindFilter);
+  // Group by stage in arrival order (verify-panel review 2026-08-29: 120 flat
+  // rows read as a log dump; the stage IS the researcher's mental model).
+  const groups: { stage: string; label: string; rows: ProvenanceReceipt[] }[] = [];
+  for (const r of filtered) {
+    const stage = r.stage ?? 'unknown';
+    const label = STAGE_KEYS[stage] !== undefined ? t(STAGE_KEYS[stage]) : stage;
+    const last = groups[groups.length - 1];
+    if (last !== undefined && last.stage === stage) last.rows.push(r);
+    else groups.push({ stage, label, rows: [r] });
+  }
+
+  const copyHash = (hash: string): void => {
+    void navigator.clipboard.writeText(hash)
+      .then(() => toast.success(t('prov.hashCopied')))
+      .catch(() => toast.error(t('common.idCopyFailed')));
+  };
+
   return (
-    <div className="table-scroll">
+    <>
+      <div className="prov-filter" role="group" aria-label={t('prov.filterLabel')}>
+        <button type="button" className={`btn btn--sm${kindFilter === 'all' ? ' btn--primary' : ''}`} aria-pressed={kindFilter === 'all'} onClick={() => setKindFilter('all')}>
+          {t('prov.filterAll')} {receipts.length}
+        </button>
+        {(['model_call', 'source_retrieval', 'tool_exec'] as const).map((k) => (
+          <button
+            key={k}
+            type="button"
+            className={`btn btn--sm${kindFilter === k ? ' btn--primary' : ''}`}
+            aria-pressed={kindFilter === k}
+            onClick={() => setKindFilter(k)}
+          >
+            {t(receiptKindKey(k))} {receipts.filter((r) => r.kind === k).length}
+          </button>
+        ))}
+      </div>
+      <div className="table-scroll">
       <table className="data-table receipts">
-        <caption className="sr-only">{t('prov.receipts', { n: receipts.length })}</caption>
+        <caption className="sr-only">{t('prov.receipts', { n: filtered.length })}</caption>
         <thead>
           <tr>
             <th scope="col">{t('prov.col.id')}</th>
@@ -159,42 +220,61 @@ function ReceiptsTable({ receipts }: { receipts: ProvenanceReceipt[] }): JSX.Ele
             <th scope="col">{t('prov.detail')}</th>
           </tr>
         </thead>
-        <tbody>
-          {receipts.map((r) => {
-            const open = openId === r.id;
-            const hashes: string[] = [];
-            if (r.modelCall !== undefined) {
-              hashes.push(r.modelCall.requestHash, r.modelCall.outputHash);
-            } else if (r.sourceRetrieval !== undefined) {
-              hashes.push(...(r.sourceRetrieval.contentHashes ?? []));
-            } else if (r.toolExec !== undefined) {
-              hashes.push(r.toolExec.inputHash, r.toolExec.outputHash);
-            }
-            return (
-              <ReceiptRow
-                key={r.id}
-                receipt={r}
-                open={open}
-                hashSummary={hashes.length > 0 ? `${hashes[0]!.slice(0, 12)} (+${hashes.length - 1})` : '—'}
-                onToggle={() => setOpenId(open ? null : r.id)}
-              />
-            );
-          })}
-        </tbody>
+        {groups.map((g, gi) => (
+          <tbody key={`${g.stage}-${gi}`}>
+            <tr className="receipt-group-row">
+              <th scope="rowgroup" colSpan={9}>
+                <span className="receipt-group-label">{g.label}</span>
+                <span className="muted small"> {g.rows.length}</span>
+              </th>
+            </tr>
+            {g.rows.map((r) => {
+              const open = openId === r.id;
+              const hashes: string[] = [];
+              if (r.modelCall !== undefined) {
+                hashes.push(r.modelCall.requestHash, r.modelCall.outputHash);
+              } else if (r.sourceRetrieval !== undefined) {
+                hashes.push(...(r.sourceRetrieval.contentHashes ?? []));
+              } else if (r.toolExec !== undefined) {
+                hashes.push(r.toolExec.inputHash, r.toolExec.outputHash);
+              }
+              const firstHash = hashes[0];
+              return (
+                <ReceiptRow
+                  key={r.id}
+                  receipt={r}
+                  open={open}
+                  hashNode={firstHash === undefined ? <span className="mono hash-cell">—</span> : (
+                    <button
+                      type="button"
+                      className="mono hash-cell hash-copy"
+                      title={t('prov.hashTitle', { all: hashes.join('\n') })}
+                      onClick={() => copyHash(firstHash)}
+                    >
+                      {firstHash.slice(0, 12)}{hashes.length > 1 ? ` (+${hashes.length - 1})` : ''}
+                    </button>
+                  )}
+                  onToggle={() => setOpenId(open ? null : r.id)}
+                />
+              );
+            })}
+          </tbody>
+        ))}
       </table>
-    </div>
+      </div>
+    </>
   );
 }
 
 function ReceiptRow({
   receipt,
   open,
-  hashSummary,
+  hashNode,
   onToggle,
 }: {
   receipt: ProvenanceReceipt;
   open: boolean;
-  hashSummary: string;
+  hashNode: JSX.Element;
   onToggle: () => void;
 }): JSX.Element {
   const { t } = useI18n();
@@ -222,7 +302,7 @@ function ReceiptRow({
           {r.modelCall !== undefined ? `${r.modelCall.provider}/${r.modelCall.modelId}` : r.sourceRetrieval !== undefined ? r.sourceRetrieval.family : r.toolExec !== undefined ? r.toolExec.tool : '—'}
         </td>
         <td className="mono">{r.modelCall?.latencyMs !== undefined ? `${r.modelCall.latencyMs}ms` : r.toolExec?.durationMs !== undefined ? `${r.toolExec.durationMs}ms` : '—'}</td>
-        <td className="mono hash-cell">{hashSummary}</td>
+        <td>{hashNode}</td>
         <td><TimeText iso={r.at} /></td>
         <td>
           <button type="button" className="link-button" aria-expanded={open} onClick={onToggle}>
