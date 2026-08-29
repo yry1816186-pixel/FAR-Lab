@@ -6,8 +6,8 @@ name: surgery
 # scripts/surgery/ — fail-loud anchors, idempotent re-runs, no shell inputs.
 # Scoped to converge/** branches only (never pull_request) so untrusted
 # patches cannot ride this workflow. The diagnose job gives the remote work
-# surface a read channel for verification output (typecheck/lint/targeted
-# tests) that otherwise lives only in logs it cannot fetch.
+# surface a read channel for verification output that otherwise lives only in
+# logs it cannot fetch.
 on:
   push:
     branches: ['converge/**']
@@ -54,6 +54,11 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Install python deps for the experiment sidecar
+        run: pip install numpy --quiet
       - name: Install root dependencies
         run: npm ci
       - name: Install web dependencies (root suite imports web/src)
@@ -65,19 +70,19 @@ jobs:
         run: npm run typecheck 2>&1 | tee /tmp/typecheck.txt || echo "TYPECHECK_FAILED" >> /tmp/typecheck.txt
       - name: Lint
         run: npm run lint 2>&1 | tee /tmp/lint.txt || echo "LINT_FAILED" >> /tmp/lint.txt
-      - name: Targeted tests (protocol slice + regression guards)
-        run: npx vitest run tests/protocol-domain.test.ts tests/protocol-from-plan.test.ts tests/protocol-execute-stage.test.ts tests/protocol-ops.test.ts tests/iteration.test.ts tests/scientific-state.test.ts tests/real-content-mixed-route.test.ts 2>&1 | tee /tmp/vitest.txt || echo "VITEST_FAILED" >> /tmp/vitest.txt
+      - name: Full test suite (same gates as ci.yml verify)
+        run: npm test 2>&1 | tee /tmp/vitest.txt || echo "VITEST_FAILED" >> /tmp/vitest.txt
       - name: Commit diagnostics
         run: |
           git config user.name "farlab-surgery-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           mkdir -p scripts/surgery
-          { echo '===== typecheck (last 40 lines) ====='; tail -n 40 /tmp/typecheck.txt; echo; echo '===== lint (last 40 lines) ====='; tail -n 40 /tmp/lint.txt; echo; echo '===== targeted vitest (last 200 lines) ====='; tail -n 200 /tmp/vitest.txt; } > scripts/surgery/diag.txt
+          { echo '===== typecheck (last 30 lines) ====='; tail -n 30 /tmp/typecheck.txt; echo; echo '===== lint (last 30 lines) ====='; tail -n 30 /tmp/lint.txt; echo; echo '===== FULL vitest (last 400 lines) ====='; tail -n 400 /tmp/vitest.txt; } > scripts/surgery/diag.txt
           git add scripts/surgery/diag.txt
           if git diff --cached --quiet; then
             echo "no diagnostics change"
           else
             git pull --rebase || true
-            git commit -m "chore(surgery): diagnostics snapshot"
+            git commit -m "chore(surgery): diagnostics snapshot (full suite)"
             git push
           fi
