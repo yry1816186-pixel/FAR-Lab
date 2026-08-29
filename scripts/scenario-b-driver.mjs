@@ -42,22 +42,34 @@ const db = openDb(path.join(dataDir, 'far.db'));
 const store = new Store(db);
 const artifacts = openArtifactStore(path.join(dataDir, 'artifacts'));
 
-// 1. Question + run
-const question = ResearchQuestion.parse({
-  id: newId('q'),
-  text: 'Is near-surface air temperature over the NCEP reanalysis grid learnable as a spatial-seasonal mapping (value ~ month, latitude, longitude), and does a random forest beat the mean baseline beyond paired-bootstrap uncertainty?',
-  background: 'NCEP/NCAR reanalysis daily air temperature, 2013 (xarray tutorial dataset air_temperature.nc).',
-  goalType: 'methodological',
-  scope: { domain: 'climate science', phenomena: ['near-surface air temperature'] },
-  constraints: { assumptions: [] },
-  createdAt: new Date().toISOString(),
-});
-store.putObject('question', question);
-const run = store.createRun(question);
-console.log(`run: ${run.id}`);
+// 1. Question + run — SCENARIO_B_RUN_ID bridges this data leg into an existing
+// literature run (one study, two legs); absent = fresh operator run.
+const reuseRunId = process.env.SCENARIO_B_RUN_ID;
+let runId;
+const questionText = 'Is near-surface air temperature over the NCEP reanalysis grid learnable as a spatial-seasonal mapping (value ~ month, latitude, longitude), and does a random forest beat the mean baseline beyond paired-bootstrap uncertainty?';
+if (reuseRunId !== undefined) {
+  const existing = store.getRun(reuseRunId);
+  if (existing === null) throw new Error(`SCENARIO_B_RUN_ID ${reuseRunId} not found in ${dataDir}`);
+  runId = existing.id;
+  console.log(`run (reused): ${runId}`);
+} else {
+  const question = ResearchQuestion.parse({
+    id: newId('q'),
+    text: 'Is near-surface air temperature over the NCEP reanalysis grid learnable as a spatial-seasonal mapping (value ~ month, latitude, longitude), and does a random forest beat the mean baseline beyond paired-bootstrap uncertainty?',
+    background: 'NCEP/NCAR reanalysis daily air temperature, 2013 (xarray tutorial dataset air_temperature.nc).',
+    goalType: 'methodological',
+    scope: { domain: 'climate science', phenomena: ['near-surface air temperature'] },
+    constraints: { assumptions: [] },
+    createdAt: new Date().toISOString(),
+  });
+  store.putObject('question', question);
+  const run = store.createRun(question);
+  runId = run.id;
+  console.log(`run: ${run.id}`);
+}
 
 // 2. Raw acquisition + QC + derived features
-const raw = await acquireNetcdfDataset(store, artifacts, run.id, ncPath, 'air', { license: 'public domain (NCEP/NCAR reanalysis via xarray-data)' });
+const raw = await acquireNetcdfDataset(store, artifacts, runId, ncPath, 'air', { license: 'public domain (NCEP/NCAR reanalysis via xarray-data)' });
 const { record: derived } = await extractNetcdfFeatures(store, artifacts, raw, 'monthly_mean_per_gridpoint', {
   maxRows: 60000,
   materializeDir: path.join(dataDir, 'derived'),
@@ -68,10 +80,10 @@ console.log(`derived dataset_record: ${derived.id} -> ${derived.source.path} (${
 const sha = createHash('sha256').update(fs.readFileSync(derived.source.path)).digest('hex');
 const spec = ExperimentSpec.parse({
   id: newId('xsp'),
-  runId: run.id,
+  runId,
   planId: newId('pln'),
   planStepId: newId('task'),
-  question: question.text.slice(0, 500),
+  question: (store.getObject('question', store.getRun(runId).questionId)?.text ?? questionText).slice(0, 500),
   datasets: [{
     source: { resolver: 'local', path: derived.source.path, sha256Expected: sha },
     targetColumn: 'value',
@@ -116,3 +128,5 @@ for (const rep of executed.statReports) {
 }
 db.close();
 console.log('scenario-b: chain complete.');
+
+
