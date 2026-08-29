@@ -1,0 +1,36 @@
+{
+  "items": [
+    {
+      "id": "B-QWEN-LIVE-ROUTE",
+      "status": "OPEN",
+      "critical": true,
+      "reason": "Competition-mandated Qwen-via-Bailian/DashScope receipted live route does not exist: needs user-provided credential. DeepSeek-era live evidence superseded (DeepSeek banned project-side). No fabrication allowed; live-API policy forbids spending any key 'to feel sure'. [2026-08-27 window: Qwen-via-Bailian route contract tests green at 42452c9 + CI verify/web-e2e both SUCCESS; engineering side fully ready — only the credential run remains.]",
+      "owner": "user (credential) + model-plane (route already implemented and contract-tested)",
+      "openedAt": "2026-08-24",
+      "lastReviewed": "2026-08-27",
+      "userDecision": {
+        "decidedAt": "2026-08-27T06:35:00.000Z",
+        "decision": "DEFER to the 09-05 submission-logistics batch (user-selected via explicit prompt: key injection or adjudication happens alongside S-1 review / video / netdisk / registration form)",
+        "implication": "Not a waiver: ACC-02 target stays live_verified; engineering stays fully ready (route + contract tests green at 42452c9, CI verify+web-e2e SUCCESS). Next action on user key arrival or submission window."
+      }
+    },
+    {
+      "id": "B-S1-TECHNICAL-PDF",
+      "status": "DRAFTED_PENDING_USER_REVIEW",
+      "critical": false,
+      "reason": "v4 draft generated 2026-08-29 (submission/技术方案文档.md + .pdf, 6 pages <= 20 limit) from real capability evidence only: W4R current-architecture baseline comparison, honest judge recalibration 0.58->0.226, counter-evidence live metrics, real-content discipline. Stale 0.58 figure removed (disproved in-repo). USER ACTION: final review/adjudication of the draft before submission.",
+      "owner": "lane-15 drafts / user approves",
+      "openedAt": "2026-08-25",
+      "lastReviewed": "2026-08-29"
+    },
+    {
+      "id": "B-CONTROL-PLANE-REBUILT",
+      "status": "RESOLVED",
+      "critical": false,
+      "reason": "Local .control/ runtime state was lost (gitignored). Rebuilt 2026-08-26 from in-git durable evidence + this session re-run (typecheck/build/web-tsc/vitest 1968 green @8ae6c66). Recorded as resolved so the loss event stays auditable.",
+      "owner": "current mission",
+      "openedAt": "2026-08-26",
+      "resolvedAt": "2026-08-26"
+    }
+  ]
+}

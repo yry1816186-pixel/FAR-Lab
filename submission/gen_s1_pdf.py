@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """S-1 技术方案文档 PDF generator (Report route, ReportLab).
-Content mirrors submission/技术方案文档.md (v3, 2026-08-27) — the case table and
+Content mirrors submission/技术方案文档.md (v4, 2026-08-29) — the case table and
 body text are embedded here for typesetting control, so edits must be applied to
 BOTH files (known mirroring cost; audit P2 accepted for a submission artifact).
 Cover: template 01 via cover_render.py, merged as page 1 via pypdf.
@@ -77,7 +77,7 @@ def footer(canv, doc):
     canv.saveState()
     canv.setFont('Deng', 8.5)
     canv.setFillColor(TEXT_MUTED)
-    canv.drawString(ML, 12 * mm, 'FAR-Lab · XH-202619 Track 1 / Direction 1 / A · 技术方案文档 v3')
+    canv.drawString(ML, 12 * mm, 'FAR-Lab · XH-202619 Track 1 / Direction 1 / A · 技术方案文档 v4')
     canv.drawRightString(PAGE_W - MR, 12 * mm, '第 %d 页' % canv.getPageNumber())
     canv.setStrokeColor(BORDER)
     canv.setLineWidth(0.4)
@@ -188,6 +188,8 @@ case_tbl.setStyle(TableStyle(tstyle))
 case_tbl.hAlign = 'CENTER'
 story.append(case_tbl)
 story.append(Spacer(1, 5))
+story.append(P('<b>案例 H — 现架构与强基线的公平对比（W4R，2026-08-29，全部 live/真实检索）</b>：FAR-Lab（zai glm-4.6 live）6/6 完成：来源核验 72/72=100%、主张-来源绑定 170/170=100%、结构化反证 6/6（104 条反证关系）、计划可执行 6/6；baseline-direct（glm-5.3）引用不受支持率 78.9%、结构化反证 0；baseline-rag（同模型+EuropePMC top-5）引用全部可解析但无主张模型、可执行计划 0/6。协议偏离如实披露且均不利于己方（evidence/W4R/evaluation-report.md）。'))
+story.append(P('<b>案例 I — 判官诚实重校</b>：重发现原报 0.58 经对照实验证伪（判官宽松伪影）；157 对 gold 零误差重校后复测 0.226，全程如实入账（evidence/W-EV2/rediscovery.md）。系统不通过改指标恢复数字。'))
 story.append(callout([Paragraph('<b>工作区累计真值（2026-08-26 读数）</b>：85+ 个研究运行（52 个完整完成）· 模型调用收据 2951 张 · 累计 931 万 token（三路由真实账本）· 全量确定性测试 2000+ 通过 / 195+ 测试文件 · CI 于真实 GitHub runner 验证绿（run 32983787357），其后提交本地同套门禁全绿（远端重跑受平台 runner 配给故障延迟）。', S_CARD)]))
 
 # ============ 4 ============
@@ -210,11 +212,12 @@ story.append(P('<b>受治理记忆</b>：终态运行确定性投影为情景记
 
 # ============ 7 ============
 story.append(H1('7. 数据或资料来源说明'))
-story.append(P('文献证据全部来自真实检索源：OpenAlex、arXiv、CrossRef、EuropePMC（+全文阶段：arXiv LaTeXML / OpenAlex GROBID TEI）。每个来源保存不可变快照（内容寻址 artifact + 可解析溯源），主张-来源绑定逐字可验证；统计实验数据来自 OpenML 真实数据集（校验和/许可/谱系持久化，种子可复现切分）。评测基准：MLR-Bench、POPPER 式重发现（5 任务，mean F1 0.58，2/5 完美重发现，评判步方差 ±0.5 task-F1 如实披露）、裁判方差研究（worstTaskSwing 0.061 < 0.15 目标）。'))
+story.append(P('文献证据全部来自真实检索源：OpenAlex、arXiv、CrossRef、EuropePMC（+全文阶段：arXiv LaTeXML / OpenAlex GROBID TEI）。每个来源保存不可变快照（内容寻址 artifact + 可解析溯源），主张-来源绑定逐字可验证；统计实验数据来自 OpenML 真实数据集（校验和/许可/谱系持久化，种子可复现切分）。评测基准：MLR-Bench；W4R 现架构基线对比（案例 H）；POPPER 式重发现（判官 gold 锁定重校后 mean F1 0.226，判官方差 4/5 任务 swing ≤0.045、gold 精度 0.826 实测；历史 0.58 已证伪留档）；裁判方差研究（worstTaskSwing 0.061 < 0.15 目标）。'))
 
 # ============ 8 ============
 story.append(H1('8. 结果展示与反馈迭代过程'))
 story.append(P('<b>量化进步（同裁判前后对比）</b>：主张数 +40%（58→81）、反向证据关系 +104%（均值 16→32.67）、token 成本 +84.5% 如实记录；单维不宣称全域优势（18 个质量格中 6 格落后于最佳基线，如实列出）。'))
+story.append(P('<b>反证能力（live 实测）</b>：方向锚定证伪审计 A/B strict 0.625→0.875、反向标签 inverted 9→3；两题合并 strict 0.867（n=30）。'))
 story.append(P('<b>反馈迭代的三条真实路径</b>：① 结构化专家反馈→因果修订（含真实的克隆混杂批评案例）；② 研究者直接编辑→同一因果链；③ 实验判决→FeedbackSignal→修正→再实验（迭代控制器有界级联）。'))
 story.append(P('<b>自我纠错的诚实记录</b>：对抗审计曾抓到再生成死代码 P0（已修+真实阶段回归锁）、探索沙箱 dunder 逃逸 P1（双层封禁+回归测试）、关系标签 30% 错误率（根因修复后 live 复测 0/21）——所有被抓住的缺陷及其修复都是系统能力的一部分，而非需要隐藏的污点。2026-08-26 的离线浏览器旅程延续同一纪律：一次旅程发现并修复离线预设半成品表单、前端 wire 枚举契约漂移（保存成功却报结构不符）、阶段计数口径混淆三个真实缺陷。'))
 story.append(P('<b>已知边界</b>：官方路线凭证待补；多轮真实工作区运行与 live 对比基准等待 live 路由恢复（2026-08-29 后或用户提供新路由）；领域包（天文/生物/化学等）当前为通用科研核心 + 待扩展域语义。'))
