@@ -453,8 +453,12 @@ def op_identity_check(payload: dict[str, Any]) -> dict[str, Any]:
     fin = residual[finite]
     worst = int(np.argmax(np.where(finite, residual, -np.inf)))  # non-finite points never win the max
     worst_point = {v["name"]: float(mesh[i].flat[worst]) for i, v in enumerate(variables)}
-    worst_point["lhs"] = float(lhs.flat[worst])
-    worst_point["rhs"] = float(rhs.flat[worst])
+    # A constant operand (e.g. rhs "1") is 0-d; broadcast to the residual shape
+    # before indexing with the flattened worst point.
+    lhs_full = np.broadcast_to(lhs, residual.shape)
+    rhs_full = np.broadcast_to(rhs, residual.shape)
+    worst_point["lhs"] = float(lhs_full.flat[worst])
+    worst_point["rhs"] = float(rhs_full.flat[worst])
     return {
         "maxAbsResidual": float(fin.max()),
         "meanAbsResidual": float(fin.mean()),

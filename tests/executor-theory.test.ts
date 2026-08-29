@@ -200,18 +200,19 @@ describe('theory executor (deterministic doubles, real store)', () => {
     expect(store.listObjects('experiment_run', runId).filter((r) => r.status === 'completed')).toHaveLength(0);
   });
 
-  it('the lexical admission gate rejects free identifiers outside the grid', async () => {
-    const { store, runId, artifacts } = makeEnv();
-    const spec = makeSpec(runId, {
-      claims: [{
-        id: 'claim_1', label: 'uses an undeclared variable',
-        lhs: 'x + y', rhs: 'x',
-        tolerance: 1e-6, thresholdProvenance: 'model-stipulated', primary: true,
-      }],
-    });
-    await expect(
-      executeTheoryAnalysis(store, artifacts, spec, { sidecar: () => fakeSidecar([]), now: () => T0 }),
-    ).rejects.toThrow(/identifier 'y'/);
+  it('the lexical admission gate rejects free identifiers outside the grid', () => {
+    const { runId } = makeEnv();
+    // The admission gate lives in the TheorySpec schema itself (fail-closed at
+    // parse time), so the refusal fires when the spec is built, not in the executor.
+    expect(() =>
+      makeSpec(runId, {
+        claims: [{
+          id: 'claim_1', label: 'uses an undeclared variable',
+          lhs: 'x + y', rhs: 'x',
+          tolerance: 1e-6, thresholdProvenance: 'model-stipulated', primary: true,
+        }],
+      }),
+    ).toThrow(/identifier 'y'/);
   });
 });
 
