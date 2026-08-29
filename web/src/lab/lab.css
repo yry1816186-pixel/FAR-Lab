@@ -246,6 +246,13 @@
 .lab-status--partial, .lab-status--paused { color: var(--v2-warn, #8a6d1a); border-color: color-mix(in oklab, var(--v2-warn, #b8860b) 40%, var(--v2-border)); }
 .lab-status--failed { color: var(--v2-refuted); border-color: color-mix(in oklab, var(--v2-refuted) 40%, var(--v2-border)); }
 .lab-status--completed { color: var(--v2-verified); border-color: color-mix(in oklab, var(--v2-verified) 40%, var(--v2-border)); }
+/* Scientific-attention chip: execution completed but the study's next action
+   is a researcher decision (e.g. unresolved counter-evidence). */
+.lab-status--decision {
+  color: var(--v2-caution);
+  border-color: color-mix(in oklab, var(--v2-caution) 40%, var(--v2-border));
+  background: var(--v2-caution-tint);
+}
 .lab-select {
   font-size: 12.5px; padding: 3px 6px; border-radius: 6px;
   border: 1px solid var(--v2-border); background: var(--v2-surface);
@@ -665,6 +672,21 @@
   font-weight: 600;
   max-width: 70ch;
 }
+/* 3-second summary strip: confidence + counter status directly under the
+   conclusion statement (previously 876px down the band). */
+.ss-line--summary {
+  font-size: 12.5px; color: var(--v2-text-2);
+  padding: 4px 0 0;
+  border-top: 1px solid var(--v2-border);
+  margin-top: 4px;
+}
+/* Inspector source attribution: document title + year + DOI link ride each
+   locator quote — verifiable at the source, one click. */
+.insp-source { margin: 10px 0; }
+.insp-source .insp-quote { margin: 0; }
+.insp-source-meta { margin: 4px 0 0; font-size: 11.5px; color: var(--v2-text-3); line-height: 1.5; }
+.insp-source-meta a { color: var(--v2-info); }
+.insp-source-title { color: var(--v2-text-2); }
 .ss-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px 18px; }
 .ss-k { font-size: 11px; letter-spacing: 0.07em; color: var(--v2-text-3); margin-bottom: 3px; }
 .ss-why { display: grid; gap: 1px; margin-bottom: 6px; }

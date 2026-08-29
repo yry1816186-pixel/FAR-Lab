@@ -4,6 +4,16 @@ import { Download, FileText, PackageOpen, RefreshCw, ScrollText } from 'lucide-r
 import { ApiError, isNotFound, withTimeout } from '../../api/client';
 import { getBundles, getEvidence, getHypotheses, getPaper, getReceipts, getReport, reexportRun, verifyBundle } from '../../api/endpoints';
 import type { ProvenanceReceipt, ResearchRun, VerificationReport } from '../../api/types';
+
+/** Receipt stage values in practice: the 12 RunStageName values or 'agent:*'
+ * kernel stages (those render raw, honestly — they name a capability, not a
+ * pipeline stage a researcher knows). */
+const STAGE_KEYS: Record<string, ReturnType<typeof stageKey>> = {
+  scope: stageKey('scope'), retrieve: stageKey('retrieve'), verify_sources: stageKey('verify_sources'),
+  build_evidence: stageKey('build_evidence'), generate_hypotheses: stageKey('generate_hypotheses'),
+  critique_falsify: stageKey('critique_falsify'), rank: stageKey('rank'), plan: stageKey('plan'),
+  execute: stageKey('execute'), feedback: stageKey('feedback'), revise: stageKey('revise'), export: stageKey('export'),
+};
 import { isSettled } from '../../api/types';
 import { useResource } from '../../hooks/useResource';
 import { aggregateReceipts, formatTokens } from '../../viz/cross-viz';
@@ -202,7 +212,12 @@ function ReceiptRow({
         <td>
           <Badge tone={r.executionMode === 'live' ? 'ok' : 'warn'}>{t(executionModeKey(r.executionMode))}</Badge>
         </td>
-        <td className="mono">{r.stage ?? '—'}</td>
+        <td
+          className="mono"
+          title={r.stage ?? undefined}
+        >
+          {(() => { const k = r.stage !== undefined ? STAGE_KEYS[r.stage] : undefined; return k !== undefined ? t(k) : (r.stage ?? '—'); })()}
+        </td>
         <td className="mono small">
           {r.modelCall !== undefined ? `${r.modelCall.provider}/${r.modelCall.modelId}` : r.sourceRetrieval !== undefined ? r.sourceRetrieval.family : r.toolExec !== undefined ? r.toolExec.tool : '—'}
         </td>

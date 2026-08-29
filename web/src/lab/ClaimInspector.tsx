@@ -7,8 +7,8 @@ import {
   annotateClaim, connectClaim, excludeClaim, pinClaim, reinstateClaim, reclassifyClaim, unpinClaim,
   type ClaimClassification,
 } from '../api/endpoints';
-import type { HypothesisCandidate, ResearchRun, ScientificClaim } from '../api/types';
-import { zhFirst } from './bilingual';
+import type { HypothesisCandidate, ResearchRun, ScientificClaim, SourceDocument } from '../api/types';
+import { zhFirst, decodeEntities } from './bilingual';
 
 /**
  * Claim side of the study-map inspector — the §15 researcher judgement
@@ -17,11 +17,14 @@ import { zhFirst } from './bilingual';
  * real claim-ops contract; exclusion silently reorders NOTHING — the
  * adjusted ACH projection band on the map discloses its effect.
  */
-export function ClaimInspector({ claim, run, hyps, balances, busy, op, onError }: {
+export function ClaimInspector({ claim, run, hyps, balances, sourceById, busy, op, onError }: {
   claim: ScientificClaim;
   run: ResearchRun;
   hyps: HypothesisCandidate[];
   balances: Map<string, { supports: number; counters: number }>;
+  /** Source lookup: the inspector renders each locator's DOCUMENT (title,
+   *  year, DOI link) so the quote is verifiable at the source. */
+  sourceById: Map<string, SourceDocument>;
   busy: boolean;
   op: (act: () => Promise<unknown>) => Promise<void>;
   onError: (e: ApiError | null) => void;
@@ -48,9 +51,28 @@ export function ClaimInspector({ claim, run, hyps, balances, busy, op, onError }
     <>
       <h3>{t('map.inspClaim')}</h3>
       <p className="insp-body">{claim.text}</p>
-      {claim.locators.slice(0, 2).map((loc, i) => (
-        <blockquote key={i} className="insp-quote">“{loc.quote}”</blockquote>
-      ))}
+      {claim.locators.slice(0, 2).map((loc, i) => {
+        const src = sourceById.get(loc.sourceDocumentId);
+        const doi = src?.identifiers.find((id) => id.kind === 'doi')?.value;
+        return (
+          <div key={i} className="insp-source">
+            <blockquote className="insp-quote">“{loc.quote}”</blockquote>
+            {src !== undefined && (
+              <p className="insp-source-meta">
+                {t('map.inspSourcePrefix')}
+                <span className="insp-source-title" title={decodeEntities(src.title)}>{decodeEntities(src.title)}</span>
+                {src.publicationYear !== undefined && ` · ${src.publicationYear}`}
+                {doi !== undefined && (
+                  <>
+                    {' · '}
+                    <a href={`https://doi.org/${doi}`} target="_blank" rel="noreferrer">DOI {doi}</a>
+                  </>
+                )}
+              </p>
+            )}
+          </div>
+        );
+      })}
       <p className="insp-meta">
         {t('map.inspBinding', { status: claim.bindingStatus })}
         {claim.gradeCertainty !== undefined && t('map.inspCertainty', { n: claim.gradeCertainty })}

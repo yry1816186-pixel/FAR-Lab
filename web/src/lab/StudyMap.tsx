@@ -56,6 +56,17 @@ const ellipsize = (text: string, max: number): string => {
 const stripArchiveHash = (s: string): string => s.replace(/\s*\(archived full object: sha256:[0-9a-f]+…?\)/g, '');
 
 /**
+ * Model rationales sometimes cite internal claim ids verbatim ("...(clm_hhdevz…)") —
+ * live-observed on the real run 2026-08-29. Display-layer substitution to a
+ * researcher-language reference; the raw id rides the hover title.
+ */
+const claimIdRef = /[(（]?clm_[a-z0-9]{8,}[)）]?/g;
+const stripClaimIds = (s: string, ref: string): { text: string; raw: string | null } => {
+  const raw = claimIdRef.test(s) ? s.match(claimIdRef)?.join(', ') ?? null : null;
+  return { text: s.replace(claimIdRef, ref), raw };
+};
+
+/**
  * Stored revision labels are id-based ("hyp_p10bkqa…@v1") — audit-canonical but
  * engineering-object leakage when shown verbatim. Render the OBJECT KIND with
  * the version marker; the raw label stays reachable on hover (title).
@@ -280,6 +291,12 @@ export function StudyMap({
         <a className="lab-crumb" href="#/">{t('map.backHome')}</a>
         <span className="lab-title">{t('map.title')}</span>
         <span className={`lab-status lab-status--${run.status}`}>{t(runStatusKey(run.status))}</span>
+        {/* Execution status ≠ scientific status (real-run review 2026-08-29):
+            a COMPLETED run whose leading action awaits the researcher says so
+            right here — "已完成" alone understated the open counter-evidence. */}
+        {science?.nextActions[0]?.researcherDecisionRequired === true && (
+          <span className="lab-status lab-status--decision" title={science.nextActions[0].objective}>{t('map.pendingDecision')}</span>
+        )}
         {truth !== null && truth.klass !== 'live' && truth.klass !== 'empty' && (
           <span className={`lab-status lab-truth--${truth.klass}`} title={t('map.truthHint', { n: truth.totalReceipts })}>
             {t('map.truthBadge')}
@@ -538,6 +555,7 @@ export function StudyMap({
                     </button>
                   );
                 })}
+                {activeHyps.length > 6 && <p className="queue-empty">{t('map.moreHyps', { n: activeHyps.length - 6 })}</p>}
               </div>
             )}
         </section>
@@ -572,6 +590,7 @@ export function StudyMap({
                 liveClaim={live}
                 hyps={hyps}
                 balances={balances}
+                sourceById={sourceById}
                 onClose={() => setInsp(null)}
                 onMutated={() => { onMutated(); loadScience(run.id); }}
               />
@@ -587,6 +606,7 @@ export function StudyMap({
                 liveHyp={live}
                 hyps={hyps}
                 balances={balances}
+                sourceById={sourceById}
                 onClose={() => setInsp(null)}
                 onMutated={() => { onMutated(); loadScience(run.id); }}
               />
@@ -680,7 +700,7 @@ function PartialBand({ run, claims, hyps, cancelled, onResume, busy }: {
 }
 
 /** Object inspector — where scientific decisions are made, not just viewed. */
-function Inspector({ insp, run, liveClaim, liveHyp, hyps, balances, onClose, onMutated }: {
+function Inspector({ insp, run, liveClaim, liveHyp, hyps, balances, sourceById, onClose, onMutated }: {
   insp: Insp;
   run: ResearchRun;
   /** Live (post-op) object for the inspected id; the parent guarantees presence. */
@@ -688,6 +708,8 @@ function Inspector({ insp, run, liveClaim, liveHyp, hyps, balances, onClose, onM
   liveHyp?: HypothesisCandidate;
   hyps: HypothesisCandidate[];
   balances: Map<string, { supports: number; counters: number }>;
+  /** Source lookup for the claim inspector's provenance lines (DOI links). */
+  sourceById: Map<string, SourceDocument>;
   onClose: () => void;
   onMutated: () => void;
 }): JSX.Element {
@@ -730,6 +752,7 @@ function Inspector({ insp, run, liveClaim, liveHyp, hyps, balances, onClose, onM
             run={run}
             hyps={hyps}
             balances={balances}
+            sourceById={sourceById}
             busy={busy}
             op={op}
             onError={setOpError}
@@ -833,7 +856,7 @@ function StateBand({ run, science, onResume, onDispatch, dispatchError, busy }: 
     const u = s.biggestUnknown;
     if (u === null) return null;
     switch (u.kind) {
-      case 'unresolved_counter': return t('map.unknown.unresolvedCounter', { excerpt: u.excerpt });
+      case 'unresolved_counter': return t('map.unknown.unresolvedCounter', { excerpt: stripClaimIds(u.excerpt, t('map.claimRef')).text });
       case 'hyp_uncertainty': return t('map.unknown.hypUncertainty', { text: u.text });
       case 'searched_no_counter': return t('map.unknown.searchedNoCounter', { n: u.queriesAttempted });
       case 'template_content': return t('map.unknown.templateContent');
@@ -880,7 +903,20 @@ function StateBand({ run, science, onResume, onDispatch, dispatchError, busy }: 
         </div>
       ) : (
         <div className="map-state">
-          {s.leading !== null && <p className="ss-leader">{zhFirst(s.leading.statement, s.leading.statementZh, lang)}</p>}
+          {s.leading !== null && (
+            <>
+              <p className="ss-leader">{zhFirst(s.leading.statement, s.leading.statementZh, lang)}</p>
+              {/* 3-second summary strip (real-run review 2026-08-29): confidence
+                  used to sit 876px down a 1116px band — the conclusion's second
+                  most important fact. It rides directly under the statement now;
+                  the full grid still explains it below. */}
+              <p className="ss-line ss-line--summary">
+                {t('map.stateConfidence', { level: t(`map.qual.${s.confidence.qualitative}` as DictKey) })}
+                {s.strongestCounter !== null && ` · ${t('map.stateCounterShort')}`}
+                {s.counters.searchedAndFoundNone !== null && ` · ${t('map.stateCounterNoneShort', { n: s.counters.searchedAndFoundNone.queriesAttempted })}`}
+              </p>
+            </>
+          )}
           <div className="ss-grid">
             <div className="ss-cell">
               <p className="ss-k">{t('map.stateWhy')}</p>
@@ -888,7 +924,7 @@ function StateBand({ run, science, onResume, onDispatch, dispatchError, busy }: 
                 ? s.leading.whyItLeads.map((d) => (
                   <p key={`${d.dimension}-${d.rationale}`} className="ss-why">
                     <span className={`ss-dim ss-dim--${d.qualitative ?? 'n'}`}>{dimensionLabel(d.dimension, t)}{d.qualitative !== null ? ` · ${t(`map.qual.${d.qualitative}` as DictKey)}` : ''}</span>
-                    <span className="ss-why-text">{d.rationale}</span>
+                    <span className="ss-why-text" title={stripArchiveHash(d.rationale)}>{stripClaimIds(stripArchiveHash(d.rationale), t('map.claimRef')).text}</span>
                   </p>
                 ))
                 : <p className="ss-why">{t('map.stateWhyEmpty')}</p>}
@@ -912,7 +948,6 @@ function StateBand({ run, science, onResume, onDispatch, dispatchError, busy }: 
               {unknownText !== null && <p className="ss-evidence">{unknownText}</p>}
             </div>
           </div>
-          <p className="ss-line">{t('map.stateConfidence', { level: t(`map.qual.${s.confidence.qualitative}` as DictKey) })}</p>
           {s.confidence.factors.length > 0 && (
             <details className="ss-factors">
               <summary>{t('map.stateConfidenceFactors')}</summary>
@@ -929,7 +964,7 @@ function StateBand({ run, science, onResume, onDispatch, dispatchError, busy }: 
             sep: t(`map.order.sep.${s.ordering.topSeparation}` as DictKey),
             tau: s.ordering.agreement !== null ? s.ordering.agreement.toFixed(2) : '—',
           })}</p>
-          {leaderFalsifier !== null && <p className="ss-line">{t('map.stateFalsifier', { text: leaderFalsifier.condition })}</p>}
+          {leaderFalsifier !== null && <p className="ss-line" title={leaderFalsifier.condition}>{t('map.stateFalsifier', { text: stripClaimIds(leaderFalsifier.condition, t('map.claimRef')).text })}</p>}
           {s.competing.length > 0 && (
             <p className="ss-line">
               {s.competing.map((c) => (
@@ -1015,7 +1050,7 @@ function StateBand({ run, science, onResume, onDispatch, dispatchError, busy }: 
                     : op.reason}
                 </p>
               ))}
-              <p className="md-line"><span className="ss-k">{t('map.deltaWhy')}</span>{d.explanation}</p>
+              <p className="md-line" title={d.explanation}><span className="ss-k">{t('map.deltaWhy')}</span>{stripClaimIds(d.explanation, t('map.claimRef')).text}</p>
             </div>
           ))}
           {science.deltas.length > 2 && <p className="md-more">+{science.deltas.length - 2}</p>}
