@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { ApiError } from '../api/client';
-import { ErrorBox } from '../components/common';
+import { Badge, ErrorBox } from '../components/common';
 import { useI18n } from '../i18n/LanguageContext';
 import type { DictKey } from '../i18n/dict';
 import {
@@ -456,7 +456,8 @@ export function StudyMap({
         )}
         {!draftable && (
           <>
-        {settled && science !== null && (
+        {settled && science !== null && (<>
+          <ProblemModelBand science={science} />
           <StateBand
             run={run}
             science={science}
@@ -465,7 +466,7 @@ export function StudyMap({
             dispatchError={dispatchError}
             busy={lifecycleBusy}
           />
-        )}
+        </>)}
         <section className="map-node">
           <p className="map-node-label">{t('map.evidenceLabel')}<span className="map-node-hint">{t('map.evidenceHint')}</span></p>
           {claims.length === 0 && !running
@@ -852,6 +853,45 @@ function Inspector({ insp, run, liveClaim, liveHyp, hyps, balances, sourceById, 
   );
 }
 
+function ProblemModelBand({ science }: { science: ScienceBundle }): JSX.Element | null {
+  const { t } = useI18n();
+  const pm = science.problemModel;
+  if (pm === null) return null;
+  const sel = (objId: string): string[] =>
+    pm.methodSelections.find((s) => s.forObjectiveId === objId)?.selectedFamilies ?? [];
+  return (
+    <section className="map-node">
+      <p className="map-node-label">{t('map.pm.title')}<span className="map-node-hint">{t('map.pm.hint')}</span></p>
+      <p className="small">
+        <Badge tone="muted">{pm.problemClass}</Badge>{' '}
+        {t('map.pm.variables', { n: pm.variables.length })} · {t('map.pm.stop', { n: pm.stopConditions.length })}
+      </p>
+      <ul className="pm-objectives">
+        {pm.objectives.map((o) => {
+          const families = sel(o.id);
+          const undecided = pm.methodSelections.find((s) => s.forObjectiveId === o.id)?.undecidedReason ?? null;
+          return (
+            <li key={o.id}>
+              <span>{o.statement}</span>{' '}
+              {families.length > 0
+                ? <Badge tone="ok">{families.join(' / ')}</Badge>
+                : <Badge tone="muted">{t('map.pm.undecided')}</Badge>}
+              {undecided !== null && <span className="muted small"> {undecided}</span>}
+            </li>
+          );
+        })}
+      </ul>
+      {pm.unknowns.length > 0 && (
+        <p className="small">
+          <span className="muted">{t('map.pm.unknowns')}：</span>
+          {pm.unknowns.map((u) => (
+            <span key={u.statement}>{u.blocking ? '⚠ ' : ''}{u.statement}；</span>
+          ))}
+        </p>
+      )}
+    </section>
+  );
+}
 /**
  * CURRENT SCIENTIFIC STATE band (Product Spine M1-M4, 2026-08-28): the answer
  * to "这个研究现在知道什么" — leading explanation, why it leads, strongest

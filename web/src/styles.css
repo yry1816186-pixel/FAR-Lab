@@ -2652,3 +2652,7 @@ select option { color: var(--text); background: var(--surface); }
   color: var(--muted); vertical-align: baseline;
 }
 .id-copy:hover { color: var(--accent); }
+
+/* AOSSA product visibility: data-plane section in the experiments tab */
+.exp-dataplane { margin: 12px 0 18px; }
+.exp-dataplane table { margin-top: 4px; }

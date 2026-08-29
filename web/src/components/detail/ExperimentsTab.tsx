@@ -85,6 +85,38 @@ export function ExperimentsTab({ run }: { run: ResearchRun }): JSX.Element {
         />
       )}
       {reports.length > 0 && <VerdictTallyStrip reports={reports as ReportLike[]} />}
+      {/* AOSSA data plane (product visibility): acquired/derived datasets + numerical-PDE specs */}
+      {(data?.datasetRecords?.length ?? 0) > 0 && (
+        <section className="exp-dataplane">
+          <p className="muted small">{t('exp.dataplaneTitle')}</p>
+          <table className="table table--compact">
+            <thead><tr><th>{t('exp.dpName')}</th><th>{t('exp.dpFormat')}</th><th>{t('exp.dpRows')}</th><th>{t('exp.dpLineage')}</th><th>contentRef</th></tr></thead>
+            <tbody>
+            {data!.datasetRecords.map((d) => (
+              <tr key={str(d.id)}>
+                <td>{str(d.name)}</td>
+                <td>{str(d.format)}</td>
+                <td>{typeof d.nRows === 'number' ? d.nRows : '—'}</td>
+                <td>{Array.isArray(d.lineage) ? d.lineage.map((l) => str((l as Record<string, unknown>).kind)).join(' → ') : '—'}</td>
+                <td><code>{str(d.contentRef).slice(0, 19)}…</code></td>
+              </tr>
+            ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+      {(data?.femSpecs?.length ?? 0) > 0 && (
+        <section className="exp-dataplane">
+          <p className="muted small">{t('exp.femTitle')}</p>
+          {data!.femSpecs.map((f) => (
+            <p key={str(f.id)} className="small">
+              <Badge tone="muted">{str((f as Record<string, unknown>).mode)}</Badge>{' '}
+              <code>{str((f as Record<string, unknown>).manufacturedSolution)}</code>
+              {' — '}{str((f as Record<string, unknown>).question)}
+            </p>
+          ))}
+        </section>
+      )}
       {runs.map((xr) => {
         const xid = str(xr.id);
         const status = str(xr.status);

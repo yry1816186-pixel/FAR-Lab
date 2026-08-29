@@ -1294,3 +1294,7 @@ body.is-resizing-panel { cursor: row-resize; user-select: none; }
 .map-protocol-qcfail { color: var(--v2-refuted-on-tint, #c0564f); font-weight: 600; }
 .map-protocol-error { color: var(--v2-refuted-on-tint, #c0564f); font-size: 0.82rem; margin: 6px 0; }
 .map-protocol-note { font-size: 0.8rem; opacity: 0.75; }
+
+/* AOSSA problem-model band (pre-hypothesis layer) */
+.pm-objectives { margin: 8px 0 6px; padding: 0; list-style: none; }
+.pm-objectives li { margin: 4px 0; }

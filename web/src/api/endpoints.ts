@@ -158,7 +158,8 @@ export const searchAll = async (q: string, signal?: AbortSignal): Promise<Search
 export interface ExperimentEvidence {
   experimentRuns: Array<Record<string, unknown>>;
   resultSets: Array<Record<string, unknown>>;
-  statReports: Array<Record<string, unknown>>;
+  statReports: Array<Record<string, unknown>>;  femSpecs: Array<Record<string, unknown>>;
+  datasetRecords: Array<Record<string, unknown>>;
 }
 export const getExperiments = async (runId: string, signal?: AbortSignal): Promise<ExperimentEvidence> => {
   const data = (await api.getJson(`${BASE}/runs/${encodeURIComponent(runId)}/experiments`, signal)) as ExperimentEvidence;
@@ -166,6 +167,8 @@ export const getExperiments = async (runId: string, signal?: AbortSignal): Promi
     experimentRuns: Array.isArray(data?.experimentRuns) ? data.experimentRuns : [],
     resultSets: Array.isArray(data?.resultSets) ? data.resultSets : [],
     statReports: Array.isArray(data?.statReports) ? data.statReports : [],
+    femSpecs: Array.isArray(data?.femSpecs) ? data.femSpecs : [],
+    datasetRecords: Array.isArray(data?.datasetRecords) ? data.datasetRecords : [],
   };
 };
 

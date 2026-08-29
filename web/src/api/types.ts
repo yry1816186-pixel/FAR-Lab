@@ -1223,10 +1223,29 @@ export interface StateDeltaView {
   remainingUncertainties: string[];
 }
 
+/** AOSSA pre-hypothesis layer: the run's Scientific Problem Model + method selections
+ * (product visibility). Projected whole from far.db; the UI renders, never re-derives. */
+export interface ProblemModelSelectionView {
+  id: string;
+  forObjectiveId: string;
+  selectedFamilies: string[];
+  undecidedReason: string | null;
+}
+export interface ProblemModelView {
+  id: string;
+  problemClass: string;
+  objectives: Array<{ id: string; statement: string }>;
+  variables: Array<{ name: string; role: string; unit: string | null }>;
+  unknowns: Array<{ statement: string; blocking: boolean }>;
+  stopConditions: string[];
+  methodSelections: ProblemModelSelectionView[];
+}
+
 export interface ScienceBundle {
   state: ScientificStateView;
   nextActions: NextActionView[];
   deltas: StateDeltaView[];
   experimentLeg: { kind: string; executabilityPassed: boolean; reason?: string };
   unconsumedFeedbackCount: number;
+  problemModel: ProblemModelView | null;
 }

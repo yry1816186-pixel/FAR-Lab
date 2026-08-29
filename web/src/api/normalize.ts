@@ -13,7 +13,7 @@ import { ApiError } from './client';
 import type {
   AchAnalysis, AchResearcherAdjusted, EvidenceBody, EvidenceRelation, FeedbackSignal, HypothesisCandidate, HypothesisScorecard, HypothesisTournament,
   NextActionView, ProvenanceReceipt, ResearchPlan, ResearchQuestion, ResearchRun, RunEvent,
-  RunSummary, ScienceBundle, ScientificClaim, ScientificStateView, SearchResponse, SearchHit, SourceDocument, StateDeltaView, VersionDiff, Revision,
+  RunSummary, ScienceBundle, ScientificClaim, ScientificStateView, SearchResponse, SearchHit, SourceDocument, StateDeltaView, VersionDiff, Revision, ProblemModelView,
 } from './types';
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
@@ -312,6 +312,43 @@ const looksLikeAction = (v: unknown): v is NextActionView =>
 const looksLikeDelta = (v: unknown): v is StateDeltaView =>
   isRecord(v) && typeof v.id === 'string' && typeof v.toVersionLabel === 'string' && Array.isArray(v.whatChanged);
 
+/** AOSSA problem-model projection (strict but total: every field checked, missing → honest default). */
+function normalizeProblemModel(data: unknown): ProblemModelView | null {
+  if (!isRecord(data) || !isRecord(data.model)) return null;
+  const m = data.model;
+  const selections = Array.isArray(data.methodSelections) ? data.methodSelections : [];
+  const str = (v: unknown): string => (typeof v === 'string' ? v : '');
+  const strArr = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+  return {
+    id: typeof m.id === 'string' ? m.id : '',
+    problemClass: isRecord(m.formalization) && typeof m.formalization.problemClass === 'string' ? m.formalization.problemClass : 'none_stated',
+    objectives: (Array.isArray(m.objectives) ? m.objectives : []).filter(isRecord).map((o, i) => ({
+      id: typeof o.id === 'string' ? o.id : `obj${i + 1}`,
+      statement: typeof o.statement === 'string' ? o.statement : '',
+    })).filter((o) => o.statement.length > 0),
+    variables: (Array.isArray(m.variables) ? m.variables : []).filter(isRecord).map((v) => ({
+      name: typeof v.name === 'string' ? v.name : '?',
+      role: typeof v.role === 'string' ? v.role : '?',
+      unit: typeof v.unit === 'string' ? v.unit : null,
+    })),
+    unknowns: (Array.isArray(m.unknowns) ? m.unknowns : []).filter(isRecord).map((u) => ({
+      statement: typeof u.statement === 'string' ? u.statement : '',
+      blocking: u.blocking === true,
+    })).filter((u) => u.statement.length > 0),
+    stopConditions: strArr(m.stopConditions),
+    methodSelections: selections.filter(isRecord).map((s) => ({
+      id: str(s.id),
+      forObjectiveId: str(s.forObjectiveId),
+      selectedFamilies: (Array.isArray(s.candidates) ? s.candidates : [])
+        .filter(isRecord)
+        .filter((c) => c.assessment === 'selected')
+        .map((c) => str(c.family))
+        .filter((f) => f.length > 0),
+      undecidedReason: typeof s.undecidedReason === 'string' ? s.undecidedReason : null,
+    })),
+  };
+}
+
 export function normalizeScience(data: unknown): ScienceBundle {
   if (!isRecord(data)) throw schemaError('science bundle');
   const rec = data;
@@ -329,5 +366,6 @@ export function normalizeScience(data: unknown): ScienceBundle {
         }
       : { kind: 'no_plan', executabilityPassed: false },
     unconsumedFeedbackCount: typeof rec.unconsumedFeedbackCount === 'number' ? rec.unconsumedFeedbackCount : 0,
+    problemModel: normalizeProblemModel(rec.problemModel),
   };
 }

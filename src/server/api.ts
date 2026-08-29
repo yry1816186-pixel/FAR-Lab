@@ -840,8 +840,12 @@ function parseSeedSources(raw: unknown): string | {
    * achResearcherAdjusted above).
    */
   const runScience = (res: http.ServerResponse, runId: string): void => {
+    // AOSSA pre-hypothesis layer (product visibility): the run's Scientific Problem
+    // Model + method selections, projected whole — the UI renders, never re-derives.
     const run = mustGetRun(runId);
     const question = app.store.getObject('question', run.questionId);
+    const problemModel = app.store.listObjects('problem_model', runId).at(-1) ?? null;
+    const methodSelections = app.store.listObjects('method_selection', runId);
     const claims = app.store.listObjects('claim', runId);
     const relations = app.store.listObjects('evidence_relation', runId);
     const hypotheses = app.store.listObjects('hypothesis', runId);
@@ -912,6 +916,7 @@ function parseSeedSources(raw: unknown): string | {
         ...(leg.kind === 'unexecutable' ? { reason: leg.reason } : {}),
       },
       unconsumedFeedbackCount,
+      problemModel: problemModel === null ? null : { model: problemModel, methodSelections },
     });
   };
 
@@ -2593,6 +2598,8 @@ function parseSeedSources(raw: unknown): string | {
             resultSets: app.store.listObjects('result_set', runId),
             statReports: app.store.listObjects('stat_report', runId),
             experimentSpecs: app.store.listObjects('experiment_spec', runId),
+            femSpecs: app.store.listObjects('fem_spec', runId),
+            datasetRecords: app.store.listObjects('dataset_record', runId),
           });
         }
         if (leaf === 'receipts' && method === 'GET') {
