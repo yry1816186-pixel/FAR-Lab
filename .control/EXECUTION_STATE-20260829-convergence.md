@@ -358,3 +358,22 @@ Execution + Auditable Research Record）。本窗口落地：
 2. CPS-AOSSA-2：数值执行腿——sidecar 增 FEM/ODE op（收敛阶验证为 validator），
    场景 A（2D Poisson 混合边界）贯通。
 3. CPS-AOSSA-3：NetCDF/xarray 数据族 + QC + 派生版本 lineage，场景 B 前置。
+
+## 切片 2 已落地（90f8c11，main ff）
+
+问题模型下游披露：hypotheses 三策略载荷+系统提示携带 problemModel
+（objectives/variables/selectedMethods）+ 纪律句；缓存族键 rc3；plan 载荷
++ 对齐纪律句；捕获式测试锁定（36/36 + 新 disclosure 套件 2 例）。全量门禁
+220 文件 2242 passed 0 failed。依赖恢复事件：本机 root+web node_modules 被
+外部清空且无安装进程——npm ci 自恢复（root 4s / web 19s，均锁文件确定性），
+僵尸 e2e 包装进程核验（0 CPU/0 WS）后未动。
+
+## 交接（下一窗口从这里继续）
+
+1. 切片 3 = CPS-AOSSA-2 数值腿：sidecar 新 op（FEM 2D Poisson 混合边界 +
+   自适应加密 + L2/H1 误差 + 收敛阶 vs 解析解），executor 仿 theory/simulation
+   模式（预注册 spec + 机械裁决），场景 A 全链。参考：SimulationSpec CRN 执行器
+   已存在（executor-simulation.ts）；theory.ts 的预注册纪律可直接移植。
+2. explore-runtime / explore-web 两测绘 agent 受配额限流未回（8-31 21:01 重置）；
+   explore-backend 已交付并折入盘点文档。
+3. StudyMap 问题模型带（UI）未做——数值腿落地后一并（那时有真实内容可显示）。
