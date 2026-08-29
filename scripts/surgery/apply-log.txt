@@ -5,4 +5,6 @@
 [surgery:protocol-export] paper-outline.ts already carries the protocol category — nothing to do
 [surgery:protocol-export] package.ts already writes protocol files — nothing to do
 [surgery:protocol-export] all edits done
+===== node scripts/surgery/apply-protocol-export-fix.mjs =====
+[surgery:protocol-export-fix] declaration block already sits above the limitations array — nothing to do
 APPLY_RC=0
