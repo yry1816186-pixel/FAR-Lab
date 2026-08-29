@@ -251,4 +251,61 @@ describe('real-content discipline: mixed route (product run on the offline wire 
     const out = await rankStage.execute(makeCtx(store, run, offlineProvider(), true));
     expect(out.kind === 'skipped' && out.reason.startsWith(TEMPLATE_REFUSAL_REASON)).toBe(true);
   });
+
+  it('control: plan under a LIVE receipt passes the guard and mints (live-control parity)', async () => {
+    const { store, run, hyp } = setup();
+    const step = (id: string, title: string, deps: string[] = []) => ({
+      id, title, kind: 'data_analysis', inputs: [], outputs: [`${title} out`], method: 'fixture method', failureConditions: [], dependsOn: deps,
+    });
+    const draft = {
+      objective: 'Discriminate the redistribution-impedance pathway against interface-degradation alternatives',
+      hypothesisIds: [hyp.id],
+      variables: ['impedance growth rate', 'anion redistribution index'],
+      controls: ['inert-additive control cells'],
+      inclusionCriteria: [], exclusionCriteria: [], dataRequirements: [], toolRequirements: [],
+      steps: [step('s1', 'prepare paired cells'), step('s2', 'cycle with operando spectra', ['s1']), step('s3', 'estimate growth-rate contrast', ['s2'])],
+      metrics: ['overpotential rise per 100 cycles', 'impedance spectra interface contribution'],
+      statistics: [],
+      decisionRules: { successCriterion: '>= 30% lower growth in blocked cells', weakeningCriterion: '< 10% difference', falsificationCriterion: 'interval excludes the predicted direction', stopCriterion: '20 cells per arm' },
+      confounders: [], alternativeExplanations: [], resources: { compute: 'low', cost: 'low', time: '3 months' }, risks: [], ethics: [], prerequisites: [], alternativeBranches: [], reproducibilityRequirements: [],
+    };
+    const provider = createTestStubProvider([{ rawOutput: JSON.stringify(draft), forPurpose: 'research-plan-design' }], { asLive: true });
+    const out = await planStage.execute(makeCtx(store, run, provider, true));
+    expect(out.kind).toBe('done');
+    expect(store.listObjects('plan', run.id)).toHaveLength(1);
+  });
+
+  it('control: revise under LIVE receipts consumes feedback and mints a Revision (live-control parity)', async () => {
+    const { store, run, hyp } = setup();
+    store.putObject('feedback', {
+      id: newId('fbk'),
+      runId: run.id,
+      source: 'human_expert',
+      content: 'The leading hypothesis ignores baseline-severity stratification; please revise.',
+      provenance: 'live-control parity test',
+      receivedAt: new Date().toISOString(),
+    });
+    const causal = {
+      affected: [{ objectType: 'hypothesis', objectId: hyp.id, reason: 'the feedback bears on the leading hypothesis' }],
+      causalChain: 'feedback -> stratification confounder -> hypothesis refinement',
+      expectedQualityDelta: { status: 'inconclusive', claim: 'live route cannot argue a quality delta in this fixture' },
+    };
+    const revision = {
+      statement: 'Anion redistribution concentrated at degraded sites drives impedance growth, conditional on baseline-severity stratification',
+      mechanism: 'redistribution creates depletion zones raising the charge-transfer barrier, after adjusting for baseline severity',
+      assumptions: [{ statement: 'anion motion couples to interface impedance', kind: 'empirical' as const }],
+      predictions: ['stratified blocked-redistribution cells show materially lower impedance growth than matched controls'],
+      addedUncertainties: ['stratification variable choice not yet validated'],
+      revisionRationale: 'baseline-severity stratification bounds the claimed mechanism; the revision conditions it',
+    };
+    const provider = createTestStubProvider([
+      { rawOutput: JSON.stringify(causal), forPurpose: 'causal-revision-analysis' },
+      { rawOutput: JSON.stringify(revision), forPurpose: `hypothesis-revision:${hyp.id}` },
+    ], { asLive: true });
+    const out = await reviseStage.execute(makeCtx(store, run, provider, true));
+    expect(out.kind).toBe('done');
+    expect(store.listObjects('revision', run.id)).toHaveLength(1);
+    const updated = store.listObjects('hypothesis', run.id).find((h) => h.id === hyp.id);
+    expect(updated?.statement).toBe(revision.statement);
+  });
 });

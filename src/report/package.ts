@@ -62,6 +62,20 @@ export const buildReproducibilityPackage = async (
   }
   const bundle = bundles[bundles.length - 1]! as ReproducibilityBundle;
 
+  // ---- projection-basis gate (export-audit P2, root fix): the package must be ----
+  // internally consistent — bib/figures/tables are re-projected from the CURRENT
+  // store while paper/report are the stored bundle bytes. If the store grew past
+  // the bundle (counter-search added sources post-export), the package would
+  // silently mix two evidence bases. Fail closed and point at the re-export
+  // (the export stage re-runs automatically on resume for exactly this case).
+  const storedSources = deps.store.listObjects('source_document', runId).length;
+  if (storedSources > bundle.sourceArtifactHashes.length) {
+    throw new Error(
+      `store drift: run ${runId} now has ${storedSources} source documents but bundle ${bundle.id} covers ${bundle.sourceArtifactHashes.length} — ` +
+      `re-export first (far research resume ${runId}); a package must project exactly the bundled evidence`,
+    );
+  }
+
   // ---- stored artifacts (bytes are the pipeline's own output; hash must match bundle) ----
   const written: Array<{ path: string; content: Buffer; encodingFormat: string; name: string; crate: boolean }> = [];
   const reportHash = bundle.finalArtifactHashes[0];

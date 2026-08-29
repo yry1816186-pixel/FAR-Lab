@@ -12,7 +12,7 @@ import type { ArtifactStore } from '../shared/ports.js';
  * Third-party bundle verification (ACC-14, mission §56 Inspect/Validate/Re-execute/
  * Compare). Every check is really executed against the store, the artifact store and
  * the local environment — no check may assume or fabricate a pass. Invariant: a
- * report always carries the same 12 checks in the same order (VERIFY_CHECK_NAMES);
+ * report always carries the same 14 checks in the same order (VERIFY_CHECK_NAMES);
  * checks that cannot run fail closed with passed=false, never silently skipped.
  */
 
@@ -29,6 +29,8 @@ export const VERIFY_CHECK_NAMES = [
   'declared_evidence_level_valid',
   'claim_taint_labels_present',
   'hypothesis_template_content_absent',
+  'paper_outline_ref_resolvable',
+  'figures_tables_refs_resolvable',
 ] as const;
 export type VerifyCheckName = (typeof VERIFY_CHECK_NAMES)[number];
 
@@ -356,6 +358,51 @@ export async function verifyBundle(bundleId: string, deps: VerifyDeps): Promise<
       detail: jsonLdTemplate === 0
         ? `${(bundle.hypothesisJsonLd ?? []).length} 条 hypothesisJsonLd 无模板内容（real-content 投影干净）`
         : `${jsonLdTemplate}/${(bundle.hypothesisJsonLd ?? []).length} 条 hypothesisJsonLd 为离线模板内容 — 模板内容不得作为科学产物入 bundle`,
+    });
+
+    // ---- checks 13/14 (export-audit Q3 gap): shipped-artifact refs must resolve ----
+    // figures/tables/paperOutline ride in the bundle as content-addressed REFS that
+    // verify never probed (only sourceArtifactHashes/finalArtifactHashes were). A
+    // dangling or corrupt ref means the shipped package cannot be rebuilt from the
+    // artifact store — the reproducibility claim would be hollow. Fields are
+    // optional for pre-BP3 bundles: absent = not declared (pass with a note —
+    // legacy bundles must not start failing on fields that did not exist).
+    const probeRef = async (ref: string): Promise<string | null> => {
+      const hash = ref.startsWith('sha256:') ? ref.slice('sha256:'.length) : ref;
+      const problem = await probeArtifact(artifacts, hash);
+      return problem === null ? null : `${ref.slice(0, 16)}… ${problem}`;
+    };
+    const paperRef = bundle.paperOutlineRef;
+    let paperRefProblem: string | null = null;
+    if (paperRef !== undefined) paperRefProblem = await probeRef(paperRef);
+    checks.push({
+      name: 'paper_outline_ref_resolvable',
+      passed: paperRefProblem === null,
+      detail: paperRef === undefined
+        ? '（pre-BP3 bundle：未声明 paperOutlineRef — 检查空转通过）'
+        : paperRefProblem === null
+          ? `paperOutlineRef 已解析且内容 sha256 一致（${paperRef.slice(0, 16)}…）`
+          : paperRefProblem,
+    });
+    const figures = bundle.figures ?? [];
+    const tables = bundle.tables ?? [];
+    const refProblems: string[] = [];
+    for (const f of figures) {
+      const p = await probeRef(f.ref);
+      if (p !== null) refProblems.push(`figure ${f.name}: ${p}`);
+    }
+    for (const t of tables) {
+      const p = await probeRef(t.ref);
+      if (p !== null) refProblems.push(`table ${t.name}: ${p}`);
+    }
+    checks.push({
+      name: 'figures_tables_refs_resolvable',
+      passed: refProblems.length === 0,
+      detail: figures.length + tables.length === 0
+        ? '（本 bundle 未声明 figures/tables 引用 — 检查空转通过）'
+        : refProblems.length === 0
+          ? `${figures.length} figure(s) + ${tables.length} table(s) 引用全部解析且哈希一致`
+          : `${refProblems.length}/${figures.length + tables.length} 个引用校验失败：${refProblems.join('；')}`,
     });
   }
 
