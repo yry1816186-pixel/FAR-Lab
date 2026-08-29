@@ -1,1 +1,2 @@
-bump: 7
+dormant: slice 2 complete (2026-08-29) — surgery.yml is workflow_dispatch-only;
+final head ci is the merge gate for PR #133.
