@@ -60,6 +60,25 @@ export const FAR_COMMANDS: readonly CompletionCommand[] = [
   },
   { name: 'probe', help: 'model-route health check', subs: [{ name: 'net', help: 'network plane: proxy/CA status + loopback self-test' }] },
   { name: 'serve', help: 'start the local API server (headless/SSH entry)', subs: [] },
+  {
+    name: 'mcp',
+    help: 'MCP server integrations (add/list/enable/disable/probe)',
+    subs: [
+      { name: 'list', help: 'list MCP server integrations' },
+      { name: 'add', help: 'stage an MCP server (disabled, review-first)' },
+      { name: 'enable', help: 'enable an MCP integration' },
+      { name: 'disable', help: 'disable an MCP integration' },
+      { name: 'probe', help: 'real initialize + tools/list round trip' },
+    ],
+  },
+  {
+    name: 'plugin',
+    help: 'local plugin import (far-plugin.json)',
+    subs: [
+      { name: 'install', help: 'import a reviewed local plugin directory' },
+      { name: 'list', help: 'list plugin-imported integrations' },
+    ],
+  },
   { name: 'probe-custom', help: 'health check for user-defined model configs', subs: [] },
   { name: 'memory', help: 'search the re-audit memory queue', subs: [] },
   { name: 'backup', help: 'VACUUM INTO snapshot of the database', subs: [] },

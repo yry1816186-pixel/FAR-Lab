@@ -67,6 +67,15 @@ Usage:
   far probe net [--json]                         Network plane: HTTP(S) proxy / custom CA status +
                                                   real loopback self-test (local TLS + CONNECT proxy;
                                                   no external network contact)
+  far mcp list [--json]                          List MCP server integrations (label, enabled, risk, lastTest)
+  far mcp add <label> --command <cmd>|--url <u>  Stage an MCP server (DISABLED; review then enable) —
+                                                  [--args a,b] [--env K=V,…] [--risk read|edit|execute|destructive]
+  far mcp enable|disable <id|label>              Flip an MCP integration after review
+  far mcp probe <id|label>                       REAL connectivity check: initialize + tools/list round
+                                                  trip; result persisted as the integration's lastTest
+  far plugin install <dir>                       Import a reviewed local plugin (far-plugin.json) —
+                                                  expands to skills/commands/hooks/MCP, all DISABLED
+  far plugin list [--json]                       List plugin-imported integrations
   far probe-custom [mcfg-id] [--live] [--json]   Same health surface for user-defined model configs
                                                   (Settings / mcfg_* routes); --live = one real call
   far data info [--json]                         Data footprint: runs, db size, artifacts, exports

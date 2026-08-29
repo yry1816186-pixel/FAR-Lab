@@ -423,6 +423,136 @@ const main = async (): Promise<void> => {
     return;
   }
 
+  if (cmd === 'mcp') {
+    // MCP integrations from the CLI (extensibility lane): add (disabled, review-first),
+    // list, enable/disable, probe (REAL initialize + tools/list round trip, persisted
+    // as lastTest). Same store and same McpManager the server/settings use.
+    const subCmd = process.argv[3];
+    const app = await createApp();
+    try {
+      const integrations = app.store.listObjects('tool_integration', '__none__').filter((i) => i.kind === 'mcp_server');
+      const { ToolIntegrationSchema, integrationSemanticIssues, newId } = await import('../domain/index.js');
+      if (subCmd === 'list') {
+        if (integrations.length === 0) { out(ink.muted('(no MCP servers — add one: far mcp add <label> --command <cmd>)')); return; }
+        if (json()) jsonOutput(integrations.map(({ enabled: en, id, label: l, transport, riskClass, lastTest }) => ({ id, label: l, enabled: en, transport, riskClass, lastTest })));
+        else table(
+          ['id', 'label', 'enabled', 'transport', 'risk', 'last test'],
+          integrations.map((i) => [
+            i.id, i.label, i.enabled ? 'yes' : 'no', i.transport, i.riskClass,
+            i.lastTest === undefined ? ink.muted('never') : `${i.lastTest.ok ? ink.ok('ok') : ink.err('fail')} ${i.lastTest.summary.slice(0, 46)}`,
+          ]),
+        );
+        return;
+      }
+      if (subCmd === 'add') {
+        const label = positional(4);
+        if (label === undefined) die('usage: far mcp add <label> --command <cmd> [--args a,b,c] [--env K=V,…] | --url <https://…> [--risk read|edit|execute|destructive] [--prefix <p>] [--timeout-ms <n>]', 2);
+        const command = arg('--command');
+        const url = arg('--url');
+        const argsRaw = arg('--args');
+        const envRaw = arg('--env');
+        const risk = (arg('--risk') ?? 'execute') as 'read' | 'edit' | 'execute' | 'destructive';
+        if (command === undefined && url === undefined) die('provide --command <cmd> (stdio) or --url <https://…> (streamable-http)', 2);
+        const draft = {
+          kind: 'mcp_server' as const, label, enabled: false,
+          ...(command !== undefined
+            ? { transport: 'stdio' as const, command, args: argsRaw !== undefined ? argsRaw.split(',').map((a) => a.trim()).filter((a) => a.length > 0) : [] }
+            : { transport: 'http' as const, url: url! }),
+          env: envRaw !== undefined
+            ? Object.fromEntries(
+                envRaw.split(',')
+                  .map((kv): [string, string] => { const i = kv.indexOf('='); return i < 0 ? [kv.trim(), ''] : [kv.slice(0, i).trim(), kv.slice(i + 1)]; })
+                  .filter(([k]) => k.length > 0),
+              )
+            : {},
+          headers: {},
+          ...(arg('--prefix') !== undefined ? { toolNamePrefix: arg('--prefix')! } : {}),
+          riskClass: risk,
+          ...(arg('--timeout-ms') !== undefined ? { timeoutMs: Number(arg('--timeout-ms')) } : {}),
+        };
+        const parsed = ToolIntegrationSchema.safeParse({ ...draft, id: newId('tint'), createdBy: 'researcher', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+        if (!parsed.success) die(`invalid MCP integration: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).slice(0, 3).join('; ')}`, 2);
+        const semantic = integrationSemanticIssues(parsed.data);
+        if (semantic.length > 0) die(`invalid MCP integration: ${semantic.join('; ')}`, 2);
+        app.store.putObject('tool_integration', parsed.data);
+        out(`${marker()} staged MCP server '${label}' (${parsed.data.id}) ${ink.muted('— disabled by default; review then: far mcp enable ' + parsed.data.id)}`);
+        return;
+      }
+      if (subCmd === 'enable' || subCmd === 'disable') {
+        const idOrLabel = positional(4);
+        if (idOrLabel === undefined) die(`usage: far mcp ${subCmd} <id|label>`, 2);
+        const target = integrations.find((i) => i.id === idOrLabel || i.label === idOrLabel);
+        if (target === undefined) die(`MCP server not found: ${idOrLabel}`, 2);
+        const updated = ToolIntegrationSchema.parse({ ...target, enabled: subCmd === 'enable', updatedAt: new Date().toISOString() });
+        app.store.putObject('tool_integration', updated);
+        out(`${marker()} ${subCmd === 'enable' ? 'enabled' : 'disabled'} MCP server '${updated.label}'`);
+        return;
+      }
+      if (subCmd === 'probe') {
+        const idOrLabel = positional(4);
+        if (idOrLabel === undefined) die('usage: far mcp probe <id|label>', 2);
+        const target = integrations.find((i) => i.id === idOrLabel || i.label === idOrLabel);
+        if (target === undefined) die(`MCP server not found: ${idOrLabel}`, 2);
+        log(`probing '${target.label}' — real initialize + tools/list round trip …`);
+        const { McpManager } = await import('../agent/mcp-manager.js');
+        const manager = new McpManager({ listServers: () => [target] });
+        try {
+          const record = await manager.testIntegration(target);
+          app.store.putObject('tool_integration', ToolIntegrationSchema.parse({ ...target, lastTest: record, updatedAt: new Date().toISOString() }));
+          if (json()) jsonOutput(record);
+          else out(`${record.ok ? ink.ok('PASS') : ink.err('FAIL')} ${record.summary}`);
+          process.exitCode = record.ok ? 0 : 1;
+        } finally {
+          await manager.close();
+        }
+        return;
+      }
+      die(`usage: far mcp <list|add|enable|disable|probe> [args]`, 2);
+    } finally {
+      app.close();
+    }
+  }
+
+  if (cmd === 'plugin') {
+    // Plugin CLI (extensibility lane): local-directory import (same expansion the
+    // settings UI uses — everything lands DISABLED for review) + list.
+    const subCmd = process.argv[3];
+    const app = await createApp();
+    try {
+      if (subCmd === 'install') {
+        const dir = positional(4);
+        if (dir === undefined) die('usage: far plugin install <dir>  (a local directory holding far-plugin.json)', 2);
+        const { importPlugin, PluginImportError } = await import('../plugins/import.js');
+        let staged;
+        try {
+          staged = importPlugin({ dir, reviewed: true });
+        } catch (e) {
+          if (e instanceof PluginImportError) die(`plugin import failed: ${e.message}`, 2);
+          throw e;
+        }
+        for (const integration of staged.integrations) app.store.putObject('tool_integration', integration);
+        out(`${marker()} staged plugin ${staged.manifest.name}@${staged.manifest.version}: ${staged.integrations.length} integration(s), all DISABLED`);
+        for (const w of staged.warnings) log(`  warning: ${w}`);
+        out(ink.muted('  review in 设置→工具 (or far mcp list / enable), then enable.'));
+        return;
+      }
+      if (subCmd === 'list') {
+        const all = app.store.listObjects('tool_integration', '__none__');
+        const fromPlugins = all.filter((i) => i.createdBy === 'plugin_import');
+        if (fromPlugins.length === 0) { out(ink.muted('(no plugin-imported integrations — install one: far plugin install <dir>)')); return; }
+        if (json()) jsonOutput(fromPlugins);
+        else table(
+          ['id', 'label', 'kind', 'enabled', 'plugin'],
+          fromPlugins.map((i) => [i.id, i.label, i.kind, i.enabled ? 'yes' : 'no', i.provenance?.pluginId ?? '—']),
+        );
+        return;
+      }
+      die('usage: far plugin <install|list> [args]', 2);
+    } finally {
+      app.close();
+    }
+  }
+
   if (cmd === 'probe') {
     // Route health (D-060 phase-3). Config mode never touches the network; --live makes
     // ONE minimal chat call per route (explicit user action — no ambient probing).

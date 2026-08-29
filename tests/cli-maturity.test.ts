@@ -70,8 +70,10 @@ describe('far completion: generators cover the real command tree', () => {
 
   it('tree mirrors the router dispatch surface (guards completion drift)', () => {
     expect(FAR_COMMANDS.map((c) => c.name)).toEqual(
-      ['research', 'runs', 'experiment', 'campaign', 'agent', 'probe', 'serve', 'probe-custom', 'memory', 'backup', 'gc', 'data', 'ingest', 'inspect', 'verify', 'new', 'completion'],
+      ['research', 'runs', 'experiment', 'campaign', 'agent', 'probe', 'serve', 'mcp', 'plugin', 'probe-custom', 'memory', 'backup', 'gc', 'data', 'ingest', 'inspect', 'verify', 'new', 'completion'],
     );
+    expect(FAR_COMMANDS.find((c) => c.name === 'mcp')!.subs.map((s) => s.name)).toEqual(['list', 'add', 'enable', 'disable', 'probe']);
+    expect(FAR_COMMANDS.find((c) => c.name === 'plugin')!.subs.map((s) => s.name)).toEqual(['install', 'list']);
     expect(FAR_COMMANDS[0]!.subs.map((s) => s.name)).toEqual(
       ['start', 'status', 'inspect', 'cancel', 'resume', 'export', 'feedback', 'counter-search', 'lineage', 'supervise', 'fork'],
     );
