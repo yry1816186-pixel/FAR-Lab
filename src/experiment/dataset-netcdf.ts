@@ -47,6 +47,30 @@ export interface AcquireNetcdfOptions {
   timeoutMs?: number;
 }
 
+/**
+ * Security W2 (defense-in-depth): a netcdf source is an operator-supplied
+ * local file, and model-drafted specs only ever name a plain absolute local
+ * path. URIs and relative paths are rejected before any byte is read;
+ * FARLAB_DATA_ROOT (when set) fences reads to one data directory.
+ */
+const assertLocalNetcdfPath = (path: string): void => {
+  if (path.includes('://')) {
+    throw new Error(`netcdf source must be a local filesystem path, not a URI: ${path}`);
+  }
+  if (!nodePath.isAbsolute(path)) {
+    throw new Error(`netcdf source must be an absolute path (got relative: ${path})`);
+  }
+  const root = process.env.FARLAB_DATA_ROOT;
+  if (root !== undefined && root !== '') {
+    const resolvedRoot = nodePath.resolve(root);
+    const resolved = nodePath.resolve(path);
+    if (resolved !== resolvedRoot && !resolved.startsWith(resolvedRoot + nodePath.sep)) {
+      throw new Error(`netcdf source escapes FARLAB_DATA_ROOT ${resolvedRoot}: ${path}`);
+    }
+  }
+};
+
+
 export const acquireNetcdfDataset = async (
   store: Store,
   artifacts: ArtifactStore,
@@ -56,8 +80,10 @@ export const acquireNetcdfDataset = async (
   opts: AcquireNetcdfOptions = {},
 ): Promise<DatasetRecord> => {
   const now = opts.now ?? (() => new Date().toISOString());
+  assertLocalNetcdfPath(path);
+  const size = fs.statSync(path).size;
+  if (size > 200 * 1024 * 1024) throw new Error(`netcdf file exceeds 200MB: ${path} (${size} bytes)`);
   const buf = fs.readFileSync(path);
-  if (buf.length > 200 * 1024 * 1024) throw new Error(`netcdf file exceeds 200MB: ${path}`);
   const sha = createHash('sha256').update(buf).digest('hex');
   const raw = await artifacts.put(buf);
 
@@ -75,6 +101,11 @@ export const acquireNetcdfDataset = async (
   if (!profile.variables.some((v) => v.name === variable)) {
     throw new Error(`variable '${variable}' not present in ${path} (vars: ${profile.variables.map((v) => v.name).join(', ')})`);
   }
+  const shaAfter = createHash('sha256').update(fs.readFileSync(path)).digest('hex');
+  if (shaAfter !== sha) {
+    throw new Error(`netcdf file changed during acquisition (hash mismatch ${sha.slice(0, 12)} -> ${shaAfter.slice(0, 12)}) — refusing a lineage that does not match the profiled bytes`);
+  }
+
 
   const record = DatasetRecord.parse({
     id: newId('ds') as DatasetRecord['id'],
@@ -189,4 +220,5 @@ export const extractNetcdfFeatures = async (
   }, now());
   return { record, csv };
 };
+
 

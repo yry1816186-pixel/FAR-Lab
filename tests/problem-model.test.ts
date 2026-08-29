@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ScientificProblemModel, MethodSelection, ProblemModelDraft,
+  ScientificProblemModel, MethodSelection, ProblemModelDraft, ProblemModelDraftGuards,
   checkMethodSelectionBinding,
 } from '../src/domain/problem-model.js';
 
@@ -187,5 +187,37 @@ describe('ProblemModelDraft (model-proposed shape)', () => {
   it('rejects duplicate objective ordinals across selections', () => {
     const bad = { ...draft, methodSelections: [draft.methodSelections[0]!, draft.methodSelections[0]!] };
     expect(() => ProblemModelDraft.parse(bad)).toThrow(/duplicate forObjective ordinals/);
+  });
+});
+
+describe('ProblemModelDraftGuards (W3: boundary rejection before persistence)', () => {
+  const makeDraft = () => ({
+    objectives: [{ statement: 'estimate the treatment effect' }],
+    variables: [],
+    formalization: { problemClass: 'statistical_estimation', governingRelations: [], boundaryConditions: [], wellPosednessNotes: [] },
+    dataInventory: [],
+    statisticalPremises: { assumptions: [], causalClaims: [] },
+    metrics: [],
+    stopConditions: ['one preregistered analysis'],
+    unknowns: [],
+    methodSelections: [{
+      forObjective: 1,
+      candidates: [
+        { family: 'statistical_inference', assessment: 'selected', rationale: 'effect estimation from trial data', validationPlan: 'preregistered test at the frozen alpha' },
+        { family: 'retrieval_synthesis', assessment: 'viable_alternative', rationale: 'literature context informs priors but cannot estimate the local effect' },
+      ],
+    }],
+  });
+
+  it('rejects a selected candidate without validationPlan at the call boundary', () => {
+    const draft = makeDraft();
+    draft.methodSelections[0]!.candidates[0]!.validationPlan = undefined;
+    expect(() => ProblemModelDraftGuards.parse(draft)).toThrow(/every selected family must carry validationPlan/);
+  });
+
+  it('rejects an undecided selection without undecidedReason', () => {
+    const draft = makeDraft();
+    draft.methodSelections[0]!.candidates.forEach((c) => { c.assessment = 'rejected_inappropriate'; });
+    expect(() => ProblemModelDraftGuards.parse(draft)).toThrow(/no selected family requires undecidedReason/);
   });
 });

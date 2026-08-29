@@ -106,3 +106,26 @@ describe('audit C1 regression: monthly gridpoint coordinates are physical, never
     } finally { sidecar.close(); }
   }, 180_000);
 });
+
+describe('netcdf source path guard (fires before any file access)', () => {
+  it('rejects URIs and relative paths before any byte is read', async () => {
+    const { store, runId, artifacts } = makeEnv();
+    await expect(acquireNetcdfDataset(store, artifacts, runId, 'file:///data/air.nc', 'air'))
+      .rejects.toThrow(/local filesystem path, not a URI/);
+    await expect(acquireNetcdfDataset(store, artifacts, runId, 'data/air.nc', 'air'))
+      .rejects.toThrow(/absolute path/);
+  });
+
+  it('fences reads to FARLAB_DATA_ROOT when set (security W2)', async () => {
+    const { store, runId, artifacts } = makeEnv();
+    const prev = process.env.FARLAB_DATA_ROOT;
+    process.env.FARLAB_DATA_ROOT = path.join(os.tmpdir(), 'farlab-dataroot-tmp');
+    try {
+      await expect(acquireNetcdfDataset(store, artifacts, runId, path.resolve('work/scenario-b/air_temperature.nc'), 'air'))
+        .rejects.toThrow(/FARLAB_DATA_ROOT/);
+    } finally {
+      if (prev === undefined) delete process.env.FARLAB_DATA_ROOT;
+      else process.env.FARLAB_DATA_ROOT = prev;
+    }
+  });
+});

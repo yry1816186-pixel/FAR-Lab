@@ -599,7 +599,7 @@ def op_fem_poisson_2d_adaptive(payload: dict[str, Any]) -> dict[str, Any]:
     h1_rates: list[float] = []
     for prev, cur in itertools.pairwise(usable):
         if prev["h1Err"] > 0 and cur["h1Err"] > 0 and cur["ndof"] > prev["ndof"]:
-            h1_rates.append(float(np.log(prev["h1Err"] / cur["h1Err"]) / np.log(cur["ndof"] / prev["ndof"]) / 2.0))
+            h1_rates.append(float(np.log(prev["h1Err"] / cur["h1Err"]) / np.log(cur["ndof"] / prev["ndof"])))
     slope = None
     if len(usable) >= 3:
         xs_l = np.log([h["ndof"] for h in usable])
@@ -620,6 +620,7 @@ def op_fem_poisson_2d_adaptive(payload: dict[str, Any]) -> dict[str, Any]:
         "expectedOptimalSlope": -0.5,
         "effectivities": [h.get("effectivity") for h in usable if h.get("effectivity") is not None],
     }
+
 
 
 

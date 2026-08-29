@@ -93,19 +93,22 @@ export const executeTheoryAnalysis = async (
     expRun = run;
   };
   persist(expRun, 'experiment_queued', { specId: spec.id, specHash, experimentType: 'theory_identity' });
+  // Audit W1: fail() lives inside the try, so its throw re-enters the outer
+  // catch, which would mint a SECOND experiment_failed event overwriting the
+  // first with a double-wrapped message. One failure, one event; the outer
+  // catch rethrows instead. (Pre-existing pattern, fixed alongside fem.)
+  let failedOnce = false;
   const fail: (message: string, cause?: unknown) => never = (message, cause) => {
-    persist({ ...expRun, status: 'failed', error: message, endedAt: now() }, 'experiment_failed', { id: expRun.id, error: message });
+    if (!failedOnce) {
+      failedOnce = true;
+      persist({ ...expRun, status: 'failed', error: message, endedAt: now() }, 'experiment_failed', { id: expRun.id, error: message });
+    }
     throw new Error(`theory experiment ${expRun.id} failed: ${message}`, cause !== undefined ? { cause } : undefined);
   };
 
   const sidecar = (opts.sidecar ?? (() => createSidecar()))();
   try {
-    let env: Awaited<ReturnType<Sidecar['warmup']>>;
-    try {
-      env = await sidecar.warmup(spec.compute.timeoutMs);
-    } catch (e) {
-      fail(e instanceof Error ? e.message : String(e), e);
-    }
+    const env = await sidecar.warmup(spec.compute.timeoutMs);
     const lock = sidecar.lockfileHash();
     persist({
       ...expRun, status: 'running', startedAt: now(),
@@ -211,6 +214,7 @@ export const executeTheoryAnalysis = async (
       persist({ ...expRun, status: 'canceled', cancelRequested: true, endedAt: now(), error: 'canceled by operator' }, 'experiment_canceled', { id: expRun.id });
       throw new Error(`theory experiment ${expRun.id} canceled`, { cause: e });
     }
+    if (failedOnce) throw e; // already recorded by fail() — no second experiment_failed event
     fail(e instanceof Error ? e.message : String(e), e);
   } finally {
     const logs = sidecar.logs();

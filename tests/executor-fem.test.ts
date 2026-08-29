@@ -210,6 +210,19 @@ describe('fem verdict mechanics (deterministic doubles)', () => {
       .rejects.toThrow(/fem spec failed validation/);
   });
 });
+  it('mints exactly one experiment_failed event when the sidecar fails (W1 regression)', async () => {
+    const { store, runId, artifacts } = makeEnv();
+    const spec = makeSpec(runId);
+    const exploding: Sidecar = {
+      ...fakeSidecar([]),
+      warmup: async () => { throw new Error('warmup exploded'); },
+    };
+    await expect(executeFemAnalysis(store, artifacts, spec, { sidecar: () => exploding, now: () => T0 }))
+      .rejects.toThrow(/warmup exploded/);
+    const failed = store.listEvents(runId).filter((e) => e.type === 'experiment_failed');
+    expect(failed).toHaveLength(1);
+  });
+
 
 describe('fem executor (real sidecar, uv-run family env with sympy)', () => {
   it('measures optimal convergence for a mixed-boundary manufactured solution', async () => {

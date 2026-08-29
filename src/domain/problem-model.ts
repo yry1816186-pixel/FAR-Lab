@@ -358,3 +358,25 @@ export const ProblemModelDraft = z.object({
   }
 });
 export type ProblemModelDraft = z.infer<typeof ProblemModelDraft>;
+
+/**
+ * Audit W3 (engineering): the LLM-facing DRAFT must fail at the model-call
+ * boundary (callStructured retry/refusal) rather than letting an incomplete
+ * draft pass and explode in canonical parse AFTER the refined question was
+ * already persisted. These guards mirror MethodSelection's superRefines,
+ * applied per method selection.
+ */
+export const ProblemModelDraftGuards = ProblemModelDraft.superRefine((d, ctx) => {
+  for (const [i, s] of d.methodSelections.entries()) {
+    const selected = s.candidates.filter((c) => c.assessment === 'selected');
+    if (selected.some((c) => c.validationPlan === undefined)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['methodSelections', i], message: 'every selected family must carry validationPlan in the draft' });
+    }
+    if (selected.length > 2) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['methodSelections', i], message: 'at most 2 selected families per objective' });
+    }
+    if (selected.length === 0 && s.undecidedReason === undefined) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['methodSelections', i], message: 'no selected family requires undecidedReason' });
+    }
+  }
+});

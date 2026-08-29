@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { ConstraintSet, ResearchQuestion, ScientificGoalType } from '../../domain/index.js';
 import {
-  ProblemModelDraft,
+  ProblemModelDraft, ProblemModelDraftGuards,
   ScientificProblemModel, MethodSelection, checkMethodSelectionBinding,
 } from '../../domain/problem-model.js';
 import { newId } from '../../domain/ids.js';
@@ -136,14 +136,14 @@ export const scopeStage: StageHandler = {
         goalType: r.goalType,
         constraints: r.constraints,
       },
-      schema: ProblemModelDraft,
+      schema: ProblemModelDraftGuards,
       temperature: 0.2,
     });
 
     if (ctx.productRun === true && pm.executionMode === 'test') {
-      // Same real-content discipline as refinement above — but refinement has
-      // already been adopted, so the honest outcome is a DONE scope with the
-      // formation refused and recorded, not a rolled-back stage.
+      // Audit W4: a MARKER SKIPPED, not done — the orchestrator reopens marker
+      // skips on resume, so the promised recovery is real; done would leave the
+      // run permanently without a problem model.
       ctx.store.appendEvent(ctx.run.id, {
         type: 'note',
         stage: 'scope',
@@ -153,11 +153,10 @@ export const scopeStage: StageHandler = {
         },
       });
       return {
-        kind: 'done',
-        summary:
-          `scope refined: domain="${r.domain}"; ${r.phenomena.length} phenomena; ` +
-          `in/out scope ${r.inScope.length}/${r.outOfScope.length}; goalType=${r.goalType}; ` +
-          'problem model NOT formed (test wire refusal — configure a live route and resume)',
+        kind: 'skipped',
+        reason:
+          `${TEMPLATE_REFUSAL_REASON}: refinement was adopted from a live receipt but problem-model formation came back ` +
+          'test-stamped (mid-run route flip) - scope re-runs whole on resume with a live route',
       };
     }
 
@@ -243,6 +242,7 @@ export const scopeStage: StageHandler = {
     };
   },
 };
+
 
 
 
