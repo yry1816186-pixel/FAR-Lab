@@ -100,4 +100,55 @@ describe('terminal sessions API (real shells)', () => {
     const res = await request('POST', '/api/v1/terminal/sessions/00000000-0000-0000-0000-000000000000/input', { text: 'x\n' });
     expect(res.status).toBe(409);
   });
+
+  it('reports the session cap so the UI can disable "new session" at it', async () => {
+    const listed = await request('GET', '/api/v1/terminal/sessions');
+    expect(listed.status).toBe(200);
+    expect(typeof (listed.body as { maxSessions: number }).maxSessions).toBe('number');
+    expect((listed.body as { maxSessions: number }).maxSessions).toBeGreaterThan(0);
+  });
+
+  // The global panel keeps a session's stream open for a long time; a
+  // reconnect replays the ring buffer. Every frame carries its stream offset
+  // (`pos`), which is what makes that replay idempotent client-side instead
+  // of duplicating the transcript.
+  it('streams monotonic offsets: a late subscriber replays without a gap', async () => {
+    const created = await request('POST', '/api/v1/terminal/sessions');
+    const session = created.body as { id: string };
+    const produced = await request('POST', `/api/v1/terminal/sessions/${session.id}/input`, {
+      text: 'node -e "console.log(\'far-api-pos-marker\')"\n',
+    });
+    expect(produced.status).toBe(200);
+
+    // Collect frames from a LATE subscriber: it must see the ring replay first.
+    const controller = new AbortController();
+    const stream = await fetch(`${base}/api/v1/terminal/sessions/${session.id}/events`, { signal: controller.signal });
+    const reader = stream.body!.getReader();
+    const decoder = new TextDecoder();
+    let text = '';
+    const deadline = Date.now() + 45_000;
+    while (Date.now() < deadline) {
+      const next = await Promise.race([
+        reader.read(),
+        new Promise<undefined>((r) => setTimeout(() => r(undefined), Math.max(0, deadline - Date.now()))),
+      ]);
+      if (next === undefined) continue;
+      if (next.done) break;
+      text += decoder.decode(next.value, { stream: true });
+      if (text.includes('far-api-pos-marker') && text.split('event: terminal-out').length > 2) break;
+    }
+    controller.abort();
+
+    const frames = [...text.matchAll(/event: terminal-out\ndata: (.*)/g)].map((m) => JSON.parse(m[1]!) as { data: string; pos: number });
+    expect(frames.length).toBeGreaterThan(0);
+    expect(frames.every((f) => typeof f.pos === 'number')).toBe(true);
+    // Replay + live output must form one contiguous stream: no overlap, no gap.
+    for (let i = 1; i < frames.length; i += 1) {
+      const prev = frames[i - 1]!;
+      const cur = frames[i]!;
+      expect(cur.pos).toBe(prev.pos + prev.data.length);
+    }
+    expect(frames.map((f) => f.data).join('')).toContain('far-api-pos-marker');
+    await request('DELETE', `/api/v1/terminal/sessions/${session.id}`);
+  }, 90_000);
 });

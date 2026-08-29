@@ -1,25 +1,29 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { ModelProviderConfig, OFFLINE_WIRE_BASE_URL, newId } from '../src/domain/index.js';
-import { createOfflineDevProvider } from '../src/providers/offline.js';
+import { ModelProviderConfig, TEST_DOUBLE_WIRE_BASE_URL, newId } from '../src/domain/index.js';
+import { createTestDoubleProvider } from '../src/providers/test-double.js';
 import { createCustomProvider } from '../src/providers/custom.js';
 import { defaultLiveProvider, getProvider } from '../src/providers/index.js';
 import type { StructuredCallRequest } from '../src/shared/ports.js';
 
 /**
- * OFFLINE DEVELOPMENT WIRE — provider mechanics. Pipeline-shape correctness of
- * every purpose handler is proven by tests/offline-dev-run.test.ts (the real
+ * IN-PROCESS TEST DOUBLE — provider mechanics. Pipeline-shape correctness of
+ * every purpose handler is proven by tests/test-double-pipeline.test.ts (the real
  * orchestrator + the stages' own zod schemas are the authority); this file locks
  * the provider-level invariants: truth-plane stamping, determinism, the generic
  * schema-walker fallback, fail-visible behaviour and config-boundary rules.
+ *
+ * The double is an isolated TEST FIXTURE: it exists so automated tests and the
+ * browser E2E suite can drive the real pipeline without model quota. It is not a
+ * product route and serves no demonstration or acceptance purpose.
  */
 
-const offlineCfg = (): ModelProviderConfig =>
+const doubleCfg = (): ModelProviderConfig =>
   ModelProviderConfig.parse({
     id: newId('mcfg'),
-    label: 'offline dev route',
+    label: 'test double route',
     wire: 'offline',
-    baseUrl: OFFLINE_WIRE_BASE_URL,
+    baseUrl: TEST_DOUBLE_WIRE_BASE_URL,
     modelId: 'offline-dev',
     apiKey: '',
     createdAt: new Date().toISOString(),
@@ -34,13 +38,13 @@ const req = (purpose: string, extra: Partial<StructuredCallRequest> = {}): Struc
   ...extra,
 });
 
-describe('offline dev provider: config boundary', () => {
-  it('accepts a plain offline config', () => {
-    expect(offlineCfg().wire).toBe('offline');
+describe('test double provider: config boundary', () => {
+  it('accepts a plain test-double config', () => {
+    expect(doubleCfg().wire).toBe('offline');
   });
 
-  it('rejects a reasoning declaration on the offline wire (deterministic route speaks no dialect)', () => {
-    const base = offlineCfg();
+  it('rejects a reasoning declaration on the test-double wire (it speaks no dialect)', () => {
+    const base = doubleCfg();
     const r = ModelProviderConfig.safeParse({ ...base, reasoning: { style: 'enable_thinking', defaultGear: 'medium' } });
     expect(r.success).toBe(false);
   });
@@ -58,9 +62,9 @@ describe('offline dev provider: config boundary', () => {
   });
 });
 
-describe('offline dev provider: receipts and determinism', () => {
+describe('test double provider: receipts and determinism', () => {
   it('stamps every receipt executionMode=test with the custom:<id> provider name (no key needed)', async () => {
-    const cfg = offlineCfg();
+    const cfg = doubleCfg();
     const p = createCustomProvider(cfg);
     expect(p.liveReady).toBe(true);
     const res = await p.structuredCall(req('model-config-test'), (raw) => raw);
@@ -73,7 +77,7 @@ describe('offline dev provider: receipts and determinism', () => {
   });
 
   it('is deterministic: identical requests produce identical output hashes', async () => {
-    const p = createOfflineDevProvider(offlineCfg());
+    const p = createTestDoubleProvider(doubleCfg());
     const parse = (raw: unknown): unknown => raw;
     const a = await p.structuredCall(req('query-planning'), parse);
     const b = await p.structuredCall(req('query-planning'), parse);
@@ -83,7 +87,7 @@ describe('offline dev provider: receipts and determinism', () => {
   });
 
   it('covers the pipeline purposes with schema-valid payloads (spot check via inline parse)', async () => {
-    const p = createOfflineDevProvider(offlineCfg());
+    const p = createTestDoubleProvider(doubleCfg());
     const QueryPlan = z.object({
       discovery: z.array(z.string().min(1)).length(2),
       supporting: z.array(z.string().min(1)).min(1).max(2),
@@ -100,7 +104,7 @@ describe('offline dev provider: receipts and determinism', () => {
   });
 });
 
-describe('offline dev provider: generic fallback and fail-visible', () => {
+describe('test double provider: generic fallback and fail-visible', () => {
   const walkerSchema = {
     type: 'object',
     properties: {
@@ -113,7 +117,7 @@ describe('offline dev provider: generic fallback and fail-visible', () => {
   };
 
   it('unknown purposes fall back to a minimal instance from the strict JSON-Schema projection', async () => {
-    const p = createOfflineDevProvider(offlineCfg());
+    const p = createTestDoubleProvider(doubleCfg());
     const Parse = z.object({ a: z.string(), b: z.array(z.number().int()), c: z.enum(['p', 'q']) });
     const res = await p.structuredCall(
       req('some-future-purpose', { jsonSchema: walkerSchema }),
@@ -127,7 +131,7 @@ describe('offline dev provider: generic fallback and fail-visible', () => {
   });
 
   it('fails visible with invalid_output when nothing can satisfy the caller schema (never fabricated success)', async () => {
-    const p = createOfflineDevProvider(offlineCfg());
+    const p = createTestDoubleProvider(doubleCfg());
     const Impossible = z.object({ a: z.string().refine(() => false, 'never') });
     const res = await p.structuredCall(
       req('unparseable-purpose', { jsonSchema: walkerSchema }),
@@ -144,12 +148,12 @@ describe('offline dev provider: generic fallback and fail-visible', () => {
   });
 });
 
-describe('offline dev provider: conversation turn and claim->hypothesis edges (2026-08-27 takeover)', () => {
+describe('test double provider: conversation turn and claim->hypothesis edges (2026-08-27 takeover)', () => {
   // Sibling-lane gap A: the resident-agent loop asks with purpose
   // 'conversation:turn:turn' and its validator is the kernel's AgentAction
   // schema — a finish action with the conversation reply contract must parse.
   it('answers the resident-agent conversation turn with a valid finish action + launchable candidate', async () => {
-    const p = createOfflineDevProvider(offlineCfg());
+    const p = createTestDoubleProvider(doubleCfg());
     const AgentActionLike = z.object({
       action: z.literal('finish'),
       reason: z.string().min(1),
@@ -174,7 +178,7 @@ describe('offline dev provider: conversation turn and claim->hypothesis edges (2
   });
 
   it('conversation turn without an extractable question still finishes honestly (no candidate)', async () => {
-    const p = createOfflineDevProvider(offlineCfg());
+    const p = createTestDoubleProvider(doubleCfg());
     const res = await p.structuredCall(
       req('conversation:turn:turn', { userPayload: { task: 'no quoted question here' } }),
       (raw) => {
@@ -190,7 +194,7 @@ describe('offline dev provider: conversation turn and claim->hypothesis edges (2
   // enough claims, one weakening) link so offline runs carry claim->hypothesis
   // edges for the web binding chips.
   it('falsification-spec proposes supporting links and a counter link when claims allow', async () => {
-    const p = createOfflineDevProvider(offlineCfg());
+    const p = createTestDoubleProvider(doubleCfg());
     const LinkReason = z.object({ claimId: z.string().min(1), linkReason: z.string().min(20) });
     const Out = z.object({
       supportingLinks: z.array(LinkReason).min(1),

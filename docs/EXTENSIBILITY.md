@@ -11,7 +11,7 @@
 | MCP 服务器 | `far mcp add/list/enable/probe`、设置→工具 | stdio + streamable-HTTP 客户端，风险分级准入，探针真连验证 |
 | Commands（命令） | 插件清单、设置→工具 | 提示词模板，命令面板 / 会话输入框 `/<name>` 触发 |
 | Hooks（钩子） | 插件清单、设置→工具 | 声明式规则→内核权限（block/require_approval/log）；插件进程内 beforeTool/afterTool |
-| 集成终端 | web 侧栏「终端」 | 真实登录 shell 会话（SSE 输出流；无 PTY：vim/htop 等全屏程序不支持，UI 如实标注） |
+| 集成终端 | web 全局底部面板（状态栏「终端」/ `Ctrl+\`` / `Ctrl+Shift+\`` / 命令面板） | 真实登录 shell 会话，可多开（服务端上限 6）；每个会话独立 SSE 流 + 偏移量去重，后台会话持续累积输出；切换研究/刷新页面不丢会话（服务端环形缓冲回放）。无 PTY：vim/htop 等全屏程序不支持，UI 如实标注 |
 | Shell 执行（agent） | 会话中让 agent 跑命令 | `run_command` 提案 → 批准卡（命令原文可见）→ 登录 shell 执行，cwd 围栏+超时+退出码诚实 |
 | 文件读/查 | agent 内建工具 | `read_file` / `find_files`（glob） / `grep_content`（正则）：根围栏、二进制检测、有界扫描 |
 | HTTP 代理 / 自定义 CA | `FARLAB_HTTPS_PROXY` / `FARLAB_CA_CERT` 等环境变量 | Node 原生 fetch 全局生效（providers/文献源/MCP HTTP），`far probe net` 环回自检 |

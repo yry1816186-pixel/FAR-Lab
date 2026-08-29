@@ -897,7 +897,7 @@ function StateBand({ run, science, onResume, onDispatch, dispatchError, busy }: 
             const skipped = run.stages.find((st) => st.stage === 'generate_hypotheses');
             if (skipped?.error === undefined) return null;
             const raw = skipped.error;
-            const isWireRefusal = raw.includes('deterministic development wire');
+            const isWireRefusal = raw.includes('in-process test double');
             return <p className="ss-line" title={raw}>{isWireRefusal ? t('map.insufficientWireReason') : t('map.stateInsufficientWhy', { text: raw.slice(0, 220) })}</p>;
           })()}
         </div>

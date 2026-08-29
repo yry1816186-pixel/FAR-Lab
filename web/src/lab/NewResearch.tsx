@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { BookMarked, FileUp, Link2 } from 'lucide-react';
+import { BookMarked, ChevronDown, ChevronUp, FileUp, Link2 } from 'lucide-react';
 import { ErrorBox } from '../components/common';
 import { ZoteroPanel } from '../components/ZoteroPanel';
 import { DictationButton } from '../components/DictationButton';
@@ -9,13 +9,18 @@ import { deleteRun, editRunQuestion, listModelConfigs, proposeScope, resumeRun, 
 import { ApiError } from '../api/client';
 import type { ModelConfigsResponse, ResearchQuestion, ScientificGoalType } from '../api/types';
 import { TRAY_MAX_SEEDS, SeedCardRow, useSeedTray } from './SeedTray';
+import type { DictKey } from '../i18n/dict';
 import './lab.css';
 
 /**
- * New research formation (HX §8.2) — the new architecture's creation surface.
- * One screen: the question in the researcher's words, materials riding the
- * shared SeedTray, the honest "what will happen" note, direct pipeline launch
- * (no mandatory chat round-trip), and conversational refinement as an OPTION.
+ * New-research compose zone — the workspace's creation surface (HX §8.2).
+ *
+ * It lives INSIDE the workspace (never as a second top-level destination):
+ * one entry point, one question box. Collapsed it is the quick start
+ * (question + quick-task templates + launch); expanded it carries the full
+ * option set — materials riding the shared SeedTray, the model route picker,
+ * the pre-launch scope review, and the honest "what will happen" note.
+ *
  * Launch navigates to the study map where the live run is watched.
  *
  * §8.2 pre-launch scope review: "预览研究范围" persists a DRAFT run, runs ONLY
@@ -30,13 +35,21 @@ const linesOf = (items: readonly string[]): string => items.join('\n');
 const fromLines = (text: string): string[] =>
   text.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
 
-export function NewResearch({ onLaunched, onOpenConversation, initialQuestion = null }: {
+export function NewResearch({
+  onLaunched, onOpenConversation, initialQuestion = null,
+  open = false, onOpenChange, autoFocus = false,
+}: {
   onLaunched: (runId: string) => void;
   onOpenConversation: () => void;
-  /** Welcome-box quick start: hands the home's centered question box over to
-   *  the (possibly already-mounted) formation screen — updates the question
-   *  field when new text arrives. Null = no prefill. */
+  /** Welcome-box quick start: hands the workspace's question box real text
+   *  (spine rerun, deep link `#lab/new?q=…`). Null = no prefill. */
   initialQuestion?: string | null;
+  /** Expanded = the full option set (materials / route / scope review). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** Focus the question on mount — on a fresh workspace typing must start
+   *  here, with zero navigation. */
+  autoFocus?: boolean;
 }): JSX.Element {
   const { t } = useI18n();
   const run = useCreateRun(onLaunched);
@@ -77,10 +90,12 @@ export function NewResearch({ onLaunched, onOpenConversation, initialQuestion = 
   useEffect(() => { run.setSeeds(tray.seeds); }, [tray.seeds, run.setSeeds]);
 
   // Keyboard path: arriving via "n" or the CTA puts the researcher straight
-  // into the question — one keystroke from anywhere to typing (§9.8).
-  useEffect(() => { textareaRef.current?.focus(); }, []);
+  // into the question — one keystroke from anywhere to typing (§9.8). The
+  // fresh-workspace mount focuses too (typing begins with zero navigation).
+  useEffect(() => { if (autoFocus) textareaRef.current?.focus(); }, [autoFocus]);
+  useEffect(() => { if (open) textareaRef.current?.focus(); }, [open]);
 
-  // Welcome-box handover: the prop updates the field even when this screen is
+  // Welcome-box handover: the prop updates the field even when this zone is
   // already mounted (useCreateRun's hash read only initializes on mount).
   // run.setText is the stable useState setter.
   useEffect(() => {
@@ -190,229 +205,315 @@ export function NewResearch({ onLaunched, onOpenConversation, initialQuestion = 
   const reviewing = proposal !== null;
   const activeLabel = configs?.configs.find((c) => c.id === (run.providerConfigId === '' ? configs.activeModelConfigId : run.providerConfigId))?.label;
 
-  return (
-    <div className="lab-root">
-      <header className="lab-topline">
-        <span className="lab-title">{t('newresearch.title')}</span>
-        <span className="lab-spacer" />
-        <a href="#/">{t('newresearch.backHome')}</a>
-      </header>
+  // Collapsing would strand real state (attached materials, an in-progress
+  // scope review) — the panel stays open until that state is resolved.
+  const canCollapse = tray.cards.length === 0 && proposal === null && draftId === null;
 
-      <main className="nr-canvas">
-        <form
-          className={`nr-card${dragActive ? ' nr-card--drag' : ''}`}
-          onSubmit={(e) => {
-            e.preventDefault();
-            // While reviewing, the implicit-submit path (Enter in an input)
-            // confirms the draft launch — it must never bypass the review as
-            // a silent direct launch.
-            if (reviewing) void confirmLaunch();
-            else void run.submit(e);
-          }}
-          onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
-          onDragLeave={(e) => { if (e.currentTarget === e.target) setDragActive(false); }}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragActive(false);
-            const files = Array.from(e.dataTransfer.files);
-            if (files.length > 0) tray.addFiles(files);
-            else {
-              const text = e.dataTransfer.getData('text/plain');
-              if (text.length > 0) tray.addDroppedText(text);
-            }
+  const QUICK: { key: DictKey; template: string }[] = [
+    { key: 'labhome.qkHypotheses', template: t('labhome.qkHypothesesTpl') },
+    { key: 'labhome.qkEvidence', template: t('labhome.qkEvidenceTpl') },
+    { key: 'labhome.qkPlan', template: t('labhome.qkPlanTpl') },
+  ];
+
+  const questionField = (
+    <>
+      <label htmlFor="nr-question" className="nr-label">{t('newresearch.questionLabel')}</label>
+      <textarea
+        id="nr-question"
+        ref={textareaRef}
+        className="nr-question"
+        value={run.text}
+        rows={open ? 3 : 2}
+        placeholder={t('newresearch.placeholder')}
+        aria-invalid={run.showValidationError && run.text.trim().length === 0}
+        onChange={(e) => run.setText(e.target.value)}
+        onPaste={(e) => tray.onPaste(e)}
+      />
+      {run.showValidationError && run.text.trim().length === 0 && (
+        <p className="nr-error" role="alert">{t('newresearch.needQuestion')}</p>
+      )}
+    </>
+  );
+
+  /** Quick tasks fill the box with a real question skeleton (editable). */
+  const quickChips = (
+    <div className="nr-quick" role="group" aria-label={t('labhome.qwQuickLabel')}>
+      {QUICK.map((q) => (
+        <button
+          type="button"
+          key={q.key}
+          className="qw-chip"
+          title={t('labhome.qkHint', { text: q.template })}
+          onClick={() => {
+            run.setText(q.template);
+            textareaRef.current?.focus();
+            textareaRef.current?.setSelectionRange(q.template.length, q.template.length);
           }}
         >
-          <label htmlFor="nr-question" className="nr-label">{t('newresearch.questionLabel')}</label>
-          <textarea
-            id="nr-question"
-            ref={textareaRef}
-            className="nr-question"
-            value={run.text}
-            rows={3}
-            placeholder={t('newresearch.placeholder')}
-            aria-invalid={run.showValidationError && run.text.trim().length === 0}
-            onChange={(e) => run.setText(e.target.value)}
-            onPaste={(e) => tray.onPaste(e)}
-          />
-          {run.showValidationError && run.text.trim().length === 0 && (
-            <p className="nr-error" role="alert">{t('newresearch.needQuestion')}</p>
-          )}
+          {t(q.key)}
+        </button>
+      ))}
+    </div>
+  );
 
-          {tray.cards.length > 0 && (
-            <div className="nr-tray" aria-label={t('newresearch.materials')}>
-              {tray.cards.map((c) => <SeedCardRow key={c.id} card={c} onRemove={tray.remove} onRetry={tray.retryCard} />)}
+  const materialsTray = tray.cards.length > 0 && (
+    <div className="nr-tray" aria-label={t('newresearch.materials')}>
+      {tray.cards.map((c) => <SeedCardRow key={c.id} card={c} onRemove={tray.remove} onRetry={tray.retryCard} />)}
+    </div>
+  );
+
+  const toolsRow = (
+    <div className="nr-actions">
+      <button type="button" className="nr-tool" onClick={() => fileInputRef.current?.click()}>
+        <FileUp size={13} aria-hidden="true" /> {t('newresearch.addFile')}
+      </button>
+      <button
+        type="button"
+        className="nr-tool"
+        aria-expanded={citeOpen}
+        onClick={() => { setCiteOpen((v) => !v); if (!citeOpen) window.setTimeout(() => citeInputRef.current?.focus(), 50); }}
+      >
+        <Link2 size={13} aria-hidden="true" /> {t('newresearch.addCitation')}
+      </button>
+      <button type="button" className="nr-tool" onClick={() => setZoteroOpen(true)}>
+        <BookMarked size={13} aria-hidden="true" /> {t('newresearch.addZotero')}
+      </button>
+      <DictationButton
+        onTranscribed={(fragment) => run.setText(`${run.text}${run.text.length > 0 ? ' ' : ''}${fragment}`)}
+        onError={(message) => tray.flash(message)}
+      />
+      <span className="nr-tools-hint">{t('newresearch.pasteHint')}</span>
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        hidden
+        onChange={(e) => { tray.addFiles(Array.from(e.target.files ?? [])); e.target.value = ''; }}
+      />
+    </div>
+  );
+
+  const citePanel = citeOpen && (
+    <div className="nr-cite">
+      <label htmlFor="nr-cite-input">{t('newresearch.citeLabel')}</label>
+      <textarea
+        id="nr-cite-input"
+        ref={citeInputRef}
+        rows={3}
+        value={citeText}
+        placeholder={t('newresearch.citePlaceholder')}
+        onChange={(e) => setCiteText(e.target.value)}
+      />
+      <div className="nr-cite-acts">
+        <button
+          type="button"
+          className="mb-act mb-act--primary"
+          disabled={citeText.trim().length === 0}
+          onClick={() => {
+            tray.addDroppedText(citeText);
+            setCiteText('');
+          }}
+        >
+          {t('newresearch.citeAdd')}
+        </button>
+        <span className="nr-tools-hint">{t('newresearch.citeHint')}</span>
+      </div>
+    </div>
+  );
+
+  const reviewPanel = reviewing && (
+    <section className="nr-review" aria-label={t('newresearch.reviewTitle')}>
+      <h3 className="nr-review-title">{t('newresearch.reviewTitle')}</h3>
+      <p className="nr-review-hint">{t('newresearch.reviewHint')}</p>
+      <div className="nr-review-grid">
+        <label className="nr-field">
+          <span className="nr-field-label">{t('newresearch.fieldDomain')}</span>
+          <input className="nr-input" value={domainText} onChange={(e) => setDomainText(e.target.value)} />
+        </label>
+        <label className="nr-field">
+          <span className="nr-field-label">{t('newresearch.fieldGoalType')}</span>
+          <select className="nr-input" value={goalChoice} onChange={(e) => setGoalChoice(e.target.value as ScientificGoalType)}>
+            {GOAL_TYPES.map((g) => <option key={g} value={g}>{t(`goalType.${g}`)}</option>)}
+          </select>
+        </label>
+        <label className="nr-field nr-field--wide">
+          <span className="nr-field-label">{t('newresearch.fieldPhenomena')}</span>
+          <textarea className="nr-input" rows={2} value={phenomenaText} onChange={(e) => setPhenomenaText(e.target.value)} />
+        </label>
+        <label className="nr-field">
+          <span className="nr-field-label">{t('newresearch.fieldInScope')}</span>
+          <textarea className="nr-input" rows={2} value={inScopeText} onChange={(e) => setInScopeText(e.target.value)} />
+        </label>
+        <label className="nr-field">
+          <span className="nr-field-label">{t('newresearch.fieldOutOfScope')}</span>
+          <textarea className="nr-input" rows={2} value={outOfScopeText} onChange={(e) => setOutOfScopeText(e.target.value)} />
+        </label>
+      </div>
+      {proposal.constraints && (
+        <p className="nr-review-constraints">
+          {t('newresearch.fieldConstraints')}
+          {': '}
+          {[...proposal.constraints.assumptions, ...proposal.constraints.dataConstraints, ...proposal.constraints.methodologicalConstraints].filter((s) => s.length > 0).join('；') || t('newresearch.noConstraints')}
+        </p>
+      )}
+      {savedNote && <p className="nr-review-saved" role="status">{t('newresearch.saved')}</p>}
+    </section>
+  );
+
+  const launchRow = (
+    <div className="nr-launch-row">
+      <select
+        aria-label={t('newresearch.routeLabel')}
+        className="nr-route"
+        value={run.providerConfigId}
+        onChange={(e) => run.setProviderConfigId(e.target.value)}
+      >
+        <option value="">{t('newresearch.routeDefault')}{activeLabel !== undefined ? `（${activeLabel}）` : ''}</option>
+        {configs?.configs.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+      </select>
+      {reviewing ? (
+        <>
+          <button type="button" className="nr-secondary" disabled={reviewBusy === 'saving'} onClick={() => void saveEdits()}>
+            {reviewBusy === 'saving' ? t('newresearch.saving') : t('newresearch.saveScope')}
+          </button>
+          <button type="button" className="nr-submit" disabled={reviewBusy !== null} onClick={() => void confirmLaunch()}>
+            {reviewBusy === 'launching' ? t('newresearch.launchingDraft') : t('newresearch.confirmLaunch')}
+          </button>
+          <span className="nr-review-links">
+            <button type="button" className="nr-linklike" onClick={() => void discardDraft()}>{t('newresearch.discardDraft')}</button>
+            <button type="button" className="nr-linklike" onClick={keepDraft} title={t('newresearch.keepDraftHint')}>{t('newresearch.keepDraft')}</button>
+          </span>
+        </>
+      ) : (
+        <>
+          <button
+            type="button"
+            className="nr-secondary"
+            disabled={!canSubmit || reviewBusy !== null}
+            onClick={(e) => void startPreview(e)}
+          >
+            {reviewBusy === 'proposing' ? t('newresearch.previewBusy') : t('newresearch.previewLaunch')}
+          </button>
+          <button type="submit" className="nr-submit" disabled={!canSubmit || reviewBusy !== null}>
+            {run.submitting || reviewBusy !== null ? t('newresearch.launching') : t('newresearch.launch')}
+          </button>
+        </>
+      )}
+    </div>
+  );
+
+  /** Honest pre-flight: what the launch actually does (expanded panel only). */
+  const whatHappens = (
+    <div className="nr-embed-side">
+      <p className="nr-embed-side-title">{t('newresearch.whatHappensTitle')}</p>
+      <ol className="nr-side-steps">
+        <li>{t('newresearch.stepRetrieve')}</li>
+        <li>{t('newresearch.stepEvidence')}</li>
+        <li>{t('newresearch.stepHypotheses')}</li>
+        <li>{t('newresearch.stepPlan')}</li>
+      </ol>
+      <p className="nr-side-note">{t('newresearch.honestyNote')}</p>
+      <p className="nr-side-note">{t('newresearch.materialsNote', { n: TRAY_MAX_SEEDS })}</p>
+      <div className="nr-side-alt">
+        <Link2 size={13} aria-hidden="true" />
+        <button type="button" className="nr-alt-btn" onClick={onOpenConversation}>{t('newresearch.conversational')}</button>
+        <span className="nr-alt-hint">{t('newresearch.conversationalHint')}</span>
+      </div>
+    </div>
+  );
+
+  return (
+    <section className="nr-embed" aria-labelledby="nr-embed-title">
+      <div className="nr-embed-head">
+        <h2 className="nr-embed-title" id="nr-embed-title">{t('newresearch.title')}</h2>
+        <p className="nr-embed-sub">{t('labhome.qwSub')}</p>
+      </div>
+
+      <form
+        className={`nr-card nr-card--embed${dragActive ? ' nr-card--drag' : ''}`}
+        onSubmit={(e) => {
+          e.preventDefault();
+          // While reviewing, the implicit-submit path (Enter in an input)
+          // confirms the draft launch — it must never bypass the review as
+          // a silent direct launch.
+          if (reviewing) void confirmLaunch();
+          else void run.submit(e);
+        }}
+        onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+        onDragLeave={(e) => { if (e.currentTarget === e.target) setDragActive(false); }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragActive(false);
+          const files = Array.from(e.dataTransfer.files);
+          if (files.length > 0) tray.addFiles(files);
+          else {
+            const text = e.dataTransfer.getData('text/plain');
+            if (text.length > 0) tray.addDroppedText(text);
+          }
+        }}
+      >
+        {questionField}
+
+        {open ? (
+          <>
+            {materialsTray}
+            {toolsRow}
+            {citePanel}
+            {reviewPanel}
+            {launchRow}
+            {whatHappens}
+          </>
+        ) : (
+          <>
+            {quickChips}
+            <div className="nr-embed-acts">
+              <button
+                type="button"
+                className="nr-secondary"
+                aria-expanded={false}
+                onClick={() => onOpenChange?.(true)}
+              >
+                {t('newresearch.moreOptions')} <ChevronDown size={13} aria-hidden="true" />
+              </button>
+              <button type="submit" className="nr-submit" disabled={!canSubmit}>
+                {run.submitting ? t('newresearch.launching') : t('newresearch.launch')}
+              </button>
+              <span className="nr-tools-hint">{t('newresearch.collapsedHint')}</span>
             </div>
-          )}
-          {tray.note !== null && <p className="nr-note" role="status">{tray.note}</p>}
+          </>
+        )}
 
-          <div className="nr-actions">
-            <button type="button" className="nr-tool" onClick={() => fileInputRef.current?.click()}>
-              <FileUp size={13} aria-hidden="true" /> {t('newresearch.addFile')}
-            </button>
+        {tray.note !== null && <p className="nr-note" role="status">{tray.note}</p>}
+        {reviewBusy === 'proposing' && (
+          <p className="nr-note" role="status">{t('newresearch.previewNote')}</p>
+        )}
+
+        {(reviewError ?? run.error) !== null && (
+          <ErrorBox
+            error={(reviewError ?? run.error)!}
+            onRetry={() => {
+              setReviewError(null);
+              if (draftId !== null && proposal === null) void startPreview();
+              else textareaRef.current?.focus();
+            }}
+          />
+        )}
+
+        {open && (
+          <div className="nr-embed-foot">
             <button
               type="button"
-              className="nr-tool"
-              aria-expanded={citeOpen}
-              onClick={() => { setCiteOpen((v) => !v); if (!citeOpen) window.setTimeout(() => citeInputRef.current?.focus(), 50); }}
+              className="nr-linklike"
+              aria-expanded
+              disabled={!canCollapse}
+              title={canCollapse ? undefined : t('newresearch.collapseBlocked')}
+              onClick={() => onOpenChange?.(false)}
             >
-              <Link2 size={13} aria-hidden="true" /> {t('newresearch.addCitation')}
+              {t('newresearch.collapseOptions')} <ChevronUp size={13} aria-hidden="true" />
             </button>
-            <button type="button" className="nr-tool" onClick={() => setZoteroOpen(true)}>
-              <BookMarked size={13} aria-hidden="true" /> {t('newresearch.addZotero')}
-            </button>
-            <DictationButton
-              onTranscribed={(fragment) => run.setText(`${run.text}${run.text.length > 0 ? ' ' : ''}${fragment}`)}
-              onError={(message) => tray.flash(message)}
-            />
-            <span className="nr-tools-hint">{t('newresearch.pasteHint')}</span>
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              hidden
-              onChange={(e) => { tray.addFiles(Array.from(e.target.files ?? [])); e.target.value = ''; }}
-            />
           </div>
-
-          {citeOpen && (
-            <div className="nr-cite">
-              <label htmlFor="nr-cite-input">{t('newresearch.citeLabel')}</label>
-              <textarea
-                id="nr-cite-input"
-                ref={citeInputRef}
-                rows={3}
-                value={citeText}
-                placeholder={t('newresearch.citePlaceholder')}
-                onChange={(e) => setCiteText(e.target.value)}
-              />
-              <div className="nr-cite-acts">
-                <button
-                  type="button"
-                  className="mb-act mb-act--primary"
-                  disabled={citeText.trim().length === 0}
-                  onClick={() => {
-                    tray.addDroppedText(citeText);
-                    setCiteText('');
-                  }}
-                >
-                  {t('newresearch.citeAdd')}
-                </button>
-                <span className="nr-tools-hint">{t('newresearch.citeHint')}</span>
-              </div>
-            </div>
-          )}
-
-          {reviewing && (
-            <section className="nr-review" aria-label={t('newresearch.reviewTitle')}>
-              <h3 className="nr-review-title">{t('newresearch.reviewTitle')}</h3>
-              <p className="nr-review-hint">{t('newresearch.reviewHint')}</p>
-              <div className="nr-review-grid">
-                <label className="nr-field">
-                  <span className="nr-field-label">{t('newresearch.fieldDomain')}</span>
-                  <input className="nr-input" value={domainText} onChange={(e) => setDomainText(e.target.value)} />
-                </label>
-                <label className="nr-field">
-                  <span className="nr-field-label">{t('newresearch.fieldGoalType')}</span>
-                  <select className="nr-input" value={goalChoice} onChange={(e) => setGoalChoice(e.target.value as ScientificGoalType)}>
-                    {GOAL_TYPES.map((g) => <option key={g} value={g}>{t(`goalType.${g}`)}</option>)}
-                  </select>
-                </label>
-                <label className="nr-field nr-field--wide">
-                  <span className="nr-field-label">{t('newresearch.fieldPhenomena')}</span>
-                  <textarea className="nr-input" rows={2} value={phenomenaText} onChange={(e) => setPhenomenaText(e.target.value)} />
-                </label>
-                <label className="nr-field">
-                  <span className="nr-field-label">{t('newresearch.fieldInScope')}</span>
-                  <textarea className="nr-input" rows={2} value={inScopeText} onChange={(e) => setInScopeText(e.target.value)} />
-                </label>
-                <label className="nr-field">
-                  <span className="nr-field-label">{t('newresearch.fieldOutOfScope')}</span>
-                  <textarea className="nr-input" rows={2} value={outOfScopeText} onChange={(e) => setOutOfScopeText(e.target.value)} />
-                </label>
-              </div>
-              {proposal.constraints && (
-                <p className="nr-review-constraints">
-                  {t('newresearch.fieldConstraints')}
-                  {': '}
-                  {[...proposal.constraints.assumptions, ...proposal.constraints.dataConstraints, ...proposal.constraints.methodologicalConstraints].filter((s) => s.length > 0).join('；') || t('newresearch.noConstraints')}
-                </p>
-              )}
-              {savedNote && <p className="nr-review-saved" role="status">{t('newresearch.saved')}</p>}
-            </section>
-          )}
-
-          <div className="nr-launch-row">
-            <select
-              aria-label={t('newresearch.routeLabel')}
-              className="nr-route"
-              value={run.providerConfigId}
-              onChange={(e) => run.setProviderConfigId(e.target.value)}
-            >
-              <option value="">{t('newresearch.routeDefault')}{activeLabel !== undefined ? `（${activeLabel}）` : ''}</option>
-              {configs?.configs.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-            </select>
-            {reviewing ? (
-              <>
-                <button type="button" className="nr-secondary" disabled={reviewBusy === 'saving'} onClick={() => void saveEdits()}>
-                  {reviewBusy === 'saving' ? t('newresearch.saving') : t('newresearch.saveScope')}
-                </button>
-                <button type="button" className="nr-submit" disabled={reviewBusy !== null} onClick={() => void confirmLaunch()}>
-                  {reviewBusy === 'launching' ? t('newresearch.launchingDraft') : t('newresearch.confirmLaunch')}
-                </button>
-                <span className="nr-review-links">
-                  <button type="button" className="nr-linklike" onClick={() => void discardDraft()}>{t('newresearch.discardDraft')}</button>
-                  <button type="button" className="nr-linklike" onClick={keepDraft} title={t('newresearch.keepDraftHint')}>{t('newresearch.keepDraft')}</button>
-                </span>
-              </>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  className="nr-secondary"
-                  disabled={!canSubmit || reviewBusy !== null}
-                  onClick={(e) => void startPreview(e)}
-                >
-                  {reviewBusy === 'proposing' ? t('newresearch.previewBusy') : t('newresearch.previewLaunch')}
-                </button>
-                <button type="submit" className="nr-submit" disabled={!canSubmit || reviewBusy !== null}>
-                  {run.submitting || reviewBusy !== null ? t('newresearch.launching') : t('newresearch.launch')}
-                </button>
-              </>
-            )}
-          </div>
-          {reviewBusy === 'proposing' && (
-            <p className="nr-note" role="status">{t('newresearch.previewNote')}</p>
-          )}
-
-          {(reviewError ?? run.error) !== null && (
-            <ErrorBox
-              error={(reviewError ?? run.error)!}
-              onRetry={() => {
-                setReviewError(null);
-                if (draftId !== null && proposal === null) void startPreview();
-                else textareaRef.current?.focus();
-              }}
-            />
-          )}
-        </form>
-
-        <aside className="nr-side">
-          <h2 className="nr-side-title">{t('newresearch.whatHappensTitle')}</h2>
-          <ol className="nr-side-steps">
-            <li>{t('newresearch.stepRetrieve')}</li>
-            <li>{t('newresearch.stepEvidence')}</li>
-            <li>{t('newresearch.stepHypotheses')}</li>
-            <li>{t('newresearch.stepPlan')}</li>
-          </ol>
-          <p className="nr-side-note">{t('newresearch.honestyNote')}</p>
-          <p className="nr-side-note">{t('newresearch.materialsNote', { n: TRAY_MAX_SEEDS })}</p>
-          <div className="nr-side-alt">
-            <Link2 size={13} aria-hidden="true" />
-            <button type="button" className="nr-alt-btn" onClick={onOpenConversation}>{t('newresearch.conversational')}</button>
-            <span className="nr-alt-hint">{t('newresearch.conversationalHint')}</span>
-          </div>
-        </aside>
-      </main>
+        )}
+      </form>
 
       <ZoteroPanel
         open={zoteroOpen}
@@ -420,6 +521,6 @@ export function NewResearch({ onLaunched, onOpenConversation, initialQuestion = 
         onImport={(items) => tray.importZotero(items)}
         remaining={Math.max(0, TRAY_MAX_SEEDS - tray.cards.length)}
       />
-    </div>
+    </section>
   );
 }

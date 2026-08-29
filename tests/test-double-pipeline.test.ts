@@ -4,18 +4,23 @@ import os from 'node:os';
 import path from 'node:path';
 import { createApp } from '../src/app/composition.js';
 import type { App } from '../src/app/composition.js';
-import { ModelProviderConfig, OFFLINE_WIRE_BASE_URL, ResearchQuestion, ResearchRun, newId } from '../src/domain/index.js';
+import { ModelProviderConfig, TEST_DOUBLE_WIRE_BASE_URL, ResearchQuestion, ResearchRun, newId } from '../src/domain/index.js';
+import { TEMPLATE_REFUSAL_REASON } from '../src/pipeline/stages/shared.js';
 import type { RawSourceRecord, SourceAdapter } from '../src/shared/ports.js';
 import type { SourceFamily, SourceIdentifier } from '../src/domain/source.js';
 
 /**
- * OFFLINE DEVELOPMENT WIRE — full-journey integration. A run bound to a
+ * IN-PROCESS TEST DOUBLE — full-journey integration. A run bound to a
  * wire='offline' model config traverses the REAL orchestrator end-to-end
  * (scope -> ... -> export) with zero network: the model plane is the
- * deterministic offline provider and every source family is an in-memory fake
+ * deterministic test double and every source family is an in-memory fake
  * (composition adaptersOverride, the test-only seam with the same rule as
  * providerOverride). The stages' own zod schemas are the output authority —
- * this test is the schema-validity proof for every offline purpose handler.
+ * this test is the schema-validity proof for every purpose handler.
+ *
+ * The double is an isolated TEST FIXTURE (automated tests + browser E2E), not a
+ * product route: its filler must never be minted as scientific content, which is
+ * exactly what the real-content assertions below lock down.
  */
 
 const QUESTION =
@@ -111,13 +116,13 @@ let app: App;
 let cfgId: string;
 
 beforeAll(async () => {
-  tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'farlab-offline-run-'));
+  tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'farlab-test-double-run-'));
   app = await createApp({ dataDir: tmp, adaptersOverride: fakeAdapters() });
   const cfg = ModelProviderConfig.parse({
     id: newId('mcfg'),
-    label: 'offline dev route',
+    label: 'test double route',
     wire: 'offline',
-    baseUrl: OFFLINE_WIRE_BASE_URL,
+    baseUrl: TEST_DOUBLE_WIRE_BASE_URL,
     modelId: 'offline-dev',
     apiKey: '',
     createdAt: new Date().toISOString(),
@@ -128,19 +133,7 @@ beforeAll(async () => {
 });
 
 afterAll(() => {
-  // Close FIRST: node:sqlite runs WAL, and the seeded rows live in the -wal
-  // sidecar until close checkpoints them (known trap: copying only the main
-  // db file exports an empty schema). Then export the cache (fake-adapter
-  // responses under the EXACT keys the deterministic offline query plan
-  // produces) for the HTTP smoke's FARLAB_RETRIEVAL_REPLAY boot.
   app.close();
-  try {
-    fs.mkdirSync(path.join('evidence', 'offline-dev-smoke'), { recursive: true });
-    fs.copyFileSync(path.join(tmp, 'source-cache.db'), path.join('evidence', 'offline-dev-smoke', 'source-cache.db'));
-  } catch {
-    // Export is a smoke convenience, not an assertion; a missing file just
-    // means the smoke must be re-seeded from a fresh run of this test.
-  }
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
@@ -193,10 +186,10 @@ describe('offline dev run: full journey through the real orchestrator', () => {
       // (owner directive 2026-08-29: no demonstration content in the product).
       const scopeRec = final.stages.find((s) => s.stage === 'scope');
       expect(scopeRec?.state).toBe('skipped');
-      expect(String(scopeRec?.error)).toContain('deterministic development wire');
+      expect(String(scopeRec?.error)).toContain(TEMPLATE_REFUSAL_REASON);
       const hypStageRec = final.stages.find((s) => s.stage === 'generate_hypotheses');
       expect(hypStageRec?.state).toBe('skipped');
-      expect(String(hypStageRec?.error)).toContain('deterministic development wire');
+      expect(String(hypStageRec?.error)).toContain(TEMPLATE_REFUSAL_REASON);
       expect(app.store.listObjects('hypothesis', final.id)).toHaveLength(0);
       expect(app.store.listObjects('plan', final.id)).toHaveLength(0);
 

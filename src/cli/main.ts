@@ -99,31 +99,20 @@ const STAGE_GLYPH: Record<string, string> = UNICODE_OK
  */
 const startRun = async (question: string, goalType: string, domain: string, route?: string): Promise<void> => {
   assertDistFresh();
-  // --route offline|zai|dashscope|deepseek|universal: explicit model-route
-  // control (R4-P1). 'offline' pins the deterministic offline dev wire — the
-  // demo and acceptance path that needs no keys or network; live names resolve
-  // through the registry. Absent -> product-layer default (UI route > env chain).
+  // --route zai|dashscope|deepseek|universal: explicit model-route control (R4-P1).
+  // Live registry routes only — there is deliberately no keyless/deterministic
+  // route: every route the CLI can pin is a real endpoint the registry knows.
+  // Absent -> product-layer default (UI route > env chain).
   const routeOpts: AppOptions = {};
   /** Narrowed after the registry lookup below: route is a valid registry name. */
-  let routeOverride: 'zai' | 'dashscope' | 'deepseek' | 'universal' | 'offline' | undefined;
+  let routeOverride: 'zai' | 'dashscope' | 'deepseek' | 'universal' | undefined;
   if (route !== undefined) {
-    if (route === 'offline') {
-      routeOverride = 'offline';
-      const { createOfflineDevProvider } = await import('../providers/offline.js');
-      routeOpts.providerOverride = createOfflineDevProvider({
-        id: 'mcfg_cli_offline', label: '离线开发路由 (CLI --route offline)',
-        createdAt: '2026-08-27T00:00:00.000Z', updatedAt: '2026-08-27T00:00:00.000Z',
-        wire: 'offline', baseUrl: 'https://offline.farlab.invalid/v1',
-        modelId: 'farlab-offline-deterministic', apiKey: '', fallbackConfigIds: [],
-      });
-    } else {
-      const { getProvider } = await import('../providers/index.js');
-      const prov = getProvider(route);
-      if (prov === undefined) die(`--route: unknown route "${route}" (offline | zai | dashscope | deepseek | universal)`, 2);
-      routeOpts.providerOverride = prov;
-      // getProvider(route) returned a provider above — the string is a registry name.
-      routeOverride = route as 'zai' | 'dashscope' | 'deepseek' | 'universal';
-    }
+    const { getProvider } = await import('../providers/index.js');
+    const prov = getProvider(route);
+    if (prov === undefined) die(`--route: unknown route "${route}" (zai | dashscope | deepseek | universal)`, 2);
+    routeOpts.providerOverride = prov;
+    // getProvider(route) returned a provider above — the string is a registry name.
+    routeOverride = route as 'zai' | 'dashscope' | 'deepseek' | 'universal';
   }
   const app = await createApp(routeOpts);
   try {

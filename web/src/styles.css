@@ -515,6 +515,58 @@ a:hover { text-decoration: underline; }
 
 .app-body { display: flex; flex: 1; min-height: 0; align-items: stretch; }
 
+/* ---------- IDE shell: editor column + global panel + status bar ----------
+   Layout follows the mature-IDE convention (VS Code / Cursor / Trae):
+   full-height rail | (content over panel) | dock, status bar across the bottom. */
+.workbench-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.workbench-main > .content { flex: 1 1 auto; min-height: 0; }
+.workbench-main.is-panel-maximized > .content { display: none; }
+
+.status-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  height: 26px;
+  padding: 0 10px;
+  border-top: 1px solid var(--v2-border);
+  background: var(--v2-surface);
+  color: var(--v2-text-2);
+  font-size: 11px;
+}
+.status-group { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }
+.status-group--right { gap: 2px; }
+.status-conn { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--v2-text-3); flex: none; }
+.status-conn.is-online .status-dot { background: var(--v2-verified); }
+.status-conn.is-offline { color: var(--v2-refuted-on-tint); font-weight: 600; }
+.status-conn.is-offline .status-dot { background: var(--v2-refuted); }
+.status-item { white-space: nowrap; color: var(--v2-text-2); }
+.status-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 7px;
+  border: none;
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--v2-text-2);
+  font-size: 11px;
+  cursor: pointer;
+}
+.status-btn--icon { padding: 0 5px; }
+.status-btn:hover { background: var(--v2-surface-2); color: var(--v2-text-1); }
+.status-btn.is-active { background: var(--v2-surface-2); color: var(--v2-text-1); font-weight: 600; }
+.status-btn:focus-visible { outline: 2px solid var(--v2-info); outline-offset: 1px; }
+
 /* ---------- sidebar ---------- */
 .sidebar {
   width: 340px;

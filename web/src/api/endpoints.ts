@@ -431,8 +431,10 @@ const modelConfigOf = (data: unknown): ModelConfigSummary => {
   if (typeof data === 'object' && data !== null) {
     const c = data as Record<string, unknown>;
     // Full server wire enum (2026-08-26 drift fix): the guard once accepted only
-    // openai/anthropic, so a legitimately created gemini/offline config parsed
-    // as a schema error AFTER a successful server save.
+    // openai/anthropic, so a legitimately created gemini config parsed as a schema
+    // error AFTER a successful server save. 'offline' is the in-process test double:
+    // listed only on a test-harness server (FARLAB_TEST_DOUBLE=1), never a product
+    // route the settings UI can create.
     if (typeof c.id === 'string' && typeof c.label === 'string'
       && (c.wire === 'openai' || c.wire === 'anthropic' || c.wire === 'gemini' || c.wire === 'offline')
       && typeof c.baseUrl === 'string' && typeof c.modelId === 'string') {
@@ -1104,10 +1106,15 @@ const terminalSessionOf = (data: unknown): TerminalSessionView => {
   return data as TerminalSessionView;
 };
 
-export const listTerminalSessions = async (signal?: AbortSignal): Promise<TerminalSessionView[]> => {
+/** `maxSessions` is the server's concurrent cap — the panel's "+" disables at it. */
+export const listTerminalSessions = async (signal?: AbortSignal): Promise<{ sessions: TerminalSessionView[]; maxSessions: number }> => {
   const data = await api.getJson(`${BASE}/terminal/sessions`, signal);
   const sessions = (data as { sessions?: unknown }).sessions;
-  return Array.isArray(sessions) ? sessions.map(terminalSessionOf) : [];
+  const max = (data as { maxSessions?: unknown }).maxSessions;
+  return {
+    sessions: Array.isArray(sessions) ? sessions.map(terminalSessionOf) : [],
+    maxSessions: typeof max === 'number' && max > 0 ? max : 6,
+  };
 };
 
 export const createTerminalSession = async (signal?: AbortSignal): Promise<TerminalSessionView> =>

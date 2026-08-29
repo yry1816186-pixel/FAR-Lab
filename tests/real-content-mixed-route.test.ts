@@ -8,11 +8,12 @@ import { planStage } from '../src/pipeline/stages/plan.js';
 import { reviseStage } from '../src/pipeline/stages/revise.js';
 import type { StageContext } from '../src/pipeline/types.js';
 import { createTestStubProvider } from '../src/providers/test-stub.js';
-import { createOfflineDevProvider } from '../src/providers/offline.js';
+import { TEMPLATE_REFUSAL_REASON } from '../src/pipeline/stages/shared.js';
+import { createTestDoubleProvider } from '../src/providers/test-double.js';
 import {
   HypothesisCandidate,
   ModelProviderConfig,
-  OFFLINE_WIRE_BASE_URL,
+  TEST_DOUBLE_WIRE_BASE_URL,
   ResearchQuestion,
   ResearchRun,
   ScientificClaim,
@@ -104,19 +105,19 @@ const memArtifacts = () => {
   };
 };
 
-const offlineProvider = () => {
+const testDoubleProvider = () => {
   const cfg = ModelProviderConfig.parse({
     id: newId('mcfg'),
     label: 'offline dev wire (mixed-route regression)',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     wire: 'offline',
-    baseUrl: OFFLINE_WIRE_BASE_URL,
+    baseUrl: TEST_DOUBLE_WIRE_BASE_URL,
     modelId: 'farlab-offline-deterministic',
     apiKey: '',
     fallbackConfigIds: [],
   });
-  return createOfflineDevProvider(cfg);
+  return createTestDoubleProvider(cfg);
 };
 
 const makeCtx = (
@@ -154,9 +155,9 @@ const makeCtx = (
 describe('real-content discipline: mixed route (product run on the offline wire with real objects)', () => {
   it('falsify refuses template specs — hypothesis untouched, zero relations minted', async () => {
     const { store, run, hyp } = setup();
-    const out = await falsifyStage.execute(makeCtx(store, run, offlineProvider(), true));
+    const out = await falsifyStage.execute(makeCtx(store, run, testDoubleProvider(), true));
     expect(out.kind).toBe('skipped');
-    expect(out.kind === 'skipped' && out.reason).toContain('deterministic development wire');
+    expect(out.kind === 'skipped' && out.reason).toContain(TEMPLATE_REFUSAL_REASON);
     const stored = store.listObjects('hypothesis', run.id).find((h) => h.id === hyp.id);
     expect(stored?.falsification).toBeUndefined();
     expect(store.listObjects('evidence_relation', run.id)).toHaveLength(0);
@@ -164,18 +165,18 @@ describe('real-content discipline: mixed route (product run on the offline wire 
 
   it('rank refuses template scorecards — zero scorecards and tournament', async () => {
     const { store, run } = setup();
-    const out = await rankStage.execute(makeCtx(store, run, offlineProvider(), true));
+    const out = await rankStage.execute(makeCtx(store, run, testDoubleProvider(), true));
     expect(out.kind).toBe('skipped');
-    expect(out.kind === 'skipped' && out.reason).toContain('deterministic development wire');
+    expect(out.kind === 'skipped' && out.reason).toContain(TEMPLATE_REFUSAL_REASON);
     expect(store.listObjects('scorecard', run.id)).toHaveLength(0);
     expect(store.listObjects('tournament', run.id)).toHaveLength(0);
   });
 
   it('plan refuses the template research plan — zero plans persisted', async () => {
     const { store, run } = setup();
-    const out = await planStage.execute(makeCtx(store, run, offlineProvider(), true));
+    const out = await planStage.execute(makeCtx(store, run, testDoubleProvider(), true));
     expect(out.kind).toBe('skipped');
-    expect(out.kind === 'skipped' && out.reason).toContain('deterministic development wire');
+    expect(out.kind === 'skipped' && out.reason).toContain(TEMPLATE_REFUSAL_REASON);
     expect(store.listObjects('plan', run.id)).toHaveLength(0);
   });
 
@@ -189,9 +190,9 @@ describe('real-content discipline: mixed route (product run on the offline wire 
       provenance: 'mixed-route regression test',
       receivedAt: new Date().toISOString(),
     });
-    const out = await reviseStage.execute(makeCtx(store, run, offlineProvider(), true));
+    const out = await reviseStage.execute(makeCtx(store, run, testDoubleProvider(), true));
     expect(out.kind).toBe('skipped');
-    expect(out.kind === 'skipped' && out.reason).toContain('deterministic development wire');
+    expect(out.kind === 'skipped' && out.reason).toContain(TEMPLATE_REFUSAL_REASON);
     expect(store.listObjects('revision', run.id)).toHaveLength(0);
     expect(store.listObjects('feedback', run.id)).toHaveLength(1); // signal still pending, resumable
   });
@@ -229,7 +230,7 @@ describe('real-content discipline: mixed route (product run on the offline wire 
     // Execution 1: the offline wire under a product run — the refusal must fire
     // INSIDE the checkpointed fn so the template batch is NOT cached as a
     // successful step output.
-    const out1 = await rankStage.execute(makeCtx(store, run, offlineProvider(), true, cache));
+    const out1 = await rankStage.execute(makeCtx(store, run, testDoubleProvider(), true, cache));
     expect(out1.kind).toBe('skipped');
     expect(out1.kind === 'skipped' && out1.reason).toContain(TEMPLATE_REFUSAL_REASON);
     expect([...cache.keys()].filter((k) => k.includes('scoring'))).toHaveLength(0);
@@ -248,7 +249,7 @@ describe('real-content discipline: mixed route (product run on the offline wire 
 
   it('red-team P1-1: refusal skips carry the resume-reopen marker', async () => {
     const { store, run } = setup();
-    const out = await rankStage.execute(makeCtx(store, run, offlineProvider(), true));
+    const out = await rankStage.execute(makeCtx(store, run, testDoubleProvider(), true));
     expect(out.kind === 'skipped' && out.reason.startsWith(TEMPLATE_REFUSAL_REASON)).toBe(true);
   });
 

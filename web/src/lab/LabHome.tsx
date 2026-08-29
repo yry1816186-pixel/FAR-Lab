@@ -1,40 +1,50 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import { ApiError } from '../api/client';
 import { Badge, ErrorBox, TimeAgo } from '../components/common';
 import { useI18n } from '../i18n/LanguageContext';
-import type { DictKey } from '../i18n/dict';
 import { getHypotheses } from '../api/endpoints';
 import type { Conversation, HypothesisCandidate, RunSummary } from '../api/types';
 import { runStatusKey, runStatusTone } from '../tones';
 import { groupStudies, runLabel } from '../studies';
 import { useHealth } from '../hooks/useHealth';
+import { NewResearch } from './NewResearch';
 import './lab.css';
 
 /** Studies shown before the expand toggle (search overrides). */
 const STUDY_PREVIEW = 10;
 
 /**
- * Lab home — the product's front door (Research Experience Architecture A).
- * Three researcher-owned zones: what needs my judgment now (intervention
- * queue), my studies (index, one study per question), and — only on a fresh
- * workspace — the first-use path (what this is, environment check, model
- * config, first question). No system-object lists: every row is a decision
- * or a study, in researcher language.
+ * Lab home — the product's front door AND its only creation surface (Research
+ * Experience Architecture A). One entry point, no competing destinations:
+ * the new-research compose zone sits at the top of the workspace, followed by
+ * what needs my judgment now (intervention queue), my studies (index, one
+ * study per question), and — only on a fresh workspace — the first-use path
+ * (what this is, environment check, model config). No system-object lists:
+ * every row is a decision or a study, in researcher language.
  */
 export function LabHome({
   runs, runsLoading, runsError, conversations,
-  onOpenStudy, onOpenConversation, onOpenSettings, onRetryRuns, onAskQuestion, onJudgmentCount,
+  composeOpen, onComposeOpenChange, initialQuestion,
+  onOpenStudy, onOpenConversation, onStartConversation, onOpenSettings, onRetryRuns, onLaunched, onJudgmentCount,
 }: {
   runs: RunSummary[];
   runsLoading: boolean;
   runsError: ApiError | null;
   conversations: Conversation[];
+  /** Compose zone expanded (mirrors `#lab/new`) — the shell owns the state so
+   *  the URL and the panel can never disagree. */
+  composeOpen: boolean;
+  onComposeOpenChange: (open: boolean) => void;
+  /** Question handed to the compose zone (deep link / spine rerun). */
+  initialQuestion: string | null;
   onOpenStudy: (runId: string) => void;
   onOpenConversation: (id: string) => void;
+  /** Open a fresh dialogue to shape the question before launching. */
+  onStartConversation: () => void;
   onOpenSettings: () => void;
   onRetryRuns: () => void;
-  onAskQuestion: (text: string) => void;
+  onLaunched: (runId: string) => void;
   /** Lifts the judgment-queue size to the shell (rail badge) — one truth. */
   onJudgmentCount?: (n: number) => void;
 }): JSX.Element {
@@ -110,6 +120,21 @@ export function LabHome({
     onJudgmentCount?.(live.length + attentionAll.length + drafts.length + counterStudies.length);
   }, [live.length, attentionAll.length, drafts.length, counterStudies.length, onJudgmentCount]);
 
+  // One compose zone, one truth: the same component instance in both branches
+  // (fresh workspace = autofocus so typing can begin with zero navigation).
+  // It is never a second destination — the rail's 工作台 entry is the only
+  // navigation item that leads here.
+  const composeZone = (autoFocus: boolean): JSX.Element => (
+    <NewResearch
+      open={composeOpen}
+      onOpenChange={onComposeOpenChange}
+      initialQuestion={initialQuestion}
+      autoFocus={autoFocus}
+      onLaunched={onLaunched}
+      onOpenConversation={onStartConversation}
+    />
+  );
+
   return (
     <div className="lab-root">
       {/* No topline on the home: the rail's 工作台 entry already names this
@@ -124,11 +149,12 @@ export function LabHome({
             healthError={healthError !== null}
             checking={checking}
             onOpenSettings={onOpenSettings}
-            onAskQuestion={onAskQuestion}
-          />
+          >
+            {composeZone(true)}
+          </FirstUse>
         ) : (
           <>
-            <QuestionWelcome onAsk={onAskQuestion} />
+            {composeZone(false)}
             <section className="queue-section" aria-labelledby="labq-judgment">
               <h2 className="queue-section-title" id="labq-judgment">{t('labhome.judgmentTitle')}</h2>
               <p className="queue-section-sub">{t('labhome.judgmentSub')}</p>
@@ -279,87 +305,15 @@ export function LabHome({
   );
 }
 
-/** Question-first welcome zone (Bohrium parity): on a workspace with studies,
- *  the fastest path to the next study is still ONE question — a centered box
- *  that hands its text to research formation (route-carried prefill), plus
- *  quick-task templates that fill the box with a real question skeleton. The
- *  judgment queue below stays the operational heart of the home. */
-function QuestionWelcome({ onAsk, embedded = false }: { onAsk: (text: string) => void; embedded?: boolean }): JSX.Element {
-  const { t } = useI18n();
-  const [text, setText] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const QUICK: { key: DictKey; template: string }[] = [
-    { key: 'labhome.qkHypotheses', template: t('labhome.qkHypothesesTpl') },
-    { key: 'labhome.qkEvidence', template: t('labhome.qkEvidenceTpl') },
-    { key: 'labhome.qkPlan', template: t('labhome.qkPlanTpl') },
-  ];
-
-  const submit = (): void => {
-    const trimmed = text.trim();
-    if (trimmed.length === 0) return;
-    onAsk(trimmed);
-  };
-
-  return (
-    <section className={`qwelcome${embedded ? ' qwelcome--embedded' : ''}`} aria-label={t('labhome.qwTitle')}>
-      {!embedded && <h1 className="qw-title" id="qw-title">{t('labhome.qwTitle')}</h1>}
-      {!embedded && <p className="qw-sub">{t('labhome.qwSub')}</p>}
-      <div className="qw-box">
-        <input
-          ref={inputRef}
-          type="text"
-          className="qw-input"
-          value={text}
-          placeholder={t('labhome.qwPlaceholder')}
-          aria-label={t('labhome.qwPlaceholder')}
-          maxLength={600}
-          /* Fresh workspace: this box IS the first step — cursor lands here
-             so typing can begin with zero navigation. */
-          autoFocus={embedded}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }}
-        />
-        <button
-          type="button"
-          className="qw-go"
-          onClick={submit}
-          disabled={text.trim().length === 0}
-        >
-          {t('labhome.qwGo')}
-        </button>
-      </div>
-      <div className="qw-quick" role="group" aria-label={t('labhome.qwQuickLabel')}>
-        {QUICK.map((q) => (
-          <button
-            type="button"
-            key={q.key}
-            className="qw-chip"
-            title={t('labhome.qkHint', { text: q.template })}
-            onClick={() => {
-              setText(q.template);
-              inputRef.current?.focus();
-              inputRef.current?.setSelectionRange(q.template.length, q.template.length);
-            }}
-          >
-            {t(q.key)}
-          </button>
-        ))}
-      </div>
-      <p className="qw-note">{t('labhome.qwNote')}</p>
-    </section>
-  );
-}
-
-/** First-use zone (G1): what this is, is the engine ready, and the question
- *  box itself — the first-run researcher types their question HERE, not after
- *  a navigation hop (the formation screen receives it prefilled). */
-function FirstUse({ health, healthError, checking, onOpenSettings, onAskQuestion }: {
+/** First-use zone (G1): what this is, is the engine ready, and the compose
+ *  zone itself — the first-run researcher types their question HERE, not after
+ *  a navigation hop. */
+function FirstUse({ health, healthError, checking, onOpenSettings, children }: {
   health: { status: string; db: string; providers: { name: string; kind: string; liveReady: boolean }[] } | null;
   healthError: boolean;
   checking: boolean;
   onOpenSettings: () => void;
-  onAskQuestion: (text: string) => void;
+  children: React.ReactNode;
 }): JSX.Element {
   const { t } = useI18n();
   const liveProviders = health?.providers.filter((p) => p.kind === 'live') ?? [];
@@ -421,10 +375,9 @@ function FirstUse({ health, healthError, checking, onOpenSettings, onAskQuestion
         <p className="fu-hint">{t('labhome.fuRoutesHint')}</p>
       )}
 
-      {/* The question box IS the first step — the researcher types here, the
-          formation screen receives it prefilled (one hop less than a bare
-          CTA; the quick chips double as honest example questions). */}
-      <QuestionWelcome onAsk={onAskQuestion} embedded />
+      {/* The compose zone IS the first step — the researcher types here, in
+          the same surface that will later hold the queue and the studies. */}
+      {children}
 
       <p className="fu-note">{t('labhome.fuNote')}</p>
     </section>

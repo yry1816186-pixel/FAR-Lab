@@ -4,29 +4,36 @@ import { computeRequestHash } from './http.js';
 import { canonicalJson, canonicalSha256 } from '../shared/crypto.js';
 
 /**
- * OFFLINE DEVELOPMENT WIRE (providers/custom.ts wire='offline').
+ * IN-PROCESS TEST DOUBLE (providers/custom.ts wire='offline').
  *
- * A deterministic, in-process ModelProvider for the product's OFFLINE_DEVELOPMENT
- * truth mode: it performs NO network call, uses NO key, and answers every pipeline
- * purpose with a deterministic, schema-valid payload so a researcher can exercise
- * the full journey — create run, watch stages progress, read results — without
- * credentials or quota. It exists for development and demonstration only:
+ * A deterministic ModelProvider used EXCLUSIVELY as an isolated test fixture:
+ * automated tests and the browser E2E suite exercise the real pipeline, the real
+ * orchestrator and the real server without burning model quota or depending on
+ * network reachability. It performs NO network call and uses NO key.
  *
+ * It is NOT a product route and exists for NO demonstration or acceptance purpose:
+ *
+ * - it is absent from the provider catalog, the CLI route set and the settings UI;
+ * - the server refuses to create or activate such a config unless it was started
+ *   with FARLAB_TEST_DOUBLE=1 (scripts/serve-e2e.mjs is the only launcher that
+ *   sets it — see src/server/api.ts assertTestDoubleAllowed);
+ * - the env chain (defaultLiveProvider) refuses it and the registry's live set is
+ *   untouched; competition-route mode rejects it (not a Qwen-via-Bailian route);
  * - every receipt is stamped executionMode 'test' (never 'live');
- * - it is only ever reachable through an EXPLICIT user model config with
- *   wire 'offline' (run.providerConfigId / active default) — the env chain
- *   (defaultLiveProvider) refuses it and the registry's live set is untouched;
- * - competition-route mode rejects it (offline is not a Qwen-via-Bailian route);
  * - unknown purposes fall back to a minimal instance built from the call's strict
  *   JSON-Schema projection; if even that fails the caller's zod parse, the call
  *   fails visibly (invalid_output) — never a fabricated success.
  *
- * Generation strategy: purpose-keyed handlers produce semantically plausible
- * payloads that honour the pipeline's cross-reference contracts (echo input ids,
- * verbatim quotes, mirrored tournament verdicts); a generic schema walker covers
+ * Generation strategy: purpose-keyed handlers produce schema-valid payloads that
+ * honour the pipeline's cross-reference contracts (echo input ids, verbatim
+ * quotes, mirrored tournament verdicts); a generic schema walker covers
  * everything else. Handlers read req.userPayload DEFENSIVELY (unknown -> narrow):
  * a payload shape change degrades to minimal-valid output, and the caller's zod
  * parse stays the single authority either way.
+ *
+ * Its generated CONTENT is filler, never scientific output: pipeline stages and
+ * the API filter template-shaped objects out of every scientific projection
+ * (domain/scientific-state.ts isTemplateHypothesis / isTemplatePlan).
  */
 
 /** Stable string hash -> [0,1): deterministic pseudo-scores/verdicts, no RNG. */
@@ -293,15 +300,15 @@ const bilingualStatements: Handler = (p) => ({
     return [
       {
         hypothesisId: id,
-        statementZh: `【离线演示】${statement.slice(0, 200)}`,
-        mechanismZh: mechanism.length > 0 ? `【离线演示】${mechanism.slice(0, 200)}` : '',
+        statementZh: `【测试替身】${statement.slice(0, 200)}`,
+        mechanismZh: mechanism.length > 0 ? `【测试替身】${mechanism.slice(0, 200)}` : '',
       },
     ];
   }),
 });
 
 const bilingualObjective: Handler = (p) => ({
-  objectiveZh: `【离线演示】${(asString(p.objective) ?? questionTextOf(p)).slice(0, 200)}`,
+  objectiveZh: `【测试替身】${(asString(p.objective) ?? questionTextOf(p)).slice(0, 200)}`,
 });
 
 const dimensionScores: Handler = (p) => {
@@ -534,8 +541,8 @@ const conversationTurn: Handler = (payload) => {
   const m = /「([^」]{6,2000})」/.exec(task);
   const question = m !== null ? m[1]! : '';
   const reply = question.length > 0
-    ? `（离线开发路线确定性回复）已收到你的消息：「${question}」。\n\n这条路线不联网、不调用真实模型——用于开发与界面验收：对话式创建、研究运行与结果阅读的全流程可以走通，所有回执均标记为 test 模式；模型判断内容会被如实拒绝，文献检索照常真实执行。下面已把你的原话列为候选研究问题，可直接发起一次完整研究。`
-    : '（离线开发路线确定性回复）已收到你的消息。这条路线不联网、不调用真实模型——用于开发与界面验收；如需真实文献检索与模型推理，请在设置中切换到已配置密钥的路线。';
+    ? `（测试替身确定性回复）已收到你的消息：「${question}」。\n\n当前路线是在进程内的测试替身：不联网、不调用真实模型，回执标记为 test 模式，用于自动化测试驱动完整流程；它产生的任何内容都是占位填充，不构成科学判断，也不可用于展示。请在设置中配置真实模型路线后再发起研究。`
+    : '（测试替身确定性回复）已收到你的消息。当前路线是在进程内的测试替身，不联网、不调用真实模型，仅供自动化测试使用；请在设置中配置真实模型路线以获得真实推理。';
   return {
     action: 'finish',
     reason: 'offline deterministic reply: the development route exercises the conversation flow without tools or network',
@@ -609,7 +616,7 @@ const PREFIX_HANDLERS: ReadonlyArray<readonly [string, Handler]> = [
 type JsonSchema = { type?: string; enum?: unknown[]; items?: JsonSchema; properties?: Record<string, JsonSchema>; required?: string[]; anyOf?: JsonSchema[] };
 
 const templateString = (purpose: string, field: string): string =>
-  `offline ${field} (${purpose})`;
+  `test-double ${field} (${purpose})`;
 
 const instanceFromSchema = (schema: JsonSchema, purpose: string, field: string, depth: number): unknown => {
   if (depth > 10) return null;
@@ -645,12 +652,12 @@ const instanceFromSchema = (schema: JsonSchema, purpose: string, field: string, 
 // provider
 // ---------------------------------------------------------------------------
 
-export const createOfflineDevProvider = (cfg: ModelProviderConfig): ModelProvider => {
+export const createTestDoubleProvider = (cfg: ModelProviderConfig): ModelProvider => {
   const name = `custom:${cfg.id}`;
   return {
     name,
-    // No credentials are needed — the route is usable by construction (it is also,
-    // by construction, never a live route; receipts carry that truth).
+    // No credentials are needed — the double answers in-process. It is never a
+    // live route: every receipt below is stamped executionMode 'test'.
     liveReady: true,
     async structuredCall<T>(
       req: StructuredCallRequest,
@@ -708,7 +715,7 @@ export const createOfflineDevProvider = (cfg: ModelProviderConfig): ModelProvide
         error: {
           kind: 'invalid_output',
           message:
-            `[offline-dev] no deterministic payload satisfied the schema for purpose "${req.purpose}" ` +
+            `[test-double] no deterministic payload satisfied the schema for purpose "${req.purpose}" ` +
             `(${handler !== undefined ? 'purpose handler and schema-walker both rejected' : 'no purpose handler and schema-walker rejected'} ` +
             '— the caller schema and the offline generator disagree; fix the generator or the schema). ' +
             `First parse error: ${why.slice(0, 400)}`,

@@ -771,6 +771,11 @@ export interface ResearchActionResponse {
 
 // ---- user-defined model configurations (custom model routes) ----
 
+/**
+ * Transport wire of a stored model config. 'offline' is NOT a transport and NOT a
+ * product route: it is the in-process test double, visible only on a test-harness
+ * server (FARLAB_TEST_DOUBLE=1). The settings UI can create openai/anthropic/gemini.
+ */
 export type ProviderWireProtocol = 'openai' | 'anthropic' | 'gemini' | 'offline';
 
 /** Preset provider template (server catalog.ts) — one-click prefill, not a whitelist. */

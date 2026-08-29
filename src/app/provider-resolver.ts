@@ -9,23 +9,16 @@ import { computeRequestHash } from '../providers/http.js';
 import { canonicalSha256 } from '../shared/crypto.js';
 import { isQwenFamily, isBailianEndpoint } from '../model-plane/capabilities.js';
 import { getProvider } from '../providers/index.js';
-import { createOfflineDevProvider } from '../providers/offline.js';
 
-/** Registry route a run may pin via routeOverride — same set the CLI --route accepts. */
-export type BuiltinRouteName = 'zai' | 'dashscope' | 'deepseek' | 'universal' | 'offline';
+/**
+ * Registry route a run may pin via routeOverride — same set the CLI --route accepts.
+ * Live transport routes only: the in-process test double is not a pinnable route.
+ */
+export type BuiltinRouteName = 'zai' | 'dashscope' | 'deepseek' | 'universal';
 
-/** The built-in provider for a named route ('offline' = the deterministic dev wire). */
-export const builtinRouteProvider = (route: BuiltinRouteName): ModelProvider | null => {
-  if (route === 'offline') {
-    return createOfflineDevProvider({
-      id: 'mcfg_cli_offline', label: '离线开发路由 (routeOverride)',
-      createdAt: '2026-08-28T00:00:00.000Z', updatedAt: '2026-08-28T00:00:00.000Z',
-      wire: 'offline', baseUrl: 'https://offline.farlab.invalid/v1',
-      modelId: 'farlab-offline-deterministic', apiKey: '', fallbackConfigIds: [],
-    });
-  }
-  return getProvider(route) ?? null;
-};
+/** The built-in live provider for a named registry route. */
+export const builtinRouteProvider = (route: BuiltinRouteName): ModelProvider | null =>
+  getProvider(route) ?? null;
 
 /**
  * Runtime model-route resolution for the user configuration layer:
@@ -137,6 +130,40 @@ type ModelProviderConfigChain =
   | { kind: 'routes'; routes: Array<{ provider: ModelProvider; configId: string }> }
   | { kind: 'missing'; configId: string };
 
+/**
+ * The in-process test double (wire 'offline') is a TEST FIXTURE, not a route a
+ * researcher may run on. Only a server started with FARLAB_TEST_DOUBLE=1 (the E2E
+ * launcher) may serve it; anywhere else a leftover or hand-seeded test-double
+ * config resolves to a fail-closed refusal instead of quietly producing
+ * deterministic filler content.
+ */
+export const testDoubleEnabled = (): boolean => process.env.FARLAB_TEST_DOUBLE === '1';
+
+const testDoubleRefusalProvider = (): ModelProvider => ({
+  name: 'test-double-gate',
+  liveReady: false,
+  structuredCall<T>(req: StructuredCallRequest): Promise<StructuredCallResult<T>> {
+    return Promise.resolve({
+      ok: false,
+      error: {
+        kind: 'provider_error',
+        message:
+          'test-double-gate: the selected model config is the in-process test double (wire "offline"), which is an isolated test fixture for automated tests and the browser E2E suite — not a product route. Select a real model route in settings (or start the server with FARLAB_TEST_DOUBLE=1 for test harnesses).',
+        retryable: false,
+      },
+      receipt: {
+        provider: 'test-double-gate',
+        modelId: '(refused)',
+        latencyMs: 0,
+        usage: {},
+        requestHash: computeRequestHash(req),
+        outputHash: canonicalSha256(''),
+        executionMode: 'test',
+      },
+    });
+  },
+});
+
 export const resolveRunProvider = (store: Store, run: ResearchRun): ModelProvider | null => {
   const competition = readCompetitionRouteMode(store);
   // Run-scoped built-in route (CLI --route): pinned at creation so a resume in a
@@ -163,6 +190,10 @@ export const resolveRunProvider = (store: Store, run: ResearchRun): ModelProvide
   }
   const chain = buildChain(store, configId);
   if (chain.kind === 'missing') return missingConfigProvider(configId);
+  if (!testDoubleEnabled()) {
+    const primary = store.getObject('model_config', configId);
+    if (primary !== null && primary.wire === 'offline') return testDoubleRefusalProvider();
+  }
   if (competition) {
     // EVERY route in the chain (primary + declared failovers) must comply: a mid-run
     // failover onto a non-compliant route would breach the official rule invisibly.

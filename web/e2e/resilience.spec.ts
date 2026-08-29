@@ -61,12 +61,15 @@ test('failure injection: mid-run cancel (armed) -> honest cancelled state -> res
 });
 
 test('structure regression: §26 negative-acceptance invariants hold on the shipped surfaces', async ({ page }) => {
-  // Home: no permanent dual-list sidebar chrome; judgment queue is the front door.
+  // Home: no permanent dual-list sidebar chrome; judgment queue is the front
+  // door, and the compose zone rides inside it — never a second rail entry.
   await page.goto('/#/');
-  await expect(page.getByRole('button', { name: /新研究|New research/ }).first()).toBeVisible();
+  await expect(page.locator('#nr-question')).toBeVisible();
+  await expect(page.locator('nav.app-rail').getByRole('button', { name: /新研究|New research/ })).toHaveCount(0);
   expect(await page.locator('.runs-sidebar, .sidebar-dock, nav.runs-nav').count()).toBe(0);
 
-  // Formation: no 6-tab chrome on the creation surface.
+  // Creation surface: no 6-tab chrome (#lab/new is the workspace with the
+  // compose zone expanded, not a separate screen).
   await page.goto('/#lab/new');
   await expect(page.locator('#nr-question')).toBeVisible();
   expect(await page.locator('.tab-bar, .run-tabs, [role="tablist"]').count()).toBe(0);

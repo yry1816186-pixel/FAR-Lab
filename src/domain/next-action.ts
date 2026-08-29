@@ -152,8 +152,8 @@ export function deriveNextActions(input: ActionDerivationInput): NextResearchAct
   // -- Truth gates first: template content and insufficient states are CONCLUSIONS, not config problems --
   if (state.kind === 'template') {
     actions.push(mk('RERUN_WITH_LIVE_ROUTE', {
-      objective: '用真实模型路线重新运行本研究，替换离线模板产物',
-      knowledgeGap: '当前假设/范围由离线确定性模板生成，不含真实科学推理',
+      objective: '用真实模型路线重新运行本研究，替换测试替身填充产物',
+      knowledgeGap: '当前假设/范围由测试替身填充内容生成，不含真实科学推理',
       rationale: `检测到模板标记：${state.templateEvidence.map(templateMarkerZh).join('；')}。模板内容不构成科学判断，重跑是唯一获得真实假设的路径`,
       wouldChange: wouldChangeOf('真实路线将生成基于所检索文献的可证伪假设，当前“证据不足”结论将被真实排序替换', 'A live route will generate falsifiable hypotheses grounded in the retrieved literature; the current "insufficient evidence" conclusion will be replaced by a real ranking').wouldChange,
       expectedDiscrimination: 'high', feasibility: 'high', costClass: 'medium',

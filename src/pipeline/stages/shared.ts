@@ -46,17 +46,17 @@ export const TEMPLATE_REFUSAL_REASON = 'template_mode_refused';
 
 /**
  * Thrown by judgment call sites when a PRODUCT run's receipt is test-mode: the
- * deterministic offline development wire answers purposes with template
- * payloads, which must never be stored as scientific content. Stage handlers
- * catch this and record an honest skip carrying TEMPLATE_REFUSAL_REASON
- * (resumable once a live route serves — the orchestrator reopens marker skips).
- * Throw it INSIDE ctx.checkpointed fns: a refusal must never be cached as a
- * successful step output (red-team P1-2 poison loop).
+ * in-process test double answers purposes with filler payloads, which must never
+ * be stored as scientific content. Stage handlers catch this and record an honest
+ * skip carrying TEMPLATE_REFUSAL_REASON (resumable once a live route serves — the
+ * orchestrator reopens marker skips). Throw it INSIDE ctx.checkpointed fns: a
+ * refusal must never be cached as a successful step output (red-team P1-2 poison
+ * loop).
  */
 export class TemplateModeRefusal extends Error {
   constructor(readonly what: string) {
     super(
-      `${TEMPLATE_REFUSAL_REASON}: model route is the deterministic development wire — template ${what} refused as scientific content ` +
+      `${TEMPLATE_REFUSAL_REASON}: model route is the in-process test double — filler ${what} refused as scientific content ` +
         `in a product run; restore a live model route and resume (marker-skipped stages are reopened automatically)`,
     );
     this.name = 'TemplateModeRefusal';

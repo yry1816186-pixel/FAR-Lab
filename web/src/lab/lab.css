@@ -620,6 +620,37 @@
 .nr-cite textarea:focus-visible { outline: 2px solid var(--v2-info); outline-offset: 1px; }
 .nr-cite-acts { display: flex; align-items: center; gap: 10px; }
 
+/* ---- New-research compose zone, embedded in the workspace ----
+   Same component as the former standalone formation screen, now living at the
+   top of 工作台: the rail has one work entry, the researcher never picks
+   between "workspace" and "new research". Collapsed = quick start; expanded =
+   the full option set (materials, route, scope review). */
+.nr-embed { margin-bottom: 30px; }
+.nr-embed-head { margin-bottom: 10px; }
+.nr-embed-title { margin: 0 0 4px; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; color: var(--v2-text-1); }
+.nr-embed-sub { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--v2-text-2); max-width: 68ch; }
+.nr-card--embed { padding: 16px 18px; gap: 10px; }
+.nr-quick { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+.nr-embed-acts { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.nr-embed-acts .nr-submit,
+.nr-embed-acts .nr-secondary { display: inline-flex; align-items: center; gap: 6px; }
+.nr-embed-acts .nr-tools-hint { flex-basis: 100%; }
+.nr-embed-side {
+  display: grid; gap: 6px; padding-top: 10px;
+  border-top: 1px dashed var(--v2-border);
+}
+.nr-embed-side-title { margin: 0; font-size: 12.5px; font-weight: 700; color: var(--v2-text-1); }
+.nr-embed-foot { display: flex; justify-content: flex-end; }
+.nr-embed-foot .nr-linklike,
+.nr-embed-acts .nr-secondary { display: inline-flex; align-items: center; gap: 5px; }
+.nr-linklike:disabled { opacity: 0.45; cursor: not-allowed; }
+@media (max-width: 600px) {
+  /* 375px integrity: the scope grid and the action rows must never widen the
+     page (narrow-viewport E2E asserts scrollWidth === innerWidth). */
+  .nr-card--embed { padding: 14px 12px; }
+  .nr-review-grid { grid-template-columns: 1fr; }
+}
+
 /* First-use route readiness detail (P2): which routes, per-route mark */
 .fu-routes-detail { display: flex; flex-wrap: wrap; gap: 4px 6px; margin-top: 4px; }
 /* One chip per route — the readiness mark lives INSIDE the chip, so it can
@@ -1020,95 +1051,158 @@
 .rail-group-add:hover { color: var(--v2-info-on-tint); background: var(--v2-info-tint); }
 .rail-group-add:focus-visible { outline: 2px solid var(--v2-info); outline-offset: 1px; }
 
-/* ---------- integrated terminal (extensibility lane) ---------- */
-.term-root {
-  min-height: 100vh;
+/* ---------- global terminal panel (IDE panel parity) ----------
+   The terminal is SHELL chrome: it sits under the workbench (never inside a
+   route), spans the editor column, and survives every navigation. */
+.ide-panel {
+  position: relative;
   display: flex;
   flex-direction: column;
-  background: var(--v2-page-bg);
+  flex-shrink: 0;
+  min-height: 0;
+  border-top: 1px solid var(--v2-border);
+  background: var(--v2-surface);
   color: var(--v2-text-1);
 }
-.term-topline {
+.ide-panel.is-maximized { flex: 1 1 auto; }
+.ide-panel.is-collapsed { flex: 0 0 auto; }
+
+/* Drag/keyboard resize handle: 7px hit area straddling the panel border. */
+.ide-panel__resizer {
+  position: absolute;
+  top: -3px; left: 0; right: 0;
+  height: 7px;
+  cursor: row-resize;
+  z-index: 5;
+}
+.ide-panel__resizer:hover,
+.ide-panel__resizer:focus-visible { background: var(--v2-info); opacity: 0.4; outline: none; }
+body.is-resizing-panel { cursor: row-resize; user-select: none; }
+
+.ide-panel__bar {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px 22px 10px;
+  gap: 6px;
+  height: 34px;
+  padding: 0 6px 0 2px;
   border-bottom: 1px solid var(--v2-border);
   background: var(--v2-surface);
+  overflow: hidden;
 }
-.term-topline .term-title { font-size: 14px; font-weight: 700; }
-.term-shell-tag {
-  font-size: 11px;
-  color: var(--v2-text-3);
-  border: 1px solid var(--v2-border);
-  border-radius: 999px;
-  padding: 1px 8px;
-}
-.term-spacer { flex: 1; }
-.term-note {
-  margin: 8px 22px 0;
-  font-size: 11.5px;
-  color: var(--v2-text-3);
-}
-.term-error {
-  margin: 8px 22px 0;
-  font-size: 12px;
-  color: var(--v2-refuted);
-}
-.term-body {
-  flex: 1;
-  display: flex;
-  gap: 12px;
-  padding: 14px 22px 30px;
-  min-height: 0;
-}
-.term-tabs {
-  display: flex;
-  flex-direction: column;
+.ide-panel.is-collapsed .ide-panel__bar { border-bottom: none; }
+.panel-tab {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
-  min-width: 170px;
-}
-.term-tab-row { display: flex; align-items: center; gap: 4px; }
-.term-tab {
-  flex: 1;
-  font-size: 12px;
-  text-align: left;
-  padding: 5px 9px;
-  border-radius: 7px;
-  border: 1px solid var(--v2-border);
-  background: var(--v2-surface);
-  color: var(--v2-text-2, inherit);
+  height: 34px;
+  padding: 0 10px;
+  border: none;
+  border-bottom: 2px solid var(--v2-info);
+  background: transparent;
+  color: var(--v2-text-1);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   cursor: pointer;
 }
-.term-tab.is-active { border-color: var(--v2-info); color: var(--v2-text-1); font-weight: 600; }
-.term-tab-kill {
+.panel-tab-count {
+  min-width: 16px; height: 16px; padding: 0 4px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 600;
+  color: var(--v2-text-2);
+  background: var(--v2-surface-2);
+  border-radius: var(--radius-pill);
+}
+.panel-spacer { flex: 1; }
+.panel-act {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px; height: 24px;
   border: none;
+  border-radius: var(--radius-s);
   background: transparent;
   color: var(--v2-text-3);
   cursor: pointer;
-  padding: 3px;
-  border-radius: 5px;
 }
-.term-tab-kill:hover { color: var(--v2-refuted); }
+.panel-act:hover:not(:disabled) { color: var(--v2-text-1); background: var(--v2-surface-2); }
+.panel-act:disabled { opacity: 0.4; cursor: not-allowed; }
+.panel-act:focus-visible { outline: 2px solid var(--v2-info); outline-offset: 1px; }
+
+/* Session tabs: one row, horizontally scrollable (multi-session is the point). */
+.term-session-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.term-session-tabs::-webkit-scrollbar { height: 0; }
+.term-session-tab-row {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-s);
+}
+.term-session-tab-row.is-active { border-color: var(--v2-border); background: var(--v2-page-bg); }
+.term-session-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 190px;
+  padding: 3px 4px 3px 7px;
+  border: none;
+  background: transparent;
+  color: var(--v2-text-3);
+  font-size: 11.5px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.term-session-tab-row.is-active .term-session-tab { color: var(--v2-text-1); font-weight: 600; }
+.term-session-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--v2-text-3); flex: none; }
+.term-session-dot[data-alive='true'] { background: var(--v2-verified); }
+.term-session-act {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 5px;
+  border: none;
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--v2-text-3);
+  cursor: pointer;
+}
+.term-session-act:hover { color: var(--v2-refuted); background: var(--v2-surface-2); }
+.term-session-act:focus-visible { outline: 2px solid var(--v2-info); outline-offset: 1px; }
+
+.ide-panel__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 10px 10px;
+}
 .term-pane {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   border: 1px solid var(--v2-border);
-  border-radius: 10px;
+  border-radius: var(--radius-s);
   background: var(--code-bg);
-  min-height: 380px;
   overflow: hidden;
 }
 .term-scroll {
   flex: 1;
+  min-height: 0;
   overflow: auto;
-  padding: 10px 12px;
+  padding: 8px 10px;
 }
 .term-pre {
   margin: 0;
-  font-family: var(--font-mono, ui-monospace, 'IBM Plex Mono', Consolas, monospace);
-  font-size: 12.5px;
+  font-family: var(--font-data, ui-monospace, 'IBM Plex Mono', Consolas, monospace);
+  font-size: var(--fs-data);
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-all;
@@ -1119,7 +1213,7 @@
   align-items: center;
   gap: 8px;
   border-top: 1px solid var(--v2-border);
-  padding: 8px 12px;
+  padding: 6px 10px;
 }
 .term-prompt { color: var(--v2-info); font-weight: 700; }
 .term-input {
@@ -1127,7 +1221,23 @@
   border: none;
   background: transparent;
   color: var(--v2-text-1);
-  font-family: var(--font-mono, ui-monospace, 'IBM Plex Mono', Consolas, monospace);
-  font-size: 12.5px;
+  font-family: var(--font-data, ui-monospace, 'IBM Plex Mono', Consolas, monospace);
+  font-size: var(--fs-data);
   outline: none;
 }
+.term-input:disabled { color: var(--v2-text-3); }
+.term-error { margin: 6px 2px 0; font-size: var(--fs-aux); color: var(--v2-refuted); }
+.term-note { margin: 6px 2px 0; font-size: 11px; color: var(--v2-text-3); }
+.term-note--compact { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.term-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 8px;
+  color: var(--v2-text-3);
+  font-size: var(--fs-aux);
+}
+.term-empty p { margin: 0; }

@@ -11,19 +11,26 @@ import { ModelConfigId } from './ids.js';
 
 /**
  * Transport wire the custom endpoint speaks — the three the transport core
- * implements plus the deterministic in-process development wire. 'gemini' is
- * the Google generativelanguage generateContent REST shape (the native path for
- * Gemini models worldwide; OpenAI-compat also exists but the native wire
- * carries thinkingConfig/usageMetadata faithfully). 'offline' is the
- * OFFLINE_DEVELOPMENT route (providers/offline.ts): no network, no key,
- * purpose-keyed deterministic outputs, every receipt stamped
- * executionMode 'test' — it can never masquerade as a live model call.
+ * implements, plus ONE non-transport value that is NOT a product route.
+ * 'gemini' is the Google generativelanguage generateContent REST shape (the
+ * native path for Gemini models worldwide; OpenAI-compat also exists but the
+ * native wire carries thinkingConfig/usageMetadata faithfully).
+ *
+ * 'offline' is the IN-PROCESS TEST DOUBLE (providers/test-double.ts): no network,
+ * no key, purpose-keyed deterministic outputs, every receipt stamped
+ * executionMode 'test'. It is an isolated test fixture for automated tests and
+ * the browser E2E suite — gated server-side by FARLAB_TEST_DOUBLE=1, absent from
+ * the provider catalog, the CLI route set and the settings UI. A researcher can
+ * never select it, and it can never masquerade as a live model call.
  */
 export const ProviderWireProtocol = z.enum(['openai', 'anthropic', 'gemini', 'offline']);
 export type ProviderWireProtocol = z.infer<typeof ProviderWireProtocol>;
 
-/** Offline dev routes: no real endpoint is contacted, so the URL is a fixed sentinel. */
-export const OFFLINE_WIRE_BASE_URL = 'https://offline.farlab.invalid/v1';
+/** Product-selectable wires: everything a researcher can actually configure as a route. */
+export const PRODUCT_WIRE_PROTOCOLS: readonly ProviderWireProtocol[] = ['openai', 'anthropic', 'gemini'];
+
+/** Test-double wire: no real endpoint is contacted, so the URL is a fixed sentinel. */
+export const TEST_DOUBLE_WIRE_BASE_URL = 'https://offline.farlab.invalid/v1';
 
 /**
  * Per-config REASONING CAPABILITY declaration (product configuration layer):
@@ -109,9 +116,8 @@ const assertReasoningWireCompat = (
     thinking_config: 'gemini',
   };
   if (cfg.wire === 'offline') {
-    // The offline wire never emits thinking fields: declaring a dialect on a
-    // deterministic in-process route would be a config lie.
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['reasoning'], message: 'offline wire is deterministic in-process development — it speaks no thinking dialect; remove the reasoning declaration' });
+    // The in-process test double never emits thinking fields.
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['reasoning'], message: 'wire "offline" is the in-process test double (test/E2E only) — it speaks no thinking dialect; remove the reasoning declaration' });
     return;
   }
   if (cfg.wire !== requiredWire[style]) {

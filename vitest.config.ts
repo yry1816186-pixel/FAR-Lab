@@ -13,6 +13,10 @@ export default defineConfig({
       // the suite hermetic against CI environments that set CI=true (which
       // would otherwise force colors on and break plain-text assertions).
       NO_COLOR: '1',
+      // Automated tests are an allowed consumer of the in-process test double
+      // (see src/app/provider-resolver.ts); the vitest process must carry the
+      // same gate key scripts/serve-e2e.mjs sets for the browser E2E harness.
+      FARLAB_TEST_DOUBLE: '1',
     },
   },
 });

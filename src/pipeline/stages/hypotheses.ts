@@ -619,7 +619,7 @@ export const generateHypothesesStage: StageHandler = {
         return {
           kind: 'skipped',
           reason:
-            `${TEMPLATE_REFUSAL_REASON}: model route is the deterministic development wire — template hypotheses are refused as scientific content; ` +
+            `${TEMPLATE_REFUSAL_REASON}: model route is the in-process test double — filler hypotheses are refused as scientific content; ` +
             'the evidence base (real retrieved claims) stands, and hypotheses require a live model route (restore the route and resume, or rerun via 研究地图 or CLI)',
         };
       }

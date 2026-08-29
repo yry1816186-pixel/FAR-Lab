@@ -6,7 +6,7 @@ import {
   type FetchLike,
   type SleepLike,
 } from './http.js';
-import { createOfflineDevProvider } from './offline.js';
+import { createTestDoubleProvider } from './test-double.js';
 
 /**
  * User-defined model route: a thin generalization of the zai (anthropic wire),
@@ -42,7 +42,7 @@ const liveWireOf = (w: ModelProviderConfig['wire']): LiveWire | null => {
     case 'gemini':
       return 'gemini';
     default:
-      return null; // 'offline': deterministic in-process route, not a transport wire
+      return null; // 'offline': in-process test double, not a transport wire
   }
 };
 
@@ -53,7 +53,7 @@ export const createCustomProvider = (
   const name = `${CUSTOM_PROVIDER_PREFIX}${cfg.id}`;
   return {
     name,
-    // An offline route needs no credentials; live routes need their key.
+    // The in-process test double needs no credentials; live routes need their key.
     liveReady: cfg.wire === 'offline' ? true : cfg.apiKey.length > 0,
     structuredCall<T>(
       req: StructuredCallRequest,
@@ -61,9 +61,10 @@ export const createCustomProvider = (
     ): Promise<StructuredCallResult<T>> {
       const wire = liveWireOf(cfg.wire);
       if (wire === null) {
-        // OFFLINE_DEVELOPMENT wire: deterministic in-process route — no network,
-        // no key, every receipt executionMode 'test' (providers/offline.ts).
-        return createOfflineDevProvider(cfg).structuredCall(req, parse);
+        // Test-double wire: deterministic in-process double — no network, no key,
+        // every receipt executionMode 'test' (providers/test-double.ts). Reachable
+        // only from configs created under FARLAB_TEST_DOUBLE=1.
+        return createTestDoubleProvider(cfg).structuredCall(req, parse);
       }
       if (cfg.apiKey.length === 0) {
         // Fail closed: no key -> no network, no fabricated output (same rule as zai/dashscope).

@@ -1,8 +1,13 @@
 #!/usr/bin/env node
 /**
  * E2E server launcher (HX §19): boots the REAL product (root dist + web/dist)
- * on a scratch workspace + fixed port, with a deterministic OFFLINE model
+ * on a scratch workspace + fixed port, with the in-process TEST-DOUBLE model
  * config pre-created and activated, so the suite needs no keys or network.
+ *
+ * FARLAB_TEST_DOUBLE=1 is what separates this harness from the product: the
+ * test double is an isolated test fixture (providers/test-double.ts), never a
+ * route a researcher can select. A normal (`scripts/serve.mjs`) server refuses
+ * to create, list, activate or run it.
  * Print the URL for Playwright's webServer.url probe and stay in foreground.
  */
 import { spawn } from 'node:child_process';
@@ -22,6 +27,8 @@ const env = {
   FARLAB_DATA_DIR: dataDir,
   PORT,
   FARLAB_AUTOMATIONS: 'off',
+  // Opt-in: unlocks the in-process test double for this harness only.
+  FARLAB_TEST_DOUBLE: '1',
 };
 const child = spawn(process.execPath, ['scripts/serve.mjs'], { cwd, env, stdio: 'inherit' });
 
@@ -43,12 +50,12 @@ if (!ready) {
   process.exit(3);
 }
 
-// Deterministic offline route, created + activated once per suite run.
+// In-process test double, created + activated once per suite run.
 const cfg = await fetch(`http://127.0.0.1:${PORT}/api/v1/model-configs`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
-    label: '离线开发路由（E2E）',
+    label: '测试替身路由（E2E）',
     wire: 'offline',
     baseUrl: 'https://offline.farlab.invalid/v1',
     modelId: 'farlab-offline-deterministic',
@@ -62,7 +69,7 @@ await fetch(`http://127.0.0.1:${PORT}/api/v1/model-configs/active`, {
   body: JSON.stringify({ id: cfg.config.id }),
 });
 
-console.log(`serve-e2e: ready at ${HEALTH} (offline route ${cfg.config.id})`);
+console.log(`serve-e2e: ready at ${HEALTH} (test-double route ${cfg.config.id})`);
 
 // Windows: child.kill('SIGTERM') terminates ONLY the direct child — the
 // serve.mjs process tree can survive Playwright's teardown, leaving a stale

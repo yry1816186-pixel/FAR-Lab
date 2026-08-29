@@ -62,15 +62,15 @@ export const scopeStage: StageHandler = {
     });
     const r = res.data;
 
-    // Real-content discipline (owner directive 2026-08-29): a deterministic
-    // development wire's refinement is template scaffolding, not analysis of
-    // the user's question. Refuse adoption — the user's own scope stands and
-    // every surface stays truthful (the proposal panel reports unavailability).
+    // Real-content discipline (owner directive 2026-08-29): the in-process test
+    // double's refinement is filler scaffolding, not analysis of the user's
+    // question. Refuse adoption — the user's own scope stands and every surface
+    // stays truthful (the proposal panel reports unavailability).
     if (ctx.productRun === true && res.executionMode === 'test') {
       return {
         kind: 'skipped',
         reason:
-          `${TEMPLATE_REFUSAL_REASON}: model route is the deterministic development wire — template scope output is refused as scientific content; ` +
+          `${TEMPLATE_REFUSAL_REASON}: model route is the in-process test double — filler scope output is refused as scientific content; ` +
           'configure a live model route and resume to obtain a real scope refinement',
       };
     }

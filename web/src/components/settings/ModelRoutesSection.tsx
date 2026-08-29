@@ -41,13 +41,12 @@ interface FormState {
 const EMPTY_FORM: FormState = { id: null, label: '', wire: 'openai', baseUrl: '', modelId: '', apiKey: '', fallbackConfigIds: [], pricingIn: '', pricingOut: '', reasoningStyle: '', reasoningDefaultGear: 'medium' };
 
 /**
- * Keyless-by-design routes: the offline dev wire, and local self-hosted
- * endpoints (Ollama/vLLM/LM Studio presets — the catalog itself documents
- * their keys as optional). Audit P2: the create gate once demanded a key for
- * these too, blocking the same one-click journey class as the offline bug.
+ * Keyless-by-design routes: local self-hosted endpoints (Ollama/vLLM/LM Studio
+ * presets — the catalog itself documents their keys as optional). Audit P2: the
+ * create gate once demanded a key for these too, blocking one-click setup.
  */
-const keylessRoute = (wire: ProviderWireProtocol, baseUrl: string): boolean =>
-  wire === 'offline' || /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(:\d+)?(\/|$)/i.test(baseUrl.trim());
+const keylessRoute = (baseUrl: string): boolean =>
+  /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(:\d+)?(\/|$)/i.test(baseUrl.trim());
 
 /** Built-in route edit form: modelId '' = follow env; pricing '' both = clear. */
 interface BuiltinFormState {
@@ -105,7 +104,7 @@ export function ModelRoutesSection(): JSX.Element {
       wire === 'openai' ? 'settings.wireOpenai'
         : wire === 'anthropic' ? 'settings.wireAnthropic'
           : wire === 'gemini' ? 'settings.wireGemini'
-            : 'settings.wireOffline',
+            : 'settings.wireTestDouble',
     );
 
   const startEdit = (cfg: ModelConfigSummary): void => {
@@ -133,9 +132,8 @@ export function ModelRoutesSection(): JSX.Element {
       setFormError(t('settings.formInvalid'));
       return;
     }
-    // Keyless routes (offline wire, local self-hosted endpoints) are never
-    // gated on apiKey.
-    if (form.id === null && form.apiKey.length === 0 && !keylessRoute(form.wire, form.baseUrl)) {
+    // Keyless routes (local self-hosted endpoints) are never gated on apiKey.
+    if (form.id === null && form.apiKey.length === 0 && !keylessRoute(form.baseUrl)) {
       setFormError(t('settings.formInvalid'));
       return;
     }
@@ -541,7 +539,6 @@ export function ModelRoutesSection(): JSX.Element {
             <option value="openai">{t('settings.wireOpenai')}</option>
             <option value="anthropic">{t('settings.wireAnthropic')}</option>
             <option value="gemini">{t('settings.wireGemini')}</option>
-            <option value="offline">{t('settings.wireOffline')}</option>
           </select>
 
           <label className="field-label" htmlFor="mcfg-baseurl">{t('settings.baseUrl')}</label>
@@ -666,12 +663,10 @@ export function ModelRoutesSection(): JSX.Element {
                 onClick={() => setForm({
                   ...form,
                   // One-click presets are meant to BE one click: prefilled label
-                  // and (offline) model id, not a half-filled form the user must
-                  // archaeologize (2026-08-26 journey finding).
+                  // too, not a half-filled form the user must archaeologize.
                   label: form.label.trim().length > 0 ? form.label : p.label.replace(/\s*\(.*\)$/, '').slice(0, 60),
                   wire: p.wire,
                   baseUrl: p.baseUrl,
-                  ...(p.wire === 'offline' && form.modelId.trim().length === 0 ? { modelId: 'farlab-offline-deterministic' } : {}),
                 })}
               >
                 {p.label}
@@ -692,7 +687,7 @@ export function ModelRoutesSection(): JSX.Element {
             <button
               type="button"
               className="btn btn--small"
-                disabled={testing || form.baseUrl.trim().length === 0 || form.modelId.trim().length === 0 || (form.id === null && form.apiKey.length === 0 && !keylessRoute(form.wire, form.baseUrl))}
+                disabled={testing || form.baseUrl.trim().length === 0 || form.modelId.trim().length === 0 || (form.id === null && form.apiKey.length === 0 && !keylessRoute(form.baseUrl))}
               onClick={() => {
                 void runTest({
                   ...(form.id !== null ? { configId: form.id } : {}),

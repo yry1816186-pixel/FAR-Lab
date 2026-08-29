@@ -51,12 +51,14 @@ test('zh/en parity: every lab-home and map label renders in the chosen language'
   // Switch to English via the real header toggle.
   await page.getByRole('button', { name: 'English', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Studies' })).toBeVisible();
-  // The "New research" path renders the EN dict string (rail nav — the one
-  // persistent entry; the home hero's question box is the primary path).
-  await expect(page.locator('nav.app-rail').getByRole('button', { name: 'New research' })).toBeVisible();
-  // Rail + welcome box EN strings (Bohrium/Doubao shell).
+  // Creation lives INSIDE 工作台: the rail carries exactly one work entry and
+  // no rival "New research" destination — the EN dict string renders as the
+  // compose zone's heading inside the workspace.
+  await expect(page.locator('nav.app-rail').getByRole('button', { name: 'Workspace' })).toBeVisible();
+  await expect(page.locator('nav.app-rail').getByRole('button', { name: 'New research' })).toHaveCount(0);
+  // Rail + compose zone EN strings (Bohrium/Doubao shell).
   await expect(page.locator('nav.app-rail').getByRole('button', { name: 'Library' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Start with a scientific question' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'New research' })).toBeVisible();
 
   // Map surface in English — these strings exist ONLY through the en dict
   // pairs; a missing key renders the raw key (e.g. "map.title"), failing fast.

@@ -453,12 +453,14 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
 
   /**
    * Terminal SSE (extensibility lane): ring-buffer replay then live shell output.
-   * Same framing/lifetime contract as runEventStream; no cursor — the replay IS
-   * the resume (bounded ring, droppedChars disclosed on the first comment line).
+   * The terminal is a GLOBAL panel, so a stream is a long-lived session view:
+   * no hard 30-minute cut (the session's own idle TTL governs lifetime), and
+   * every `out` frame carries its stream offset (`pos`) so an EventSource
+   * reconnect replays without duplicating the transcript.
    */
   const terminalEventStream = (req: http.IncomingMessage, res: http.ServerResponse, id: string): void => {
-    const onEvent = (event: { type: 'out'; data: string } | { type: 'exit'; code: number | null }): void => {
-      if (event.type === 'out') res.write(`event: terminal-out\ndata: ${JSON.stringify({ data: event.data })}\n\n`);
+    const onEvent = (event: { type: 'out'; data: string; pos: number } | { type: 'exit'; code: number | null }): void => {
+      if (event.type === 'out') res.write(`event: terminal-out\ndata: ${JSON.stringify({ data: event.data, pos: event.pos })}\n\n`);
       else {
         res.write(`event: terminal-exit\ndata: ${JSON.stringify({ code: event.code })}\n\n`);
         close();
@@ -476,12 +478,10 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
       if (closed) return;
       closed = true;
       clearInterval(timer);
-      clearTimeout(lifetime);
       terminals.unsubscribe(id, onEvent);
       res.end();
     };
     const timer = setInterval(() => { if (!closed) res.write(': ping\n\n'); }, 5_000);
-    const lifetime = setTimeout(close, 30 * 60_000);
     const sub = terminals.subscribe(id, onEvent);
     if (sub === null) {
       res.write(`event: terminal-exit\ndata: ${JSON.stringify({ code: null, reason: 'session not found (expired or killed)' })}\n\n`);
@@ -1247,9 +1247,9 @@ function parseSeedSources(raw: unknown): string | {
       });
     }
     if (scopeRec?.state === 'skipped') {
-      // Honest refusal (e.g. the deterministic development wire: template scope
-      // is not analysis of the user's question) — the reason rides the stage
-      // record; the researcher is told WHY no proposal exists, not a 502.
+      // Honest refusal (e.g. the in-process test double: filler scope is not
+      // analysis of the user's question) — the reason rides the stage record;
+      // the researcher is told WHY no proposal exists, not a 502.
       throw new HttpError(422, {
         code: 'scope_proposal_unavailable',
         message: `no scope proposal from this route: ${scopeRec.error ?? 'stage skipped'}`,
@@ -1648,8 +1648,19 @@ function parseSeedSources(raw: unknown): string | {
   });
 
   const listModelConfigs = (res: http.ServerResponse): void => {
-    const activeId = app.store.getMeta(ACTIVE_MODEL_CONFIG_META_KEY);
-    const configs = listModelConfigsAll().map((c) => modelConfigSummary(c, activeId));
+    // Test-double configs (wire 'offline') are test fixtures, not product routes:
+    // the settings surface never lists them unless this server IS a test harness.
+    const testDouble = process.env.FARLAB_TEST_DOUBLE === '1';
+    // A leftover test-double default must not survive the filter as a dangling
+    // pointer: report it as "no product default" so the env chain (a real route)
+    // serves instead of a fixture the researcher can no longer see.
+    const storedActive = app.store.getMeta(ACTIVE_MODEL_CONFIG_META_KEY);
+    const activeHidden = storedActive !== null && !testDouble
+      && (app.store.getObject('model_config', storedActive)?.wire ?? null) === 'offline';
+    const activeId = activeHidden ? null : storedActive;
+    const configs = listModelConfigsAll()
+      .filter((c) => c.wire !== 'offline' || testDouble)
+      .map((c) => modelConfigSummary(c, activeId));
     // Effective product-plane default: UI default switch > env chain, with the UI
     // modelId override applied — the panel shows what a call would actually use.
     const envDefaultView = (): { name: string; modelId: string; liveReady: boolean; defaultSource: 'ui' | 'env' } | null => {
@@ -1683,8 +1694,25 @@ function parseSeedSources(raw: unknown): string | {
   const invalidConfigMessage = (issues: { path: (string | number)[]; message: string }[]): string =>
     `invalid model config: ${issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`).join('; ')}`;
 
+  /**
+   * wire 'offline' is the IN-PROCESS TEST DOUBLE (providers/test-double.ts): an
+   * isolated test fixture that lets automated tests and the browser E2E suite
+   * drive the real pipeline without model quota. It is NOT a product route and
+   * serves no demonstration or acceptance purpose — a server not started with
+   * FARLAB_TEST_DOUBLE=1 (only scripts/serve-e2e.mjs sets it) refuses to create,
+   * edit, activate or probe such a config.
+   */
+  const assertTestDoubleAllowed = (wire: unknown): void => {
+    if (wire !== 'offline') return;
+    if (process.env.FARLAB_TEST_DOUBLE === '1') return;
+    throw validation(
+      'wire "offline" is the in-process test double, not a product route: it exists only for automated tests and the browser E2E suite and can be used on a server started with FARLAB_TEST_DOUBLE=1',
+    );
+  };
+
   const createModelConfig = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
     const body = await readJsonObject(req);
+    assertTestDoubleAllowed(body.wire);
     const now = new Date().toISOString();
     const parsed = ModelProviderConfig.safeParse({
       id: newId('mcfg'),
@@ -1708,6 +1736,10 @@ function parseSeedSources(raw: unknown): string | {
     assertModelConfigId(id);
     const existing = mustGetModelConfig(id);
     const body = await readJsonObject(req);
+    // A test-double config is untouchable off a test-double server — editing is
+    // the same product surface as creating it (and is how the double would leak
+    // into a researcher's workspace).
+    assertTestDoubleAllowed(body.wire ?? existing.wire);
     // apiKey semantics: absent field = keep stored value; present string (even empty) = replace.
     let apiKey: string;
     if (body.apiKey === undefined) {
@@ -2019,7 +2051,8 @@ function parseSeedSources(raw: unknown): string | {
     }
     if (typeof id !== 'string') throw validation('field "id" must be a model config id string or null');
     assertModelConfigId(id);
-    mustGetModelConfig(id);
+    const cfg = mustGetModelConfig(id);
+    assertTestDoubleAllowed(cfg.wire);
     app.store.setMeta(ACTIVE_MODEL_CONFIG_META_KEY, id);
     sendJson(res, 200, { activeModelConfigId: id });
   };
@@ -2034,8 +2067,10 @@ function parseSeedSources(raw: unknown): string | {
     let cfg: ModelProviderConfig;
     if (typeof body.configId === 'string') {
       const stored = mustGetModelConfig(body.configId);
+      assertTestDoubleAllowed(stored.wire);
       cfg = typeof body.apiKey === 'string' && body.apiKey.length > 0 ? { ...stored, apiKey: body.apiKey } : stored;
     } else {
+      assertTestDoubleAllowed(body.wire);
       const now = new Date().toISOString();
       const parsed = ModelProviderConfig.safeParse({
         id: newId('mcfg'), // throwaway identity for this probe only; nothing is persisted
@@ -2116,7 +2151,7 @@ function parseSeedSources(raw: unknown): string | {
         throw new HttpError(403, { code: 'feature_disabled', message: 'terminal disabled: FARLAB_TERMINAL=off', retryable: false });
       }
       if (segments.length === 4) {
-        if (method === 'GET') { sendJson(res, 200, { sessions: terminals.list() }); return; }
+        if (method === 'GET') { sendJson(res, 200, { sessions: terminals.list(), maxSessions: terminals.maxSessions() }); return; }
         if (method === 'POST') {
           // Empty POST body is legal here (no cwd = workspace root) — only read
           // JSON when a body is actually present.

@@ -233,10 +233,10 @@ describe('Orchestrator providerFor seam', () => {
       id: newId('q'), text: 'pinned route?', background: '', goalType: 'exploratory',
       scope: { domain: 'test', phenomena: ['x'] }, constraints: {}, createdAt: new Date().toISOString(),
     });
-    const run = store.createRun(q, { routeOverride: 'offline' });
+    const run = store.createRun(q, { routeOverride: 'zai' });
     const seen: { providerNames: string[] } = { providerNames: [] };
     await recordingOrchestrator(seen, (r) => resolveRunProvider(store, r)).execute(run.id, { stopAfter: 'retrieve' });
-    expect(seen.providerNames).toEqual(['custom:mcfg_cli_offline']);
+    expect(seen.providerNames).toEqual(['zai']); // pinned live route, never the dead active config
     expect(resolveRunReasoningRoute(store, run)).toBeNull(); // active config reasoning must not leak onto a pinned route
     store.deleteMeta('activeModelConfigId');
     store.deleteObject('model_config', cfg.id);

@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './conversation-dock.css';
-import { Bell, BellOff, MonitorCog, Moon, Search, Settings, Sun, X } from 'lucide-react';
+import { Bell, BellOff, MonitorCog, Moon, Plus, Search, Settings, Sun, TerminalSquare, X } from 'lucide-react';
 import { ApiError } from './api/client';
 import { getEvents, getRun, listRuns, listConversations, createConversation, deleteConversation, renameConversation, searchAll } from './api/endpoints';
 import { AppRail, type RailSurface } from './lab/AppRail';
-import { Terminal } from './lab/Terminal';
+import { TerminalPanel } from './lab/TerminalPanel';
 import { Library } from './lab/Library';
 import type { Conversation, ResearchRun, RunEvent, RunSummary } from './api/types';
 import { useI18n } from './i18n/LanguageContext';
@@ -26,7 +26,6 @@ import { useToolCommands } from './hooks/useToolCommands';
 import type { EventsState } from './components/RunDetail';
 import { ErrorBox } from './components/common';
 import { LabHome } from './lab/LabHome';
-import { NewResearch } from './lab/NewResearch';
 import { StudyMap } from './lab/StudyMap';
 import { groupStudies, runLabel } from './studies';
 
@@ -37,6 +36,10 @@ const EVENTS_POLL_MS = 2_000;
 /** Safety-net cadence while SSE push is healthy (B3). */
 const EVENTS_POLL_SSE_MS = 15_000;
 const MAX_EVENTS_KEPT = 2_000;
+
+const PANEL_OPEN_KEY = 'farlab.panelOpen';
+const PANEL_HEIGHT_KEY = 'farlab.panelHeight';
+const PANEL_MIN_HEIGHT = 140;
 
 /**
  * App shell — HX Research Experience Architecture (skeleton A productionized).
@@ -66,9 +69,68 @@ export function App(): JSX.Element {
   // Workspace literature library (#library) + welcome-box question prefill
   // (#lab/new?q=…). Prefill is consumed once by NewResearch on mount.
   const [libraryView, setLibraryView] = useState(false);
-  // Integrated terminal surface (#terminal) — real login-shell sessions.
-  const [terminalView, setTerminalView] = useState(false);
+  // ---- global panel (IDE parity: the terminal is SHELL state, not a route) ----
+  // It stays open and its sessions stay alive across every surface, so it
+  // never competes with research objects for the rail or the main view.
+  const [panelMounted, setPanelMounted] = useState(false); // mounted on first open, then kept
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [panelCollapsed, setPanelCollapsed] = useState(false);
+  const [panelMaximized, setPanelMaximized] = useState(false);
+  const [panelHeight, setPanelHeight] = useState(300);
+  // Bumped to ask the panel for a new session (Ctrl+Shift+` / palette).
+  const [terminalSessionSignal, setTerminalSessionSignal] = useState(0);
+  // Live session count is OWNED by the panel; the status bar shows a projection.
+  const [terminalAlive, setTerminalAlive] = useState(0);
   const [prefilledQuestion, setPrefilledQuestion] = useState<string | null>(null);
+
+  // Panel geometry/open state is a per-browser preference (IDE convention: the
+  // panel you closed stays closed next session). Restore once on mount.
+  useEffect(() => {
+    try {
+      const open = window.localStorage.getItem(PANEL_OPEN_KEY) === '1';
+      const raw = Number(window.localStorage.getItem(PANEL_HEIGHT_KEY) ?? 0);
+      setPanelHeight(Number.isFinite(raw) && raw >= PANEL_MIN_HEIGHT ? Math.min(raw, 720) : 300);
+      if (open) { setPanelOpen(true); setPanelMounted(true); }
+    } catch { /* private mode: session-only panel state */ }
+  }, []);
+  useEffect(() => {
+    try { window.localStorage.setItem(PANEL_OPEN_KEY, panelOpen ? '1' : '0'); } catch { /* ignore */ }
+  }, [panelOpen]);
+  useEffect(() => {
+    try { window.localStorage.setItem(PANEL_HEIGHT_KEY, String(panelHeight)); } catch { /* ignore */ }
+  }, [panelHeight]);
+
+  const togglePanel = useCallback((): void => {
+    setPanelMounted(true);
+    setPanelCollapsed(false);
+    setPanelOpen((v) => !v);
+  }, []);
+  const newTerminalSession = useCallback((): void => {
+    setPanelMounted(true);
+    setPanelOpen(true);
+    setPanelCollapsed(false);
+    setTerminalSessionSignal((n) => n + 1);
+  }, []);
+
+  // IDE keyboard conventions: Ctrl+` toggles the terminal panel (VS Code /
+  // Cursor / Trae / CodeBuddy), Ctrl+Shift+` opens a NEW session, Ctrl+J
+  // toggles the panel. Modifiers only, so they never steal typing.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      if (e.key === '`' || e.key === '~') {
+        e.preventDefault();
+        if (e.shiftKey) newTerminalSession();
+        else togglePanel();
+      } else if (e.key === 'j' || e.key === 'J') {
+        e.preventDefault();
+        togglePanel();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [togglePanel, newTerminalSession]);
+
   // Judgment-queue size lifted from LabHome (the one truth) for the rail badge.
   const [judgmentCount, setJudgmentCount] = useState(0);
   const reportJudgmentCount = useCallback((n: number): void => {
@@ -91,7 +153,6 @@ export function App(): JSX.Element {
     setSelectedConvId(id);
     setLibraryView(false);
     setNewResearchView(false);
-    setTerminalView(false);
     if (selectedRunId !== null) setConvDocked(true); // objects stay primary; dialogue docks
     void refreshConversations();
   }, [refreshConversations, selectedRunId]);
@@ -283,7 +344,6 @@ export function App(): JSX.Element {
   const selectStudy = useCallback((runId: string): void => {
     setSelectedRunId(runId);
     setStudyView(true);
-    setTerminalView(false);
     setNewResearchView(false);
     setLibraryView(false);
     if (selectedConvId !== null) setConvDocked(true);
@@ -291,7 +351,6 @@ export function App(): JSX.Element {
   const openHome = useCallback((): void => {
     setSelectedRunId(null);
     setStudyView(false);
-    setTerminalView(false);
     setNewResearchView(false);
     setLibraryView(false);
     closeConversation();
@@ -300,7 +359,6 @@ export function App(): JSX.Element {
     setNewResearchView(true);
     setSelectedRunId(null);
     setStudyView(false);
-    setTerminalView(false);
     setLibraryView(false);
     setSelectedConvId(null);
     setConvDocked(false);
@@ -308,15 +366,6 @@ export function App(): JSX.Element {
   }, []);
   const openLibrary = useCallback((): void => {
     setLibraryView(true);
-    setNewResearchView(false);
-    setSelectedRunId(null);
-    setStudyView(false);
-    setTerminalView(false);
-    closeConversation();
-  }, [closeConversation]);
-  const openTerminal = useCallback((): void => {
-    setTerminalView(true);
-    setLibraryView(false);
     setNewResearchView(false);
     setSelectedRunId(null);
     setStudyView(false);
@@ -417,6 +466,20 @@ export function App(): JSX.Element {
       ...runCmds,
       ...userCmds,
       {
+        id: 'terminal-toggle',
+        labelKey: 'palette.toggleTerminal',
+        groupKey: 'palette.groupActions',
+        keywords: 'terminal shell console 终端 shell 命令行',
+        run: togglePanel,
+      },
+      {
+        id: 'terminal-new',
+        labelKey: 'palette.newTerminal',
+        groupKey: 'palette.groupActions',
+        keywords: 'new terminal session 新终端 新建会话',
+        run: newTerminalSession,
+      },
+      {
         id: 'settings',
         labelKey: 'palette.openSettings',
         groupKey: 'palette.groupActions',
@@ -436,7 +499,7 @@ export function App(): JSX.Element {
         run: () => setLang(lang === 'zh' ? 'en' : 'zh'),
       },
     ];
-  }, [runs, selectedRunId, studyView, selectStudy, openNewResearch, openHome, cycleTheme, lang, setLang, userCommands]);
+  }, [runs, selectedRunId, studyView, selectStudy, openNewResearch, openHome, cycleTheme, lang, setLang, userCommands, togglePanel, newTerminalSession]);
 
   // ---- universal search wiring (B2): palette -> cross-run object lookup ----
   // A claim hit lands on the study map and opens that claim in the inspector
@@ -559,13 +622,35 @@ export function App(): JSX.Element {
         });
       });
   }, [refreshConversations]);
+  // The workspace is ONE surface: the new-research compose zone plus the
+  // judgment queue and the studies index. `#/` and `#lab/new` are the same
+  // surface with different compose-open state — the rail therefore has a
+  // single work entry, and the researcher never chooses between "workspace"
+  // and "new research".
+  const homeSurface = (
+    <LabHome
+      runs={runs}
+      runsLoading={runsLoading}
+      runsError={runsError}
+      conversations={conversations}
+      composeOpen={newResearchView}
+      onComposeOpenChange={setNewResearchView}
+      initialQuestion={prefilledQuestion}
+      onOpenStudy={selectStudy}
+      onOpenConversation={openConversation}
+      onStartConversation={newConversation}
+      onOpenSettings={() => setSettingsOpen(true)}
+      onRetryRuns={() => void refreshRunsWithAbort()}
+      onLaunched={selectStudy}
+      onJudgmentCount={reportJudgmentCount}
+    />
+  );
+
   const railSurface: RailSurface = libraryView
     ? 'library'
-    : terminalView
-      ? 'terminal'
-      : newResearchView
-        ? 'new'
-        : selectedConvId !== null && selectedRunId === null
+    // The compose zone belongs to the workspace, not to a second surface:
+    // `#lab/new` lights up 工作台 (the rail has exactly one work entry).
+    : selectedConvId !== null && selectedRunId === null
           ? 'conv'
           : selectedRunId !== null && studyView
             ? 'study'
@@ -663,7 +748,6 @@ export function App(): JSX.Element {
           conversations={conversations}
           judgmentCount={judgmentCount}
           onHome={openHome}
-          onNewResearch={() => openNewResearch()}
           onLibrary={openLibrary}
           onOpenStudy={selectStudy}
           onOpenConversation={openConversation}
@@ -671,8 +755,8 @@ export function App(): JSX.Element {
           onRenameConversation={renameConv}
           onNewConversation={newConversation}
           onOpenSettings={() => setSettingsOpen(true)}
-          onTerminal={openTerminal}
         />
+        <div className={`workbench-main${panelOpen && panelMaximized ? ' is-panel-maximized' : ''}`}>
         <main className="content content--full" aria-label={t('app.title')}>
           {convCreateError !== null && (
             /* Adversarial-audit P1 fix: the create-conversation failure must be
@@ -682,24 +766,9 @@ export function App(): JSX.Element {
             <ErrorBox error={convCreateError.error} onRetry={() => discussRun(convCreateError.runId)} />
           )}
           {newResearchView ? (
-            <NewResearch
-              initialQuestion={prefilledQuestion}
-              onLaunched={(runId) => selectStudy(runId)}
-              onOpenConversation={() => {
-                void createConversation({})
-                  .then((c) => { void refreshConversations(); setSelectedConvId(c.id); setConvDocked(false); })
-                  .catch((e: unknown) => {
-                    setConvCreateError({
-                      error: e instanceof ApiError ? e : new ApiError({ code: 'unknown', message: String(e), retryable: true }),
-                      runId: '',
-                    });
-                  });
-              }}
-            />
+            homeSurface
           ) : libraryView ? (
             <Library runs={runs} onOpenStudy={selectStudy} />
-          ) : terminalView ? (
-            <Terminal />
           ) : selectedConvId !== null && selectedRunId === null ? (
             <ConversationView
               conversationId={selectedConvId}
@@ -707,18 +776,7 @@ export function App(): JSX.Element {
               onMutated={refreshConversations}
             />
           ) : selectedRunId === null ? (
-            <LabHome
-              runs={runs}
-              runsLoading={runsLoading}
-              runsError={runsError}
-              conversations={conversations}
-              onOpenStudy={selectStudy}
-              onOpenConversation={openConversation}
-              onOpenSettings={() => setSettingsOpen(true)}
-              onRetryRuns={() => void refreshRunsWithAbort()}
-              onAskQuestion={(text) => openNewResearch(text)}
-              onJudgmentCount={reportJudgmentCount}
-            />
+            homeSurface
           ) : runDetail === null ? (
             detailLoading ? (
               <div className="select-hint" role="status">
@@ -757,6 +815,22 @@ export function App(): JSX.Element {
             />
           )}
         </main>
+        {panelMounted && (
+          <TerminalPanel
+            open={panelOpen}
+            enabled={panelMounted}
+            height={panelHeight}
+            maximized={panelMaximized}
+            collapsed={panelCollapsed}
+            newSessionSignal={terminalSessionSignal}
+            onHeightChange={setPanelHeight}
+            onMaximizeToggle={() => setPanelMaximized((v) => !v)}
+            onCollapseToggle={() => setPanelCollapsed((v) => !v)}
+            onClose={() => setPanelOpen(false)}
+            onAliveCountChange={setTerminalAlive}
+          />
+        )}
+        </div>
         {dockOpen && (
           <aside className="conv-dock" aria-label={t('dock.title')}>
             <div className="conv-dock-head">
@@ -782,6 +856,43 @@ export function App(): JSX.Element {
           </aside>
         )}
       </div>
+      {/* IDE status bar: the shell's always-visible truth — connection, live
+          work, and the one global home of the terminal (open, count, new). */}
+      <footer className="status-bar">
+        <div className="status-group">
+          <span
+            className={`status-conn${online ? ' is-online' : ' is-offline'}`}
+            role="status"
+            title={online ? t('conn.online') : t('conn.offline')}
+          >
+            <span className="status-dot" aria-hidden="true" />
+            {online ? t('conn.online') : t('conn.offline')}
+          </span>
+          {activeRuns.length > 0 && <span className="status-item">{t('statusbar.running', { n: activeRuns.length })}</span>}
+          {judgmentCount > 0 && <span className="status-item">{t('statusbar.judgment', { n: judgmentCount })}</span>}
+        </div>
+        <div className="status-group status-group--right">
+          <button
+            type="button"
+            className={`status-btn${panelOpen ? ' is-active' : ''}`}
+            onClick={togglePanel}
+            aria-pressed={panelOpen}
+            title={t('panel.toggleHint')}
+          >
+            <TerminalSquare size={11} aria-hidden="true" />
+            {t('statusbar.terminal', { n: terminalAlive })}
+          </button>
+          <button
+            type="button"
+            className="status-btn status-btn--icon"
+            onClick={newTerminalSession}
+            aria-label={t('terminal.new')}
+            title={t('panel.newSessionHint')}
+          >
+            <Plus size={11} aria-hidden="true" />
+          </button>
+        </div>
+      </footer>
       <CommandPalette
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}

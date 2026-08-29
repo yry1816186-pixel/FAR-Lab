@@ -10,8 +10,13 @@ import { runLabel } from '../studies';
 import type { RunSummary } from '../api/types';
 import './lab.css';
 
-/** Which primary surface the workspace is showing (rail active-state). */
-export type RailSurface = 'home' | 'new' | 'library' | 'study' | 'conv' | 'terminal';
+/**
+ * Which primary surface the workspace is showing (rail active-state). There is
+ * no 'new' entry: creating a study happens INSIDE the workspace (the compose
+ * zone at the top of 工作台), so the rail never offers two competing "start
+ * here" destinations.
+ */
+export type RailSurface = 'home' | 'library' | 'study' | 'conv' | 'terminal';
 
 const COLLAPSE_KEY = 'farlab.railCollapsed';
 
@@ -23,7 +28,7 @@ const COLLAPSE_KEY = 'farlab.railCollapsed';
  *  and "n". */
 export function AppRail({
   surface, runs, conversations, judgmentCount,
-  onHome, onNewResearch, onLibrary, onOpenStudy, onOpenConversation,
+  onHome, onLibrary, onOpenStudy, onOpenConversation,
   onDeleteConversation, onRenameConversation, onNewConversation, onOpenSettings, onTerminal,
 }: {
   surface: RailSurface;
@@ -33,7 +38,6 @@ export function AppRail({
    *  home's judgment queue, lifted so the badge and the queue can't diverge. */
   judgmentCount: number;
   onHome: () => void;
-  onNewResearch: () => void;
   onLibrary: () => void;
   onOpenStudy: (runId: string) => void;
   onOpenConversation: (id: string) => void;
@@ -41,7 +45,8 @@ export function AppRail({
   onRenameConversation: (id: string, title: string) => void;
   onNewConversation: () => void;
   onOpenSettings: () => void;
-  onTerminal: () => void;
+  /** Toggles the shell terminal panel (optional: the shell owns that wiring). */
+  onTerminal?: () => void;
 }): JSX.Element | null {
   const { t } = useI18n();
   const [collapsed, setCollapsed] = useState<boolean>(() => {
@@ -95,10 +100,15 @@ export function AppRail({
       </div>
 
       <div className="rail-group">
+        {/* One work entry. Creating a study is a zone inside 工作台 (the
+            question box at the top), not a rival destination — a second
+            "new research" entry made the choice ambiguous. */}
         {navItem('rail.home', <Home size={15} aria-hidden="true" />, surface === 'home', onHome, { badge: judgmentCount })}
-        {navItem('rail.newResearch', <Plus size={15} aria-hidden="true" />, surface === 'new', onNewResearch)}
         {navItem('rail.library', <BookOpen size={15} aria-hidden="true" />, surface === 'library', onLibrary)}
-        {navItem('rail.terminal', <TerminalSquare size={15} aria-hidden="true" />, surface === 'terminal', onTerminal)}
+        {/* Terminal: the workspace terminal is a SHELL panel (IDE parity), so
+            this entry toggles that panel instead of navigating to a route.
+            Optional while the shell finishes wiring it — never a dead link. */}
+        {onTerminal !== undefined && navItem('panel.terminal', <TerminalSquare size={15} aria-hidden="true" />, false, onTerminal)}
       </div>
 
       {recentStudies.length > 0 && (

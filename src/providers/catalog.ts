@@ -54,9 +54,10 @@ const RAW_TEMPLATES: Array<z.input<typeof ProviderTemplate>> = [
   { id: 'ollama', label: 'Ollama (本地)', wire: 'openai', baseUrl: 'http://localhost:11434/v1', note: '本地默认端口；key 可留空或任意值' },
   { id: 'vllm', label: 'vLLM (自托管)', wire: 'openai', baseUrl: 'http://localhost:8000/v1', note: '启动参数 --api-key 时填写，否则可留空' },
   { id: 'lmstudio', label: 'LM Studio (本地)', wire: 'openai', baseUrl: 'http://localhost:1234/v1', note: '本地默认端口' },
-  // ---- deterministic development route (no endpoint at all) ----
-  { id: 'offline-dev', label: '离线开发路由 (Offline dev)', wire: 'offline', baseUrl: 'https://offline.farlab.invalid/v1', note: '确定性开发路线：不联网、不需要 key；走完整研究流程用于演示与界面验收，所有回执标记为 test 模式，绝不冒充真实模型调用' },
 ];
+// No template for the in-process test-double wire (domain 'offline'): it is an
+// ISOLATED TEST FIXTURE (automated tests / E2E only, gated by FARLAB_TEST_DOUBLE),
+// never a product route a researcher can select.
 
 /** Parsed through the schema at module load — a catalog typo fails fast, never ships. */
 export const PROVIDER_TEMPLATES: readonly ProviderTemplate[] = RAW_TEMPLATES.map(

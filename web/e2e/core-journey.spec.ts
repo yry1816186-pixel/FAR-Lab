@@ -21,16 +21,19 @@ test('empty workspace shows the first-use zone (G1), not fabricated lists', asyn
   // type immediately; the judgment/studies sections appear only with content).
   await expect(page.locator('.fu-title, h1').first()).toBeVisible();
   await expect(page.getByRole('list', { name: /环境检查|Environment check/ })).toBeVisible();
-  await expect(page.locator('.qw-input')).toBeVisible();
-  await expect(page.locator('.qw-input')).toBeFocused();
+  // Fresh workspace: the compose zone IS the first step — it renders inside
+  // the first-use zone with the cursor already in it (no navigation hop to a
+  // separate "new research" screen).
+  await expect(page.locator('#nr-question')).toBeVisible();
+  await expect(page.locator('#nr-question')).toBeFocused();
 });
 
 test('full journey: formation -> launch -> study map -> inspector -> home', async ({ page }) => {
-  // 1. Home -> New research
+  // 1. Home -> compose zone expanded (one surface: 工作台 owns creation; the
+  //    rail carries no second "new research" destination).
   await page.goto('/#/');
-  const newBtn = page.getByRole('button', { name: /新研究|New research/ }).first();
-  await expect(newBtn).toBeVisible();
-  await newBtn.click();
+  await expect(page.locator('#nr-question')).toBeVisible();
+  await page.getByRole('button', { name: /更多选项|More options/ }).click();
   await expect(page).toHaveURL(/#lab\/new/);
 
   // 2. Formation: question field, paste-hint presence, route picker with the

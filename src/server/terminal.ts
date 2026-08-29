@@ -57,6 +57,9 @@ interface LiveSession {
   cwd: string;
   child: ReturnType<typeof spawnSessionShell>;
   ring: RingBuffer;
+  /** Monotonic count of chars ever emitted (ring replay included). Clients use
+   *  the per-event `pos` to make a reconnect's replay idempotent. */
+  emitted: number;
   createdAt: string;
   lastActivityAt: string;
   exited: boolean;
@@ -65,7 +68,7 @@ interface LiveSession {
 }
 
 export type TerminalEvent =
-  | { type: 'out'; data: string }
+  | { type: 'out'; data: string; pos: number }
   | { type: 'exit'; code: number | null };
 
 const MAX_SESSIONS = 6;
@@ -78,6 +81,11 @@ export class TerminalManager {
 
   enabled(): boolean {
     return process.env.FARLAB_TERMINAL !== 'off';
+  }
+
+  /** Concurrent session cap (the UI disables "new session" at the cap). */
+  maxSessions(): number {
+    return MAX_SESSIONS;
   }
 
   /** Start a login-shell session rooted at `cwd` (caller confines the path). */
@@ -95,6 +103,7 @@ export class TerminalManager {
       cwd,
       child,
       ring: makeRing(RING_CHARS),
+      emitted: 0,
       createdAt: new Date().toISOString(),
       lastActivityAt: new Date().toISOString(),
       exited: false,
@@ -140,7 +149,9 @@ export class TerminalManager {
   subscribe(id: string, onEvent: (event: TerminalEvent) => void): { droppedChars: number } | null {
     const s = this.sessions.get(id);
     if (s === undefined) return null;
-    if (s.ring.replay().length > 0) onEvent({ type: 'out', data: s.ring.replay() });
+    // The ring holds the LAST n chars emitted, so its first char sits at
+    // emitted - length — the offset that makes a replay idempotent.
+    if (s.ring.replay().length > 0) onEvent({ type: 'out', data: s.ring.replay(), pos: s.emitted - s.ring.replay().length });
     if (s.exited) { onEvent({ type: 'exit', code: s.exitCode }); return { droppedChars: s.ring.droppedChars }; }
     s.listeners.add(onEvent);
     return { droppedChars: s.ring.droppedChars };
@@ -166,7 +177,9 @@ export class TerminalManager {
 
   private onOutput(session: LiveSession, chunk: string): void {
     session.ring.push(chunk);
-    for (const l of session.listeners) l({ type: 'out', data: chunk });
+    const pos = session.emitted;
+    session.emitted += chunk.length;
+    for (const l of session.listeners) l({ type: 'out', data: chunk, pos });
   }
 
   private view(s: LiveSession): TerminalSessionView {

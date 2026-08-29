@@ -25,7 +25,7 @@ test('six core tasks: measured AFTER walkthrough', async ({ page }) => {
   let t0 = now();
   let clicks = 0;
   await page.goto('/#/');
-  await page.getByRole('button', { name: /新研究|New research/ }).first().click(); clicks += 1;
+  await page.getByRole('button', { name: /更多选项|More options/ }).click(); clicks += 1;
   await expect(page).toHaveURL(/#lab\/new/);
   const q = page.locator('#nr-question');
   await q.fill(QUESTION);
