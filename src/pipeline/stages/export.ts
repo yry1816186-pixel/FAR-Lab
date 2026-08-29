@@ -86,7 +86,7 @@ import { canonicalJson, canonicalSha256, sha256Hex } from '../../shared/crypto.j
 import { truthProfileFromReceipts, truthDisclosureLine, type RunTruthProfile } from '../../app/truth-profile.js';
 import { buildPaperOutline, renderPaperMarkdown } from '../paper-outline.js';
 import { buildCorpusDepthFigure, buildWinRateFigure } from '../../report/figures.js';
-import { buildClaimBindingTable, buildCorpusTable, buildResultsTable, tableToCsv, tableToMarkdown } from '../../report/tables.js';
+import { buildClaimBindingTable, buildCorpusTable, buildResultsTable, sourceIdentifierLabel, tableToCsv, tableToMarkdown } from '../../report/tables.js';
 import type { StageHandler } from '../types.js';
 
 /**
@@ -257,15 +257,15 @@ const buildReport = (d: ExportInputs, missingItems: string[], truth: RunTruthPro
     push('（缺失：corpus_snapshot）');
   }
   if (d.sources.length > 0) {
-    push('| 标题 | 年份 | 深度 | 访问态 | 核验结果 | contentHash(前12位) |');
-    push('|---|---|---|---|---|---|');
+    push('| 标题 | 标识符 | 年份 | 深度 | 访问态 | 核验结果 | contentHash(前12位) |');
+    push('|---|---|---|---|---|---|---|');
     for (const s of d.sources) {
       const verify = s.verification
         ? `${s.verification.method} · resolved=${s.verification.resolved}` +
           (s.verification.titleMatch !== undefined ? ` · titleMatch=${s.verification.titleMatch}` : '') +
           (s.verification.wrongPaperSuspect === true ? ' · ⚠️wrongPaperSuspect' : '')
         : '未核验';
-      push(`| ${s.title} | ${s.publicationYear ?? '未知'} | ${s.contentDepth} | ${s.accessState} | ${verify} | ${s.contentHash.slice(0, 12)} |`);
+      push(`| ${s.title} | ${truncate(sourceIdentifierLabel(s), 48)} | ${s.publicationYear ?? '未知'} | ${s.contentDepth} | ${s.accessState} | ${verify} | ${s.contentHash.slice(0, 12)} |`);
     }
   } else {
     push('（缺失：无 source_document）');

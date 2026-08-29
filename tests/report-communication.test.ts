@@ -139,7 +139,7 @@ describe('tables', () => {
     ]);
     const csv = tableToCsv(t);
     expect(csv).toContain('retracted');
-    expect(csv).toContain('true'); // resolved
+    expect(csv).toContain('true'); // resolved  expect(csv).toContain('doi:10.1/x'); // W4: identifier rides the citation surface, not just the lossy title
   });
 });
 

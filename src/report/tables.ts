@@ -58,6 +58,24 @@ export const buildResultsTable = (outline: PaperOutline): ReportTable => ({
 });
 
 /** T2 — retrieved corpus with verification + retraction state per source. */
+/**
+ * Audit scientific W4: a rendered citation must carry a resolvable identifier, not
+ * only a lossy title paraphrase. The stored identifier value verbatim (first doi,
+ * then arxiv/pubmed/url) — URLs are never constructed from guesses.
+ */
+export const sourceIdentifierLabel = (s: SourceDocument): string => {
+  const first = (kind: string) => s.identifiers.find((i) => i.kind === kind);
+  const doi = first('doi');
+  if (doi !== undefined) return `doi:${doi.value}`;
+  const arxiv = first('arxiv');
+  if (arxiv !== undefined) return `arxiv:${arxiv.value}`;
+  const pubmed = first('pubmed');
+  if (pubmed !== undefined) return `pubmed:${pubmed.value}`;
+  const url = first('url');
+  if (url !== undefined) return url.value;
+  return '未存储标识符';
+};
+
 export const buildCorpusTable = (sources: readonly SourceDocument[]): ReportTable => ({
   name: 'corpus-overview',
   provenance: {
@@ -65,7 +83,7 @@ export const buildCorpusTable = (sources: readonly SourceDocument[]): ReportTabl
     note: 'One row per stored source document, in store order; retraction status only when verification carried one.',
   },
   columns: [
-    { key: 'title', label: 'Title', from: 'source_document.title' },
+    { key: 'title', label: 'Title', from: 'source_document.title' },  { key: 'identifier', label: 'Identifier', from: 'source_document.identifiers' },
     { key: 'year', label: 'Year', from: 'source_document.publicationYear' },
     { key: 'depth', label: 'Content depth', from: 'source_document.contentDepth' },
     { key: 'access', label: 'Access', from: 'source_document.accessState' },
@@ -74,7 +92,7 @@ export const buildCorpusTable = (sources: readonly SourceDocument[]): ReportTabl
     { key: 'contentHash12', label: 'contentHash (12)', from: 'source_document.contentHash' },
   ],
   rows: sources.map((s) => ({
-    title: truncate(s.title, 60),
+    title: truncate(s.title, 60),  identifier: truncate(sourceIdentifierLabel(s), 48),
     year: s.publicationYear ?? null,
     depth: s.contentDepth,
     access: s.accessState,
