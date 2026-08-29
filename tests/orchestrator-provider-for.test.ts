@@ -118,6 +118,62 @@ describe('Orchestrator providerFor seam', () => {
     expect(store.getRunLease(run.id).holder).toBeNull(); // lease released; paused means unadoptable
   });
 
+  it('parking-intent lifecycle: the park clears a parking:* tag; a full resume strips a stale one', async () => {
+    // The crash guard: scopeProposal/CLI tag deliberately-stopped runs 'parking:*'
+    // BEFORE execution so a worker that dies pre-park is never watchdog-adopted.
+    // (a) tag survives the stopAfter execution and is cleared by the park;
+    const runA = await newRun();
+    const tagged = store.getRun(runA.id)!;
+    store.updateRun({ ...tagged, tags: [...tagged.tags, 'parking:scope-proposal'] });
+    await recordingOrchestrator({ providerNames: [] }).execute(runA.id, { stopAfter: 'retrieve' });
+    const afterA = store.getRun(runA.id)!;
+    expect(afterA.status).toBe('paused');
+    expect(afterA.tags.some((t) => t.startsWith('parking:'))).toBe(false);
+    // (b) a stale tag on a run resumed WITHOUT stopAfter is stripped by the owning
+    // execution (parking_intent_cleared) — otherwise a later crash of THAT execution
+    // would freeze the run (watchdog-exempt forever).
+    const runB = await newRun();
+    const taggedB = store.getRun(runB.id)!;
+    store.updateRun({ ...taggedB, tags: [...taggedB.tags, 'parking:cli-stop-after'] });
+    await recordingOrchestrator({ providerNames: [] }).execute(runB.id);
+    const afterB = store.getRun(runB.id)!;
+    expect(afterB.tags.some((t) => t.startsWith('parking:'))).toBe(false);
+    expect(store.listEvents(runB.id).some((e) => (e.detail as { reason?: string } | undefined)?.reason === 'parking_intent_cleared')).toBe(true);
+  });
+
+  it('progress() is lease-fenced: a disowned worker never writes run state or notes', async () => {
+    // Adversarial round-2 REL-4: the progress callback's unfenced updateRun could
+    // roll back the adopter's transition after a mid-call adoption. Fence = the
+    // design's own invariant ("a disowned worker must never write run state").
+    const run = await newRun();
+    const handler: StageHandler = {
+      stage: 'scope',
+      applicable: async () => true,
+      execute: async (ctx) => {
+        // simulate mid-stage adoption: release our own lease (expiry+adoption)
+        const holder = store.getRunLease(ctx.run.id).holder;
+        expect(holder).not.toBeNull();
+        store.releaseLease(ctx.run.id, holder!);
+        ctx.progress(1, 2, { reason: 'progress-from-disowned-worker' });
+        return { kind: 'done', summary: 'unreachable-when-disowned' };
+      },
+    };
+    const orch = new Orchestrator({
+      store,
+      artifacts: openArtifactStore(path.join(tmp, 'artifacts')),
+      provider: envChainProvider,
+      sourceFor: () => { throw new Error('no source expected in this test'); },
+      stages: new Map<RunStageName, StageHandler>([['scope', handler]]),
+      signals: new Map(),
+    });
+    await orch.execute(run.id); // lease-lost abort returns gracefully (audit-note path)
+    const after = store.getRun(run.id)!;
+    expect(after.stages.find((s) => s.stage === 'scope')?.subtasks).toBeUndefined(); // no doc write
+    expect(after.stages.find((s) => s.stage === 'scope')?.state).not.toBe('done'); // stage never closed by the disowned worker
+    expect(store.listEvents(run.id).some((e) => (e.detail as { reason?: string } | undefined)?.reason === 'progress-from-disowned-worker')).toBe(false);
+    expect(store.listEvents(run.id).some((e) => (e.detail as { reason?: string } | undefined)?.reason === 'lease_lost_abort')).toBe(true);
+  });
+
   it('a run-pinned routeOverride keeps the run on its registry route even with an active config set', async () => {
     // The live-observed bug: CLI --route zai run resumed into the workspace's
     // dead deepseek default. routeOverride must outrank the active config.

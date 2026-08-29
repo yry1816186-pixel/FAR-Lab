@@ -433,6 +433,42 @@ describe('W8 S1: server watchdog adopts frozen runs within one poll cycle', () =
     }
   }, 10_000);
 
+  it('parking-tagged frozen runs are NOT adopted — a crashed scope-proposal draft is never run behind the user\'s back', async () => {
+    // Adversarial round-2 REL-1(b): a scope-proposal/CLI --stop-after worker that
+    // dies before the park transition leaves status='running' with an expired lease.
+    // The 'parking:*' intent tag (set BEFORE execution) must keep the watchdog off:
+    // adoption would execute the FULL pipeline on a draft the researcher never launched.
+    const dir = tmp();
+    const app = await createApp({ dataDir: dir, providerOverride: createTestStubProvider([]) });
+    const q = ResearchQuestion.parse({
+      id: newId('q'), text: 'q', background: '', goalType: 'explanatory',
+      scope: { domain: 'd', phenomena: ['p'] }, constraints: {}, createdAt: new Date().toISOString(),
+    });
+    const run = app.store.createRun(q);
+    const doc = app.store.getRun(run.id)!;
+    doc.status = 'running';
+    doc.tags = [...doc.tags, 'parking:scope-proposal'];
+    app.store.updateRun(doc);
+    app.store.acquireLease(run.id, 'dead-worker', new Date(Date.now() - 60_000).toISOString());
+
+    const adopted: string[] = [];
+    const api = createApiServer(app, {
+      watchdogIntervalMs: 40,
+      executor: async (runId) => { adopted.push(runId); return null; },
+    });
+    try {
+      await new Promise((r) => setTimeout(r, 300)); // > several poll cycles
+      expect(adopted).not.toContain(run.id);
+      expect(app.store.getRun(run.id)?.status).toBe('running'); // untouched, still awaiting the human
+      // and the projection feeds the guard: tags surface on the expired-lease scan
+      const stale = app.store.listExpiredLeaseRuns(new Date().toISOString()).find((r) => r.id === run.id);
+      expect(stale?.tags).toContain('parking:scope-proposal');
+    } finally {
+      await api.stop();
+      app.close();
+    }
+  }, 10_000);
+
   it('live-lease runs are NOT adopted (slow worker protection)', async () => {
     const dir = tmp();
     const app = await createApp({ dataDir: dir, providerOverride: createTestStubProvider([]) });

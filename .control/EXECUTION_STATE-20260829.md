@@ -8,6 +8,14 @@
 
 # EXECUTION_STATE — 2026-08-29 全自主接管会话（终稿）
 
+## 第二轮独立对抗审查 → 已完成并处置（8f0ebd8 + 待落地的耦合修复）
+
+两个 fresh-context 子 Agent（产品/可靠性 + 科学/评测）实际交付：产品侧因环境无本地工具改为攻击公共镜像 8e8a480，其 5 个 P1 逐一对照本地树核验——REL-1/REL-2/REL-3(safeTick)/NUJ-1/2/RES-1 已在本地先行修复（91bc89c/606b652/572f20b/传输重试）；其指出的遗漏子例**今日补修**：(b) 崩溃中途守卫（parking:* 意图标签先于执行设置、watchdog 跳过、park 清除、完整 resume 剥离）+ (d) --stop-after 拼写校验（原 `as never` 静默全管道）；REL-4 progress() 租约围栏；REL-3 跨进程双触发（store 级 CAS claim-then-fire + 回退）；NUJ-4 CLI 数值旗标硬错。FE-2（discussRun 重试）对本地树**证伪**已回执。子例 (c)（dispatchAction reopen 窗口）不成立：reopenStages 自持租约。回复已送达 adversarial-r1。
+
+科学侧（本地工具，全数字重算）P1 三项全部处置：(1) 裁决层精度从未验证 → 新常设仪器 adjudication-accuracy.mjs 实测 109 条带内 gold 对精度 0.826（TPR 0.919/FPR 0.222，误差画像：方向蕴含宽松 16FP/否定语义偏严 3FN）；(2) W4R 聚合吸收 P5 门禁前坏成分 → P5 门禁后复跑正确弃权（run_xag5mwky，55s），重钉重算：真问题 planExec 5/5 + 探针 1/1 正确拒绝，与基线从平局转为结构性对比（基线不能弃权）；(3) counter-evidence 0.867 双数字披露（精确一致 0.467 并列）。P2/P3：rag 5/6→4/6 报告内部矛盾修正、declaredAt 改 git 锚定（H1 预注册时序如实标注不可考）、H1 运行证据 run_pzz9z54 补记、retrieval-verified 更新 72/72。falsify supporting 锚句补存（S-P1-4）已改，因与并发会话模板拒绝重构同文件耦合待其落地随提交（同批：orchestrator parking 围栏、api 租约/parking、draft-journey/wave8 测试）。
+
+登记新增（未修，非 P0）：metrics-w4-refresh.json 原始 stdout 包装（P3）；falsification 分母无 spec 即排除的平凡通过路径（P3）；基线温度 0.4 vs 管线 0.2 未入协议公平性条款（P3）；gold 单标注者无 held-out（已披露维持）；结构对比行的呈现措辞（W4R 报告已加 addendum）。
+
 ## 追加落地（同日午后）
 
 - **91bc89c 可靠性两项**：stopAfter 断点在租约释放**前**停车为 paused（原窗口内 watchdog/进程重启会收养 scope 草案或 CLI --stop-after 运行，在用户背后推进全管道）；resume 前置租约检查→409 lease_held（原 202 后异步执行内才暴露冲突、静默 no-op），残余竞态落 execution_refused_lease_held 事件可见。新测试 2 项，2098 全绿。
@@ -87,3 +95,31 @@
 - DASHSCOPE_API_KEY → ACC-02 receipted run（比赛路线）。
 - 陈旧 3196 服务器进程：按 HCI state 既有记录由用户重启（环境 key 只在该进程）。
 - 对抗审查第 2 轮独立子 Agent：本会话机制失效，需新会话重试（第 1 轮由主 Agent 对抗自查完成并修出 2 个真问题：比赛门禁旁门 + 图谱 zh 缺线）。
+
+# 最终收敛窗口（new-2e 会话，2026-08-29 午后）——real-content 全链闭环 + 安全/漂移修复
+
+本窗口为独立收敛负责人，与 HCI/全项目优化两个并发会话并行。全部改动已 typecheck+lint+vitest 2110 全绿。
+
+## real-content discipline 补全（承接并完善并发会话的方向）
+
+1. **判断阶段守卫补全**：并发会话只守卫了 scope/hypotheses(strategy)/evidence(gap+cross)。本窗口补齐 falsify（spec 铸前拒）、rank（scorecard 批次拒 + pair judge→no_contest）、plan（design 拒 + zh 跳过）、revise（causal/hyp/plan 修订拒）、hypotheses 的 zh/supplement/novelty/lit-verdict 四残余点。根抽象：`stages/shared.ts` 的 `TemplateModeRefusal` + `refuseTemplateMode(ctx, mode, what)`；stage 顶层捕获转 honest skip（productRun && executionMode==='test' 才触发；直连 stage 测试不受影响）。混合场景（live run 掉到离线 wire，UI 可选 keyless offline config）不再能把模板判决铸到真实对象上。
+2. **导出链 P0（export-audit 抓到）**：遗留模板假设/计划在 report §5-§7、IMRaD 论文摘要/results、bundle hypothesisJsonLd、表/图全程投影为科学内容（"Offline hypothesis 1" 曾是论文头条）。修复：export.ts 与 paper-outline.ts 的 store 读取统一过滤（isTemplateHypothesis + 新增 isTemplatePlan）；missing-items/limitations 增加排除披露行；论文新增 execution_truth limitation（非全 live run 的数字不再无保留呈现）。
+3. **遗留修复闭环**：orchestrator 对 done stage 不咨询 applicable（发现于真实 run 复验），故新增三触点同谓词机制：export.applicable + orchestrator completed-run reopen（template_content_remediation）+ API reexport 放宽。谓词单-owner：`export.ts latestBundleTemplateTainted`（jld regex + 报告工件全局标记匹配，工件不可读= tainted 安全向）。真实工作区遗留 run（6 模板假设+1 模板计划）经 resume→重导出→模板内容归零、双披露入账、新 bundle 12/12 verified。
+4. **verify 第 12 项检查** `hypothesis_template_content_absent`（bundle jld 模板零容忍）+ readDependencyLock 改 findUp（与 export 同基准，修 `far verify` 任意 cwd 误报 degraded）。API 层 tournament 仅在 ≥1 真实假设参战时下发。
+
+## 安全/工程修复
+
+- **desktop P1 注入**：far:// 深链 hash 未转义插值进 `location.hash='…'` 的 eval（`x';eval(…);//` 可在 loopback origin 执行任意 JS）。修复：serde_json::to_string JSON 编码 + 切割集补 `'`。cargo check 绿。
+- **CLI 漂移**：completion/HELP 补 research counter-search、experiment simulate/dead-list/requeue/approve/rerun、data obs、agent refine --resume；cli-maturity 锚点重钉到真实 dispatch 面。
+- **文档真话**：TUI README 远程配方标注 `PORT=3196 far serve`（裸 far serve=8787）；desktop README macOS 行如实声明深链/单实例为死路径。
+- notify.ts 浮动 permission promise 补 reject 分支。
+
+## 新增测试
+
+tests/real-content-mixed-route.test.ts（混合路由 5 例：四 stage 拒 + asLive 对照过）、tests/real-content-export-filter.test.ts（导出链 2 例：论文+报告+JSON-LD 排除与披露）。
+
+## 登记未修（并发冲突或非 P0）
+
+- hypotheses.ts / api.ts / orchestrator.ts / main.ts 为三会话共享编辑文件，本窗口改动已注明（见上）；其余会话资产未动。
+- health-audit P1（dead routes、model-plane test-only 模块、~90 dead i18n keys、as unknown as 约 20 处）——涉及 api.ts/dict.ts/store.ts 等并发热文件，留待树稳定后处理。
+- export-audit P2：package.ts 打包时 bib/figures 从 CURRENT store 重投影（与已存论文可能漂移）；verify 未探测 figures/tables refs。
