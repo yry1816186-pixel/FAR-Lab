@@ -478,3 +478,20 @@ CPS-AOSSA-3 核心切片：sidecar netcdf.py（xarray+netcdf4，剖析/QC/闭枚
 3. StudyMap 问题模型带 + FEM/数据集呈现。
 4. 场景 C 端到端（机制全备；真实人类执行 BLOCKED-user）。
 5. baseline benchmark + completion-gate + 独立四维审计（终局）。
+
+## 场景 B 数据→ML 链贯通（980ee58 + 29721a8，2026-08-30 03:1x）
+
+- extractNetcdfFeatures 增 materializeDir（派生 CSV 真实落盘，EEL 本地
+  数据集腿可消费；安全闸门不变——操作者背书路径，LLM 不提名路径）。
+- scripts/scenario-b-driver.mjs：可复现运营侧链。两次运行同一
+  StatReport（paired MSE 差 -248.938 K²，95% CI [-258.8, -239.1]，
+  RF 显著优于均值基线；verdict 空=诚实 exploratory，D-085 确认性需
+  批准）。run_z90qsyws 与 run_3vevczdd 两轮证据在 work/scenario-b。
+- 场景 B 剩余：文献腿（~10 papers）与 run 级串联（execute 级联引用
+  注册数据集的 draft payload 扩展）。
+
+# 本 turn 终局（12 个 main 提交）
+
+问题模型→披露→FEM 均匀→AFEM→NetCDF 数据面→场景 A live 闭环
+（bundle 15/15）→场景 B 数据链（可复现）。goal 完成判据仍未满足：
+场景 B 文献+run 级整合、场景 C、benchmark、completion-gate、四维审计。
