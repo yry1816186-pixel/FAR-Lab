@@ -7,9 +7,9 @@ import {
   TheorySpec,
   checkTheorySpec,
   theoryIdentityVerdict,
+  FeedbackSignal,
   type ExperimentRun,
   type StatReport,
-  type FeedbackSignal,
   type HypothesisCandidate,
 } from '../domain/index.js';
 import { createSidecar, type Sidecar } from './python.js';

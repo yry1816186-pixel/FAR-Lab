@@ -10,13 +10,14 @@
 //   4. spec-from-plan.ts      — draftTheorySpecFromPlan (deterministic assembly)
 //   5. stages/execute.ts      — theory leg between literature-pool and protocol fallback
 //   6. providers/offline.ts   — deterministic 'theory-spec-draft' refusal handler
-//   7. persistence/store.ts   — theory_spec kind registration
+//   7. persistence/store.ts   — theory_spec kind registration (delegated to
+//                               apply-theory-store.mjs after the wrong last-entry
+//                               assumption; this script's edit 7 fails fast by design)
 //
 // Discipline (slice-4 lessons): fail-loud UNIQUE anchors; natural idempotence
 // (skip when an edit's signature string already exists); per-file EOL detection
 // with uniform-EOL assertion (mixed-EOL files fail rather than normalize);
-// post-edit invariant assertions before any write; root-cause-9 lesson: this
-// script adds no cross-file declarations — every file's insert is self-contained.
+// post-edit invariant assertions before any write.
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const read = (p) => readFileSync(p, 'utf8');
@@ -258,90 +259,83 @@ const DRAFT_BLOCK = [
   '  }',
   '});',
   '',
-  'const THEORY_SYSTEM_PROMPT = [',
-  "  'You convert a research plan into ONE theory-identity verification spec draft, or declare it infeasible.'",
-  "  'Feasible ONLY when the plan\\'s falsifiable content is a claimed closed-form mathematical identity or bound'",
-  "  'that can be checked NUMERICALLY on a small grid (trigonometric identities, algebraic equivalences,'",
-  "  'derived analytic formulas stated as lhs == rhs).' ",
-  "  'Expressions are Python-syntax numeric expressions over the declared variables, using ONLY:'",
-  "+ - * / % ** ( ), numbers, the functions exp log log2 log10 sqrt sin cos tan sinh cosh tanh",
-  "  'arcsin arccos arctan arctan2 abs floor ceil min max, and the constants pi e.'",
-  "  'No imports, no attribute access, no other names.'",
-  "  'variables: 1-4 grid variables with honest numeric ranges covering the domain the identity is claimed on.'",
-  "  'claims: the plan\\'s claimed identities; lhs and rhs are each ONE expression in those variables.'",
-  "  'If the plan needs physical experiments, datasets, or literature pooling rather than a checkable symbolic'",
-  "  'claim, set feasible=false with a skipReason naming what is missing. Output JSON only.'",
-  "].join('\\n');",
-].map((l) => (l.startsWith('+ - * /') ? `  ${l}` : l));
-// fix the one non-quoted prompt line into a proper string literal
-const idxFix = DRAFT_BLOCK.findIndex((l) => l.startsWith("+ - * /"));
-DRAFT_BLOCK[idxFix] = "  '+ - * / % ** ( ), numbers, the functions exp log log2 log10 sqrt sin cos tan sinh cosh tanh',";
-DRAFT_BLOCK.push(
-  ...[
-    '',
-    'export const draftTheorySpecFromPlan = async (',
-    '  plan: ResearchPlan,',
-    '  questionText: string,',
-    '  plane: ModelPlaneDeps,',
-    '): Promise<TheorySpecDraftOutcome> => {',
-    '  let draft: z.infer<typeof TheoryDraftOut>;',
-    "  let executionMode: 'live' | 'test';",
-    '  try {',
-    '    const res = await invokeStructured<z.infer<typeof TheoryDraftOut>>(plane, {',
-    "      stage: 'execute',",
-    "      purpose: 'theory-spec-draft',",
-    '      systemPrompt: THEORY_SYSTEM_PROMPT,',
-    '      payload: {',
-    '        researchQuestion: questionText,',
-    '        objective: plan.objective,',
-    '        variables: plan.variables,',
-    '        decisionRules: { success: plan.decisionRules.successCriterion, falsification: plan.decisionRules.falsificationCriterion },',
-    '        hypothesisIds: plan.hypothesisIds,',
-    '      },',
-    '      schema: TheoryDraftOut,',
-    '      temperature: 0.1,',
-    '      maxTokens: 2048,',
-    '    });',
-    '    draft = res.data;',
-    '    executionMode = res.executionMode;',
-    '  } catch (e) {',
-    '    if (e instanceof RunBudgetExhaustedError) throw e;',
-    '    return { kind: \'skip\', reason: `theory spec drafting failed: ${(e instanceof Error ? e.message : String(e)).slice(0, 180)}` };',
-    '  }',
-    '  if (!draft.feasible || draft.variables === undefined || draft.claims === undefined) {',
-    "    return { kind: 'skip', reason: draft.skipReason ?? 'plan is not testable by numerical identity verification' };",
-    '  }',
-    '  // Deterministic discipline (the model never picks these): grid resolution from',
-    '  // the variable-count table, preregistered default tolerance, model-stipulated',
-    '  // threshold provenance, first claim primary, exploratory until an operator binds.',
-    '  const gridN = THEORY_GRID_POINTS[draft.variables.length] ?? 9;',
-    '  const spec = TheorySpec.parse({',
-    "    id: newId('xsp'),",
-    '    runId: plan.runId,',
-    '    planId: plan.id,',
-    '    planStepId: plan.steps[0]?.id ?? newId(\'task\'),',
-    '    question: questionText.slice(0, 500),',
-    "    experimentType: 'theory_identity',",
-    '    variables: draft.variables.map((v) => ({ name: v.name, low: v.low, high: v.high, n: gridN })),',
-    '    claims: draft.claims.map((c, i) => ({',
-    '      id: `claim_${i + 1}`,',
-    '      label: c.label,',
-    '      lhs: c.lhs,',
-    '      rhs: c.rhs,',
-    '      tolerance: THEORY_DEFAULT_TOLERANCE,',
-    "      thresholdProvenance: 'model-stipulated',",
-    '      primary: i === 0,',
-    '    })),',
-    '    compute: { device: \'local\', maxParallel: 1, timeoutMs: 300_000 },',
-    '    approvals: [],',
-    '    exploratoryNote: `Plan-drafted exploratory identity check for ${plan.id}: tolerance is model-stipulated; hypothesis-bound theory specs require operator approval.`,',
-    '    validation: { passed: false, missing: [\'pending deterministic validation at execution\'] },',
-    '    createdAt: new Date().toISOString(),',
-    '  });',
-    "  return { kind: 'theory', spec, executionMode };",
-    '};',
-  ]
-);
+  'const THEORY_SYSTEM_PROMPT =',
+  "  'You convert a research plan into ONE theory-identity verification spec draft, or declare it infeasible. ' +",
+  "  'Feasible ONLY when the plan\\'s falsifiable content is a claimed closed-form mathematical identity or bound ' +",
+  "  'that can be checked NUMERICALLY on a small grid (trigonometric identities, algebraic equivalences, ' +",
+  "  'derived analytic formulas stated as lhs == rhs). ' +",
+  "  'Expressions are Python-syntax numeric expressions over the declared variables, using ONLY: ' +",
+  "  '+ - * / % ** ( ), numbers, the functions exp log log2 log10 sqrt sin cos tan sinh cosh tanh ' +",
+  "  'arcsin arccos arctan arctan2 abs floor ceil min max, and the constants pi e. ' +",
+  "  'No imports, no attribute access, no other names. ' +",
+  "  'variables: 1-4 grid variables with honest numeric ranges covering the domain the identity is claimed on. ' +",
+  "  'claims: the plan\\'s claimed identities; lhs and rhs are each ONE expression in those variables. ' +",
+  "  'If the plan needs physical experiments, datasets, or literature pooling rather than a checkable symbolic ' +",
+  "  'claim, set feasible=false with a skipReason naming what is missing. Output JSON only.';",
+].concat([
+  '',
+  'export const draftTheorySpecFromPlan = async (',
+  '  plan: ResearchPlan,',
+  '  questionText: string,',
+  '  plane: ModelPlaneDeps,',
+  '): Promise<TheorySpecDraftOutcome> => {',
+  '  let draft: z.infer<typeof TheoryDraftOut>;',
+  "  let executionMode: 'live' | 'test';",
+  '  try {',
+  '    const res = await invokeStructured<z.infer<typeof TheoryDraftOut>>(plane, {',
+  "      stage: 'execute',",
+  "      purpose: 'theory-spec-draft',",
+  '      systemPrompt: THEORY_SYSTEM_PROMPT,',
+  '      payload: {',
+  '        researchQuestion: questionText,',
+  '        objective: plan.objective,',
+  '        variables: plan.variables,',
+  '        decisionRules: { success: plan.decisionRules.successCriterion, falsification: plan.decisionRules.falsificationCriterion },',
+  '        hypothesisIds: plan.hypothesisIds,',
+  '      },',
+  '      schema: TheoryDraftOut,',
+  '      temperature: 0.1,',
+  '      maxTokens: 2048,',
+  '    });',
+  '    draft = res.data;',
+  '    executionMode = res.executionMode;',
+  '  } catch (e) {',
+  '    if (e instanceof RunBudgetExhaustedError) throw e;',
+  '    return { kind: \'skip\', reason: `theory spec drafting failed: ${(e instanceof Error ? e.message : String(e)).slice(0, 180)}` };',
+  '  }',
+  '  if (!draft.feasible || draft.variables === undefined || draft.claims === undefined) {',
+  "    return { kind: 'skip', reason: draft.skipReason ?? 'plan is not testable by numerical identity verification' };",
+  '  }',
+  '  // Deterministic discipline (the model never picks these): grid resolution from',
+  '  // the variable-count table, preregistered default tolerance, model-stipulated',
+  '  // threshold provenance, first claim primary, exploratory until an operator binds.',
+  '  const gridN = THEORY_GRID_POINTS[draft.variables.length] ?? 9;',
+  '  const spec = TheorySpec.parse({',
+  "    id: newId('xsp'),",
+  '    runId: plan.runId,',
+  '    planId: plan.id,',
+  '    planStepId: plan.steps[0]?.id ?? newId(\'task\'),',
+  '    question: questionText.slice(0, 500),',
+  "    experimentType: 'theory_identity',",
+  '    variables: draft.variables.map((v) => ({ name: v.name, low: v.low, high: v.high, n: gridN })),',
+  '    claims: draft.claims.map((c, i) => ({',
+  '      id: `claim_${i + 1}`,',
+  '      label: c.label,',
+  '      lhs: c.lhs,',
+  '      rhs: c.rhs,',
+  '      tolerance: THEORY_DEFAULT_TOLERANCE,',
+  "      thresholdProvenance: 'model-stipulated',",
+  '      primary: i === 0,',
+  '    })),',
+  '    compute: { device: \'local\', maxParallel: 1, timeoutMs: 300_000 },',
+  '    approvals: [],',
+  '    exploratoryNote: `Plan-drafted exploratory identity check for ${plan.id}: tolerance is model-stipulated; hypothesis-bound theory specs require operator approval.`,',
+  '    validation: { passed: false, missing: [\'pending deterministic validation at execution\'] },',
+  '    createdAt: new Date().toISOString(),',
+  '  });',
+  "  return { kind: 'theory', spec, executionMode };",
+  '};',
+]);
 {
   const p = 'src/experiment/spec-from-plan.ts';
   const src = read(p);
@@ -352,7 +346,7 @@ DRAFT_BLOCK.push(
       e.insertAfter(
         "import { MetaAnalysisSpec } from '../domain/meta.js';",
         ["import { TheorySpec, THEORY_GRID_POINTS, THEORY_DEFAULT_TOLERANCE } from '../domain/theory.js';"],
-      );
+  );
       const idx = e.findIdx("  return { kind: 'meta', spec };");
       e.assertLine(idx + 1, '};');
       // append the drafting block after the file's final closing brace
@@ -401,28 +395,27 @@ const THEORY_LEG = [
   if (src.includes('draftTheorySpecFromPlan')) {
     console.log(`SKIP ${p}: theory leg present`);
   } else {
-    const OLD_KIND = 'z.enum([\'meta_iv_fixed\', \'meta_iv_random_dl\'])';
     edit(p, (e) => {
       e.insertAfter(
         "import { draftSpecFromPlan, draftMetaSpecFromPlan } from '../../experiment/spec-from-plan.js';",
         ["import { draftTheorySpecFromPlan } from '../../experiment/spec-from-plan.js';"],
-      );
+  );
       e.insertAfter(
         "import { executeMetaAnalysis } from '../../experiment/executor-meta.js';",
         ["import { executeTheoryAnalysis } from '../../experiment/executor-theory.js';"],
-      );
+  );
       e.insertBefore(
         '      // Protocol fallback (paradigm-honest execution): the computational legs are',
         THEORY_LEG,
-      );
+  );
       e.replaceLine(
         '          return { kind: \'skipped\', reason: `tabular: ${draft.reason}; literature-pool: ${metaDraft.reason}; protocol: ${e.reason}` };',
         '          return { kind: \'skipped\', reason: `tabular: ${draft.reason}; literature-pool: ${metaDraft.reason}; theory: ${theoryDraft.reason}; protocol: ${e.reason}` };',
-      );
+  );
       e.replaceLine(
         '          reason: `tabular: ${draft.reason}; literature-pool: ${metaDraft.reason}; protocol: drafting failed (${(e instanceof Error ? e.message : String(e)).slice(0, 180)})`,',
         '          reason: `tabular: ${draft.reason}; literature-pool: ${metaDraft.reason}; theory: ${theoryDraft.reason}; protocol: drafting failed (${(e instanceof Error ? e.message : String(e)).slice(0, 180)})`,',
-      );
+  );
     });
     const after = read(p);
     if (countOf(after, 'draftTheorySpecFromPlan') !== 2) fail(`${p}: theory symbol count != 2 (import + call)`);
@@ -455,23 +448,12 @@ const THEORY_LEG = [
   }
 }
 
-// ---- 7. persistence/store.ts ----
-{
-  const p = 'src/persistence/store.ts';
-  const src = read(p);
-  if (src.includes('theory_spec')) {
-    console.log(`SKIP ${p}: kind registered`);
-  } else {
-    edit(p, (e) => {
-      e.insertAfter('  ProtocolSpec, ProtocolExecution,', ['  TheorySpec,']);
-      const idx = e.findIdx('  protocol_execution: ProtocolExecution,');
-      e.assertLine(idx + 1, '};');
-      e.lines.splice(idx + 1, 0, '  theory_spec: TheorySpec,');
-    });
-    const after = read(p);
-    if (countOf(after, 'theory_spec: TheorySpec') !== 1) fail(`${p}: KIND_SCHEMAS entry count != 1`);
-  }
-}
+// ---- 7. persistence/store.ts (kind registration) ----
+// Delegated to apply-theory-store.mjs: the original last-entry assumption here
+// was wrong (the KIND_SCHEMAS map continues past protocol_execution), so this
+// script deliberately does NOT touch store.ts. The registration script runs
+// after this one in the workflow's run_scripts chain.
+console.log('store.ts kind registration: delegated to apply-theory-store.mjs');
 
 // ---- final cross-file invariants ----
 {
@@ -487,7 +469,5 @@ const THEORY_LEG = [
   if (!ex.includes('executeTheoryAnalysis') || !ex.includes('refuseTemplateMode(ctx, theoryDraft.executionMode')) fail('invariant: execute.ts theory leg incomplete');
   const off = read('src/providers/offline.ts');
   if (!off.includes("'theory-spec-draft': theorySpecDraft")) fail('invariant: offline handler table entry missing');
-  const st = read('src/persistence/store.ts');
-  if (!st.includes('theory_spec: TheorySpec')) fail('invariant: store kind missing');
-  console.log('ALL THEORY EDITS APPLIED AND VERIFIED');
+  console.log('ALL THEORY EDITS VERIFIED');
 }
