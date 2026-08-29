@@ -277,26 +277,53 @@ def _assemble_solve_measure(
             res_sq += (area / 3.0) * fv * fv
         eta_sq.append(h_T * h_T * res_sq)
 
-    # edge-jump terms: [[grad uh . n]] is constant per interior edge (P1)
+    # edge terms: interior jumps [[grad uh . n]] (constant per edge, P1) plus
+    # the Neumann boundary residual h_e * ||du_h/dn - g||^2_{L2(e)} on Gamma_N
+    # (audit scientific W2: without the boundary term the estimator underestimates
+    # boundary-driven error and Dörfler marking misplaces refinement).
     edge_tris: dict[EdgeKey, list[int]] = {}
     for t_i, (i0, i1, i2) in enumerate(tris):
         for a, b in ((i0, i1), (i1, i2), (i2, i0)):
             edge_tris.setdefault(_ekey(a, b), []).append(t_i)
     for (a, b), owners in edge_tris.items():
-        if len(owners) != 2:
-            continue
         (x0, y0), (x1, y1) = verts[a], verts[b]
         length = float(np.hypot(x1 - x0, y1 - y0))
         if length < 1e-14:
             continue
         n_hat = np.array([(y1 - y0), -(x1 - x0)]) / length
-        g1 = np.array(guh_list[owners[0]])
-        g2 = np.array(guh_list[owners[1]])
-        # h_e * ||jump||^2_{L2(e)} = h_e * (jump^2 * h_e) for a CONSTANT jump
-        jump = float(abs((g1 - g2) @ n_hat))
-        contrib = length * length * jump * jump / 2.0  # half to each owner
-        eta_sq[owners[0]] += contrib
-        eta_sq[owners[1]] += contrib
+        if len(owners) == 2:
+            g1 = np.array(guh_list[owners[0]])
+            g2 = np.array(guh_list[owners[1]])
+            # h_e * ||jump||^2_{L2(e)} = h_e * (jump^2 * h_e) for a CONSTANT jump
+            jump = float(abs((g1 - g2) @ n_hat))
+            contrib = length * length * jump * jump / 2.0  # half to each owner
+            eta_sq[owners[0]] += contrib
+            eta_sq[owners[1]] += contrib
+            continue
+        if len(owners) != 1:
+            continue
+        if abs(y0) < 1e-12 and abs(y1) < 1e-12:
+            family, n_out = "bottom", (0.0, -1.0)
+        elif abs(y0 - 1.0) < 1e-12 and abs(y1 - 1.0) < 1e-12:
+            family, n_out = "top", (0.0, 1.0)
+        elif abs(x0) < 1e-12 and abs(x1) < 1e-12:
+            family, n_out = "left", (-1.0, 0.0)
+        elif abs(x0 - 1.0) < 1e-12 and abs(x1 - 1.0) < 1e-12:
+            family, n_out = "right", (1.0, 0.0)
+        else:
+            continue
+        if edges_cfg.get(family) != "neumann":
+            continue
+        gx, gy = guh_list[owners[0]]
+        duh_dn = gx * n_out[0] + gy * n_out[1]
+        g_num = flux_num[family]
+        s = 0.0
+        for (t, w) in _EDGE_GAUSS:
+            qx = x0 + t * (x1 - x0)
+            qy = y0 + t * (y1 - y0)
+            r = duh_dn - float(g_num(qx, qy))
+            s += w * r * r
+        eta_sq[owners[0]] += length * length * s
 
     return {
         "ndof": ndof,
