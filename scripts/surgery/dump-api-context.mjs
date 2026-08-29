@@ -3,6 +3,8 @@
  * Self-describing surgery aid (convergence 2026-08-29): dumps STRUCTURAL
  * CONTEXT of the large api.ts monolith into this file so a remote work
  * surface can craft exact anchored patches. Read-only w.r.t. api.ts.
+ * Rev 3: markers frozen post-protocol-routes; edit only when new anchors
+ * are needed.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 
@@ -18,12 +20,9 @@ dump.push(lines.slice(0, 60).map((l, i) => `${i + 1}: ${l}`).join('\n'));
 const markers = [
   'createApiServer',
   'experiment-ops',
+  "segments[4] === 'protocol'",
   'experiments/:specId/approve',
-  'readJson',
-  'editHypothesis',
-  "segments[4] === 'feedback'",
-  "segments[4] === 'supervision'",
-  'readBody',
+  'readJsonObject',
 ];
 for (const marker of markers) {
   dump.push(`\n===== context around every occurrence of "${marker}" =====`);
