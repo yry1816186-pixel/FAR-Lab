@@ -1,10 +1,14 @@
 import type { StageContext, StageHandler, StageOutcome } from '../types.js';
-import { ExperimentSpec } from '../../domain/index.js';
+import { ExperimentSpec, newId, newProtocolExecution, ProtocolSpec } from '../../domain/index.js';
+import type { ResearchPlan } from '../../domain/plan.js';
 import { draftSpecFromPlan, draftMetaSpecFromPlan } from '../../experiment/spec-from-plan.js';
+import { draftProtocolFromPlan, planHashOf, protocolForPlan } from '../../experiment/protocol-from-plan.js';
 import { executeExperiment } from '../../experiment/executor.js';
 import { executeMetaAnalysis } from '../../experiment/executor-meta.js';
 import { RunBudgetExhaustedError } from '../../app/run-budget.js';
 import { experimentLegStatus } from '../../app/iteration.js';
+import { TemplateModeRefusal, refuseTemplateMode } from './shared.js';
+import { canonicalJson, canonicalSha256 } from '../../shared/crypto.js';
 import type { ModelPlaneDeps } from '../llm.js';
 
 /**
@@ -23,7 +27,31 @@ import type { ModelPlaneDeps } from '../llm.js';
  *  - Lease discipline: executeExperiment checkpoints via receipts/objects
  *    which are lease heartbeats in the orchestrator — long training keeps the
  *    lease warm; shouldCancel is checked by the executor between models.
+ *
+ * Convergence 2026-08-29 — protocol fallback (paradigm-honest execution): when
+ * neither the tabular nor the literature-pool leg can run, the plan's physical /
+ * human / field / engineering / theory legs get their executable artifact: a
+ * FROZEN protocol (checklist + committed randomization + collection form + QC
+ * + ethics gates) and an empty human-attested ledger. The software NEVER claims
+ * execution — the ledger advances only on human records, and outcomes later
+ * re-enter feedback -> revise as experiment feedback.
  */
+
+class ProtocolDraftSkipped extends Error {
+  constructor(readonly reason: string) {
+    super(reason);
+    this.name = 'ProtocolDraftSkipped';
+  }
+}
+
+/** Inputs-fingerprint for the protocol-draft checkpoint family (code/prompt drift invalidates). */
+const protocolDraftFingerprint = (plan: ResearchPlan, questionText: string): string =>
+  canonicalSha256(canonicalJson({
+    planId: plan.id,
+    planHash: planHashOf(plan),
+    objective: plan.objective,
+    question: questionText,
+  }));
 
 export const executeStage: StageHandler = {
   stage: 'execute',
@@ -92,18 +120,63 @@ export const executeStage: StageHandler = {
           return { kind: 'skipped', reason: `meta experiment execution failed (run continues): ${msg.slice(0, 240)}` };
         }
       }
-      return { kind: 'skipped', reason: `tabular: ${draft.reason}; literature-pool: ${metaDraft.reason}` };
+
+      // Protocol fallback (paradigm-honest execution): the computational legs are
+      // unavailable, so the real-world legs get their frozen preregistration.
+      const existing = protocolForPlan(ctx.store, ctx.run.id, plan);
+      if (existing !== null) {
+        return {
+          kind: 'done',
+          summary: `protocol ${existing.id} already registered for plan ${plan.id} (${existing.steps.length} steps, paradigm ${existing.paradigm}) — awaiting human execution`,
+        };
+      }
+      let protoDraft: Awaited<ReturnType<typeof draftProtocolFromPlan>>;
+      try {
+        protoDraft = await ctx.checkpointed('execute', 'protocol-draft', plan.id, protocolDraftFingerprint(plan, question.text), async () => {
+          const d = await draftProtocolFromPlan(plan, question.text, plane);
+          if (d.kind === 'skip') throw new ProtocolDraftSkipped(d.reason);
+          // Real-content discipline: a template protocol from the deterministic
+          // development wire must never become preregistered science in a product run
+          // (thrown INSIDE the checkpointed fn so a refusal is never cached).
+          refuseTemplateMode(ctx, d.executionMode, 'protocol draft');
+          return d;
+        });
+      } catch (e) {
+        if (e instanceof TemplateModeRefusal) return { kind: 'skipped', reason: e.message };
+        if (e instanceof ProtocolDraftSkipped) {
+          return { kind: 'skipped', reason: `tabular: ${draft.reason}; literature-pool: ${metaDraft.reason}; protocol: ${e.reason}` };
+        }
+        if (e instanceof RunBudgetExhaustedError) throw e;
+        return {
+          kind: 'skipped',
+          reason: `tabular: ${draft.reason}; literature-pool: ${metaDraft.reason}; protocol: drafting failed (${(e instanceof Error ? e.message : String(e)).slice(0, 180)})`,
+        };
+      }
+      const registered = ProtocolSpec.parse({
+        ...protoDraft.spec,
+        status: 'registered',
+        frozenAt: new Date().toISOString(),
+      });
+      ctx.store.putObject('protocol', registered);
+      ctx.store.putObject('protocol_execution', newProtocolExecution(registered, newId('pex'), new Date().toISOString()));
+      return {
+        kind: 'done',
+        summary:
+          `protocol ${registered.id} registered for human execution (${registered.steps.length} steps, ${registered.arms.length} arms, ` +
+          `${registered.variables.length} measured variables, paradigm ${registered.paradigm}) — no machine execution claimed; ` +
+          'the ledger advances only on human-attested records, and recorded outcomes re-enter feedback -> revise',
+      };
     }
 
     // 2. Execute on the local executor (real path only). Existing completed
     //    runs for this spec hash make this a no-op report (idempotency).
-    const runOnce = async (): ReturnType<typeof executeExperiment> =>
+    const runOnce = async (): Promise<Awaited<ReturnType<typeof executeExperiment>>> =>
       executeExperiment(ctx.store, ctx.artifacts, draft.spec, {
         shouldCancel: () => ctx.cancelled() || ctx.disowned(),
         allowLocalDatasets: false, // plan-drafted specs use public OpenML only
       });
     try {
-      let executed: Awaited<ReturnType<typeof runOnce>>;
+      let executed: Awaited<ReturnType<typeof executeExperiment>>;
       try {
         executed = await runOnce();
       } catch (first) {

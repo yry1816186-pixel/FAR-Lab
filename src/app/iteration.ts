@@ -10,6 +10,7 @@ import {
   type IterationTrigger,
 } from '../domain/index.js';
 import { checkPlanExecutability } from '../pipeline/stages/plan.js';
+import { protocolForPlan } from '../experiment/protocol-from-plan.js';
 import { canonicalJson } from '../shared/crypto.js';
 
 /**
@@ -130,6 +131,7 @@ export const computeIterationSnapshot = (store: Store, runId: string, round: num
   const signals = store.listObjects('feedback', runId);
   const experimentRuns = store.listObjects('experiment_run', runId);
   const effectEstimates = store.listObjects('effect_estimate', runId);
+  const protocols = store.listObjects('protocol', runId);
   const consumed = new Set(revisions.map((r) => r.triggerFeedbackId));
 
   const material = {
@@ -145,6 +147,7 @@ export const computeIterationSnapshot = (store: Store, runId: string, round: num
     feedbackSignals: signals.length,
     feedbackConsumed: signals.filter((s) => consumed.has(s.id)).length,
     effectEstimates: effectEstimates.length,
+    protocolsRegistered: protocols.length,
   };
   return { round, ...material, fingerprint: sha(canonicalJson(material)) };
 };
@@ -213,7 +216,7 @@ export const evaluateIteration = (opts: {
         rationale: `iteration round cap reached (${round}/${MAX_ITERATION_ROUNDS}) — further rounds need new feedback or an approved experiment`,
         unblockHints: [
           'add a feedback signal (expert judgment / new literature / reviewer comment) and resume — feedback reopens the loop',
-          'approve a drafted experiment: far experiment approve <specId> --by <you> --hypothesis <hypId>, then far experiment rerun <specId>',
+          'approve a drafted experiment: far experiment approve  --by  --hypothesis , then far experiment rerun ',
         ],
       }),
     };
@@ -270,7 +273,15 @@ export const evaluateIteration = (opts: {
     const hypothesisIds = new Set(store.listObjects('hypothesis', runId).map((h) => h.id));
     const executable = checkPlanExecutability(plan, hypothesisIds).passed;
     const because = leg.kind === 'unexecuted' ? 'never_executed' : leg.kind === 'plan_revised_since_experiment' ? 'revised_since' : null;
-    if (because !== null && executable) {
+    // Protocol gate (convergence 2026-08-29): a protocol registered for the
+    // plan's CURRENT hash means the unexecuted leg is human-owned real-world
+    // work — the machine trigger must NOT re-fire (re-opening execute would
+    // just re-report the same registration). The loop stops honestly with the
+    // protocol as the unblock path; outcomes return later as experiment
+    // feedback. A REVISED plan changes the hash, the lookup misses, and the
+    // trigger re-arms exactly as the experiment leg does.
+    const protocol = leg.kind === 'unexecuted' ? protocolForPlan(store, runId, plan) : null;
+    if (because !== null && executable && protocol === null) {
       const rationale = leg.kind === 'plan_revised_since_experiment'
         ? `plan ${plan.id} was causally revised (re-frozen ${leg.frozenAt.slice(0, 19)}) after the last completed experiment (${leg.lastExperimentEndedAt.slice(0, 19)}) — the revised registration deserves its own experiment`
         : `plan ${plan.id} passes the deterministic executability check but no experiment has completed — reopening execute -> feedback -> revise -> export`;
@@ -298,6 +309,15 @@ export const evaluateIteration = (opts: {
   }
   if (leg.kind !== 'no_plan' && store.listObjects('experiment_run', runId).some((r) => r.status === 'completed')) {
     unblockHints.push('falsification loop has executed evidence — add expert/literature feedback to drive a causal revision round');
+  }
+  if (leg.kind === 'unexecuted') {
+    const pendingProtocol = protocolForPlan(store, runId, store.listObjects('plan', runId).at(-1)!);
+    if (pendingProtocol !== null) {
+      unblockHints.push(
+        `protocol ${pendingProtocol.id} is registered and awaits real-world execution with human-attested records ` +
+        '(checklist + committed allocation + collection form); recorded outcomes re-enter feedback -> revise as experiment feedback',
+      );
+    }
   }
   return {
     decision: 'stop',
