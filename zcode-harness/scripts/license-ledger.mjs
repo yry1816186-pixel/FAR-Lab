@@ -215,6 +215,20 @@ if (mode === '--out') {
   const committed = readFileSync(LEDGER_PATH, 'utf8');
   if (committed !== markdown) {
     console.error('FAIL: submission/OSS_LEDGER.md is out of date with the installed dependency tree — regenerate it (see header commands).');
+    // Diagnosis aid (2026-08-30 blind-drift incident): a bare FAIL is
+    // undebuggable cross-platform. Print the first differing lines both ways.
+    const a = committed.split('\n');
+    const b = markdown.split('\n');
+    const max = Math.max(a.length, b.length);
+    let shown = 0;
+    for (let i = 0; i < max && shown < 12; i++) {
+      if (a[i] !== b[i]) {
+        console.error(`  line ${i + 1}:`);
+        console.error(`  - committed: ${JSON.stringify(a[i] ?? '<eof>')}`);
+        console.error(`  + rendered : ${JSON.stringify(b[i] ?? '<eof>')}`);
+        shown++;
+      }
+    }
     process.exit(1);
   }
   if (unapproved.length > 0) {
