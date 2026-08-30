@@ -89,7 +89,7 @@ Authoritative policy: `DEPENDENCY_POLICY.md` (runtime dependency set is exactly 
 
 | license | packages |
 | --- | --- |
-| MIT | 415 |
+| MIT | 414 |
 | Apache-2.0 | 29 |
 | ISC | 23 |
 | BSD-3-Clause | 19 |

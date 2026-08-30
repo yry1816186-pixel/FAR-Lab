@@ -51,25 +51,68 @@ function readJson(p) {
   return JSON.parse(readFileSync(p, 'utf8'));
 }
 
+/**
+ * Platform-orphan set from the workspace lockfile (2026-08-30 CI blind-drift,
+ * round 2: @emnapi/runtime is optional:true with NO os/cpu, but its only
+ * parents are platform-conditional optionals — npm installs it on some
+ * platforms and not others, so any count over the installed tree drifts).
+ * Fixpoint rule: an entry is excluded when it declares os/cpu/libc, OR when it
+ * is optional and EVERY lockfile parent of it is itself excluded. The root
+ * entry ('') is never excluded, so anything the workspace truly declares
+ * always stays in the count.
+ */
+function platformOrphansFromLockfile(wsDir) {
+  const lockPath = join(repoRoot, wsDir, 'package-lock.json');
+  if (!existsSync(lockPath)) return new Set();
+  const entries = readJson(lockPath).packages ?? {};
+  const parentsOf = new Map(); // dependency name -> parent keys
+  for (const [key, info] of Object.entries(entries)) {
+    for (const dep of [...Object.keys(info.dependencies ?? {}), ...Object.keys(info.optionalDependencies ?? {})]) {
+      const arr = parentsOf.get(dep) ?? [];
+      arr.push(key);
+      parentsOf.set(dep, arr);
+    }
+  }
+  const nameOf = (key) => key.split('node_modules/').pop();
+  const excluded = new Set();
+  for (const [key, info] of Object.entries(entries)) {
+    if (info.os !== undefined || info.cpu !== undefined || info.libc !== undefined) excluded.add(key);
+  }
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const [key, info] of Object.entries(entries)) {
+      if (key === '' || excluded.has(key) || info.optional !== true) continue;
+      const ps = parentsOf.get(nameOf(key)) ?? [];
+      if (ps.length > 0 && ps.every((p) => p !== '' && excluded.has(p))) {
+        excluded.add(key);
+        changed = true;
+      }
+    }
+  }
+  return new Set([...excluded].map(nameOf));
+}
+
 function installedPackages(wsDir) {
   const nm = join(repoRoot, wsDir, 'node_modules');
   if (!existsSync(nm)) return null;
+  const orphans = platformOrphansFromLockfile(wsDir);
   const out = new Map();
   for (const entry of readdirSync(nm)) {
     if (entry.startsWith('.')) continue;
     if (entry.startsWith('@')) {
       for (const sub of readdirSync(join(nm, entry))) {
         if (sub.startsWith('.')) continue;
-        collect(join(nm, entry, sub), `${entry}/${sub}`, out);
+        collect(join(nm, entry, sub), `${entry}/${sub}`, out, orphans);
       }
     } else {
-      collect(join(nm, entry), entry, out);
+      collect(join(nm, entry), entry, out, orphans);
     }
   }
   return out;
 }
 
-function collect(pkgDir, name, out) {
+function collect(pkgDir, name, out, orphans) {
   const pj = join(pkgDir, 'package.json');
   if (!existsSync(pj)) return;
   try {
@@ -84,9 +127,12 @@ function collect(pkgDir, name, out) {
       // can never pass --check cross-platform). The whole @img/* family is
       // excluded by NAME as well: sharp's wasm32 variant and its transitive
       // @img/colour install platform-dependently WITHOUT declaring os/cpu
-      // (2026-08-30 CI blind-drift root cause). Their governance record is
+      // (2026-08-30 CI blind-drift root cause). Platform ORPHANS — optional
+      // packages whose every lockfile parent is itself platform-conditional
+      // (e.g. @emnapi/runtime under @img/sharp-wasm32) — are excluded by the
+      // lockfile fixpoint for the same reason. Their governance record is
       // rendered canonically below from PLATFORM_BINARY_DISPOSITIONS.
-      platform: (j.os !== undefined || j.cpu !== undefined) || name.startsWith('@img/'),
+      platform: (j.os !== undefined || j.cpu !== undefined) || name.startsWith('@img/') || orphans.has(name),
     });
   } catch {
     out.set(name, { version: '?', license: 'UNREADABLE' });
