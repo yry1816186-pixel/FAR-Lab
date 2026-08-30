@@ -25,27 +25,26 @@ const COPYLEFT = /(^|[\s(])(AGPL|GPL|LGPL|SSPL|Sleepycat)/i;
 
 // Entries that mention a copyleft term but carry a recorded, governance-reviewed
 // justification. Adding one requires a lane-15 decision record in the report.
+// NOTE: @img/* platform binaries are NOT here — they are excluded from the
+// installed-tree scan entirely (see collect()) and documented canonically in
+// PLATFORM_BINARY_DISPOSITIONS, because their install set varies per platform
+// (the 2026-08-30 CI blind-drift: sharp-wasm32 and its transitive @img/colour
+// install on Windows but not Linux, WITHOUT declaring os/cpu).
 const ALLOWED_EXCEPTIONS = new Map([
-  [
-    '@img/sharp-win32-x64',
-    'Apache-2.0 AND LGPL-3.0-or-later — optional platform binary of sharp (web devDependency, build-time only). Never distributed: public-release manifest prunes node_modules; end users install sharp directly from npm. No LGPL obligation attaches to FAR-Lab distributions.',
-  ],
-  [
-    '@img/sharp-libvips-linux-x64',
-    'Apache-2.0 AND LGPL-3.0-or-later — Linux twin of the allowed win32 sharp binary; same build-time-only, never-distributed disposition (npm lockfiles carry ALL platforms\' optionals, so CI on Linux installs this variant).',
-  ],
-  [
-    '@img/sharp-libvips-linuxmusl-x64',
-    'Apache-2.0 AND LGPL-3.0-or-later — musl twin of the allowed win32 sharp binary; same build-time-only, never-distributed disposition.',
-  ],
-  [
-    '@img/sharp-wasm32',
-    'Apache-2.0 AND LGPL-3.0-or-later AND MIT — wasm32 fallback variant of the allowed sharp platform binaries (forced by web overrides ^0.35.4, Dependabot fix d994b6b; zero direct imports in web sources). Same build-time-only, never-distributed disposition: public-release manifest prunes node_modules and end users install from npm directly. Decision recorded 2026-08-30 endgame window (lane log EXECUTION_STATE-20260829-convergence.md); removal = delete this entry.',
-  ],
   [
     'jszip',
     '(MIT OR GPL-3.0-or-later) — dual-licensed; FAR-Lab elects the MIT alternative at install/build time. No copyleft obligation is triggered.',
   ],
+]);
+
+// Canonical, platform-independent documentation rows for sharp's platform
+// binary family (rendered even where that variant is not installed — the table
+// documents policy, not the local npm ci).
+const PLATFORM_BINARY_DISPOSITIONS = new Map([
+  ['@img/sharp-win32-x64', 'Apache-2.0 AND LGPL-3.0-or-later — optional platform binary of sharp (web build-time only). Never distributed: public-release manifest prunes node_modules; end users install sharp directly from npm.'],
+  ['@img/sharp-libvips-linux-x64', 'Apache-2.0 AND LGPL-3.0-or-later — Linux twin of the allowed win32 sharp binary; same build-time-only, never-distributed disposition.'],
+  ['@img/sharp-libvips-linuxmusl-x64', 'Apache-2.0 AND LGPL-3.0-or-later — musl twin of the allowed win32 sharp binary; same disposition.'],
+  ['@img/sharp-wasm32', 'Apache-2.0 AND LGPL-3.0-or-later AND MIT — wasm32 fallback variant (forced by web overrides ^0.35.4, Dependabot fix d994b6b; zero direct imports). Installs platform-dependently WITHOUT os/cpu flags — 2026-08-30 CI blind-drift root cause, now excluded from the scan by the @img/* family rule. Same build-time-only, never-distributed disposition.'],
 ]);
 
 function readJson(p) {
@@ -79,12 +78,15 @@ function collect(pkgDir, name, out) {
       version: j.version ?? '?',
       license: normalizeLicense(j.license, j.licenses),
       // Platform-specific optional binaries (sharp/@img, @rollup/rollup-<os>,
-      // lightningcss-*, esbuild installs...) declare os/cpu constraints. They are
-      // environment artifacts of `npm ci`, not product dependencies — excluded
-      // from the distribution COUNT (which must be identical on every OS, or the
-      // committed ledger can never pass --check cross-platform). The copyleft
-      // gate still sees them.
-      platform: j.os !== undefined || j.cpu !== undefined,
+      // lightningcss-*, esbuild installs...) are environment artifacts of
+      // `npm ci`, not product dependencies — excluded from the distribution
+      // COUNT (which must be identical on every OS, or the committed ledger
+      // can never pass --check cross-platform). The whole @img/* family is
+      // excluded by NAME as well: sharp's wasm32 variant and its transitive
+      // @img/colour install platform-dependently WITHOUT declaring os/cpu
+      // (2026-08-30 CI blind-drift root cause). Their governance record is
+      // rendered canonically below from PLATFORM_BINARY_DISPOSITIONS.
+      platform: (j.os !== undefined || j.cpu !== undefined) || name.startsWith('@img/'),
     });
   } catch {
     out.set(name, { version: '?', license: 'UNREADABLE' });
@@ -193,7 +195,8 @@ const PLATFORM_EXCEPTION_ROWS = [
   { name: '@img/sharp-win32-x64', license: 'Apache-2.0 AND LGPL-3.0-or-later' },
   { name: '@img/sharp-libvips-linux-x64', license: 'Apache-2.0 AND LGPL-3.0-or-later' },
   { name: '@img/sharp-libvips-linuxmusl-x64', license: 'Apache-2.0 AND LGPL-3.0-or-later' },
-].map((r) => ({ ...r, exception: ALLOWED_EXCEPTIONS.get(r.name) ?? null }));
+  { name: '@img/sharp-wasm32', license: 'Apache-2.0 AND LGPL-3.0-or-later AND MIT' },
+].map((r) => ({ ...r, exception: PLATFORM_BINARY_DISPOSITIONS.get(r.name) ?? null }));
 
 const markdown = render(wsResults, copyleftHits);
 const unapproved = copyleftHits.filter((h) => !h.exception);

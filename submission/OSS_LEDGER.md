@@ -89,7 +89,7 @@ Authoritative policy: `DEPENDENCY_POLICY.md` (runtime dependency set is exactly 
 
 | license | packages |
 | --- | --- |
-| MIT | 416 |
+| MIT | 415 |
 | Apache-2.0 | 29 |
 | ISC | 23 |
 | BSD-3-Clause | 19 |
@@ -100,7 +100,6 @@ Authoritative policy: `DEPENDENCY_POLICY.md` (runtime dependency set is exactly 
 | (MIT AND Zlib) | 1 |
 | (MIT OR GPL-3.0-or-later) | 1 |
 | 0BSD | 1 |
-| Apache-2.0 AND LGPL-3.0-or-later AND MIT | 1 |
 | Apache-2.0 OR MIT | 1 |
 | BlueOak-1.0.0 | 1 |
 | BSD | 1 |
@@ -110,8 +109,8 @@ Authoritative policy: `DEPENDENCY_POLICY.md` (runtime dependency set is exactly 
 
 | package | license | disposition |
 | --- | --- | --- |
-| @img/sharp-libvips-linux-x64 | Apache-2.0 AND LGPL-3.0-or-later | ALLOWED — Apache-2.0 AND LGPL-3.0-or-later — Linux twin of the allowed win32 sharp binary; same build-time-only, never-distributed disposition (npm lockfiles carry ALL platforms' optionals, so CI on Linux installs this variant). |
-| @img/sharp-libvips-linuxmusl-x64 | Apache-2.0 AND LGPL-3.0-or-later | ALLOWED — Apache-2.0 AND LGPL-3.0-or-later — musl twin of the allowed win32 sharp binary; same build-time-only, never-distributed disposition. |
-| @img/sharp-wasm32 | Apache-2.0 AND LGPL-3.0-or-later AND MIT | ALLOWED — Apache-2.0 AND LGPL-3.0-or-later AND MIT — wasm32 fallback variant of the allowed sharp platform binaries (forced by web overrides ^0.35.4, Dependabot fix d994b6b; zero direct imports in web sources). Same build-time-only, never-distributed disposition: public-release manifest prunes node_modules and end users install from npm directly. Decision recorded 2026-08-30 endgame window (lane log EXECUTION_STATE-20260829-convergence.md); removal = delete this entry. |
-| @img/sharp-win32-x64 | Apache-2.0 AND LGPL-3.0-or-later | ALLOWED — Apache-2.0 AND LGPL-3.0-or-later — optional platform binary of sharp (web devDependency, build-time only). Never distributed: public-release manifest prunes node_modules; end users install sharp directly from npm. No LGPL obligation attaches to FAR-Lab distributions. |
+| @img/sharp-libvips-linux-x64 | Apache-2.0 AND LGPL-3.0-or-later | ALLOWED — Apache-2.0 AND LGPL-3.0-or-later — Linux twin of the allowed win32 sharp binary; same build-time-only, never-distributed disposition. |
+| @img/sharp-libvips-linuxmusl-x64 | Apache-2.0 AND LGPL-3.0-or-later | ALLOWED — Apache-2.0 AND LGPL-3.0-or-later — musl twin of the allowed win32 sharp binary; same disposition. |
+| @img/sharp-wasm32 | Apache-2.0 AND LGPL-3.0-or-later AND MIT | ALLOWED — Apache-2.0 AND LGPL-3.0-or-later AND MIT — wasm32 fallback variant (forced by web overrides ^0.35.4, Dependabot fix d994b6b; zero direct imports). Installs platform-dependently WITHOUT os/cpu flags — 2026-08-30 CI blind-drift root cause, now excluded from the scan by the @img/* family rule. Same build-time-only, never-distributed disposition. |
+| @img/sharp-win32-x64 | Apache-2.0 AND LGPL-3.0-or-later | ALLOWED — Apache-2.0 AND LGPL-3.0-or-later — optional platform binary of sharp (web build-time only). Never distributed: public-release manifest prunes node_modules; end users install sharp directly from npm. |
 | jszip | (MIT OR GPL-3.0-or-later) | ALLOWED — (MIT OR GPL-3.0-or-later) — dual-licensed; FAR-Lab elects the MIT alternative at install/build time. No copyleft obligation is triggered. |
