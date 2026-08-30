@@ -22,5 +22,8 @@ Only risks that can materially affect the product or its verified release belong
 | R-16 | pre-research corpus anchors architecture despite staleness | weak technology choices | cold reference only; fresh decision-specific verification |
 | R-17 | ZCode Harness files exist but are not actually loaded | guardrails silently absent | local marketplace install + fresh-session runtime verification |
 | R-18 | performance targets chosen without measurement | premature optimization/bad gates | representative benchmark first, then budget/reversal triggers |
+| R-19 | exploration CodeAct static gate is bypassable (alias/split-chain/getattr; static bans are guardrails, not a jail) | agent-drafted code reaches researcher-privilege OS surface | 2026-08-30: alias-aware gates + getattr ban + runtime dangerous-module scrub + env-minimized sidecar (tests/codeact-escape-regression.test.ts); REAL containment = OS-level isolation, tracked in FINAL_ACCEPTANCE FA-SEC-01 |
+| R-20 | no process-boundary network egress allowlist (sources layer guarded 2026-08-30; providers/MCP/custom routes not) | injected tool use or escape exfiltrates to arbitrary hosts | sources httpGet destination guard + per-hop redirect re-check landed; deny-by-default egress for the whole process tracked in FINAL_ACCEPTANCE FA-SEC-04 |
+| R-21 | release artifacts unsigned, no SBOM | downstream cannot verify artifact integrity; supply-chain substitution | SHA256SUMS + sigstore + SBOM planned at release-pack execution (FINAL_ACCEPTANCE FA-SEC-09/10); do NOT distribute before closed |
 
 Update this file only when the risk class/mitigation materially changes; live blockers belong in `.control/BLOCKERS.json`.
