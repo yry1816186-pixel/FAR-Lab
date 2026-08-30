@@ -44,6 +44,7 @@ import {
   setConversationReasoningGear, ConversationError, type ConversationDeps,
 } from './conversations.js';
 import { startAutomationEngine, type AutomationEngine } from './automations.js';
+import { ConversationTurnHub, type SequencedConversationStreamEvent } from './conversation-stream.js';
 import { TerminalManager } from './terminal.js';
 import { resolveInsideRoot } from '../agent/capabilities/workspace-tools.js';
 import { aggregateRunUsage, aggregateWorkspaceUsage } from '../app/usage-ledger.js';
@@ -95,7 +96,7 @@ import { checkPlanExecutability } from '../pipeline/stages/plan.js';
  */
 
 export interface ApiServerError {
-  code: 'not_found' | 'validation' | 'already_running' | 'run_active' | 'not_started' | 'internal' | 'target_not_found' | 'question_required' | 'action_model_failed' | 'action_budget_exhausted' | 'invalid_action_request' | 'invalid_counter_search' | 'provider_unreachable' | 'conversation_model_failed' | 'conversation_full' | 'turn_in_flight' | 'no_corpus' | 'session_stopped' | 'src_not_in_pool' | 'run_not_found' | 'already_launched' | 'scope_proposal_failed' | 'scope_proposal_unavailable' | 'lease_held' | 'feature_disabled' | 'terminal_limit' | 'terminal_not_writable';
+  code: 'not_found' | 'validation' | 'already_running' | 'run_active' | 'not_started' | 'internal' | 'target_not_found' | 'question_required' | 'action_model_failed' | 'action_budget_exhausted' | 'invalid_action_request' | 'invalid_counter_search' | 'provider_unreachable' | 'conversation_model_failed' | 'conversation_full' | 'turn_in_flight' | 'turn_cancelled' | 'no_corpus' | 'session_stopped' | 'src_not_in_pool' | 'run_not_found' | 'already_launched' | 'scope_proposal_failed' | 'scope_proposal_unavailable' | 'lease_held' | 'feature_disabled' | 'terminal_limit' | 'terminal_not_writable';
   message: string;
   retryable: boolean;
   runId?: string;
@@ -283,6 +284,12 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
   // Terminal sessions (extensibility lane): persistent login shells behind
   // /api/v1/terminal/* — loopback workbench surface, FARLAB_TERMINAL=off kills it.
   const terminals = new TerminalManager();
+  // Conversation generation outlives any one browser connection. The hub keeps
+  // a bounded seq replay so refresh/reconnect resumes the real provider stream;
+  // disconnect alone never cancels paid work.
+  const conversationTurns = new ConversationTurnHub(
+    (conversationId) => app.store.getObject('conversation', conversationId),
+  );
   // Sweep-health visibility (WP2 F-007): a persistent store error would otherwise
   // silently stop adoptions forever with only a stderr line — /health reports it.
   let consecutiveSweepFailures = 0;
@@ -491,6 +498,56 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
     }
     if (sub.droppedChars > 0) res.write(`: ring evicted ${sub.droppedChars} older chars\n\n`);
     req.on('close', close);
+    res.on('error', close);
+  };
+
+  /** Resident-agent stream: seq replay + live public progress. A response
+   * socket closing only unsubscribes; explicit /cancel owns cancellation. */
+  const conversationTurnStream = (
+    res: http.ServerResponse,
+    conversationId: string,
+    url: URL,
+  ): void => {
+    const headerSeq = Number.parseInt(String(res.req.headers['last-event-id'] ?? ''), 10);
+    const querySeq = Number.parseInt(url.searchParams.get('afterSeq') ?? '0', 10);
+    const afterSeq = Number.isFinite(headerSeq) && headerSeq > 0
+      ? headerSeq
+      : Number.isFinite(querySeq) && querySeq > 0 ? querySeq : 0;
+    let closed = false;
+    let heartbeat: NodeJS.Timeout | null = null;
+    let unsubscribe = (): void => {};
+    const terminal = (event: SequencedConversationStreamEvent): boolean =>
+      event.payload.type === 'completed' || event.payload.type === 'failed' || event.payload.type === 'cancelled';
+    const write = (event: SequencedConversationStreamEvent): void => {
+      if (closed || res.writableEnded) return;
+      res.write(`id: ${event.seq}\nevent: conversation-turn\ndata: ${JSON.stringify(event)}\n\n`);
+      if (terminal(event)) queueMicrotask(close);
+    };
+    const close = (): void => {
+      if (closed) return;
+      closed = true;
+      if (heartbeat !== null) clearInterval(heartbeat);
+      unsubscribe();
+      if (!res.writableEnded) res.end();
+    };
+    const sub = conversationTurns.subscribe(conversationId, afterSeq, write);
+    if (sub === null) throw notFound(`no active or recently completed conversation turn for ${conversationId}`);
+    unsubscribe = sub.unsubscribe;
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+    res.write(': conversation stream open\n\n');
+    for (const event of sub.replay) write(event);
+    if (!sub.running && !sub.replay.some(terminal)) {
+      // The caller already consumed the terminal event (afterSeq is current).
+      close();
+      return;
+    }
+    heartbeat = setInterval(() => { if (!closed) res.write(': ping\n\n'); }, 10_000);
+    res.on('close', close);
     res.on('error', close);
   };
 
@@ -2770,7 +2827,7 @@ function parseSeedSources(raw: unknown): string | {
           await fn();
         } catch (e) {
           if (e instanceof ConversationError) {
-            throw new HttpError(e.status, { code: e.code, message: e.message, retryable: e.code === 'conversation_model_failed' });
+            throw new HttpError(e.status, { code: e.code, message: e.message, retryable: e.code === 'conversation_model_failed' || e.code === 'turn_cancelled' });
           }
           throw e;
         }
@@ -2797,6 +2854,45 @@ function parseSeedSources(raw: unknown): string | {
         }
         if (method === 'DELETE') return convRoute(() => { deleteConversation(app, convId); sendJson(res, 200, { ok: true }); });
         throw notFound(`method ${method} not allowed for ${url.pathname}`);
+      }
+      if (segments[4] === 'turns' && segments[5] === 'active' && segments[6] === 'stream' && segments.length === 7 && method === 'GET') {
+        return convRoute(() => {
+          getConversation(app, convId);
+          conversationTurnStream(res, convId, url);
+        });
+      }
+      if (segments[4] === 'turns' && segments[5] === 'active' && segments[6] === 'cancel' && segments.length === 7 && method === 'POST') {
+        return convRoute(() => {
+          getConversation(app, convId);
+          sendJson(res, 202, { requested: conversationTurns.cancel(convId) });
+        });
+      }
+      if (segments[4] === 'messages' && segments[5] === 'stream' && segments.length === 6 && method === 'POST') {
+        return convRoute(async () => {
+          const body = await readJsonObject(req);
+          if (typeof body.text !== 'string' || body.text.trim().length === 0) {
+            throw new ConversationError(400, 'validation', 'field "text" is required (non-empty)');
+          }
+          getConversation(app, convId);
+          conversationTurns.start(
+            convId,
+            (runtime) => postConversationMessage(app, convId, body, conversationDeps, runtime),
+          );
+          conversationTurnStream(res, convId, url);
+        });
+      }
+      if (segments[4] === 'messages' && segments.length === 8 && segments[6] === 'retry' && segments[7] === 'stream' && method === 'POST') {
+        return convRoute(async () => {
+          // Consume/validate the JSON body before switching protocols; clients
+          // send {} so the same CSRF/content-type guard applies as other writes.
+          await readJsonObject(req);
+          getConversation(app, convId);
+          conversationTurns.start(
+            convId,
+            (runtime) => retryConversationTurn(app, convId, segments[5]!, conversationDeps, runtime),
+          );
+          conversationTurnStream(res, convId, url);
+        });
       }
       if (segments[4] === 'messages' && segments.length === 5 && method === 'POST') {
         return convRoute(async () => {
@@ -3080,6 +3176,7 @@ function parseSeedSources(raw: unknown): string | {
     new Promise((resolve) => {
       if (watchdogTimer !== null) clearInterval(watchdogTimer);
       automationEngine?.stop();
+      conversationTurns.close();
       terminals.closeAll();
       server.close(() => resolve());
       server.closeIdleConnections();

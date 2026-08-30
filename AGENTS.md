@@ -4,11 +4,12 @@
 
 ## 1. Mission boundary
 
-- This is a greenfield FAR-Lab workspace for 2026 XH-202619, **Track 1 -> Direction 1 -> A: scientific hypothesis generation and research-plan design**. No prior FAR-Lab project history, code or architecture is assumed or inherited; use only current workspace truth and explicitly chosen external references.
-- Core loop: question/scope -> real evidence -> multiple hypotheses -> supporting/counter evidence + uncertainty -> falsifiability/testability -> ranking -> executable research plan -> feedback -> revision/version comparison -> provenance/reproducible export.
-- Direction-B-style simulation/experiment adapters may support testability/feedback, but must not replace the Direction-A core.
+- Identity (owner directives 2026-08-29/30): FAR-Lab has converged into the **AOSSA research operating environment — Scientific Second Brain + Research Execution + Auditable Research Record**. Track 1-A of XH-202619 (scientific hypothesis generation and research-plan design) is a hard release constraint, not the capability ceiling.
+- North-star loop (no feature may be deleted that strengthens it): question -> knowledge/data -> Scientific Problem Model (+ method selection) -> hypotheses -> evidence/uncertainty -> prediction -> design -> experiment/protocol -> execution -> QC/processing -> analysis -> validation/replication -> conclusion -> feedback/revision -> paper/code/data/reproducible bundle -> new question.
+- Problem-model-first, LLM-proposes/deterministic-disposes: the LLM drafts only inside closed schemas (problem model, method selection, protocol, theory/FEM specs); deterministic code owns ids, enum space, validation, state transitions and verdicts. "No LLM decides whether research continues" and "no LLM renders the scientific verdict" are load-bearing invariants.
+- The execution plane is first-class product, not an adapter: tabular ML, literature-pool, theory identity, FEM (uniform + adaptive), the NetCDF data plane and the human-attested protocol layer are canonical legs. Paradigm honesty: work the software cannot execute becomes preregistered protocol artifacts with human-recorded evidence — never simulated execution.
+- Canonical semantics live in `project-spec/` (`SCIENTIFIC_MODEL.md` owns object semantics; `AOSSA-CONVERGENCE-PLAN.md` records layer dispositions and the owner-mandated proof scenarios). Semantic changes propagate the whole chain: spec -> schema -> API -> UI -> tests -> docs. Dynamic state in `.control/`, deterministic checks in `zcode-harness/scripts/`.
 - Competition release must satisfy the **model-calling route required by the current official competition rules**; the product is model-agnostic and supports access to all models worldwide. Builder model/runtime is separate. Re-check the official page before consequential compliance claims.
-- Formal product construction starts only when the user explicitly starts it. During construction, `FINAL_BUILD_PROMPT.md`, `project-spec/`, `.control/` and repository/runtime reality are the control plane.
 
 ## 2. Truth and evidence
 
@@ -23,6 +24,7 @@
 - Complete important vertical slices end-to-end: requirement -> design -> implementation -> integration -> real caller -> state -> failure/recovery -> observability -> test -> real-path verification.
 - Production paths must not silently use demo/fake/mock/fixture/synthetic success. Test fixtures and synthetic benchmarks must be explicit and isolated.
 - Do not optimize for file count, test count, agent count, commits, dashboards or report volume. Optimize real user/scientific capability.
+- AOSSA proof scenarios are acceptance criteria (ACCEPTANCE.md ACC-42..46): A/B must run end-to-end on the live route with independently verifiable bundles (`far verify`); scenario C's human leg stays user-owned and is disclosed, never simulated.
 - Completion = `project-spec/ACCEPTANCE.md` criteria + `.control/ACCEPTANCE_STATUS.json` evidence + real workflow + no critical blocker + independent adversarial audit. Run `node zcode-harness/scripts/completion-gate.mjs` before any final completion claim.
 
 ## 4. Execution and priority
@@ -60,6 +62,7 @@
 ## 8. Agents, context and recovery
 
 - Parallelize only independent, mergeable work with clear ownership and real benefit. Avoid overlapping writes. Subagent output is candidate evidence; the main Agent owns integration and final decisions.
+- Sibling sessions share one worktree. Lane rules: commits go branch -> rebase -> ff-merge (a user hook blocks direct main commits); re-read shared files before editing; each window appends its record to the active `.control/EXECUTION_STATE-*.md`.
 - Model memory/chat history is not durable state. Reconcile `.control/` with actual workspace/Git after interruption or compact.
 - Session start/resume: read `AGENTS.md` -> `.control/EXECUTION_STATE.json` -> relevant pending acceptance/blockers -> only the project-spec/policy sections needed for the current problem.
 - Do **not** preload all policies or the large `research/reference/` corpus. Use `project-spec/policies/README.md` and `research/EVIDENCE_INDEX.md` as routing indexes.

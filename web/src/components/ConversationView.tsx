@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowUp, BookMarked, Brain, BrainCircuit, Check, Clock, Copy, Link2, Loader2, Paperclip, RotateCcw, Wrench, X, Zap } from 'lucide-react';
+import { ArrowUp, BookMarked, Brain, Check, Clock, Copy, Link2, Loader2, Paperclip, RotateCcw, Square, Wrench, X, Zap } from 'lucide-react';
 import { useI18n } from '../i18n/LanguageContext';
 import type { DictKey } from '../i18n/dict';
 import { AttachIcon, DISPLAY_KIND, type AttachKind } from './common';
@@ -10,10 +10,13 @@ import { DictationButton } from './DictationButton';
 import { insertAtCaret } from '../dictation/audio';
 import {
   deleteAutomation, getConversation, getConversationReasoning, launchFromConversation,
-  listConversationAutomations, postConversationMessage, resolveConversationProposal,
-  retryConversationTurn, setAutomationEnabled, setConversationReasoningGear,
+  listConversationAutomations, resolveConversationProposal, setAutomationEnabled, setConversationReasoningGear,
   type ConversationReasoningInfo,
 } from '../api/endpoints';
+import {
+  cancelConversationTurn, streamConversationTurn,
+  type ConversationPublicProgress, type ConversationStreamConnection, type ConversationTurnStart,
+} from '../api/conversationStream';
 import { useToolCommands } from '../hooks/useToolCommands';
 import type { Automation, Conversation, ConversationMessage, ConversationProposal, ZoteroLibItem } from '../api/types';
 import {
@@ -40,6 +43,13 @@ interface Attachment {
   retry?: () => Promise<void>;
 }
 
+interface LiveTurnView {
+  phase: Extract<ConversationPublicProgress, { type: 'phase' }>['phase'];
+  reply: string;
+  tools: Extract<ConversationPublicProgress, { type: 'tool' }>[];
+  connection: ConversationStreamConnection;
+}
+
 let attachSeq = 0;
 
 export function ConversationView({
@@ -58,6 +68,10 @@ export function ConversationView({
   const [error, setError] = useState<string | null>(null);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  const [liveTurn, setLiveTurn] = useState<LiveTurnView | null>(null);
+  const [pendingResearcherText, setPendingResearcherText] = useState<string | null>(null);
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const turnStreamRef = useRef<AbortController | null>(null);
   // ---- failed-turn retry: re-running the agent reply for the dangling message ----
   const [retrying, setRetrying] = useState(false);
   const [launching, setLaunching] = useState<string | null>(null); // candidate id or 'custom'
@@ -351,52 +365,140 @@ export function ConversationView({
     bottomRef.current?.scrollIntoView({ block: 'end' });
   }, [conversation?.messages.length]);
 
-  const send = async (): Promise<void> => {
-    if (text.trim().length === 0 || sending) return;
+  const executeTurn = async (start: ConversationTurnStart | null, optimisticText: string | null = null): Promise<void> => {
+    if (sending) return;
+    const controller = new AbortController();
+    turnStreamRef.current?.abort(); // local subscription only; server work keeps running
+    turnStreamRef.current = controller;
+    const retry = start?.kind === 'retry';
+    let composerCleared = false;
     setSending(true);
+    setRetrying(retry);
     setError(null);
+    setPendingResearcherText(optimisticText);
+    setLiveTurn({ phase: 'starting', reply: '', tools: [], connection: 'connecting' });
     try {
-      const updated = await postConversationMessage(conversationId, {
-        text: text.trim(),
-        ...(readySeeds.length > 0 ? { seeds: readySeeds } : {}),
-      });
-      setConversation(updated);
-      setText('');
-      setAttachments([]);
-      onMutated();
+      const result = await streamConversationTurn(conversationId, start, {
+        onConnection: (connection) => setLiveTurn((current) => current === null
+          ? { phase: 'starting', reply: '', tools: [], connection }
+          : { ...current, connection }),
+        onEvent: ({ payload }) => {
+          if (payload.type === 'phase') {
+            // `starting` is emitted only after the researcher message is durable.
+            if (!composerCleared && start?.kind === 'message') {
+              composerCleared = true;
+              setText('');
+              setAttachments([]);
+            }
+            setLiveTurn((current) => ({
+              phase: payload.phase,
+              reply: current?.reply ?? '',
+              tools: current?.tools ?? [],
+              connection: current?.connection ?? 'live',
+            }));
+          } else if (payload.type === 'tool') {
+            setLiveTurn((current) => ({
+              phase: 'using_tools',
+              reply: current?.reply ?? '',
+              tools: [...(current?.tools ?? []), payload],
+              connection: current?.connection ?? 'live',
+            }));
+          } else if (payload.type === 'reply_reset') {
+            setLiveTurn((current) => current === null ? current : { ...current, reply: '' });
+          } else if (payload.type === 'reply_delta') {
+            setLiveTurn((current) => ({
+              phase: 'composing',
+              reply: `${current?.reply ?? ''}${payload.text}`,
+              tools: current?.tools ?? [],
+              connection: current?.connection ?? 'live',
+            }));
+          } else if (payload.type === 'completed') {
+            setConversation(payload.conversation);
+          } else if (payload.type === 'cancelled') {
+            if (payload.conversation !== null) setConversation(payload.conversation);
+          } else if (payload.type === 'failed') {
+            if (payload.conversation !== null) setConversation(payload.conversation);
+            setError(payload.error.message);
+          }
+        },
+      }, controller.signal);
+      if (result?.status === 'completed') {
+        setConversation(result.conversation);
+        onMutated();
+      } else if (result?.status === 'cancelled') {
+        if (result.conversation !== null) setConversation(result.conversation);
+        flashNote(t('conv.cancelledKept'));
+      } else if (result?.status === 'failed') {
+        if (result.conversation !== null) setConversation(result.conversation);
+        setError(result.error.message);
+      }
+      setPendingResearcherText(null);
+      setLiveTurn(null);
     } catch (e) {
+      if (controller.signal.aborted) return;
       setError(e instanceof Error ? e.message : String(e));
-      // the server persists the researcher message BEFORE the model runs — a
-      // model failure leaves it in the transcript (marked failed, retryable).
-      // Reflect that reality: refresh, and free the composer only if it landed.
+      // The message and projected reply prefix are server-owned durability.
+      // Refresh them after a transport failure; never infer that they vanished.
       try {
         const fresh = await getConversation(conversationId);
         setConversation(fresh);
         const landed = fresh.messages.at(-1);
-        if (landed?.role === 'researcher' && landed.content === text.trim()) {
+        if (optimisticText !== null && landed?.role === 'researcher' && landed.content === optimisticText) {
           setText('');
           setAttachments([]);
+          setPendingResearcherText(null);
         }
-      } catch { /* refresh is cosmetic; the error is already shown */ }
+      } catch { /* primary stream error is already visible */ }
+      setLiveTurn(null);
     } finally {
-      setSending(false);
+      if (turnStreamRef.current === controller) turnStreamRef.current = null;
+      if (!controller.signal.aborted) {
+        setSending(false);
+        setRetrying(false);
+        setCancelBusy(false);
+      }
     }
+  };
+
+  const send = async (): Promise<void> => {
+    const outgoing = text.trim();
+    if (outgoing.length === 0 || sending) return;
+    await executeTurn({
+      kind: 'message',
+      input: { text: outgoing, ...(readySeeds.length > 0 ? { seeds: readySeeds } : {}) },
+    }, outgoing);
   };
 
   const retryReply = async (messageId: string): Promise<void> => {
     if (retrying || sending) return;
-    setRetrying(true);
-    setError(null);
+    await executeTurn({ kind: 'retry', messageId });
+  };
+
+  const cancelActiveTurn = async (): Promise<void> => {
+    if (!sending || cancelBusy) return;
+    setCancelBusy(true);
     try {
-      setConversation(await retryConversationTurn(conversationId, messageId));
+      const requested = await cancelConversationTurn(conversationId);
+      if (!requested) flashNote(t('conv.cancelNoActive'));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
-      // the failure marker on the message is the authoritative state — refetch
-      getConversation(conversationId).then(setConversation).catch(() => { /* error already shown */ });
-    } finally {
-      setRetrying(false);
+      setCancelBusy(false);
     }
   };
+
+  // Refresh/reopen attaches to the server-owned active turn from seq 0. The
+  // replay reconstructs the current reply exactly; a 404 means no active turn.
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (!sending) void executeTurn(null);
+    }, 0);
+    return () => {
+      window.clearTimeout(timer);
+      turnStreamRef.current?.abort();
+    };
+    // execute once per conversation identity; the stream owns its own lifecycle
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId]);
 
   const launch = async (question: string, key: string): Promise<void> => {
     if (launching !== null) return;
@@ -487,15 +589,46 @@ export function ConversationView({
             retryBusy={retrying}
           />
         ))}
-        {/* Turn-in-progress placeholder (Claude Code parity): the agent's side
-            of the dialogue shows an honest indeterminate "working" row while
-            the server runs the kernel loop — no fabricated steps, no fake
-            progress; the toolTrace lands with the reply when it completes. */}
-        {sending && (
-          <div className="conv-msg conv-msg--agent conv-msg--pending" aria-live="polite">
-            <div className="conv-pending">
-              <Loader2 size={13} className="attach-spinner" aria-hidden="true" />
-              <span>{t('conv.agentWorking')}</span>
+        {pendingResearcherText !== null && (
+          <div className="conv-msg conv-msg--researcher conv-msg--optimistic">
+            <div className="conv-bubble"><p className="conv-text">{pendingResearcherText}</p></div>
+          </div>
+        )}
+        {/* Real provider/agent stream. Phases come from kernel events; reply
+            bytes are the finish.result.reply projection, never a typewriter. */}
+        {liveTurn !== null && (
+          <div className="conv-msg conv-msg--agent conv-msg--live">
+            <div className="conv-bubble conv-live-bubble">
+              <div className="conv-live-head" role="status" aria-live="polite">
+                <Loader2 size={13} className="attach-spinner" aria-hidden="true" />
+                <span>{t(`conv.streamPhase.${liveTurn.phase}` as DictKey)}</span>
+                {liveTurn.connection === 'reconnecting' && <span className="conv-stream-reconnect">{t('conv.streamReconnecting')}</span>}
+                <button
+                  type="button"
+                  className="conv-stop"
+                  disabled={cancelBusy}
+                  onClick={() => { void cancelActiveTurn(); }}
+                >
+                  <Square size={11} fill="currentColor" aria-hidden="true" />
+                  {cancelBusy ? t('conv.stopping') : t('conv.stop')}
+                </button>
+              </div>
+              {liveTurn.tools.length > 0 && (
+                <ul className="conv-live-tools" aria-label={t('conv.liveTools')}>
+                  {liveTurn.tools.map((tool, index) => (
+                    <li key={`${tool.tool}-${index}`}>
+                      <span className={`conv-tool-dot${tool.ok ? ' is-ok' : ' is-failed'}`} aria-hidden="true" />
+                      <span className="mono">{tool.tool}</span>
+                      {tool.summary !== undefined && <span>{tool.summary}</span>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {liveTurn.reply.length > 0 && (
+                <div className="conv-md conv-live-reply" role="log" aria-label={t('conv.streamingReply')}>
+                  <MarkdownDoc markdown={liveTurn.reply} withOutline={false} />
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -727,6 +860,12 @@ function MessageBubble({
             {message.replyError !== undefined && (
               <p className="field-error small">{t('conv.replyFailed')}：{message.replyError}</p>
             )}
+            {message.replyDraft !== undefined && message.replyDraft.length > 0 && (
+              <div className="conv-preserved-reply">
+                <p className="conv-preserved-label">{t('conv.preservedReply')}</p>
+                <div className="conv-md"><MarkdownDoc markdown={message.replyDraft} withOutline={false} /></div>
+              </div>
+            )}
             {onRetryReply !== undefined && (
               <button type="button" className="btn btn--small conv-retry" disabled={retryBusy} onClick={onRetryReply}>
                 {retryBusy ? <Loader2 size={12} className="attach-spinner" aria-hidden="true" /> : <RotateCcw size={12} aria-hidden="true" />}
@@ -736,14 +875,6 @@ function MessageBubble({
           </>
         ) : (
           <div className="conv-md"><MarkdownDoc markdown={message.content} withOutline={false} /></div>
-        )}
-        {message.thinking !== undefined && message.thinking.length > 0 && (
-          <details className="conv-thinking">
-            <summary>
-              <BrainCircuit size={11} aria-hidden="true" /> {t('conv.thinking')}
-            </summary>
-            <pre className="conv-thinking-body mono">{message.thinking}</pre>
-          </details>
         )}
         {message.toolTrace !== undefined && message.toolTrace.length > 0 && (
           <details className="conv-tooltrace">

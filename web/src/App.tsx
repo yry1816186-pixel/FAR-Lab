@@ -419,7 +419,7 @@ export function App(): JSX.Element {
   const { commands: userCommands } = useToolCommands();
 
   const commands = useMemo<Command[]>(() => {
-    const navCmds: Command[] = selectedRunId === null || !studyView
+    const navCmds: Command[] = selectedRunId === null
       ? []
       : (['research', 'evidence', 'hypotheses', 'plan', 'revisions', 'verify'] as const)
           .map((tab) => ({
@@ -499,7 +499,7 @@ export function App(): JSX.Element {
         run: () => setLang(lang === 'zh' ? 'en' : 'zh'),
       },
     ];
-  }, [runs, selectedRunId, studyView, selectStudy, openNewResearch, openHome, cycleTheme, lang, setLang, userCommands, togglePanel, newTerminalSession]);
+  }, [runs, selectedRunId, selectStudy, openNewResearch, openHome, cycleTheme, lang, setLang, userCommands, togglePanel, newTerminalSession]);
 
   // ---- universal search wiring (B2): palette -> cross-run object lookup ----
   // A claim hit lands on the study map and opens that claim in the inspector
@@ -652,7 +652,7 @@ export function App(): JSX.Element {
     // `#lab/new` lights up 工作台 (the rail has exactly one work entry).
     : selectedConvId !== null && selectedRunId === null
           ? 'conv'
-          : selectedRunId !== null && studyView
+          : selectedRunId !== null
             ? 'study'
             : 'home';
 
@@ -790,29 +790,50 @@ export function App(): JSX.Element {
                 <p className="muted">{t('common.selectRunHint')}</p>
               </div>
             )
-          ) : studyView ? (
-            <StudyMap
-              run={runDetail}
-              events={events}
-              studies={studies}
-              focusClaimId={focusClaimId}
-              onClaimFocused={() => setFocusClaimId(null)}
-              onMutated={onMutated}
-            />
           ) : (
-            <RunDetail
-              run={runDetail}
-              events={eventsState}
-              onMutated={onMutated}
-              tab={routeTab !== null ? resolveTabId(routeTab) ?? undefined : undefined}
-              onTabChange={(tab) => setRouteTab(tab)}
-              focusClaimId={focusClaimId}
-              onClaimFocused={() => setFocusClaimId(null)}
-              stream={stream}
-              sourceConversation={sourceByRunId.get(selectedRunId) ?? null}
-              dockedConversation={dockOpen ? selectedConvId : null}
-              onDiscuss={() => discussRun(selectedRunId)}
-            />
+            <div className={`research-workspace${studyView ? '' : ' is-lens-open'}`}>
+              <StudyMap
+                run={runDetail}
+                events={events}
+                studies={studies}
+                focusClaimId={studyView ? focusClaimId : null}
+                onClaimFocused={() => setFocusClaimId(null)}
+                onMutated={onMutated}
+              />
+              {!studyView && (
+                <aside className="research-lens" aria-label={t('workspace.lensTitle')}>
+                  <header className="research-lens-head">
+                    <div>
+                      <p className="research-lens-kicker">{t('workspace.lensKicker')}</p>
+                      <h2>{t('workspace.lensTitle')}</h2>
+                    </div>
+                    <button
+                      type="button"
+                      className="research-lens-close"
+                      onClick={() => { setStudyView(true); setRouteTab(null); }}
+                      aria-label={t('workspace.lensClose')}
+                      title={t('workspace.lensClose')}
+                    >
+                      <X size={18} aria-hidden="true" />
+                    </button>
+                  </header>
+                  <RunDetail
+                    run={runDetail}
+                    events={eventsState}
+                    onMutated={onMutated}
+                    tab={routeTab !== null ? resolveTabId(routeTab) ?? undefined : undefined}
+                    onTabChange={(tab) => setRouteTab(tab)}
+                    focusClaimId={focusClaimId}
+                    onClaimFocused={() => setFocusClaimId(null)}
+                    stream={stream}
+                    sourceConversation={sourceByRunId.get(selectedRunId) ?? null}
+                    dockedConversation={dockOpen ? selectedConvId : null}
+                    onDiscuss={() => discussRun(selectedRunId)}
+                    embedded
+                  />
+                </aside>
+              )}
+            </div>
           )}
         </main>
         {panelMounted && (

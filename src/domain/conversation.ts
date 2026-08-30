@@ -114,6 +114,9 @@ export const ConversationMessageSchema = z.object({
    * = replied, or reply never attempted.
    */
   replyError: z.string().max(2000).optional(),
+  /** Researcher-message-only: schema-projected reply bytes received before a
+   * turn ended. Preserved across disconnect/failure, replaced on success. */
+  replyDraft: z.string().max(40_000).optional(),
   createdAt: ISO,
 });
 export type ConversationMessage = z.infer<typeof ConversationMessageSchema>;

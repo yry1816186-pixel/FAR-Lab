@@ -10,6 +10,7 @@ import {
 import {
   generateConversationTurn, CreateAutomationArgsSchema, LaunchResearchArgsSchema, CancelAutomationArgsSchema,
   CancelRunArgsSchema, RunCommandArgsSchema, conversationSessionId, planConversationResume, conversationRolloutDir,
+  type ConversationTurnProgress,
 } from './conversation-agent.js';
 import { runInLoginShell } from '../shared/login-shell.js';
 import { resolveInsideRoot } from '../agent/capabilities/workspace-tools.js';
@@ -38,7 +39,12 @@ export interface ConversationDeps {
   createRun?: CreateRunForConversation;
 }
 
-export type ConversationErrorCode = 'not_found' | 'validation' | 'conversation_model_failed' | 'conversation_full' | 'turn_in_flight';
+export interface ConversationTurnRuntime {
+  signal?: AbortSignal;
+  onProgress?: (event: ConversationTurnProgress) => void;
+}
+
+export type ConversationErrorCode = 'not_found' | 'validation' | 'conversation_model_failed' | 'conversation_full' | 'turn_in_flight' | 'turn_cancelled';
 
 export class ConversationError extends Error {
   constructor(readonly status: number, readonly code: ConversationErrorCode, message: string) {
@@ -287,6 +293,24 @@ const markReplyFailed = (app: App, conversationId: string, researcherMsgId: stri
   } catch { /* secondary write only; the primary error already propagates */ }
 };
 
+/** Persist only the schema-projected public reply prefix. The caller throttles
+ * whole-document writes and forces a flush before every terminal outcome. */
+const writeReplyDraft = (app: App, conversationId: string, researcherMsgId: string, draft: string): void => {
+  const conv = app.store.getObject('conversation', conversationId);
+  if (conv === null || !conv.messages.some((m) => m.id === researcherMsgId)) return;
+  app.store.putObject('conversation', ConversationSchema.parse({
+    ...conv,
+    messages: conv.messages.map((m) => {
+      if (m.id !== researcherMsgId) return m;
+      const next = { ...m };
+      if (draft.length > 0) next.replyDraft = draft.slice(0, 40_000);
+      else delete next.replyDraft;
+      return next;
+    }),
+    updatedAt: new Date().toISOString(),
+  }));
+};
+
 /**
  * Run one resident-agent model turn for an ALREADY-PERSISTED researcher
  * message and land the reply: append the agent message, clear any failure
@@ -300,6 +324,7 @@ const runAndLandTurn = async (
   conv: Conversation,
   researcherMsgId: string,
   deps: ConversationDeps,
+  runtime: ConversationTurnRuntime = {},
 ): Promise<Conversation> => {
   const idx = conv.messages.findIndex((m) => m.id === researcherMsgId);
   if (idx < 0) throw new ConversationError(404, 'not_found', `message not found: ${researcherMsgId}`);
@@ -312,16 +337,45 @@ const runAndLandTurn = async (
   // a crashed turn leaves an unfinished rollout that retry RESUMES instead of
   // restarting from scratch (fresh sessions get the same id and start clean).
   const resumePlan = planConversationResume(conversationRolloutDir(app), conversationId, researcherMsgId);
-  const generation = await generateConversationTurn(app, provider, conv, {
-    text: researcherMsg.content,
-    seeds: researcherMsg.seeds ?? [],
-    history: conv.messages.filter((m) => m.id !== researcherMsgId).slice(-HISTORY_TURNS),
-    source: 'researcher',
-    sessionId: conversationSessionId(conversationId, researcherMsgId),
-    ...(resumePlan !== null ? { resumePlan } : {}),
-    ...(turnReasoning !== null ? { reasoning: turnReasoning } : {}),
-  });
+  let draft = researcherMsg.replyDraft ?? '';
+  let lastDraftWrite = 0;
+  const flushDraft = (force = false): void => {
+    const now = Date.now();
+    if (!force && now - lastDraftWrite < 400) return;
+    writeReplyDraft(app, conversationId, researcherMsgId, draft);
+    lastDraftWrite = now;
+  };
+  const onProgress = (event: ConversationTurnProgress): void => {
+    if (event.type === 'reply_reset') {
+      draft = '';
+      flushDraft(true);
+    } else if (event.type === 'reply_delta') {
+      draft = `${draft}${event.text}`.slice(0, 40_000);
+      flushDraft();
+    }
+    runtime.onProgress?.(event);
+  };
+
+  let generation: Awaited<ReturnType<typeof generateConversationTurn>>;
+  try {
+    generation = await generateConversationTurn(app, provider, conv, {
+      text: researcherMsg.content,
+      seeds: researcherMsg.seeds ?? [],
+      history: conv.messages.filter((m) => m.id !== researcherMsgId).slice(-HISTORY_TURNS),
+      source: 'researcher',
+      sessionId: conversationSessionId(conversationId, researcherMsgId),
+      ...(resumePlan !== null ? { resumePlan } : {}),
+      ...(turnReasoning !== null ? { reasoning: turnReasoning } : {}),
+      ...(runtime.signal !== undefined ? { signal: runtime.signal } : {}),
+      onProgress,
+    });
+  } finally {
+    flushDraft(true);
+  }
   if (generation.status !== 'completed' || generation.reply === undefined) {
+    if (generation.status === 'aborted') {
+      throw new ConversationError(409, 'turn_cancelled', 'resident agent turn cancelled; the received reply prefix was preserved');
+    }
     throw new ConversationError(
       502,
       'conversation_model_failed',
@@ -337,6 +391,7 @@ const runAndLandTurn = async (
   if (at < 0) throw new ConversationError(409, 'validation', 'the answered message disappeared while the turn ran');
   const answered = fresh.messages[at]!;
   if (answered.replyError !== undefined) delete answered.replyError;
+  if (answered.replyDraft !== undefined) delete answered.replyDraft;
 
   // candidate ids are assigned by the service (monotonic per conversation)
   const candSeq = fresh.messages.reduce((n, m) => n + (m.candidates?.length ?? 0), 0);
@@ -362,7 +417,6 @@ const runAndLandTurn = async (
         ...(generation.toolTrace.length > 0 ? { toolTrace: generation.toolTrace } : {}),
         ...(generation.proposals.length > 0 ? { proposals: generation.proposals } : {}),
         ...(generation.usage !== undefined ? { usage: generation.usage } : {}),
-        ...(generation.thinking !== undefined && generation.thinking.length > 0 ? { thinking: generation.thinking } : {}),
         createdAt: new Date().toISOString(),
       }),
       ...fresh.messages.slice(at + 1),
@@ -393,6 +447,7 @@ export async function postConversationMessage(
   conversationId: string,
   input: { text?: unknown; seeds?: unknown },
   deps: ConversationDeps = {},
+  runtime: ConversationTurnRuntime = {},
 ): Promise<Conversation> {
   return serializeTurn(conversationId, async () => {
     const conv = mustGetConversation(app, conversationId);
@@ -424,7 +479,7 @@ export async function postConversationMessage(
     app.store.putObject('conversation', withMessage);
 
     try {
-      return await runAndLandTurn(app, conversationId, withMessage, researcherMsg.id, deps);
+      return await runAndLandTurn(app, conversationId, withMessage, researcherMsg.id, deps, runtime);
     } catch (e) {
       markReplyFailed(app, conversationId, researcherMsg.id, e);
       throw e;
@@ -443,6 +498,7 @@ export async function retryConversationTurn(
   conversationId: string,
   messageId: string,
   deps: ConversationDeps = {},
+  runtime: ConversationTurnRuntime = {},
 ): Promise<Conversation> {
   return serializeTurn(conversationId, async () => {
     const conv = mustGetConversation(app, conversationId);
@@ -454,7 +510,7 @@ export async function retryConversationTurn(
       throw new ConversationError(409, 'validation', 'only the conversation\'s last message can be retried, and only while it has no reply');
     }
     try {
-      return await runAndLandTurn(app, conversationId, conv, messageId, deps);
+      return await runAndLandTurn(app, conversationId, conv, messageId, deps, runtime);
     } catch (e) {
       markReplyFailed(app, conversationId, messageId, e);
       throw e;

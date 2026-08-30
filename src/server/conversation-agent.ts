@@ -147,7 +147,18 @@ export interface ConversationTurnInput {
    * avoid an import cycle). Absent/undefined = nothing is sent on the wire.
    */
   reasoning?: { style: ReasoningStyle; gear: ReasoningGear };
+  /** Explicit user cancellation, wired into the in-flight provider request. */
+  signal?: AbortSignal;
+  /** Public progress only: tool summaries and validated reply text projection.
+   * Raw action JSON and private reasoning never cross this callback. */
+  onProgress?: (event: ConversationTurnProgress) => void;
 }
+
+export type ConversationTurnProgress =
+  | { type: 'phase'; phase: 'starting' | 'working' | 'using_tools' | 'composing' | 'retrying'; turn?: number }
+  | { type: 'tool'; tool: string; ok: boolean; summary?: string; durationMs: number }
+  | { type: 'reply_reset' }
+  | { type: 'reply_delta'; text: string };
 
 export interface ConversationTurnUsage {
   provider: string;
@@ -165,9 +176,104 @@ export interface ConversationTurnGeneration {
   toolTrace: ToolTrace[];
   usage?: ConversationTurnUsage;
   proposals: ConversationProposal[];
-  /** Thinking display (S4): the turn's model reasoning, joined and capped. */
-  thinking?: string;
   error?: string;
+}
+
+interface ParsedStringPrefix { value: string; end: number; complete: boolean }
+
+/** Parse one JSON string without completing or repairing missing model output.
+ * An incomplete escape contributes nothing until its wire bytes arrive. */
+const jsonStringPrefixAt = (raw: string, quoteAt: number): ParsedStringPrefix | null => {
+  if (raw.charAt(quoteAt) !== '"') return null;
+  let value = '';
+  for (let i = quoteAt + 1; i < raw.length; i += 1) {
+    const ch = raw.charAt(i);
+    if (ch === '"') return { value, end: i + 1, complete: true };
+    if (ch !== '\\') {
+      value += ch;
+      continue;
+    }
+    if (i + 1 >= raw.length) return { value, end: raw.length, complete: false };
+    const escaped = raw.charAt(++i);
+    if (escaped === 'u') {
+      const hex = raw.slice(i + 1, i + 5);
+      if (hex.length < 4 || !/^[0-9a-f]{4}$/i.test(hex)) return { value, end: raw.length, complete: false };
+      value += String.fromCharCode(Number.parseInt(hex, 16));
+      i += 4;
+    } else {
+      const decoded: Record<string, string> = {
+        '"': '"', '\\': '\\', '/': '/', b: '\b', f: '\f', n: '\n', r: '\r', t: '\t',
+      };
+      value += decoded[escaped] ?? escaped;
+    }
+  }
+  return { value, end: raw.length, complete: false };
+};
+
+const skipWs = (raw: string, from: number): number => {
+  let i = from;
+  while (i < raw.length && /\s/.test(raw.charAt(i))) i += 1;
+  return i;
+};
+
+/** Locate a property value at an exact JSON container depth. Strings embedded
+ * in another string (including model-authored prose) are never mistaken for
+ * schema keys. */
+const propertyValueAt = (
+  raw: string,
+  name: string,
+  depthWanted: number,
+  from = 0,
+): number | null => {
+  let depth = 0;
+  for (let i = 0; i < raw.length;) {
+    const ch = raw.charAt(i);
+    if (ch === '{' || ch === '[') { depth += 1; i += 1; continue; }
+    if (ch === '}' || ch === ']') { depth = Math.max(0, depth - 1); i += 1; continue; }
+    if (ch !== '"') { i += 1; continue; }
+    const token = jsonStringPrefixAt(raw, i);
+    if (token === null || !token.complete) return null;
+    if (i >= from && depth === depthWanted && token.value === name) {
+      const colon = skipWs(raw, token.end);
+      if (raw.charAt(colon) === ':') return skipWs(raw, colon + 1);
+    }
+    i = token.end;
+  }
+  return null;
+};
+
+/** Public projection of the nested finish result's `reply` string. It is safe
+ * to call on every real wire delta: use_tool arguments, action reasons and raw
+ * reasoning cannot match this structural path. */
+export const projectConversationReplyPrefix = (raw: string): string => {
+  const actionAt = propertyValueAt(raw, 'action', 1);
+  if (actionAt === null) return '';
+  const action = jsonStringPrefixAt(raw, actionAt);
+  if (action === null || !action.complete || action.value !== 'finish') return '';
+  const resultAt = propertyValueAt(raw, 'result', 1);
+  if (resultAt === null || raw.charAt(resultAt) !== '{') return '';
+  const replyAt = propertyValueAt(raw, 'reply', 2, resultAt + 1);
+  if (replyAt === null) return '';
+  return jsonStringPrefixAt(raw, replyAt)?.value ?? '';
+};
+
+class ReplyStreamProjector {
+  private raw = '';
+  private emitted = '';
+
+  reset(): void { this.raw = ''; this.emitted = ''; }
+
+  push(text: string): { reset: boolean; delta: string; full: string } {
+    this.raw += text;
+    const full = projectConversationReplyPrefix(this.raw);
+    if (!full.startsWith(this.emitted)) {
+      this.emitted = full;
+      return { reset: true, delta: full, full };
+    }
+    const delta = full.slice(this.emitted.length);
+    this.emitted = full;
+    return { reset: false, delta, full };
+  }
 }
 
 const head = (s: string, n: number): string => (s.length <= n ? s : `${s.slice(0, n)}…`);
@@ -484,7 +590,12 @@ export async function generateConversationTurn(
 ): Promise<ConversationTurnGeneration> {
   const proposals: ConversationProposal[] = [];
   const toolTrace: ToolTrace[] = [];
-  const thinkingParts: string[] = [];
+  const progress = (event: ConversationTurnProgress): void => {
+    try { input.onProgress?.(event); } catch { /* progress observers are isolated */ }
+  };
+  progress({ type: 'phase', phase: 'starting' });
+  const replyProjector = new ReplyStreamProjector();
+  let publicReply = '';
   // 09→08 handoff 2026-08-25: the resident agent composes through the ONE
   // authoritative session assembly — researcher-enabled MCP servers, skills and
   // hook rules now join conversation sessions (read-class admission; refused or
@@ -539,17 +650,18 @@ export async function generateConversationTurn(
   };
 
   const emit: AgentEventSink = (ev) => {
+    if (ev.type === 'turn_started') progress({ type: 'phase', phase: 'working', turn: ev.turn });
     if (ev.type === 'tool_used') {
       toolTrace.push({
         tool: ev.tool, ok: ev.ok,
         ...(ev.summary !== undefined ? { summary: ev.summary.slice(0, 300) } : {}),
         durationMs: ev.durationMs,
       });
-    }
-    if (ev.type === 'model_call_done' && ev.thinking !== undefined) {
-      // Thinking display (S4): concatenate the turn's model reasoning for the
-      // message-level accordion (cap 12k; per-call cap is 8k in the provider).
-      thinkingParts.push(ev.thinking);
+      progress({
+        type: 'tool', tool: ev.tool, ok: ev.ok, durationMs: ev.durationMs,
+        ...(ev.summary !== undefined ? { summary: ev.summary.slice(0, 300) } : {}),
+      });
+      progress({ type: 'phase', phase: 'using_tools', turn: ev.turn });
     }
   };
 
@@ -592,6 +704,7 @@ export async function generateConversationTurn(
         : RESIDENT_SYSTEM_PROMPT,
       task,
       maxTurns: input.maxTurns ?? 8,
+      ...(input.signal !== undefined ? { signal: input.signal } : {}),
       resultSchema: ConversationAgentReplySchema,
       // Resume continues the interrupted session's transcript + turn budget;
       // a fresh turn packs its own context entries (runAgentLoop picks by
@@ -635,6 +748,36 @@ export async function generateConversationTurn(
       telemetry,
       artifacts: app.artifacts,
       rollout: openRolloutWriter(rolloutDir, sessionId),
+      onModelOutput: (event) => {
+        if (event.type === 'attempt_started') {
+          replyProjector.reset();
+          if (publicReply.length > 0) {
+            publicReply = '';
+            progress({ type: 'reply_reset' });
+          }
+          return;
+        }
+        if (event.type === 'attempt_discarded') {
+          replyProjector.reset();
+          if (publicReply.length > 0) {
+            publicReply = '';
+            progress({ type: 'reply_reset' });
+          }
+          progress({ type: 'phase', phase: 'retrying', turn: event.turn });
+          return;
+        }
+        if (event.type !== 'delta') return;
+        const projected = replyProjector.push(event.text);
+        if (projected.reset) {
+          publicReply = '';
+          progress({ type: 'reply_reset' });
+        }
+        if (projected.delta.length > 0) {
+          publicReply = projected.full;
+          progress({ type: 'phase', phase: 'composing', turn: event.turn });
+          progress({ type: 'reply_delta', text: projected.delta });
+        }
+      },
     },
   );
   } finally {
@@ -652,16 +795,26 @@ export async function generateConversationTurn(
     ...(sawTokens ? { inputTokens: usagePromptTokens, outputTokens: usageCompletionTokens } : {}),
   } : undefined;
 
+  const landedReply = res.status === 'completed' && res.result !== undefined
+    ? ConversationAgentReplySchema.parse(res.result)
+    : undefined;
+  // A provider may truthfully ignore stream:true. Land its validated reply as
+  // one structured block; never synthesize character timing. Also reconciles
+  // any rare field-order projection mismatch against the authoritative parse.
+  if (landedReply !== undefined && publicReply !== landedReply.reply) {
+    if (publicReply.length > 0) progress({ type: 'reply_reset' });
+    publicReply = landedReply.reply;
+    progress({ type: 'phase', phase: 'composing' });
+    progress({ type: 'reply_delta', text: landedReply.reply });
+  }
+
   return {
     status: res.status,
-    ...(res.status === 'completed' && res.result !== undefined
-      ? { reply: ConversationAgentReplySchema.parse(res.result) }
+    ...(landedReply !== undefined
+      ? { reply: landedReply }
       : { error: res.error ?? `agent loop ended with status ${res.status}` }),
     toolTrace,
     ...(usage !== undefined ? { usage } : {}),
     proposals,
-    ...(thinkingParts.length > 0
-      ? { thinking: thinkingParts.join('\n\n—\n\n').slice(0, 12_000) }
-      : {}),
   };
 }

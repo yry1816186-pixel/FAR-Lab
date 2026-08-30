@@ -9,6 +9,90 @@
   font-family: var(--font-ui, inherit);
 }
 
+/* One continuous study surface. Deep evidence/hypothesis/plan/revision/export
+   tools open as a spatially anchored lens over the study narrative instead of
+   replacing it with a second, duplicated run page. Old #run routes still land
+   here, so bookmarks remain valid. */
+.research-workspace { position: relative; min-height: 100%; }
+.research-workspace.is-lens-open .lab-root {
+  padding-right: min(54vw, 760px);
+  transition: padding-right var(--dur-normal, 180ms) var(--ease-standard, ease-out);
+}
+.research-lens {
+  position: fixed;
+  z-index: 18;
+  top: var(--app-header-h, 54px);
+  right: 0;
+  bottom: var(--status-h, 28px);
+  width: min(54vw, 760px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 24px 48px;
+  color: var(--text);
+  background: color-mix(in oklab, var(--bg) 96%, transparent);
+  border-left: 1px solid var(--border);
+  box-shadow: -18px 0 48px rgba(18, 24, 32, 0.12);
+  backdrop-filter: blur(14px);
+}
+.research-lens-head {
+  position: sticky;
+  top: 0;
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 0 12px;
+  background: color-mix(in oklab, var(--bg) 94%, transparent);
+  backdrop-filter: blur(14px);
+}
+.research-lens-kicker {
+  margin: 0 0 2px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.research-lens-head h2 { margin: 0; font-size: 18px; line-height: 1.3; }
+.research-lens-close {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+.research-lens-close:hover { background: var(--surface-2); }
+.research-lens-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.run-detail--embedded .tabs { top: 76px; }
+
+@media (max-width: 980px) {
+  .research-workspace.is-lens-open .lab-root { padding-right: 0; }
+  .research-lens { width: min(88vw, 720px); }
+}
+
+@media (max-width: 640px) {
+  .research-lens {
+    top: var(--app-header-h, 50px);
+    bottom: 0;
+    width: 100vw;
+    padding-inline: 16px;
+    box-shadow: none;
+    border-left: 0;
+  }
+  .research-lens-head { padding-top: 14px; }
+  .run-detail--embedded .tabs { top: 68px; flex-wrap: nowrap; overflow-x: auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .research-workspace.is-lens-open .lab-root { transition: none; }
+}
+
 .lab-topline {
   display: flex;
   align-items: baseline;

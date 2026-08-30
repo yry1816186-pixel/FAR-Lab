@@ -130,22 +130,39 @@ export function StudyMap({
   const [cancelRequested, setCancelRequested] = useState(false);
   const [deleteArmed, setDeleteArmed] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const scienceLoadRef = useRef<AbortController | null>(null);
 
   const loadScience = useCallback((rid: string): void => {
+    // One projection refresh owns all six reads. Abort the previous generation
+    // so a slow response from run A (or an earlier poll of run B) can never
+    // overwrite newer research state.
+    scienceLoadRef.current?.abort();
     const c = new AbortController();
-    void getQuestion(rid, c.signal).then(setQuestion).catch(() => setQuestion(null));
-    void getSources(rid, c.signal).then(setSources).catch(() => setSources([]));
+    scienceLoadRef.current = c;
+    const visibleFailure = (e: unknown): void => {
+      if (c.signal.aborted) return;
+      // 404 can be an object that has not been produced yet while a run is
+      // progressing. Other failures must not masquerade as an empty result.
+      if (e instanceof ApiError && e.status === 404) return;
+      setLoadError(e instanceof ApiError ? e : new ApiError({ code: 'unknown', message: String(e), retryable: true }));
+    };
+    void getQuestion(rid, c.signal).then((v) => { if (!c.signal.aborted) setQuestion(v); }).catch(visibleFailure);
+    void getSources(rid, c.signal).then((v) => { if (!c.signal.aborted) setSources(v); }).catch(visibleFailure);
     void getEvidence(rid, c.signal)
-      .then((e) => { setClaims(e.claims); setRelations(e.relations); setScienceLoaded(true); })
-      .catch((e: unknown) => { setClaims([]); setRelations([]); setScienceLoaded(true); if (e instanceof ApiError) setLoadError(e); });
+      .then((e) => {
+        if (c.signal.aborted) return;
+        setClaims(e.claims); setRelations(e.relations); setScienceLoaded(true);
+      })
+      .catch((e: unknown) => { if (!c.signal.aborted) setScienceLoaded(true); visibleFailure(e); });
     void getHypotheses(rid, c.signal)
       .then((h) => {
+        if (c.signal.aborted) return;
         setHyps(h.hypotheses);
         setRanks(new Map(h.scorecards.map((s) => [s.hypothesisId, s.rank] as const)));
         setLeaderCard(h.scorecards.find((s) => s.rank === 1) ?? null);
         setAdjusted(h.achResearcherAdjusted);
       })
-      .catch(() => { setHyps([]); setRanks(new Map()); setAdjusted(null); setLeaderCard(null); });
+      .catch(visibleFailure);
     // Spine projection: state/next-actions/deltas. Failure is non-fatal (the
     // map still renders its bands) but leaves science null — never fake state.
     // A 404 is specifically the old-server case: surfaced as its own notice.
@@ -153,16 +170,18 @@ export function StudyMap({
     // preregistration + ledger. 404 = no protocol registered for this run
     // (the plan ran computationally) — the band simply does not render.
     void getProtocolState(rid, c.signal)
-      .then(setProtocol)
+      .then((v) => { if (!c.signal.aborted) { setProtocol(v); setProtocolError(null); } })
       .catch((e: unknown) => {
+        if (c.signal.aborted) return;
         if (e instanceof ApiError && e.status === 404) return;
         setProtocolError(e instanceof ApiError ? e : new ApiError({ code: 'unknown', message: String(e), retryable: true }));
       });
     void getScience(rid, c.signal)
-      .then(setScience)
+      .then((v) => { if (!c.signal.aborted) { setScience(v); setSpineUnavailable(false); } })
       .catch((e: unknown) => {
-        setScience(null);
+        if (c.signal.aborted) return;
         setSpineUnavailable(e instanceof ApiError && e.status === 404);
+        if (!(e instanceof ApiError && e.status === 404)) visibleFailure(e);
       });
   }, []);
 
@@ -170,7 +189,27 @@ export function StudyMap({
   // (running -> completed/partial): the live band disappears exactly when the
   // final evidence/hypotheses land — without this the map keeps the last
   // (possibly empty) snapshot from mid-run.
-  useEffect(() => { setInsp(null); setLoadError(null); setSpineUnavailable(false); setProtocol(null); setProtocolError(null); loadScience(run.id); }, [run.id, run.status, loadScience]);
+  useEffect(() => {
+    setInsp(null);
+    setLoadError(null);
+    setSpineUnavailable(false);
+    setProtocol(null);
+    setProtocolError(null);
+    setQuestion(null);
+    setSources([]);
+    setClaims([]);
+    setRelations([]);
+    setHyps([]);
+    setRanks(new Map());
+    setLeaderCard(null);
+    setAdjusted(null);
+    setScience(null);
+    setScienceLoaded(false);
+  }, [run.id]);
+  useEffect(() => {
+    loadScience(run.id);
+    return () => scienceLoadRef.current?.abort();
+  }, [run.id, run.status, loadScience]);
 
   // Palette claim-hit deep focus: once this run's claims arrive, open the
   // inspector on the targeted claim (consumed once).

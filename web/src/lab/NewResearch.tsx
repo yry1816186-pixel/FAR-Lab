@@ -132,8 +132,8 @@ export function NewResearch({
     }
   };
 
-  const saveEdits = async (): Promise<void> => {
-    if (proposal === null || draftId === null) return;
+  const saveEdits = async (manageBusy = true): Promise<boolean> => {
+    if (proposal === null || draftId === null) return false;
     setReviewError(null);
     setSavedNote(false);
     const scopePatch: NonNullable<EditQuestionInput['scope']> = {};
@@ -150,18 +150,20 @@ export function NewResearch({
     if (Object.keys(scopePatch).length > 0) patch.scope = scopePatch;
     if (patch.text === undefined && patch.goalType === undefined && patch.scope === undefined) {
       setSavedNote(true); // nothing changed — the "saved" state is truthful (no-op)
-      return;
+      return true;
     }
-    setReviewBusy('saving');
+    if (manageBusy) setReviewBusy('saving');
     try {
       const res = await editRunQuestion(draftId, patch);
       setProposal(res.question);
       enterReview(res.question);
       setSavedNote(true);
+      return true;
     } catch (e) {
       setReviewError(e instanceof ApiError ? e : new ApiError({ code: 'unknown', message: String(e), retryable: true }));
+      return false;
     } finally {
-      setReviewBusy(null);
+      if (manageBusy) setReviewBusy(null);
     }
   };
 
@@ -170,6 +172,13 @@ export function NewResearch({
     setReviewError(null);
     setReviewBusy('launching');
     try {
+      // Launch is a transaction from the researcher's point of view: persist
+      // the fields currently visible in the review before advancing the run.
+      // A failed save leaves the draft paused and preserves every local edit.
+      if (!(await saveEdits(false))) {
+        setReviewBusy(null);
+        return;
+      }
       await resumeRun(draftId);
       onLaunched(draftId);
     } catch (e) {
@@ -373,7 +382,7 @@ export function NewResearch({
       </select>
       {reviewing ? (
         <>
-          <button type="button" className="nr-secondary" disabled={reviewBusy === 'saving'} onClick={() => void saveEdits()}>
+          <button type="button" className="nr-secondary" disabled={reviewBusy !== null} onClick={() => void saveEdits()}>
             {reviewBusy === 'saving' ? t('newresearch.saving') : t('newresearch.saveScope')}
           </button>
           <button type="button" className="nr-submit" disabled={reviewBusy !== null} onClick={() => void confirmLaunch()}>

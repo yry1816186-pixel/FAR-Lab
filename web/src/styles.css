@@ -2450,11 +2450,6 @@ select option { color: var(--text); background: var(--surface); }
 
 /* ---- resident agent: tool trace, proposals, automations ---- */
 .conv-tooltrace { margin: var(--sp-1) 0 0; border-top: 1px dashed var(--v2-border); padding-top: var(--sp-1); }
-/* Thinking process accordion (extensibility lane): raw model reasoning, display-only */
-.conv-thinking { margin: var(--sp-1) 0 0; border-top: 1px dashed var(--v2-border); padding-top: var(--sp-1); }
-.conv-thinking summary { cursor: pointer; font-size: var(--fs-aux); color: var(--muted); display: inline-flex; align-items: center; gap: 4px; list-style: none; }
-.conv-thinking summary::-webkit-details-marker { display: none; }
-.conv-thinking-body { margin: var(--sp-1) 0 0; font-size: var(--fs-aux); white-space: pre-wrap; word-break: break-word; color: var(--v2-text-2); max-height: 260px; overflow: auto; background: var(--code-bg); border-radius: 6px; padding: 8px 10px; }
 .conv-tooltrace summary { cursor: pointer; font-size: var(--fs-aux); color: var(--muted); display: inline-flex; align-items: center; gap: 4px; list-style: none; }
 .conv-tooltrace summary::-webkit-details-marker { display: none; }
 .conv-tooltrace ul { list-style: none; margin: var(--sp-1) 0 0; padding: 0; display: grid; gap: 2px; font-size: var(--fs-aux); }
@@ -2466,9 +2461,35 @@ select option { color: var(--text); background: var(--surface); }
 .conv-tool-name { flex-shrink: 0; }
 .conv-tool-summary { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .conv-tool-ms { flex-shrink: 0; margin-left: auto; padding: 0 5px; border-radius: 4px; background: var(--v2-surface-2); color: var(--muted); font-size: 11px; }
-/* Turn-in-progress row (honest indeterminate — never fabricated steps) */
-.conv-msg--pending { opacity: 0.9; }
-.conv-pending { display: inline-flex; align-items: center; gap: 8px; padding: var(--sp-1) var(--sp-3); border: 1px dashed var(--v2-border); border-radius: var(--radius-s); color: var(--muted); font-size: var(--fs-aux); background: var(--v2-surface); }
+/* Real turn stream: phase/tool/reply events come from the resident-agent hub. */
+.conv-msg--optimistic { opacity: 0.82; }
+.conv-msg--live .conv-bubble { width: min(76ch, 92%); }
+.conv-live-bubble { display: grid; gap: 10px; border-color: color-mix(in oklab, var(--v2-info) 34%, var(--v2-border)); }
+.conv-live-head { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: var(--fs-aux); }
+.conv-stream-reconnect { color: var(--warn-text); }
+.conv-stop {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  border-radius: 999px;
+  padding: 4px 9px;
+  background: var(--v2-surface-2);
+  color: var(--v2-text-2);
+  font: inherit;
+  font-size: var(--fs-aux);
+  cursor: pointer;
+}
+.conv-stop:hover { color: var(--v2-refuted); }
+.conv-stop:focus-visible { outline: 2px solid var(--v2-info); outline-offset: 2px; }
+.conv-stop:disabled { opacity: 0.55; cursor: wait; }
+.conv-live-tools { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; color: var(--muted); font-size: var(--fs-aux); }
+.conv-live-tools li { display: flex; align-items: center; gap: 7px; }
+.conv-live-tools li > :last-child:not(:first-child) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conv-live-reply { padding-top: 10px; border-top: 1px solid var(--v2-border); }
+.conv-preserved-reply { margin-top: 10px; padding: 10px 12px; border-left: 2px solid var(--v2-info); background: var(--v2-surface); border-radius: 0 var(--radius-s) var(--radius-s) 0; }
+.conv-preserved-label { margin: 0 0 6px; color: var(--muted); font-size: var(--fs-aux); font-weight: 600; }
 /* ChatGPT-parity message copy affordance */
 .conv-copy { flex-shrink: 0; align-self: flex-end; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; margin: 0 2px; border: none; border-radius: 6px; background: none; color: var(--v2-text-3); cursor: pointer; opacity: 0; transition: opacity 120ms ease-out; }
 .conv-msg:hover .conv-copy, .conv-copy:focus-visible, .conv-copy.is-copied { opacity: 1; }

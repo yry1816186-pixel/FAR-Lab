@@ -100,6 +100,7 @@ export function RunDetail({
   sourceConversation,
   dockedConversation,
   onDiscuss,
+  embedded = false,
 }: {
   run: ResearchRun;
   events: EventsState;
@@ -118,6 +119,9 @@ export function RunDetail({
   dockedConversation?: string | null;
   /** Open (or create) the research conversation — docked beside the objects. */
   onDiscuss?: () => void;
+  /** Inside the study workspace's task lens, the map already owns the study
+   *  identity/header. Avoid duplicating it while keeping deep routes valid. */
+  embedded?: boolean;
 }): JSX.Element {
   const { t } = useI18n();
   const [tabId, setTabIdState] = useState<TabId>(tab ?? 'research');
@@ -270,8 +274,8 @@ export function RunDetail({
   };
 
   return (
-    <div className="run-detail">
-      <RunHeader run={run} />
+    <div className={`run-detail${embedded ? ' run-detail--embedded' : ''}`}>
+      {!embedded && <RunHeader run={run} />}
       {/* R2-01 seam: the research page carries its dialogue. Objects stay
           primary; the conversation docks beside them — never a mode switch. */}
       {onDiscuss !== undefined && (

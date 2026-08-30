@@ -2,7 +2,9 @@
 
 > Ground truth over intention：本文档描述 `web/src/styles.css` 与 lab 层已建成的
 > 视觉系统，作为后续扩展/复核的权威参考。2026-08-29 玻尔/豆包同级壳层
->（AppRail、问题优先欢迎区、文献库、会话管理）在同一世界内扩展，未换身份。
+>（AppRail、问题优先欢迎区、文献库、会话管理）在同一世界内扩展，未换身份；
+>2026-08-30 AOSSA 表面（问题模型带、协议面板、数据面 + raw 下钻、终端全局
+>面板）同世界补齐，身份未变。
 
 ## 定位
 
@@ -44,13 +46,19 @@ app-header（品牌+连接+通知/设置/palette/主题/语言）
    ├─ app-rail 232px（折叠 52px；<900px 隐藏）  ← 豆包式持久导航
    │   主导航（工作台/新研究/文献库，非 active 500/active 600）
    │   最近研究 / 会话（重命名·armed-confirm 删除） / 底部设置
-   └─ content（各表面）
-       #/        LabHome：问题优先欢迎区（居中输入+快捷任务）
-                 + 判断队列 + 研究索引 + 会话 chips ← 玻尔式问题入口
-       #lab/new  NewResearch（问题+种子+路线；?q= 预填）
-       #library  Library（跨研究去重文献，引用 chip 回跳）
-       #study/…  StudyMap（脊柱：问题→证据→假设→判决+结构图谱）
-       #run/…    深层工具（six tabs，sanctioned deep layer）
+   ├─ content（各表面）
+   │   #/        LabHome：问题优先欢迎区（居中输入+快捷任务）
+   │             + 判断队列 + 研究索引 + 会话 chips ← 玻尔式问题入口
+   │   #lab/new  NewResearch（问题+种子+路线；?q= 预填）
+   │   #library  Library（跨研究去重文献，引用 chip 回跳）
+   │   #study/…  StudyMap（脊柱：问题模型带→状态带→证据→假设→协议带→判决
+   │             + 证据—假设结构图谱；claim/hyp 点击开 inspector）
+   │   #run/…    深层工具（six tabs：research/evidence/hypotheses/plan/
+   │             revisions/verify，sanctioned deep layer；research tab 内
+   │             ExperimentsTab 数据面小节：dataset_record 表 + fem_spec
+   │             列表 + raw 下钻——行点击从内容寻址工件加载头部行，mono 呈现）
+   └─ 全局层：TerminalPanel（终端=全局面板，非装饰假终端）+ 会话 dock
+       （消息流/工具轨迹折叠/审批卡/复制/占位诚实指示/用量 up·down 分列）
 ```
 
 - 欢迎区：白 surface 卡，标题 24px/700 居中，输入框 640px 上限 +
@@ -59,6 +67,14 @@ app-header（品牌+连接+通知/设置/palette/主题/语言）
   列表项 12px/400——字重与分组标题共同区分层级。
 - armed-confirm 模式（删除/取消共用）：灰图标 → 红 is-armed 实底按钮，
   4s 超时自动复位；危险操作永不裸触发。
+- AOSSA 脊柱带（08-30，同 band 语言）：ProblemModelBand 居 StateBand 之上
+  （问题类徽章/目标×方法族对/未决理由/未知项⚠计数）；协议带居假设带与
+  结论回退之间（planHash 冻结徽章、伦理门 fail-closed 审批表单、依赖序
+  步骤台账按钮态、QC 徽章、armed 暂停/中止、终态只读）——披露优先，
+  未立新视觉范式。
+- 数据面诚实：raw 下钻一次一样本（行点击切换），mono pre + aria 标签，
+  数字只从内容寻址工件来；dataset_record/fem_spec 列表与任何汇总一样
+  可下钻（HCI 第 7 条的 AOSSA 具体化）。
 
 ## 组件语言与红线
 

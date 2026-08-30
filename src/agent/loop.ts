@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { strictSchemaOrUndefined } from '../providers/http.js';
 import { validateStructured, recordModelReceipt, describeShape, withModelSlot } from '../pipeline/llm.js';
 import type { RunBudgetView } from '../app/run-budget.js';
-import type { ModelProvider, ArtifactStore } from '../shared/ports.js';
+import type { ModelProvider, ArtifactStore, StructuredOutputEvent } from '../shared/ports.js';
 import { collectEnvSecrets, describeViolation, makeSessionCanary, redactOutbound, scanOutbound } from '../shared/exfil-guard.js';
 import type { AgentTurnRecord } from '../domain/agent.js';
 import { AgentActionSchema, type AgentAction, type AgentEventSink, type ReceiptSink, type TranscriptEntry } from './protocol.js';
@@ -66,6 +66,8 @@ export interface AgentLoopConfig {
   steer?: () => string | null;
   /** Cooperative abort, checked at turn boundaries and before tool execution. */
   shouldAbort?: () => boolean;
+  /** Wire-level abort for in-flight provider calls. */
+  signal?: AbortSignal;
   /** Compaction window: tool results kept verbatim (default 4). */
   keepLast?: number;
   /**
@@ -136,6 +138,9 @@ export interface AgentLoopDeps {
   /** Sub-agent depth (0 = main session). */
   depth?: number;
   clock?: () => string;
+  /** Raw structured output lifecycle for a trusted schema-aware projector.
+   * Never render these bytes directly: they may describe tool actions. */
+  onModelOutput?: (event: StructuredOutputEvent & { turn: number }) => void;
 }
 
 export type AgentLoopStatus = 'completed' | 'max_turns' | 'aborted' | 'failed' | 'step_timeout' | 'total_timeout' | 'stop_condition';
@@ -155,7 +160,8 @@ export async function runAgentLoop(cfg: AgentLoopConfig, deps: AgentLoopDeps): P
   const maxFinishReasks = cfg.maxFinishReasks ?? 2;
   const maxConsecutiveInvalid = cfg.maxConsecutiveInvalid ?? 3;
   const at = (): string => deps.clock?.() ?? new Date().toISOString();
-  const signal = { aborted: false };
+  const abortRequested = (): boolean => cfg.signal?.aborted === true || cfg.shouldAbort?.() === true;
+  const signal = { get aborted(): boolean { return abortRequested(); } };
   const rl = (): { append(line: Parameters<RolloutWriter['append']>[0]): void } => deps.rollout ?? { append: () => {} };
 
   const transcript: TranscriptEntry[] = [];
@@ -222,7 +228,7 @@ export async function runAgentLoop(cfg: AgentLoopConfig, deps: AgentLoopDeps): P
   const totalDeadline = cfg.totalTimeoutMs !== undefined ? Date.now() + cfg.totalTimeoutMs : null;
 
   for (let turn = (cfg.resume?.priorTurns ?? 0) + 1; turn <= maxTurns; turn++) {
-    if (cfg.shouldAbort?.() === true) return finish('aborted', { error: 'aborted by caller' });
+    if (abortRequested()) return finish('aborted', { error: 'aborted by caller' });
     if (totalDeadline !== null && Date.now() >= totalDeadline) {
       return finish('total_timeout', { error: `session exceeded totalTimeoutMs (${cfg.totalTimeoutMs}ms) before turn ${turn}` });
     }
@@ -255,7 +261,7 @@ export async function runAgentLoop(cfg: AgentLoopConfig, deps: AgentLoopDeps): P
       const micro = microcompact(transcript, deps.tools, keepLast);
       const afterMicro = transcriptTokens(micro);
       if (afterMicro > budget.transcriptHard) {
-        const summary = await handoffSummary(deps, transcript, cfg.task);
+        const summary = await handoffSummary(deps, transcript, cfg.task, cfg.signal);
         const compacted = compactedTranscript(micro, cfg.task, summary, keepLast);
         transcript.length = 0;
         transcript.push(...compacted);
@@ -310,6 +316,10 @@ export async function runAgentLoop(cfg: AgentLoopConfig, deps: AgentLoopDeps): P
         maxTokens: 4096,
         jsonSchema: strictSchemaOrUndefined(AgentActionSchema),
         ...(deps.reasoning !== undefined ? { reasoning: deps.reasoning } : {}),
+        ...(cfg.signal !== undefined ? { signal: cfg.signal } : {}),
+        ...(deps.onModelOutput !== undefined
+          ? { onOutput: (event: StructuredOutputEvent) => deps.onModelOutput?.({ ...event, turn }) }
+          : {}),
         purpose: `${deps.purpose}:turn`,
       },
       (raw) => validateStructured<AgentAction>(raw, AgentActionSchema),
@@ -444,8 +454,7 @@ export async function runAgentLoop(cfg: AgentLoopConfig, deps: AgentLoopDeps): P
     }
     consecutiveInvalid = 0;
 
-    if (cfg.shouldAbort?.() === true) return finish('aborted', { error: 'aborted by caller' });
-    signal.aborted = cfg.shouldAbort?.() === true;
+    if (abortRequested()) return finish('aborted', { error: 'aborted by caller' });
     // Step timeout before tool spend: a turn already over budget must not pay for tools.
     if (stepDeadline !== null && Date.now() >= stepDeadline) {
       pushEntry({ kind: 'tool_result', turn, tool: action.tool, ok: false, payload: { skipped: true, reason: 'step timeout' } });
@@ -543,7 +552,12 @@ export const argsEmbedUntrusted = (args: unknown, transcript: readonly Transcrip
 };
 
 /** Full handoff compaction: one structured LLM call (receipted); failure is fail-closed. */
-const handoffSummary = async (deps: AgentLoopDeps, transcript: readonly TranscriptEntry[], task: string): Promise<string> => {
+const handoffSummary = async (
+  deps: AgentLoopDeps,
+  transcript: readonly TranscriptEntry[],
+  task: string,
+  signal?: AbortSignal,
+): Promise<string> => {
   const schema = z.object({ summary: z.string().min(1).max(8000) });
   // No budget GATE here (deliberate): compaction is what lets the session CONTINUE
   // under its context budget — gating it would deadlock an over-soft-limit session.
@@ -555,6 +569,7 @@ const handoffSummary = async (deps: AgentLoopDeps, transcript: readonly Transcri
       userPayload: { task, transcript },
       outputKind: 'json',
       maxTokens: 2048,
+      ...(signal !== undefined ? { signal } : {}),
       purpose: `${deps.purpose}:compact`,
     },
     (raw) => validateStructured<{ summary: string }>(raw, schema),

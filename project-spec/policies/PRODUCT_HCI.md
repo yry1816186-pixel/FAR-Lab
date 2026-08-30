@@ -14,6 +14,8 @@
 6. 用户需要比较什么？需要追溯什么？
 7. 失败怎样发生、怎样恢复、怎样解释给用户？
 8. 空态、加载态、权限不足态分别是什么内容？
+9. 哪些科学事实必须可见（不确定性/反证/出处/执行模式/最弱环节）？哪些结论是机械判决、哪些是模型输出——界面如何不混淆二者？
+10. 人工背书节点在哪（协议签名/测量记录/审批）？误触与未授权路径如何防（armed-confirm、actor 存档）？
 
 输出（至少简版）：User Need → Task Flow → Information Hierarchy → Interaction → State → Implementation → Usability Verification。
 
@@ -24,6 +26,8 @@
 `Research/User Need -> JTBD/Task Analysis -> Information Architecture -> State/Interaction Model -> Wireframe/Prototype when useful -> Design System semantics -> Real Implementation -> Usability/Accessibility/Performance Verification`.
 
 不要为形式产出大量设计稿；每一步只有在能改变真实交互/信息/风险决策时才保留产物。
+
+UI 重构/新建一律走 **impeccable 技能闭环**（owner 指令 2026-08-26）：设计批评 → 实现 → impeccable detector + 多视口评审截图留档。不绕过、不手搓替代流程。
 
 ## 1.2 跨端、主题与语言
 
@@ -39,6 +43,15 @@
 - 按钮没有真实能力 → 禁用或隐藏，禁止点击后无效果或假成功。
 - 每个界面检查：真实 State / Action / Data / Error / Loading / Empty / Permission / Failure，缺失的态必须设计而非忽略。
 - 长时间任务：显示当前阶段、可取消、可恢复、失败时状态不损坏；禁止"转圈然后什么都没发生"。
+
+### 2.1 科研诚信表面（AOSSA 产品定义性要求）
+
+- 执行模式（LIVE / OFFLINE / RECORDED / SYNTHETIC）在产出物与其入口常显；离线/回放路由的降级提示可见，不藏在文档里。
+- 机械判决呈现为机械（预注册阈值 + 确定性规则可下钻查看）；模型输出不排版成客观事实；二者的视觉语言可区分。
+- 不确定性、反证、最弱环节置信、exploratory/confirmatory 状态是可判读的一等内容；呈现层不得为美观抹平或弱化它们。
+- 任何聚合可视（图/表/统计量）可下钻到 raw 数据或原始工件；下钻路径真实存在，不是装饰链接。
+- 人工背书节点（协议签名/仪器记录/审批）使用 armed-confirm + actor 存档；伦理门 fail-closed 的呈现让"为什么被锁"可读，解锁路径给真实命令/动作。
+- 缺席是一等态：无协议、无数据集、未形成问题模型都有诚实空态与成因说明，不渲染占位假象。
 
 ## 3. 用户与任务分析
 
@@ -104,3 +117,6 @@
 
 - UX 验收 = 设计走查 + 真实任务试用 + 可访问性扫描；记录结果。
 - "好看"不是验收标准；"用户能正确、快速、无误解地完成任务"才是。
+- Web 表面常驻门禁：zh/en 全量对等（dict.ts 单事实源，EN 泄漏 = e2e 失败）、
+  375px 零横向溢出、axe critical/serious = 0、键盘可完成核心旅程——这四条
+  是回归门禁，不随需求波动。

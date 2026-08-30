@@ -54,8 +54,8 @@ export function ScopeReview({ run, question, onQuestionChanged, onLaunched }: {
     } finally { setBusy(null); }
   };
 
-  const doSave = async (): Promise<void> => {
-    setBusy('save'); setError(null); setChangedNote([]);
+  const persistEdits = async (): Promise<boolean> => {
+    setError(null); setChangedNote([]);
     const body: EditQuestionInput = {};
     const current = question;
     if (current !== null) {
@@ -65,19 +65,31 @@ export function ScopeReview({ run, question, onQuestionChanged, onLaunched }: {
       if (JSON.stringify(lines(inScope)) !== JSON.stringify(current.scope.inScope ?? [])) body.scope = { ...(body.scope ?? {}), inScope: lines(inScope) };
       if (JSON.stringify(lines(outOfScope)) !== JSON.stringify(current.scope.outOfScope ?? [])) body.scope = { ...(body.scope ?? {}), outOfScope: lines(outOfScope) };
     }
-    if (Object.keys(body).length === 0) { setBusy(null); return; }
+    if (Object.keys(body).length === 0) return true;
     try {
       const res = await editRunQuestion(run.id, body);
       setChangedNote(res.changedFields);
       onQuestionChanged();
+      return true;
     } catch (e) {
       setError(e instanceof ApiError ? e : new ApiError({ code: 'unknown', message: String(e), retryable: true }));
+      return false;
+    }
+  };
+
+  const doSave = async (): Promise<void> => {
+    setBusy('save');
+    try {
+      await persistEdits();
     } finally { setBusy(null); }
   };
 
   const doLaunch = async (): Promise<void> => {
     setBusy('launch'); setError(null);
     try {
+      // Persist the exact scope visible to the researcher before changing the
+      // run state. If validation/networking fails, the paused run is retained.
+      if (!(await persistEdits())) return;
       await resumeRun(run.id);
       onLaunched();
     } catch (e) {

@@ -1,7 +1,7 @@
 import type { z } from 'zod';
 import { canonicalSha256 } from '../shared/crypto.js';
 import { repairJson } from './json-repair.js';
-import type { StructuredCallRequest, StructuredCallResult } from '../shared/ports.js';
+import type { StructuredCallRequest, StructuredCallResult, StructuredOutputEvent } from '../shared/ports.js';
 import { REASONING_GEAR_BUDGET_TOKENS } from '../domain/model-config.js';
 
 /**
@@ -248,10 +248,51 @@ interface ChatSuccess {
   reasoningText?: string;
   respondedModel?: string;
   finishReason?: string;
-  usage: { promptTokens?: number; completionTokens?: number; totalTokens?: number };
+  usage: StructuredCallResult<unknown>['receipt']['usage'];
 }
 
 type ChatAttempt = ChatSuccess | { ok: false; failure: ClassifiedFailure };
+
+/** Event callbacks are observational: a UI/client bug must never corrupt the
+ * provider transaction or its receipt. */
+const emitOutput = (req: StructuredCallRequest, event: StructuredOutputEvent): void => {
+  try { req.onOutput?.(event); } catch { /* isolate observers from execution */ }
+};
+
+/** Minimal SSE decoder shared by OpenAI, Anthropic and Gemini streaming wires.
+ * Handles split UTF-8/codepoint chunks, CRLF and multi-line data fields. */
+export async function readSseData(
+  response: Response,
+  onData: (data: string) => void,
+): Promise<void> {
+  if (response.body === null) throw new Error('streaming response has no body');
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let dataLines: string[] = [];
+  const consumeLine = (lineRaw: string): void => {
+    const line = lineRaw.endsWith('\r') ? lineRaw.slice(0, -1) : lineRaw;
+    if (line.length === 0) {
+      if (dataLines.length > 0) onData(dataLines.join('\n'));
+      dataLines = [];
+      return;
+    }
+    if (line.startsWith('data:')) dataLines.push(line.slice(5).replace(/^ /, ''));
+  };
+  for (;;) {
+    const next = await reader.read();
+    buffer += decoder.decode(next.value, { stream: !next.done });
+    let newline = buffer.indexOf('\n');
+    while (newline >= 0) {
+      consumeLine(buffer.slice(0, newline));
+      buffer = buffer.slice(newline + 1);
+      newline = buffer.indexOf('\n');
+    }
+    if (next.done) break;
+  }
+  if (buffer.length > 0) consumeLine(buffer);
+  if (dataLines.length > 0) onData(dataLines.join('\n'));
+}
 
 // ---------------------------------------------------------------------------
 // small narrowing helpers (no `any` under strict TS)
@@ -385,7 +426,7 @@ const buildMessages = (req: StructuredCallRequest, random: () => number = Math.r
   ];
 };
 
-const buildRequestBody = (modelId: string, messages: ChatMessage[], req: StructuredCallRequest): string => {
+const buildRequestBody = (modelId: string, messages: ChatMessage[], req: StructuredCallRequest, stream = false): string => {
   const body: Record<string, unknown> = {
     model: modelId,
     messages,
@@ -425,6 +466,12 @@ const buildRequestBody = (modelId: string, messages: ChatMessage[], req: Structu
   if (req.temperature !== undefined) body.temperature = req.temperature;
   if (req.maxTokens !== undefined) body.max_tokens = req.maxTokens;
   if (req.reasoning !== undefined) Object.assign(body, reasoningBodyFields('openai', req.reasoning));
+  if (stream) {
+    body.stream = true;
+    // OpenAI-compatible providers that implement the standard return the final
+    // usage frame. Providers that omit it stay honestly unmetered for this call.
+    body.stream_options = { include_usage: true };
+  }
   return JSON.stringify(body);
 };
 
@@ -903,7 +950,7 @@ const parseAnthropicSuccessBody = (bodyText: string, providerName: string): Chat
  * protocol has no response_format/tools — the JSON-only system suffix carries the
  * output contract (callers on this wire must not pass jsonSchema; zai strips it).
  */
-const buildAnthropicRequestBody = (modelId: string, messages: ChatMessage[], req: StructuredCallRequest): Record<string, unknown> => {
+const buildAnthropicRequestBody = (modelId: string, messages: ChatMessage[], req: StructuredCallRequest, stream = false): Record<string, unknown> => {
   const systemMessages = messages.filter((m) => m.role === 'system');
   const rest = messages.filter((m) => m.role !== 'system');
   const body: Record<string, unknown> = {
@@ -913,6 +960,7 @@ const buildAnthropicRequestBody = (modelId: string, messages: ChatMessage[], req
     messages: rest.map((m) => ({ role: m.role, content: m.content })),
   };
   if (req.temperature !== undefined) body.temperature = req.temperature;
+  if (stream) body.stream = true;
   if (req.reasoning !== undefined) {
     Object.assign(body, reasoningBodyFields('anthropic', req.reasoning));
   } else {
@@ -1067,6 +1115,148 @@ const parseSuccessBody = (bodyText: string, providerName: string): ChatAttempt =
   };
 };
 
+/** Normalize one provider's real SSE frames into the same facts as its
+ * non-streaming response. Reasoning/thought deltas are deliberately excluded
+ * from `onDelta`; only schema-output bytes cross that boundary. */
+const parseStreamingSuccess = async (
+  response: Response,
+  wire: WireName,
+  providerName: string,
+  onDelta: (text: string) => void,
+): Promise<ChatAttempt> => {
+  let content = '';
+  let toolArguments = '';
+  let reasoning = '';
+  let respondedModel: string | undefined;
+  let finishReason: string | undefined;
+  let usage: StructuredCallResult<unknown>['receipt']['usage'] = {};
+  let frameFailure: ClassifiedFailure | null = null;
+  let sawFrame = false;
+
+  const appendAnswer = (text: string, kind: 'content' | 'tool' = 'content'): void => {
+    if (text.length === 0) return;
+    if (kind === 'tool') toolArguments += text;
+    else content += text;
+    onDelta(text);
+  };
+  const malformed = (detail: string): void => {
+    if (frameFailure !== null) return;
+    frameFailure = {
+      kind: 'provider_error', retryable: true, httpStatus: 200,
+      message: `${providerName}: malformed streaming frame (${redactSecrets(detail).slice(0, 240)})`,
+    };
+  };
+
+  await readSseData(response, (data) => {
+    if (data === '[DONE]' || data.trim().length === 0) return;
+    sawFrame = true;
+    let parsed: unknown;
+    try { parsed = JSON.parse(data) as unknown; } catch {
+      malformed(`invalid JSON: ${data}`);
+      return;
+    }
+    if (!isRecord(parsed)) { malformed('frame is not an object'); return; }
+    if (isRecord(parsed.error)) {
+      const message = typeof parsed.error.message === 'string' ? parsed.error.message : 'provider stream error';
+      frameFailure = { kind: 'provider_error', retryable: true, httpStatus: 200, message: `${providerName}: ${message}` };
+      return;
+    }
+
+    if (wire === 'openai') {
+      if (typeof parsed.model === 'string') respondedModel = parsed.model;
+      if (parsed.usage !== undefined) usage = { ...usage, ...parseOpenAIUsage(parsed.usage) };
+      const choices = Array.isArray(parsed.choices) ? parsed.choices : [];
+      const choice = isRecord(choices[0]) ? choices[0] : null;
+      if (typeof choice?.finish_reason === 'string') finishReason = choice.finish_reason;
+      const delta = isRecord(choice?.delta) ? choice.delta : null;
+      if (delta !== null) {
+        if (typeof delta.content === 'string') appendAnswer(delta.content);
+        else if (Array.isArray(delta.content)) {
+          for (const part of delta.content) {
+            if (isRecord(part) && typeof part.text === 'string') appendAnswer(part.text);
+          }
+        }
+        const toolCalls = Array.isArray(delta.tool_calls) ? delta.tool_calls : [];
+        const tool = isRecord(toolCalls[0]) ? toolCalls[0] : null;
+        const fn = isRecord(tool?.function) ? tool.function : null;
+        if (typeof fn?.arguments === 'string') appendAnswer(fn.arguments, 'tool');
+        const thought = delta.reasoning_content ?? delta.reasoning;
+        if (typeof thought === 'string') reasoning += thought;
+      }
+      return;
+    }
+
+    if (wire === 'anthropic') {
+      const type = typeof parsed.type === 'string' ? parsed.type : '';
+      if (type === 'error') {
+        const err = isRecord(parsed.error) ? parsed.error : null;
+        frameFailure = {
+          kind: 'provider_error', retryable: true, httpStatus: 200,
+          message: `${providerName}: ${typeof err?.message === 'string' ? err.message : 'Anthropic stream error'}`,
+        };
+        return;
+      }
+      const message = isRecord(parsed.message) ? parsed.message : null;
+      if (typeof message?.model === 'string') respondedModel = message.model;
+      if (message?.usage !== undefined) usage = { ...usage, ...parseAnthropicUsage(message.usage) };
+      const block = isRecord(parsed.content_block) ? parsed.content_block : null;
+      if (block?.type === 'text' && typeof block.text === 'string') appendAnswer(block.text);
+      const delta = isRecord(parsed.delta) ? parsed.delta : null;
+      if (delta?.type === 'text_delta' && typeof delta.text === 'string') appendAnswer(delta.text);
+      if (delta?.type === 'thinking_delta' && typeof delta.thinking === 'string') reasoning += delta.thinking;
+      if (typeof delta?.stop_reason === 'string') {
+        finishReason = delta.stop_reason === 'max_tokens'
+          ? 'length'
+          : delta.stop_reason === 'end_turn' || delta.stop_reason === 'stop_sequence' ? 'stop' : delta.stop_reason;
+      }
+      if (parsed.usage !== undefined) usage = { ...usage, ...parseAnthropicUsage(parsed.usage) };
+      if (delta?.usage !== undefined) usage = { ...usage, ...parseAnthropicUsage(delta.usage) };
+      return;
+    }
+
+    // Gemini streamGenerateContent SSE: each frame carries the next text part;
+    // thought:true parts remain private and never enter the answer stream.
+    if (typeof parsed.modelVersion === 'string') respondedModel = parsed.modelVersion;
+    if (parsed.usageMetadata !== undefined) usage = { ...usage, ...parseGeminiUsage(parsed.usageMetadata) };
+    const candidates = Array.isArray(parsed.candidates) ? parsed.candidates : [];
+    const candidate = isRecord(candidates[0]) ? candidates[0] : null;
+    const candidateContent = isRecord(candidate?.content) ? candidate.content : null;
+    const parts = Array.isArray(candidateContent?.parts) ? candidateContent.parts : [];
+    for (const part of parts) {
+      if (!isRecord(part) || typeof part.text !== 'string') continue;
+      if (part.thought === true) reasoning += part.text;
+      else appendAnswer(part.text);
+    }
+    if (typeof candidate?.finishReason === 'string') {
+      finishReason = candidate.finishReason === 'MAX_TOKENS'
+        ? 'length'
+        : candidate.finishReason === 'STOP' ? 'stop' : candidate.finishReason;
+    }
+  });
+
+  if (frameFailure !== null) return { ok: false, failure: frameFailure };
+  const rawContent = toolArguments.length > 0 ? toolArguments : content;
+  if (rawContent.length === 0) {
+    return {
+      ok: false,
+      failure: {
+        kind: reasoning.length > 0 ? 'invalid_output' : 'provider_error',
+        retryable: false,
+        httpStatus: 200,
+        message: `${providerName}: stream ended without answer text${reasoning.length > 0 ? ' (reasoning-only output)' : sawFrame ? '' : ' (no data frames)'}`,
+      },
+    };
+  }
+  return {
+    ok: true,
+    rawContent,
+    ...(reasoning.length > 0 ? { reasoningText: reasoning } : {}),
+    ...(respondedModel !== undefined ? { respondedModel } : {}),
+    ...(finishReason !== undefined ? { finishReason } : {}),
+    usage,
+  };
+};
+
 // ---------------------------------------------------------------------------
 // the structured-call runner
 // ---------------------------------------------------------------------------
@@ -1133,10 +1323,12 @@ export async function runOpenAICompatStructuredCall<T>(
   const random: () => number = deps.random ?? Math.random;
   const totalTimeoutMs = deps.totalTimeoutMs ?? totalBudgetFromEnv();
   const wire = cfg.wire ?? 'openai';
+  const wantsStream = req.onOutput !== undefined;
   const base = cfg.baseUrl.replace(/\/+$/, '');
   const url =
     wire === 'anthropic' ? `${base}/v1/messages`
-    : wire === 'gemini' ? `${base}/v1beta/models/${encodeURIComponent(cfg.modelId)}:generateContent`
+    : wire === 'gemini'
+      ? `${base}/v1beta/models/${encodeURIComponent(cfg.modelId)}:${wantsStream ? 'streamGenerateContent?alt=sse' : 'generateContent'}`
     : `${base}/chat/completions`;
   const requestHash = computeRequestHash(req);
   const startedAt = performance.now();
@@ -1146,19 +1338,19 @@ export async function runOpenAICompatStructuredCall<T>(
   const wireRequest = (messages: ChatMessage[]): { headers: Record<string, string>; body: string } => {
     if (wire === 'anthropic') {
       return {
-        headers: { 'content-type': 'application/json', 'x-api-key': cfg.apiKey, 'anthropic-version': '2023-06-01' },
-        body: JSON.stringify(buildAnthropicRequestBody(cfg.modelId, messages, req)),
+        headers: { 'content-type': 'application/json', accept: wantsStream ? 'text/event-stream' : 'application/json', 'x-api-key': cfg.apiKey, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify(buildAnthropicRequestBody(cfg.modelId, messages, req, wantsStream)),
       };
     }
     if (wire === 'gemini') {
       return {
-        headers: { 'content-type': 'application/json', 'x-goog-api-key': cfg.apiKey },
+        headers: { 'content-type': 'application/json', accept: wantsStream ? 'text/event-stream' : 'application/json', 'x-goog-api-key': cfg.apiKey },
         body: JSON.stringify(buildGeminiRequestBody(cfg.modelId, messages, req)),
       };
     }
     return {
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${cfg.apiKey}` },
-      body: buildRequestBody(cfg.modelId, messages, req),
+      headers: { 'content-type': 'application/json', accept: wantsStream ? 'text/event-stream' : 'application/json', authorization: `Bearer ${cfg.apiKey}` },
+      body: buildRequestBody(cfg.modelId, messages, req, wantsStream),
     };
   };
   const parseWireSuccess = (bodyText: string): ChatAttempt => {
@@ -1232,17 +1424,32 @@ export async function runOpenAICompatStructuredCall<T>(
       const onExternalAbort = (): void => controller.abort();
       req.signal?.addEventListener('abort', onExternalAbort, { once: true });
       try {
-        const wire = wireRequest(messages);
+        const wireRequestData = wireRequest(messages);
+        emitOutput(req, { type: 'attempt_started', attempt: transportRetries + invalidOutputRetries + 1 });
         const res = await fetchImpl(url, {
           method: 'POST',
-          headers: wire.headers,
-          body: wire.body,
+          headers: wireRequestData.headers,
+          body: wireRequestData.body,
           signal: controller.signal,
         });
-        const bodyText = await res.text();
         if (res.status === 200) {
-          attempt = parseWireSuccess(bodyText);
+          const contentType = res.headers.get('content-type') ?? '';
+          if (wantsStream && res.body !== null && contentType.toLowerCase().includes('text/event-stream')) {
+            attempt = await parseStreamingSuccess(
+              res,
+              wire,
+              cfg.providerName,
+              (text) => emitOutput(req, { type: 'delta', text }),
+            );
+          } else {
+            // Some OpenAI-compatible gateways ignore stream:true. This is a
+            // truthful non-streaming response (no fabricated deltas); callers
+            // still receive the final validated result and can disclose the
+            // degradation from the absence of delta events.
+            attempt = parseWireSuccess(await res.text());
+          }
         } else {
+          const bodyText = await res.text();
           retryAfterMsHint = parseRetryAfterMs(res.headers);
           attempt = { ok: false, failure: classifyHttpStatus(res.status, bodyText, cfg.providerName) };
         }
@@ -1275,6 +1482,7 @@ export async function runOpenAICompatStructuredCall<T>(
       if (extracted !== null) {
         const parsed = parse(extracted.value);
         if (!(parsed instanceof Error)) {
+          emitOutput(req, { type: 'attempt_completed' });
           return {
             ok: true,
             data: parsed,
@@ -1302,12 +1510,14 @@ export async function runOpenAICompatStructuredCall<T>(
         }
         // invalid_output: caller's schema parse rejected the JSON — bounded corrective re-asks.
         if (invalidOutputRetries < MAX_INVALID_OUTPUT_RETRIES) {
+          emitOutput(req, { type: 'attempt_discarded', reason: 'invalid_output' });
           invalidOutputRetries += 1;
           messages = truncationConfirmed
             ? appendTruncationCorrection(messages, parsed.message)
             : appendCorrection(messages, parsed.message);
           continue;
         }
+        emitOutput(req, { type: 'attempt_discarded', reason: 'invalid_output' });
         return fail({
           kind: 'invalid_output',
           retryable: false,
@@ -1316,12 +1526,14 @@ export async function runOpenAICompatStructuredCall<T>(
       }
       // Output was not JSON at all (direct parse and fence-strip both failed).
       if (invalidOutputRetries < MAX_INVALID_OUTPUT_RETRIES) {
+        emitOutput(req, { type: 'attempt_discarded', reason: 'invalid_output' });
         invalidOutputRetries += 1;
         messages = truncationConfirmed
           ? appendTruncationCorrection(messages, 'direct parse and fence-stripped parse both failed')
           : appendCorrection(messages, 'output was not valid JSON (direct parse and fence-stripped parse both failed)');
         continue;
       }
+      emitOutput(req, { type: 'attempt_discarded', reason: 'invalid_output' });
       return fail({
         kind: 'invalid_output',
         retryable: false,
@@ -1335,10 +1547,12 @@ export async function runOpenAICompatStructuredCall<T>(
     // with an instruction that targets the observed failure mode.
     if (!attempt.ok && attempt.failure.kind === 'invalid_output') {
       if (invalidOutputRetries < MAX_INVALID_OUTPUT_RETRIES) {
+        emitOutput(req, { type: 'attempt_discarded', reason: 'invalid_output' });
         invalidOutputRetries += 1;
         messages = appendThinkingOnlyCorrection(messages, attempt.failure.message);
         continue;
       }
+      emitOutput(req, { type: 'attempt_discarded', reason: 'invalid_output' });
       return fail({
         kind: 'invalid_output',
         retryable: false,
@@ -1351,12 +1565,14 @@ export async function runOpenAICompatStructuredCall<T>(
     const retryableKind = f.kind === 'rate_limited' || f.kind === 'timeout' || (f.kind === 'provider_error' && f.retryable);
     if (!retryableKind || transportRetries >= MAX_TRANSPORT_RETRIES) {
       const exhausted = retryableKind && transportRetries >= MAX_TRANSPORT_RETRIES;
+      emitOutput(req, { type: 'attempt_discarded', reason: 'transport_retry' });
       return fail(
         exhausted
           ? { ...f, message: `${f.message} (retry budget of ${MAX_TRANSPORT_RETRIES} exhausted)` }
           : f,
       );
     }
+    emitOutput(req, { type: 'attempt_discarded', reason: 'transport_retry' });
     // W4-F1: server Retry-After (when the failing response carried one) beats the
     // jittered exponential curve; both cap at RETRY_MAX_BACKOFF_MS. Capacity
     // overload (529) and account RPM throttling (429) use their wider spacings so

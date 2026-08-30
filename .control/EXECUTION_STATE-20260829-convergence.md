@@ -565,3 +565,299 @@ NOTE：x^0.7 为左 Dirichlet 边型奇性（非再入角）；场景 A 仅跑�
 completion-gate：NOT_READY（唯一 ACC-02=用户侧 dashscope key）。
 四维审计 ✅ 已执行且 Critical 已修；Warning 分级登记。goal 完成判据
 中可自主完成的部分已尽；剩余=登记的 Warning 修复队列 + 用户侧凭据。
+
+## 审计 Warning 修复批 2（2026-08-30 03:5x，commit f7d0a25，main）
+
+工程 W1/W3/W4/W5/W6 + 安全 W1/W2 全部落地，全量绿（2264 passed |
+4 skipped；tsc/eslint/build 0）：
+
+- W6：fem.py h1Rates 误除 2.0 移除。
+- W3：draft 边界守卫。首版 MethodSelectionDraftGuards 建在单选择
+  schema 上——scope 拿它解析整个 payload 必然失败，全量 vitest 三个
+  测试当场暴露（forObjective/candidates Required）。重做为
+  ProblemModelDraftGuards（基座 ProblemModelDraft，逐 selection 校验
+  selected⇒validationPlan、≤2 selected、无 selected⇒undecidedReason），
+  补两条边界回归测试。教训：schema 换基座必须跑消费方测试，不能只看
+  定义文件 tsc。
+- W4：scope 测试替身拒绝路径改 marker-skipped 返回，resume 时编排器
+  重开整个 scope（此前 done 会永久缺 problem model）。
+- W5/安全 W1：dataset-netcdf profile 后二次读取重算 sha256 比对
+  （TOCTOU）；体积检查 statSync 前置。
+- 安全 W2：assertLocalNetcdfPath——URI/相对路径读字节前拒绝；
+  FARLAB_DATA_ROOT 围栏（测试覆盖三条）。
+- W1：fem/theory executor fail() 双事件（fail 抛出→外层 catch 再 fail，
+  experiment_failed 覆盖+消息双重包装）——failedOnce 单事件保证，
+  外层 rethrow；回归测试断言恰一个 experiment_failed。
+
+剩余队列：科学 W2（估计子 Neumann 边项）、W3（bundle 绑定数值证据
+——export 层）、W4（引文 DOI 存储）；产品三面可见性。
+
+## 审计 Warning 修复批 3（2026-08-30 04:3x，commits c178f8a / cb7cfaa / 6a0a52b，main）
+
+科学 W2/W3/W4 全部落地，四维审计 Warning 队列清空：
+
+- 科学 W2（c178f8a）：残差估计子补 Γ_N 边剩余项 h_e‖∂u_h/∂n−g‖²
+  （两点 Gauss 积分 + sympy 精确通量）；r^0.7 验证 slope −0.745、
+  effectivity 4.0–4.7 稳定。
+- 科学 W3（cb7cfaa）：bundle 绑定数据面证据——fem_measurement tableRef
+  并入 experimentEvidence.artifactHashes；datasetEvidence 新 schema 字段
+  （id/name/format/contentRef/lineageKinds）；verify 新增 check 16
+  data_plane_evidence_resolvable（store 再解析 + 工件探测），
+  VERIFY_CHECK_NAMES 15→16。
+- 科学 W4（6a0a52b）：引文表面带可解析标识符——sourceIdentifierLabel
+  （doi>arxiv>pubmed>url 原文，绝不拼造 URL）；report §2 与
+  corpus-overview 表各加标识符列。
+- 过程教训：D-031 对 git checkout 刷新 mtime 的正确触发（rebuild 即绿）；
+  PowerShell 写含反引号的模板串必须走单引号 here-string + [char]96 拼接。
+
+剩余登记（按杠杆）：产品三面可见性（problem model/method selection/
+fem_spec/dataset——API+web）、run 级自动序列化（execute 级联引用已登记
+数据集）、假设路由按 method selection（run_fq3rdff1 证据）、StudyMap
+问题模型带；BLOCKED-user：场景 C 真人执行、ACC-02 dashscope key。
+
+## 产品可见性批 1（2026-08-30 05:0x，commit 5fc6ac4，main）
+
+- /science 增加 problemModel（模型全量+methodSelections；无则 null）；
+  /experiments 增加 femSpecs+datasetRecords。
+- web：ScienceBundle.problemModel 严格 normalize；StudyMap
+  ProblemModelBand（问题类/目标×方法族/未决/未知项⚠/计数）置于
+  StateBand 上；ExperimentsTab 数据面小节（dataset_record 表 +
+  fem_spec 列表）。中英 i18n。web tsc+vite build 绿。
+- 全量 2265 passed | 4 skipped；root tsc/eslint/build 绿。
+- 剩余：run 级自动序列化、假设路由按 method selection、StudyMap
+  深链、benchmark 多基线扩展；BLOCKED-user：场景 C、ACC-02。
+
+## 路由 + 自动序列化批（2026-08-30 05:4x，commits 9b631aa / 25aaf64，main）
+
+- 9b631aa execute 按方法选择确定性路由：routeSkip——leg 背后全部家族
+  被 scope 评为 rejected_inappropriate 时跳过起草并落
+  method_selection_routing note；四 leg 均受路由；pre-AOSSA 保持
+  固定顺序；回归测试（仅脚本 fem 起草，3 条路由 note + FEM 完成）。
+- 25aaf64 数据集自动序列化：dataset_record(csv+local) 投影进
+  experiment-spec-draft payload（id/name/columns——路径永不进
+  prompt，确定性代码解析）；datasetRecordId 与 openml 互斥；
+  REGRESSION_BUILDERS 进草稿（mse/r2、direction below、split
+  random）；未知 id 拒绝猜测绑定；execute 侧 allowLocalDatasets
+  仅在绑定 operator 登记数据集时为真 + dataset_auto_serialized
+  note。全量 2269 passed | 4 skipped。
+- completion-gate 已在本 transcript 运行：NOT_READY，唯一缺口
+  ACC-02（Qwen-via-Bailian 凭证）+ B-QWEN-LIVE-ROUTE——均为
+  用户侧外部条件（submission/RELEASE_BLOCKERS.md 登记）。
+- 后台审计 agent：压缩后无法取回 task id；四维审计发现已在此前
+  执行并修复（Critical 前期修复，Warning 本会话全清）。若后台
+  agent 产生新发现，其输出不可达——如实登记。
+- Coding-Agent 基线（场景 A）：后台 agent 已启动（同 harness 家族
+  的诚实披露：非独立外部产品；scratch 目录隔离，禁读本仓库代码），
+  预注册结构性指标复用 work/baseline/comparison.md。结果落
+  work/baseline-agent-a/REPORT.md 后按同一 rubric 评分。
+- 剩余 BLOCKED-user：场景 C 真人执行、ACC-02。AI4Science/
+  LLM+Web+Notebook 外部基线：无外部账号与网络检索通道，登记
+  BLOCKED/external。
+
+## 审计 agent 全部返回 + 残项批（2026-08-30 06:3x，commit 1015218，main）
+
+四维审计（工程/安全/科学/产品）与三路勘察（runtime/eval/web/backend）
+消息全部返回：
+- 审计 Critical（C1 lat/lon 伪造、C2 NaN 落库）与 W1-W6 均已在前批
+  修复——审计返回的是修复前快照，其发现与修复一一对应。
+- 本批残项（1015218）：安全 W2 残项（netcdf.py op 层
+  _assert_local_path——URI/相对/根围栏/200MB，独立于 TS 的第二道门）；
+  工程 W5 残项（sha256Expected acquire 落库 + extract 消费前重验，
+  篡改回归测试）；产品 Note A（tallyVerdicts 拆 unjudged 桶——无判定
+  ≠inconclusive）、Note B（execute 阶段文案方法路由中性化）、
+  Note C（报告卡渲染 hypothesisId 绑定）；勘察发现 mlr-bench.mjs
+  行为本已 GLM 化（makeProvider deepseek 硬禁），仅字符串残项
+  三处修正。全量 2271 passed | 4 skipped。
+- 勘察其余登记：SimulationSpec/CampaignSpec CLI-only（设计现状）；
+  e_value_accumulation 占位 fail-closed（设计现状）；macOS deep-link
+  死路（已声明）；web 无 dataset import UI / raw 下钻（后续增量）；
+  本地 min 与 GitHub main 的镜像差异系兄弟会话推送（协议链在本地
+  历史中已存在，勘察读到的是旧镜像）。
+- e2e（5.6m）：19 passed / 3 failed / 1 skipped——terminal×2 与
+  perf home 属兄弟会话在制 Terminal→TerminalPanel 重构及 LabHome
+  在制改动的文件（terminal.spec.ts 在其工作集），非本会话提交的
+  表面（StudyMap/ExperimentsTab 相关 spec 全绿）。如实登记，不代改。
+- Coding-Agent 基线（场景 A）：后台 agent 恢复运行中；完成后按
+  work/baseline/comparison.md 的预注册结构性指标评分并入档。
+
+## Coding-Agent 基线结果落档（2026-08-30 07:0x）
+
+- 条件披露：单会话通用编码 agent（Claude 家族、同 harness——非独立
+  外部产品；自比限制如实登记），场景 A 问题原文 + scratch 目录 + 预
+  交付合同；~13 分钟、10 次工具调用、两次停机均未执行自己的代码
+  （委托的 runner 未跑）。
+- 交付物：fem.py/run_uniform/run_adaptive/smoke.py 存在；无 REPORT.md、
+  无执行产物、无 pin 依赖脚本。
+- 哈尼斯执行记录（披露干预）：首次执行即崩（einsum 指标序 bug），
+  两处一行修复后其自带 smoke 完成并自判 FAIL——均匀加密下误差发散
+  （L2 -0.44 / H1 -1.60）。不再代修数值（代修即变成本方实现）。
+- 评分按预注册结构性指标落 work/baseline/coding-agent-a.md +
+  comparison.md 追加节：真实执行=无、机械判定=无、复现工件=无；
+  反向列：13 分钟、零基建、骨架结构合理（对称/常数/NVB 共形自检过）。
+- 外部基线（AI4Science / LLM+Web+Notebook）：BLOCKED/external 维持。
+- benchmark 三条件现为：direct-LLM ✅、coding-agent（in-process）✅、
+  外部产品基线 BLOCKED。
+
+## 基线落档 + 论文问题模型（2026-08-30 07:2x，commit fbe5f3d，main）
+
+- fbe5f3d：论文投影纳入科学问题模型（Methods 节 Problem model
+  and method selection 小节：问题类/方法族/目标/未知项 + far.db
+  原文披露行）；pre-AOSSA run 缺省不编造；测试双向断言。
+  审计产品维残项至此全部处理完毕。
+- 状态：审计四维全返回、发现全闭环；benchmark 三条件
+  direct ✅ / coding-agent ✅（in-process，自比限制披露）/
+  外部产品 BLOCKED；gate NOT_READY 唯一缺口 ACC-02（用户侧）。
+- 剩余登记（下一批候选）：场景 B 流水线原生 execute 重跑（自动
+  序列化已具备）、web dataset import UI / raw 下钻、
+  顶端假设路由 method selection 的假设侧软约束硬闭合。
+
+## 场景 B 原生 execute 贯通（2026-08-30 07:5x，commit f22a2bc，main）
+
+run_wx8dmqmb（work/scenario-b-native，live zai glm-4.6，123 receipts）：
+- 首跑：run_631ha1cs 暴露 draft validationPlan 短占位符问题（W3 守卫
+  live 拦截），修复后该 run 诚实 evidence-insufficient 收束（12 源
+  检索后判定不覆盖主题——hypotheses/plan/execute 全跳过，不编造）。
+- 主跑 run_wx8dmqmb：完整文献链 + plan 冻结 + execute 科学性跳过
+  （四腿均判不可行，含 protocol 不可行——诚实）。
+- operator 注册数据面（scenario-b-register-datasets.mjs：raw
+  ds_j98af9gd sha256 c606b89c… + derived ds_41b9nrtet 31,800 行）
+  → feedback(new_dataset) ×2 → 因果修订把 "NCEP/NCAR Monthly Mean
+  Air Temperature (public)" 绑进 dataRequirements 并 re-freeze。
+- 修复后迭代重开 execute：dataset_auto_serialized note（spec
+  xsp_t5fm1z6 绑 derived CSV，路径由确定性代码解析）→ 真实 sidecar
+  训练（python 3.14.1 / sklearn 1.9.0；dummy_mean vs
+  linear_regression vs random_forest_regressor）→ stat_report
+  srep_tgzeg（mse paired_diff below，point 170.92，CI95
+  [163.10, 179.05]，exploratory plan-drafted）→ EEL 侧再铸
+  ds_6c98cb88（消费路径 sha256 验证记录）。
+- reexport-bundle.mjs 重铸 bnd_t9mjvb7c：verify 16/16 verified
+  （experimentEvidence 1 条含 3 工件哈希 + datasetEvidence 3 条 +
+  123 receipts live）。场景 B 桥接残项（审计科学维 framing note）
+  就此闭合：存在 pipeline-native execute 的端到端证据。
+- 四个 live 发现的修复随批落库（draft 容忍+确定性剥离 / 修订见数据
+  / 陈旧跳过判定失效 / 二进制安全工件探测）；全量 2274 passed。
+- 语义注记：本次 native 实验与桥接实验不同点（mean-baseline 对比
+  为 linear_regression、rf 为第三模型）如实保留——两次都是真实
+  执行，非复现声明。
+
+## 基准补遗：runner-a 逐字报告 + 全阶梯执行（2026-08-30 08:0x）
+
+- runner-a（受托执行 agent）返回逐字报告：smoke 首跑即崩于 fem.py:147
+  （einsum 轴序，lam 实为 (nT,nq,3)），检查 [2]-[5] 未运行，exit 1；
+  环境 python 3.14.1 / numpy 2.5.2 / scipy 1.18.1 / sympy 1.14.0。
+  与 harness 记录完全互证。
+- 两处披露的单行修复在场时，harness 执行了 agent 从未跑过的两个
+  ladder：uniform L2 阶 ~0.00（理论 ~1.4）、H1 全负（误差随加密
+  增大 1.309→1.489）；adaptive 26 轮 H1 斜率 +0.039（正——误差随
+  ndof 增大；理论 -0.5），误差平台 L2~0.2534/H1~1.492——收敛到
+  错误函数（einsum 之外的组装/边界 bug）。
+- 结论强化：该基线条件全程未产生任何一个正确的收敛数字；场景 A
+  问题在此条件下无执行证据可答。已通知 runner-a 停止、勿改文件。
+
+## 终局加固批（2026-08-30 09:0x，commit 98d4cb8，main）
+
+goal「彻底完成直到只剩 key」驱动，本批清掉全部可解决残项：
+- e2e 22 passed（唯一真实残点是 core-journey 的离线标签匹配器未随
+  test-double 更名；perf home CLS 满载 0.135 由骨架行+min-height
+  修复；terminal 两例是僵尸共享服务器假象）。首次全套绿。
+- zcode-harness 7 脚本全 PASS（destructive-guard 补 PowerShell 令牌
+  解析；secret-scan 清残留本地测试 PKI——按设计只应在临时目录）。
+- SCIENTIFIC_MODEL.md 补 7.6/7.7/10.1 三节；收敛计划增量标 LANDED
+  ——canonical 变更的 spec 同步链闭合。
+- 数据下钻端点+UI+测试（HCI 第7条：可视结果可下钻 raw data）。
+- 全量 vitest 2275 passed | 4 skipped。
+- 剩余：completion-gate NOT_READY 唯一缺口 ACC-02（用户侧 Bailian
+  key）；场景 C 真人执行 BLOCKED-user；外部产品基线 BLOCKED。
+  git push 未做（对外动作，留给用户或明示）。
+
+## 终局接管窗口 1（2026-08-30 19:0x-19:5x，commit 4aa3c2b，main）
+
+任务书：接管最终产品/科研/工程质量，建立终局控制面（FINAL_GAPS.md /
+FINAL_ACCEPTANCE.json / FINAL_EVIDENCE/），按证据推进。8 路并行只读审计
+（科学/harness/安全/数据/远程/性能/HCI/平台发布/评估）产出 56 项能力矩阵，
+载荷结论主代理抽验（CI 连红、netcdf fixture 根因、0.061 旧数、ACC-25 措辞）。
+
+本批修复（全绿证据）：
+
+- CI 红（FA-PLT-02）：dataset-netcdf 两用例移回 skipIf 守卫；本地双向验证
+  （缺 fixture 3过5skip / 在位 8过）。hosted 绿待 4aa3c2b 的 CI run。
+- 数字诚实（FA-EVAL-14）：三处 0.061 改为 08-29 实测披露（4/5≤0.045、
+  worst 0.267 未达标）；两份 PDF 重生成+抽取核验；north-star 指针改指
+  v22 文件。
+- 安全 P0 批（FA-SEC-02/04/06/07 关闭，01 部分缓解）：
+  W2b realpath 围栏+symlink 回归；CodeAct 别名/拆链/getattr 全封
+  （TS 别名追踪+全禁，Python 别名 AST+运行时 os/sys/subprocess/socket
+  身份擦除+守卫 getattr；真实 sidecar 实证 os-present: False）；
+  api_key→Bearer header+错误 chokepoint 脱敏；sources 层 egress
+  destination guard（https-only+拒 IP 字面量+手动重定向逐跳复检）；
+  sidecar env 白名单（密钥丢弃，FARLAB_ 保留）。
+- ACC-25 措辞对齐（FA-REM-01）：ACCEPTANCE_STATUS 改为 containerized
+  same-host target 如实披露；evidence/r2-10/remote-suite-evidence-index
+  -20260830.md 补索引（evidence/ 按治理不入 git）。
+- RISK_REGISTER 补 R-19/20/21。
+
+验证：vitest 全量 2287过/2败——cli-spawn=陈旧 dist（重建后即绿），
+thinking-display=兄弟 conversation-stream 车道在制品（HEAD CI 绿证非
+本批）；tsc 0；eslint 0；secret-scan PASS。
+
+车道纪律：lane/endgame-audit-1 分支→只提交本批 26 文件→ff-merge main
+→已推送。兄弟未提交文件（conversation-stream 面+规范文档）未触碰。
+
+下一批（按 FINAL_GAPS 优先级）：hosted CI 绿核验后 FA-PLT-02 翻 PASS；
+FA-SCI-05 ODE 诚实化+ode_integrate op；FA-DAT-02 far restore+三库备份；
+FA-PRF-01 容量基准；FA-SEC-01 OS 级隔离调研（WSL2/AppContainer 方案）。
+
+## 终局接管窗口 1 补记（12:3x-12:5x，commits 8a65f1c/efe42d1/ec70cb3/3f19373 + FA 状态）
+
+CI 修复三部曲（每步都有 hosted 证据）：
+
+1. 8a65f1c：OSS_LEDGER 按 d994b6b 树再生成——不够：CI 仍红（ledger
+   在干净 clone 渲染不同）。教训：regen 前必须 npm ci 四工作区。
+2. efe42d1：给 --check 失败路径加前 12 行 committed/rendered 差异输出
+   （盲 FAIL 不可调试的门禁自身工程缺陷）——CI 差异输出直接定位：
+   Linux 不装 @img/sharp-wasm32（三重 license 行消失）+ MIT 416/415。
+3. ec70cb3：@img/* 全族按平台工件排除 + gating/documentation 分离
+   （ALLOWED_EXCEPTIONS 只留 jszip；四变体处置入
+   PLATFORM_BINARY_DISPOSITIONS）。残余一行 MIT 415/414。
+4. 3f19373：平台孤儿定点排除——@emnapi/runtime（optional、无 os/cpu、
+   全部父是平台条件可选）按 lockfile 图定点判定排除。
+   → verify job hosted 绿（run 33311971591，08-28 以来首次）。
+
+web-e2e 残余（非本批引入，零 web 改动）：perf.spec CLS 断言在 GH
+runner 上 home/map ≥0.1；本地（含兄弟 WIP）home 0.0000 / map 0.0774
+全过。归因=shell 重建批以来的渐进渲染 CLS 在慢 runner 边缘超限。
+修复路径（不弱化阈值）：band 容器 min-height 预留真实降 CLS——
+归 shell 车道（App.tsx/StudyMap.tsx/lab.css 均其未提交文件），
+兄弟落地后若 CI 仍红则接手实现。
+
+车道协调：兄弟 conversation-stream 在制品使 tests/thinking-display
+本地红（HEAD CI 绿证非主干问题）；其 WIP 本地 perf 已过。
+
+## 终局接管窗口 2（2026-08-30 21:0x-21:4x，commit f0a72c6，main）
+
+批 2 九项全落地（避兄弟车道全部文件）：
+
+1. FA-DAT-02 恢复闭环：src/app/backup-restore.ts（三库 VACUUM INTO
+   set+MANIFEST sha256/user_version；只读校验先行——绝不 openDb 触发迁移；
+   -wal 热写守卫；move-aside 回滚而非删除）+ far backup/restore CLI +
+   HELP+补全树（cli-maturity 漂移守卫当场抓到我漏补全树——即修）+
+   docs 重写；真实字节级损坏 round-trip 10 测试全绿。
+2. FA-PRF-01 容量门：capacity-bench（1000c/100h/3000r，明示 SYNTHETIC）
+   bulk 1.4s / 投影 31ms / listEvents 30ms / lineage 15ms——后端在目标
+   规模快两个数量级；产物 evidence/capacity/。
+3. FA-PRF-04 cancel 计时：真 orchestrator+wireCancels 对唯一出口=
+   AbortSignal 的挂起 provider——0.6ms 实测钉死（<1s 断言）。
+4. FA-PRF-05 sweep：补 FARLAB_DATA_DIR（原硬编码）+3 测试。
+5. FA-REM-03 probe 全指纹：python/numpy 版本+cpu+GPU+nvidia-smi+
+   pip-freeze sha256 入 environment 与 ResultCell fingerprint。
+6. FA-DAT-05 verify vacuous 机器可读（check.vacuous+report.vacuousChecks
+   +CLI 标记）。
+7. FA-SCI-05 注释诚实化（ODE 腿真实状态=未实现，独立车道排队）。
+8. FA-PLT-06 numpy pin（>=2.4,<3 对齐 uv.lock）。
+9. FA-SCI-04 held-out 集：6 题 3 非 bio 域+真实 salted sha256 封存
+   （教训：初稿写的是假哈希占位——先写答案摘要再计算真哈希回填，
+   封存必须可复算）。
+
+门禁：tsc/eslint/secret-scan 绿；全量 2306 过/2 败（1=补全树漂移已修转
+绿；1=兄弟 thinking-display 在制品，非主干）。hosted CI 结果待验。
+FA 计：14F/30P/10PASS/2B（56 项）。

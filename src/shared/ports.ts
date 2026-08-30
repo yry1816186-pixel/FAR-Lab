@@ -1,6 +1,19 @@
 import type { ContentDepth, SourceFamily, SourceIdentifier, AccessState, PublicationType } from '../domain/source.js';
 import type { ReasoningStyle, ReasoningGear } from '../domain/model-config.js';
 
+/**
+ * Wire-truthful structured-output stream. `delta.text` is exactly the answer/
+ * tool-argument bytes received from the provider; consumers must interpret the
+ * closed schema before exposing any subset to a user. A corrective re-ask or
+ * transport retry invalidates the attempt explicitly so no rejected draft is
+ * mistaken for the landed result.
+ */
+export type StructuredOutputEvent =
+  | { type: 'attempt_started'; attempt: number }
+  | { type: 'delta'; text: string }
+  | { type: 'attempt_discarded'; reason: 'invalid_output' | 'transport_retry' }
+  | { type: 'attempt_completed' };
+
 /** Structured model call request — the narrow semantic boundary (INTERFACES.md §5). */
 export interface StructuredCallRequest {
   task: string;
@@ -43,6 +56,8 @@ export interface StructuredCallRequest {
    * behave exactly as before.
    */
   signal?: AbortSignal;
+  /** Optional real provider stream (never synthesized by timers/typewriters). */
+  onOutput?: (event: StructuredOutputEvent) => void;
 }
 
 export interface StructuredCallResult<T> {
