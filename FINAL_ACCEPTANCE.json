@@ -28,7 +28,7 @@
       "status": "PARTIAL",
       "priority": "P0",
       "owner": "self",
-      "gap": "FIX LANDED 2026-08-30: both netcdf cases moved under describe.skipIf(REAL_NC) guard; verified both ways locally (fixture-absent 3p/5s green, fixture-present 8p). Hosted-runner green pending push.",
+      "gap": "VERIFY JOB GREEN on hosted runner since 3f19373 (run 33311971591, first since 2026-08-28): netcdf fixture guard + two ledger root-cause fixes (@img/* family rule + platform-orphan lockfile fixpoint for @emnapi/runtime-class drift) + ledger diff-diagnosis tooling. RESIDUAL: web-e2e perf CLS marginal on CI runners (home/map layout-stable >=0.1 on GH runners; locally with sibling WIP: home 0.0000, map 0.0774 both PASS) — surface owned by sibling shell lane, predates this batch, fix = real CLS reduction (band min-height reservation) after their landing, NOT threshold weakening.",
       "target": "green verify+web-e2e on hosted runner, SHA recorded",
       "verify": "gh run list + clean-clone reasoning + local rename-fixture both-ways run",
       "evidence": [
@@ -811,6 +811,6 @@
   ],
   "stopConditions": {
     "note": "Mission stop requires ALL of: no internal FAIL/PARTIAL; canonical clean-clone CI green; science north-star met or externally justified; real evidence across all planes; 24h→72h soak+chaos; win/mac/linux matrix; sandbox attack suite; production-path-only flows; clean-machine bundle verify; honest BLOCKED_EXTERNAL only; docs==commit; final red-team audit no new P0/P1.",
-    "currentVerdict": "NOT READY — 9 FAIL, 31 PARTIAL, 2 BLOCKED_EXTERNAL; CI code-fix landed (hosted pending); submission-doc honesty restored; security P0 batch closed (2 escape paths + 2 leak surfaces + env minimization)."
+    "currentVerdict": "NOT READY — verify CI green restored (web-e2e CLS residual, sibling lane); submission-doc honesty restored; security P0 batch closed; science metrics + capacity + soak remain the open P0/P1 frontier."
   }
 }
