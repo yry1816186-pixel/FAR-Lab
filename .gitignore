@@ -92,3 +92,6 @@ web/test-results/
 
 # Nested git worktrees (isolated lanes)
 work/
+
+# External AI tool local state (CodeBuddy)
+.codebuddy/

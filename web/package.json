@@ -46,7 +46,7 @@
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4.3.3",
     "web-vitals": "6.1.1",
-    "xlsx": "^0.18.5"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
@@ -58,5 +58,9 @@
     "axe-core": "4.13.0",
     "typescript": "^5.7.2",
     "vite": "^6.0.3"
+  },
+  "overrides": {
+    "sharp": "^0.35.4",
+    "adm-zip": "^0.6.0"
   }
 }
