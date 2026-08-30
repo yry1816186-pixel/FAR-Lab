@@ -1,8 +1,8 @@
 {
   "schema": "final-acceptance/1",
-  "asOf": "2026-08-30 (post endgame batch 2)",
-  "head": "98d4cb8+dirty(sibling conversation-stream lane in flight)",
-  "provenance": "First full endgame audit: 8 parallel read-only domain audits, reports in FINAL_EVIDENCE/audit-2026-08-30/. Load-bearing claims spot-checked by main agent (CI red, netcdf fixture root cause, 0.061 stale number, north-star judge-variance detail).",
+  "asOf": "2026-08-31 (Wave 0 implementation lane in flight)",
+  "head": "cc4009c+lane/endgame-wave0-root(dirty; sibling conversation-stream lane pending integration)",
+  "provenance": "First full endgame audit: 8 parallel read-only domain audits, reports in FINAL_EVIDENCE/audit-2026-08-30/. Load-bearing claims spot-checked by main agent. Wave 0 additions are tracked below from direct repository inspection and targeted executable tests; incomplete sweep and integration states remain PARTIAL/FAIL.",
   "statusVocabulary": [
     "PASS",
     "PARTIAL",
@@ -316,6 +316,22 @@
       "verify": "memory-live-check rerun + UI e2e",
       "evidence": [
         "FINAL_EVIDENCE/audit-2026-08-30/02-harness.md CAP-06"
+      ]
+    },
+    {
+      "id": "FA-HAR-07",
+      "domain": "harness",
+      "title": "Python sidecar spawn failure rejects pending calls immediately",
+      "status": "PASS",
+      "priority": "P1",
+      "owner": "self",
+      "gap": "CLOSED 2026-08-31: process error/exit and stdin failure now settle one terminal cause, reject all pending calls, and make future calls fail immediately. A real missing launcher fails in <1s (future call <100ms); the provisioned minimized-env sidecar still boots and answers.",
+      "target": "spawn/error/close settle the process lifecycle once and reject every pending or future call immediately with the launch cause",
+      "verify": "real missing-command regression completes in under 1s; provisioned sidecar suites remain green",
+      "evidence": [
+        "src/experiment/python.ts",
+        "tests/sidecar-env.test.ts",
+        "full-suite Wave 0 run 2026-08-31: repeated sidecar timeouts with uv absent"
       ]
     },
     {
@@ -781,6 +797,102 @@
       ]
     },
     {
+      "id": "FA-W0-01",
+      "domain": "correctness",
+      "title": "Unicode/CJK evidence-alignment tokenization",
+      "status": "PASS",
+      "priority": "P0",
+      "owner": "self",
+      "gap": "CLOSED on Wave 0 lane: deterministic NFKC tokenizer handles Han/Hiragana/Katakana/Hangul without ICU-dependent segmentation; Chinese punctuation drift and one-character transcription-error regressions pass while unrelated Chinese remains unaligned.",
+      "target": "pure-CJK claims can reach exact/fuzzy alignment under the same deterministic evidence thresholds as Latin text",
+      "verify": "npm test -- --run tests/pipeline-evidence.test.ts",
+      "evidence": [
+        "src/pipeline/stages/align.ts",
+        "tests/pipeline-evidence.test.ts"
+      ]
+    },
+    {
+      "id": "FA-W0-02",
+      "domain": "agent",
+      "title": "Agent handoff, action-deduplication, child-budget, and MCP-reconnect hardening",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "owner": "self",
+      "gap": "Implemented and targeted-tested on the Wave 0 lane: closed handoff schema + quality gate + fact-only degradation, durable successful-effect deduplication, deterministic child budget split, bounded retryable-only MCP reconnect. Remaining before PASS: integrate the sibling conversation-stream AbortSignal/onOutput changes and run the full clean-lane gate.",
+      "target": "all five hardenings coexist with streaming/resume behavior and pass full verification",
+      "verify": "targeted agent/MCP suites, then npm run verify after sibling-lane integration",
+      "evidence": [
+        "tests/agent-compaction.test.ts",
+        "tests/agent-loop.test.ts",
+        "tests/agent-longhorizon.test.ts",
+        "tests/agent-rollout.test.ts",
+        "tests/agent-subagents.test.ts",
+        "tests/mcp-manager.test.ts"
+      ]
+    },
+    {
+      "id": "FA-W0-03",
+      "domain": "product",
+      "title": "Research-scope three-form semantic convergence",
+      "status": "FAIL",
+      "priority": "P0",
+      "owner": "self",
+      "gap": "Repository inspection still finds three independent scope editing surfaces/state shapes. No convergence implementation or migration proof exists yet.",
+      "target": "one canonical scope model and accordion editing surface shared by create/review/study-map flows",
+      "verify": "component/state inventory + focused UI tests + production-path browser smoke",
+      "evidence": [
+        "web/src/lab/NewResearch.tsx",
+        "web/src/lab/ScopeReview.tsx",
+        "web/src/lab/StudyMap.tsx"
+      ]
+    },
+    {
+      "id": "FA-W0-04",
+      "domain": "security",
+      "title": "Repository hygiene and plaintext-secret sweep",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "owner": "self",
+      "gap": "Existing secret/path hygiene checks exist, but the Wave 0 full tracked-file hygiene pass and resulting finding disposition have not completed.",
+      "target": "tracked repository passes deterministic secret/path hygiene with every finding fixed or explicitly recorded",
+      "verify": "node zcode-harness/scripts/secret-scan.mjs && node zcode-harness/scripts/path-hygiene.mjs",
+      "evidence": [
+        "zcode-harness/scripts/secret-scan.mjs",
+        "zcode-harness/scripts/path-hygiene.mjs"
+      ]
+    },
+    {
+      "id": "FA-W0-05",
+      "domain": "governance",
+      "title": "Five-table full-file sweep ledger with FA-first finding control",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "owner": "self",
+      "gap": "Deterministic five-table inventory, disjoint/full coverage validation, FA backfill, atomic updates, and honest red completion gate are implemented and tested. The actual file review ledger remains incomplete, so completion is intentionally red.",
+      "target": "100% tracked-file adjudication with no open finding and every finding linked to FINAL_ACCEPTANCE before repair",
+      "verify": "npm run endgame:sweep:sync && npm run endgame:sweep:complete",
+      "evidence": [
+        "zcode-harness/scripts/endgame-sweep.mjs",
+        "tests/endgame-sweep.test.ts",
+        ".control/SWEEP-LOG.json"
+      ]
+    },
+    {
+      "id": "FA-W0-06",
+      "domain": "evaluation",
+      "title": "Whole-repository shallow-assertion adjudication",
+      "status": "PARTIAL",
+      "priority": "P1",
+      "owner": "self",
+      "gap": "The staged-tree inventory currently identifies 165 shallow-assertion candidates. One scanner-fixture string is explicitly justified; 164/165 remain pending and no candidate is silently treated as fixed.",
+      "target": "every live candidate strengthened or justified with rationale/evidence; removed assertions retained as retired history",
+      "verify": "npm run endgame:sweep:status && npm run endgame:sweep:complete",
+      "evidence": [
+        ".control/SWEEP-LOG.json",
+        "tests/endgame-sweep.test.ts"
+      ]
+    },
+    {
       "id": "FA-X-01",
       "domain": "external",
       "title": "B-QWEN live route credential (ACC-02)",
@@ -811,6 +923,6 @@
   ],
   "stopConditions": {
     "note": "Mission stop requires ALL of: no internal FAIL/PARTIAL; canonical clean-clone CI green; science north-star met or externally justified; real evidence across all planes; 24h→72h soak+chaos; win/mac/linux matrix; sandbox attack suite; production-path-only flows; clean-machine bundle verify; honest BLOCKED_EXTERNAL only; docs==commit; final red-team audit no new P0/P1.",
-    "currentVerdict": "NOT READY — 14 FAIL, 30 PARTIAL, 10 PASS, 2 BLOCKED_EXTERNAL (56 tracked). Batch-2 closed: restore drill, backend capacity gate, cancel-timing pin, sweep tests, numpy pin, probe fingerprint, verify vacuous marking, ODE comment honesty, held-out set sealed. Open frontier: science metrics (rediscovery/judge/relation + held-out execution), 72h soak, streaming data plane, OS-level sandbox, windows CI matrix, release chain, user-study execution, sibling-lane items (web-e2e CLS, per-tool deadline, fence crypto-random)."
+    "currentVerdict": "NOT READY — 15 FAIL, 34 PARTIAL, 12 PASS, 2 BLOCKED_EXTERNAL (63 tracked). Wave 0 truth is explicit: CJK alignment and immediate sidecar spawn-failure handling are tested; Agent hardening awaits sibling streaming integration/full gate; scope convergence, full hygiene, sweep coverage, and 164 shallow-assertion adjudications remain open. Earlier frontier remains unchanged."
   }
 }

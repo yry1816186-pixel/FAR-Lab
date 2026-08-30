@@ -53,6 +53,50 @@ describe('session rollout (Codex JSONL format, TS port)', () => {
     expect(rec.openTurn).toBeUndefined();
   });
 
+  it('persists the compaction keep-window in its baseline, including action hashes', () => {
+    const actionHash = 'a'.repeat(64);
+    const kept = {
+      kind: 'tool_result' as const,
+      turn: 2,
+      tool: 'write_note',
+      ok: true,
+      payload: { saved: true },
+      actionHash,
+    };
+    const rec = reconstructSession([
+      { type: 'session_meta', at: 't0', sessionId: 'ags_k0000000000000000000000aaaa', capability: 'c', purpose: 'p', task: 'objective', maxTurns: 8 },
+      { type: 'transcript_item', at: 't1', entry: { kind: 'task', text: 'objective' } },
+      { type: 'compacted', at: 't2', summary: 'handoff with durable keep window', keptEntries: [kept] },
+    ]);
+    expect(rec.transcript).toEqual([
+      { kind: 'task', text: 'objective' },
+      { kind: 'handoff', summary: 'handoff with durable keep window' },
+      kept,
+    ]);
+  });
+
+  it('retains committed effects outside the compacted model transcript', () => {
+    const committed = {
+      kind: 'tool_result' as const,
+      turn: 1,
+      tool: 'write_note',
+      ok: true,
+      payload: { saved: true },
+      actionHash: 'b'.repeat(64),
+    };
+    const rec = reconstructSession([
+      { type: 'session_meta', at: 't0', sessionId: 'ags_e0000000000000000000000aaaa', capability: 'c', purpose: 'p', task: 'objective', maxTurns: 8 },
+      { type: 'transcript_item', at: 't1', entry: { kind: 'task', text: 'objective' } },
+      { type: 'effect_committed', at: 't2', entry: committed },
+      { type: 'compacted', at: 't3', summary: 'effect completed; continue with verification' },
+    ]);
+    expect(rec.transcript).toEqual([
+      { kind: 'task', text: 'objective' },
+      { kind: 'handoff', summary: 'effect completed; continue with verification' },
+    ]);
+    expect(rec.committedEffects).toEqual([committed]);
+  });
+
   it('classifies an interrupted turn: started-without-finished = outcome unknown; no marker = not started', () => {
     const meta = { type: 'session_meta', at: 't0', sessionId: 'ags_y0000000000000000000000aaaa', capability: 'c', purpose: 'p', task: 'objective', maxTurns: 8 } as const;
     const action = { kind: 'action', turn: 2, action: 'use_tool' as const, tool: 'search', reason: 'r' };

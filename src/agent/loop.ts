@@ -4,6 +4,7 @@ import { validateStructured, recordModelReceipt, describeShape, withModelSlot } 
 import type { RunBudgetView } from '../app/run-budget.js';
 import type { ModelProvider, ArtifactStore, StructuredOutputEvent } from '../shared/ports.js';
 import { collectEnvSecrets, describeViolation, makeSessionCanary, redactOutbound, scanOutbound } from '../shared/exfil-guard.js';
+import { canonicalSha256 } from '../shared/crypto.js';
 import type { AgentTurnRecord } from '../domain/agent.js';
 import { AgentActionSchema, type AgentAction, type AgentEventSink, type ReceiptSink, type TranscriptEntry } from './protocol.js';
 import type { RolloutWriter, InterruptedTurnDisposition } from './rollout.js';
@@ -12,7 +13,18 @@ import type { ExtensionBus } from './hooks.js';
 import type { PermissionEngine } from './permissions.js';
 import type { SessionTelemetry } from './telemetry.js';
 import { defaultBudget, type TokenBudget } from './budget.js';
-import { microcompact, compactedTranscript, transcriptTokens, transcriptTokensBySource, HANDOFF_PROMPT } from './compaction.js';
+import {
+  compactedTranscript,
+  deterministicHandoffFallback,
+  handoffQualityIssues,
+  HANDOFF_PROMPT,
+  HandoffDraftSchema,
+  microcompact,
+  renderHandoff,
+  transcriptTokens,
+  transcriptTokensBySource,
+  type HandoffDraft,
+} from './compaction.js';
 import type { ReasoningStyle, ReasoningGear } from '../domain/model-config.js';
 
 /**
@@ -76,7 +88,12 @@ export interface AgentLoopConfig {
    * resume.priorTurns continues turn numbering within the SAME maxTurns budget.
    */
   initialTranscript?: TranscriptEntry[];
-  resume?: { priorTurns: number; openTurn?: { turn: number; tool: string; disposition: InterruptedTurnDisposition } };
+  resume?: {
+    priorTurns: number;
+    openTurn?: { turn: number; tool: string; disposition: InterruptedTurnDisposition };
+    /** Successful effect ledger reconstructed from the durable rollout. */
+    committedEffects?: Array<Extract<TranscriptEntry, { kind: 'tool_result' }>>;
+  };
 }
 
 /** Read-only facts about the session a stop condition may predicate on. */
@@ -207,6 +224,19 @@ export async function runAgentLoop(cfg: AgentLoopConfig, deps: AgentLoopDeps): P
     });
   }
 
+  type CachedEffectfulAction = Extract<TranscriptEntry, { kind: 'tool_result' }>;
+  const completedEffectfulActions = new Map<string, CachedEffectfulAction>();
+  for (const entry of [...(cfg.resume?.committedEffects ?? []), ...transcript]) {
+    if (
+      entry.kind === 'tool_result'
+      && entry.ok
+      && entry.actionHash !== undefined
+      && !completedEffectfulActions.has(entry.actionHash)
+    ) {
+      completedEffectfulActions.set(entry.actionHash, entry);
+    }
+  }
+
   const finish = (status: AgentLoopStatus, extra: Partial<AgentLoopResult>): AgentLoopResult => {
     rl().append({ type: 'session_end', at: at(), status });
     deps.emit({ type: 'session_finished', sessionId: deps.sessionId, status, turns: turns.length, at: at() });
@@ -261,29 +291,60 @@ export async function runAgentLoop(cfg: AgentLoopConfig, deps: AgentLoopDeps): P
       const micro = microcompact(transcript, deps.tools, keepLast);
       const afterMicro = transcriptTokens(micro);
       if (afterMicro > budget.transcriptHard) {
-        const summary = await handoffSummary(deps, transcript, cfg.task, cfg.signal);
+        const handoff = await handoffSummary(deps, transcript, cfg.task, cfg.signal);
+        const summary = handoff.summary;
         const compacted = compactedTranscript(micro, cfg.task, summary, keepLast);
         transcript.length = 0;
         transcript.push(...compacted);
-        rl().append({ type: 'compacted', at: at(), summary });
-        deps.telemetry.recordCompaction();
-        // The handoff model call really happened (receipted) — its event is emitted
-        // even when degradation follows; layers tell the full story.
-        deps.emit({ type: 'compaction', sessionId: deps.sessionId, layer: 'full', tokensBefore, tokensAfter: transcriptTokens(transcript), bySourceAfter: transcriptTokensBySource(transcript), at: at() });
         let after = transcriptTokens(transcript);
-        // Degradation chain (Codex skip-summary fallback): if even the handoff baseline
-        // exceeds the hard limit, DROP oldest tool results entirely rather than overflow.
+        let budgetDegraded = false;
+        // If the handoff baseline still exceeds the hard limit, its summary already
+        // owns the old context. Drop preserved suffix entries in order, then use a
+        // short explicit emergency handoff. Never claim compaction while remaining
+        // above the declared hard budget.
         if (after > budget.transcriptHard) {
-          while (transcriptTokens(transcript) > budget.transcriptHard) {
-            const idx = transcript.findIndex((e) => e.kind === 'tool_result');
-            if (idx < 0) break;
-            transcript.splice(idx, 1);
+          budgetDegraded = true;
+          while (transcript.length > 2 && transcriptTokens(transcript) > budget.transcriptHard) {
+            transcript.splice(2, 1);
           }
           after = transcriptTokens(transcript);
-          deps.telemetry.recordCompaction();
+          if (after > budget.transcriptHard) {
+            const handoffIndex = transcript.findIndex((entry) => entry.kind === 'handoff');
+            if (handoffIndex >= 0) {
+              transcript[handoffIndex] = {
+                kind: 'handoff',
+                summary: 'Hard context limit forced omission of handoff detail. Inspect the durable rollout before assuming earlier work is complete.',
+              };
+            }
+            after = transcriptTokens(transcript);
+          }
+          if (after > budget.transcriptHard) {
+            const handoffIndex = transcript.findIndex((entry) => entry.kind === 'handoff');
+            if (handoffIndex >= 0) transcript.splice(handoffIndex, 1);
+            after = transcriptTokens(transcript);
+          }
+        }
+        const unrecoverableHardOverflow = after > budget.transcriptHard;
+        const finalHandoff = transcript.find((entry) => entry.kind === 'handoff');
+        rl().append({
+          type: 'compacted',
+          at: at(),
+          summary: finalHandoff?.kind === 'handoff' ? finalHandoff.summary : '',
+          keptEntries: transcript.slice(finalHandoff === undefined ? 1 : 2),
+        });
+        deps.telemetry.recordCompaction();
+        if (handoff.modelCallCompleted) {
+          deps.emit({ type: 'compaction', sessionId: deps.sessionId, layer: 'full', tokensBefore, tokensAfter: after, bySourceAfter: transcriptTokensBySource(transcript), at: at() });
+        }
+        if (handoff.degraded || budgetDegraded) {
           deps.emit({ type: 'compaction', sessionId: deps.sessionId, layer: 'degrade', tokensBefore, tokensAfter: after, bySourceAfter: transcriptTokensBySource(transcript), at: at() });
         }
-        pushTurn({ turn, action: 'compaction', reason: 'full handoff' });
+        pushTurn({ turn, action: 'compaction', reason: handoff.degraded ? `deterministic handoff fallback: ${handoff.reason}` : 'full handoff' });
+        if (unrecoverableHardOverflow) {
+          return finish('failed', {
+            error: `task context alone exceeds transcriptHard (${after} > ${budget.transcriptHard}); shorten the task or raise the explicit context budget`,
+          });
+        }
       } else if (afterMicro < tokensBefore) {
         transcript.length = 0;
         transcript.push(...micro);
@@ -455,6 +516,69 @@ export async function runAgentLoop(cfg: AgentLoopConfig, deps: AgentLoopDeps): P
     consecutiveInvalid = 0;
 
     if (abortRequested()) return finish('aborted', { error: 'aborted by caller' });
+
+    let actionHash: string;
+    try {
+      actionHash = canonicalSha256({
+        tool: action.tool,
+        source: tool.source ?? 'builtin',
+        version: tool.version ?? null,
+        riskClass: tool.riskClass ?? 'execute',
+        args: validated.value,
+      });
+    } catch (e) {
+      consecutiveInvalid += 1;
+      const message = `validated tool action is not canonically hashable: ${e instanceof Error ? e.message : String(e)}`;
+      pushEntry({ kind: 'tool_result', turn, tool: action.tool, ok: false, payload: { validationError: message } });
+      pushTurn({ turn, action: 'invalid_action', tool: action.tool, ok: false, reason: message });
+      if (consecutiveInvalid >= maxConsecutiveInvalid) return finish('failed', { error: `${consecutiveInvalid} consecutive invalid actions` });
+      continue;
+    }
+
+    // Effectful duplicates are suppressed only after a prior SUCCESS. Read tools
+    // remain repeatable because polling/freshness can be their intended behavior;
+    // failed effects remain retryable. The cached result is replayed verbatim so the
+    // model does not lose the information it already obtained.
+    const effectful = (tool.riskClass ?? 'execute') !== 'read';
+    const prior = effectful ? completedEffectfulActions.get(actionHash) : undefined;
+    if (prior !== undefined) {
+      pushEntry({
+        kind: 'tool_result',
+        turn,
+        tool: action.tool,
+        ok: true,
+        payload: prior.payload,
+        actionHash,
+        deduplicatedFromTurn: prior.turn,
+        ...(prior.truncated === true ? { truncated: true } : {}),
+        ...(prior.spilledTo !== undefined ? { spilledTo: prior.spilledTo } : {}),
+        ...(prior.untrusted === true ? { untrusted: true } : {}),
+      });
+      pushTurn({
+        turn,
+        action: 'use_tool',
+        tool: action.tool,
+        ok: true,
+        reason: `deduplicated effectful action ${actionHash.slice(0, 12)}; replayed successful turn ${prior.turn}`,
+        latencyMs: 0,
+      });
+      deps.emit({
+        type: 'tool_used',
+        sessionId: deps.sessionId,
+        turn,
+        tool: action.tool,
+        ok: true,
+        durationMs: 0,
+        actionHash,
+        deduplicatedFromTurn: prior.turn,
+        summary: `deduplicated; replayed turn ${prior.turn}`,
+        at: at(),
+      });
+      await deps.hooks?.turnEnd({ turn, action: 'use_tool', finished: false });
+      continue;
+    }
+
+    if (abortRequested()) return finish('aborted', { error: 'aborted by caller' });
     // Step timeout before tool spend: a turn already over budget must not pay for tools.
     if (stepDeadline !== null && Date.now() >= stepDeadline) {
       pushEntry({ kind: 'tool_result', turn, tool: action.tool, ok: false, payload: { skipped: true, reason: 'step timeout' } });
@@ -496,16 +620,23 @@ export async function runAgentLoop(cfg: AgentLoopConfig, deps: AgentLoopDeps): P
       }
     }
 
-    pushEntry({
+    const resultEntry: CachedEffectfulAction = {
       kind: 'tool_result', turn, tool: action.tool, ok: result.ok, payload,
+      actionHash,
       ...(truncated === true ? { truncated } : {}), ...(spilledTo !== undefined ? { spilledTo } : {}),
       ...(tool.trust === 'external' ? { untrusted: true } : {}),
-    });
+    };
+    pushEntry(resultEntry);
+    if (effectful && result.ok) {
+      completedEffectfulActions.set(actionHash, resultEntry);
+      rl().append({ type: 'effect_committed', at: at(), entry: resultEntry });
+    }
     rl().append({ type: 'tool_lifecycle', at: at(), turn, tool: action.tool, phase: 'finished' });
     deps.telemetry.recordToolCall(result.ok);
     pushTurn({ turn, action: 'use_tool', tool: action.tool, ok: result.ok, reason: result.summary, latencyMs: durationMs });
     deps.emit({
       type: 'tool_used', sessionId: deps.sessionId, turn, tool: action.tool, ok: result.ok, durationMs,
+      actionHash,
       ...(truncated === true ? { truncated } : {}), ...(spilledTo !== undefined ? { spilledTo } : {}),
       ...(result.summary !== undefined ? { summary: result.summary } : {}), at: at(),
     });
@@ -551,35 +682,74 @@ export const argsEmbedUntrusted = (args: unknown, transcript: readonly Transcrip
   return false;
 };
 
-/** Full handoff compaction: one structured LLM call (receipted); failure is fail-closed. */
+interface HandoffOutcome {
+  summary: string;
+  degraded: boolean;
+  modelCallCompleted: boolean;
+  reason?: string;
+}
+
+/**
+ * Full handoff compaction: one receipted structured call behind a deterministic
+ * quality gate. Provider/schema/quality failure degrades to a fact-only local
+ * handoff instead of crashing a long-running session.
+ */
 const handoffSummary = async (
   deps: AgentLoopDeps,
   transcript: readonly TranscriptEntry[],
   task: string,
   signal?: AbortSignal,
-): Promise<string> => {
-  const schema = z.object({ summary: z.string().min(1).max(8000) });
+): Promise<HandoffOutcome> => {
   // No budget GATE here (deliberate): compaction is what lets the session CONTINUE
   // under its context budget — gating it would deadlock an over-soft-limit session.
   // The call is still receipted and SPENDS from the run budget (honest accounting).
-  const res = await withModelSlot(() => deps.provider.structuredCall(
-    {
-      task: `${deps.purpose}:compact`,
-      systemPrompt: HANDOFF_PROMPT,
-      userPayload: { task, transcript },
-      outputKind: 'json',
-      maxTokens: 2048,
-      ...(signal !== undefined ? { signal } : {}),
-      purpose: `${deps.purpose}:compact`,
-    },
-    (raw) => validateStructured<{ summary: string }>(raw, schema),
-  ));
+  let res: Awaited<ReturnType<ModelProvider['structuredCall']>>;
+  try {
+    res = await withModelSlot(() => deps.provider.structuredCall(
+      {
+        task: `${deps.purpose}:compact`,
+        systemPrompt: HANDOFF_PROMPT,
+        userPayload: { task, transcript },
+        outputKind: 'json',
+        maxTokens: 2048,
+        jsonSchema: strictSchemaOrUndefined(HandoffDraftSchema),
+        ...(signal !== undefined ? { signal } : {}),
+        purpose: `${deps.purpose}:compact`,
+      },
+      (raw) => validateStructured<HandoffDraft>(raw, HandoffDraftSchema),
+    ));
+  } catch (e) {
+    const reason = `handoff provider threw: ${e instanceof Error ? e.message : String(e)}`;
+    return {
+      summary: deterministicHandoffFallback(transcript, task, reason),
+      degraded: true,
+      modelCallCompleted: false,
+      reason,
+    };
+  }
   recordModelReceipt(deps.recordReceipt, { stage: deps.purpose }, res);
   deps.budget?.spend(res.receipt.usage.totalTokens);
   deps.telemetry.recordModelCall(res.receipt.usage);
   if (!res.ok || res.data === undefined) {
     const err = res.error ?? { kind: 'provider_error' as const, message: 'unknown provider failure' };
-    throw new Error(`handoff compaction model call failed (${err.kind}): ${err.message}`);
+    const reason = `handoff model call failed (${err.kind}): ${err.message}`;
+    return {
+      summary: deterministicHandoffFallback(transcript, task, reason),
+      degraded: true,
+      modelCallCompleted: true,
+      reason,
+    };
   }
-  return res.data.summary;
+  const draft = res.data as HandoffDraft;
+  const issues = handoffQualityIssues(draft, transcript);
+  if (issues.length > 0) {
+    const reason = `handoff quality gate rejected output: ${issues.join('; ')}`;
+    return {
+      summary: deterministicHandoffFallback(transcript, task, reason),
+      degraded: true,
+      modelCallCompleted: true,
+      reason,
+    };
+  }
+  return { summary: renderHandoff(draft), degraded: false, modelCallCompleted: true };
 };

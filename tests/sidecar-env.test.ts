@@ -7,6 +7,22 @@ import { describe, it, expect } from 'vitest';
  * pin the allowlist contract AND prove the real sidecar still boots under it.
  */
 describe('sidecar env minimization (endgame audit)', () => {
+  it('rejects a missing sidecar launcher immediately instead of waiting for the call timeout', async () => {
+    const { createSidecar } = await import('../src/experiment/python.js');
+    const sidecar = createSidecar({ command: [`far-missing-sidecar-${process.pid}`] });
+    const started = Date.now();
+    try {
+      await expect(sidecar.warmup(30_000)).rejects.toThrow(/sidecar spawn failed|ENOENT/i);
+      expect(Date.now() - started).toBeLessThan(1_000);
+      expect(sidecar.logs().join('\n')).toMatch(/sidecar spawn failed|ENOENT/i);
+      const retryStarted = Date.now();
+      await expect(sidecar.warmup(30_000)).rejects.toThrow(/sidecar spawn failed|ENOENT/i);
+      expect(Date.now() - retryStarted).toBeLessThan(100);
+    } finally {
+      sidecar.close();
+    }
+  });
+
   it('forwards only the allowlisted plumbing variables — provider keys are dropped', async () => {
     const { buildSidecarEnv } = await import('../src/experiment/python.js');
     const prevZai = process.env.ZAI_API_KEY;

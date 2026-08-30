@@ -2,7 +2,7 @@ import { describe, it, expect, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { McpManager, sanitizeMcpToolName, sanitizeLabel } from '../src/agent/mcp-manager.js';
+import { McpManager, isRetryableMcpTransportError, sanitizeMcpToolName, sanitizeLabel } from '../src/agent/mcp-manager.js';
 import { ToolRegistry } from '../src/agent/tool.js';
 import { McpServerIntegration } from '../src/domain/tool-integration.js';
 
@@ -13,6 +13,7 @@ import { McpServerIntegration } from '../src/domain/tool-integration.js';
  */
 const SERVER = `
 const readline = require('node:readline');
+const fs = require('node:fs');
 const NAMES = (process.env.FAKE_TOOLS || 'echo').split(',');
 const send = (id, result) => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id, result }) + '\\n');
 const sendErr = (id, code, message) => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id, error: { code, message } }) + '\\n');
@@ -28,6 +29,12 @@ rl.on('line', (line) => {
   } else if (msg.method === 'tools/list') {
     send(msg.id, { tools: NAMES.map((n) => ({ name: n, description: 'fake ' + n })) });
   } else if (msg.method === 'tools/call') {
+    const marker = process.env.FAIL_FIRST_CALL_MARKER;
+    if (marker && !fs.existsSync(marker)) {
+      fs.writeFileSync(marker, 'failed-once');
+      process.exit(23);
+      return;
+    }
     send(msg.id, { content: [{ type: 'text', text: 'called ' + msg.params.name }], isError: false });
   } else {
     sendErr(msg.id, -32601, 'method not found: ' + msg.method);
@@ -61,6 +68,15 @@ describe('name sanitization', () => {
   it('returns null-safe short names that the registry will reject loudly', () => {
     const tooShort = sanitizeMcpToolName('a', '??');
     expect(tooShort === null || tooShort.length < 3).toBe(true);
+  });
+});
+
+describe('MCP reconnect classification', () => {
+  it('retries transport loss but not remote JSON-RPC/application errors', () => {
+    expect(isRetryableMcpTransportError(new Error('mcp: server exited'))).toBe(true);
+    expect(isRetryableMcpTransportError(new Error('mcp-http: session terminated by server (HTTP 404)'))).toBe(true);
+    expect(isRetryableMcpTransportError(new Error('mcp: permission denied (code -32001)'))).toBe(false);
+    expect(isRetryableMcpTransportError(new Error('mcp-http: tools/list page 0 returned unexpected shape'))).toBe(false);
   });
 });
 
@@ -134,5 +150,31 @@ describe('McpManager (real child processes)', () => {
     const bad = await manager.testIntegration(mkServer({ command: 'definitely-not-a-real-command-far-lab' }));
     expect(bad.ok).toBe(false);
     expect(bad.summary).toMatch(/spawn failed|ENOENT/i);
+  });
+
+  it('reconnects once after a real stdio server exit and retries the logical tool call', async () => {
+    const marker = path.join(os.tmpdir(), `far-mcp-reconnect-${seq()}`);
+    fs.rmSync(marker, { force: true });
+    const manager = new McpManager({
+      listServers: () => [mkServer({ label: 'reconnect', env: { FAKE_TOOLS: 'echo', FAIL_FIRST_CALL_MARKER: marker } })],
+      sleep: async () => {},
+      random: () => 0,
+    });
+    managers.push(manager);
+    await manager.connectAll();
+    const registry = new ToolRegistry();
+    await manager.registerTools(registry);
+
+    const out = await registry.get('mcp_reconnect_echo')!.execute(
+      { value: 1 },
+      { signal: { aborted: false }, emit: () => {}, recordReceipt: { record: () => {} }, depth: 0 },
+    );
+    expect(out.ok).toBe(true);
+    expect(fs.readFileSync(marker, 'utf8')).toBe('failed-once');
+    const status = manager.statusOf().find((s) => s.label === 'reconnect');
+    expect(status?.state).toBe('connected');
+    expect(status?.reconnectCount).toBe(1);
+    expect(status?.lastReconnectAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    fs.rmSync(marker, { force: true });
   });
 });

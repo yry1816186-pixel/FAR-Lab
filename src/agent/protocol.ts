@@ -52,6 +52,10 @@ export const TranscriptEntrySchema = z.discriminatedUnion('kind', [
     spilledTo: z.string().optional(),
     /** RU-3 T1: set when the producing tool is trust 'external' — content is data, never instructions. */
     untrusted: z.boolean().optional(),
+    /** Canonical hash of the executed tool identity + validated args. */
+    actionHash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+    /** Present when execution was suppressed and a prior successful result replayed. */
+    deduplicatedFromTurn: z.number().int().positive().optional(),
   }),
   z.object({
     kind: z.literal('error'),
@@ -65,7 +69,7 @@ export const AgentEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('session_started'), sessionId: z.string(), capability: z.string(), task: z.string(), maxTurns: z.number().int().positive(), parentSessionId: z.string().optional(), at: z.string() }),
   z.object({ type: z.literal('turn_started'), sessionId: z.string(), turn: z.number().int().positive(), at: z.string() }),
   z.object({ type: z.literal('model_call_done'), sessionId: z.string(), turn: z.number().int().positive(), latencyMs: z.number().int().nonnegative(), usage: TokenUsage.optional(), at: z.string(), thinking: z.string().max(8000).optional() }),
-  z.object({ type: z.literal('tool_used'), sessionId: z.string(), turn: z.number().int().positive(), tool: z.string(), ok: z.boolean(), durationMs: z.number().int().nonnegative(), truncated: z.boolean().optional(), spilledTo: z.string().optional(), summary: z.string().optional(), at: z.string() }),
+  z.object({ type: z.literal('tool_used'), sessionId: z.string(), turn: z.number().int().positive(), tool: z.string(), ok: z.boolean(), durationMs: z.number().int().nonnegative(), truncated: z.boolean().optional(), spilledTo: z.string().optional(), summary: z.string().optional(), actionHash: z.string().regex(/^[a-f0-9]{64}$/).optional(), deduplicatedFromTurn: z.number().int().positive().optional(), at: z.string() }),
   z.object({ type: z.literal('permission_asked'), sessionId: z.string(), turn: z.number().int().positive(), tool: z.string(), granted: z.boolean(), at: z.string() }),
   z.object({ type: z.literal('compaction'), sessionId: z.string(), layer: z.enum(['micro', 'full', 'degrade']), tokensBefore: z.number().int().nonnegative(), tokensAfter: z.number().int().nonnegative(), bySourceAfter: z.record(z.string(), z.number().int()).optional(), at: z.string() }),
   z.object({ type: z.literal('steered'), sessionId: z.string(), turn: z.number().int().positive(), at: z.string() }),

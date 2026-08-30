@@ -212,6 +212,7 @@ describe('checkQuoteAlignment (deterministic gate)', () => {
       'it\'s a "test"-string with spaces',
     );
     expect(normalizeForAlignment('  Mixed\u00A0CASE   text  ')).toBe('mixed case text');
+    expect(normalizeForAlignment('ＦＡＲ－Lab １２％')).toBe('far-lab 12%');
   });
 
   it('verbatim: normalized substring of the abstract passes', () => {
@@ -243,6 +244,39 @@ describe('checkQuoteAlignment (deterministic gate)', () => {
     const r = checkQuoteAlignment(quote, abstract);
     expect(r.jaccard).toBeCloseTo(0.8, 12);
     expect(r.verdict).toBe('fuzzy');
+  });
+
+  it('CJK: a pure-Chinese near-verbatim quote survives punctuation drift', () => {
+    const abstract =
+      '在三季田间试验中，编辑株系的平均产量比对照高百分之十二。效应随基因型和季节变化。';
+    const quote = '在三季田间试验中编辑株系的平均产量比对照高百分之十二';
+    const r = checkQuoteAlignment(quote, abstract);
+    expect(normalizeForAlignment(abstract).includes(normalizeForAlignment(quote))).toBe(false);
+    expect(r).toEqual({ verdict: 'fuzzy', jaccard: 1 });
+  });
+
+  it('CJK: a one-character transcription error can clear the near-verbatim bar', () => {
+    const abstract = '长期随访显示治疗组的复发风险显著低于对照组且未发现严重不良反应';
+    const quote = '长期随访显示治疗组的复发风险明显低于对照组且未发现严重不良反应';
+    const r = checkQuoteAlignment(quote, abstract);
+    expect(r.verdict).toBe('fuzzy');
+    expect(r.jaccard).toBeGreaterThanOrEqual(ALIGNMENT_JACCARD_THRESHOLD);
+    expect(r.jaccard).toBeLessThan(1);
+  });
+
+  it('CJK: an unrelated pure-Chinese claim still fails closed', () => {
+    const abstract = '在三季田间试验中，编辑株系的平均产量比对照高百分之十二。';
+    const r = checkQuoteAlignment('该药物显著降低肺癌患者的五年死亡率', abstract);
+    expect(r.verdict).toBe('unaligned');
+    expect(r.jaccard).toBeLessThan(ALIGNMENT_JACCARD_THRESHOLD);
+  });
+
+  it('CJK: reordering the same characters does not masquerade as near-verbatim', () => {
+    const abstract = '治疗组长期随访显示复发风险显著下降';
+    const reordered = [...abstract].reverse().join('');
+    const r = checkQuoteAlignment(reordered, abstract);
+    expect(r.verdict).toBe('unaligned');
+    expect(r.jaccard).toBeLessThan(ALIGNMENT_JACCARD_THRESHOLD);
   });
 
   it('unaligned: a real paraphrase fails well below the bar', () => {

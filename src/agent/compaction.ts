@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type { ToolRegistry } from './tool.js';
 import { estimateTokens } from './budget.js';
 import type { TranscriptEntry } from './protocol.js';
@@ -78,6 +79,75 @@ export const compactedTranscript = (
   ...entries.slice(-keepLast),
 ];
 
+/** Closed successor-facing handoff shape; arrays are explicit even when empty. */
+export const HandoffDraftSchema = z.object({
+  objective: z.string().min(8).max(2_000),
+  completed: z.array(z.string().min(4).max(1_000)).min(1).max(20),
+  decisions: z.array(z.string().min(4).max(1_000)).max(20),
+  remaining: z.array(z.string().min(4).max(1_000)).min(1).max(20),
+  references: z.array(z.string().min(2).max(500)).max(30),
+}).strict();
+export type HandoffDraft = z.infer<typeof HandoffDraftSchema>;
+
+const stableReferences = (value: unknown): string[] => {
+  let text: string;
+  try {
+    text = JSON.stringify(value) ?? '';
+  } catch {
+    text = String(value);
+  }
+  const matches = text.match(/\b(?:run|hyp|clm|src|bnd|ags|rcp|exp|corp|q)_[a-z0-9]{6,}\b|sha256:[a-f0-9]{16,}|\b10\.\d{4,9}\/[-._;()/:a-z0-9]+/gi) ?? [];
+  return [...new Set(matches)].slice(0, 30);
+};
+
+export const renderHandoff = (draft: HandoffDraft): string => [
+  `Objective\n${draft.objective}`,
+  `Completed\n${draft.completed.map((line) => `- ${line}`).join('\n')}`,
+  `Decisions\n${draft.decisions.length > 0 ? draft.decisions.map((line) => `- ${line}`).join('\n') : '- No explicit decision recorded.'}`,
+  `Remaining\n${draft.remaining.map((line) => `- ${line}`).join('\n')}`,
+  `References\n${draft.references.length > 0 ? draft.references.map((line) => `- ${line}`).join('\n') : '- No stable identifier recorded.'}`,
+].join('\n\n');
+
+/** Deterministic quality checks beyond structural schema validation. */
+export const handoffQualityIssues = (
+  draft: HandoffDraft,
+  transcript: readonly TranscriptEntry[],
+): string[] => {
+  const issues: string[] = [];
+  const rendered = renderHandoff(draft);
+  if (rendered.length < 120) issues.push(`handoff too short (${rendered.length} chars; minimum 120)`);
+  const refs = stableReferences(transcript);
+  if (refs.length > 0 && !refs.some((ref) => rendered.includes(ref))) {
+    issues.push(`handoff dropped all ${refs.length} stable identifier(s)`);
+  }
+  return issues;
+};
+
+/**
+ * Zero-model emergency handoff used only when the structured summarizer fails its
+ * call or quality gate. It reports transcript facts, never infers scientific work.
+ */
+export const deterministicHandoffFallback = (
+  transcript: readonly TranscriptEntry[],
+  task: string,
+  failure: string,
+): string => {
+  const actions = transcript.filter((entry) => entry.kind === 'action');
+  const results = transcript.filter((entry) => entry.kind === 'tool_result');
+  const successful = results.filter((entry) => entry.ok).length;
+  const refs = stableReferences([task, transcript]);
+  return renderHandoff({
+    objective: task.length >= 8 ? task.slice(0, 2_000) : `Continue task: ${task}`,
+    completed: [
+      `Transcript contains ${actions.length} recorded action(s) and ${results.length} tool result(s); ${successful} tool result(s) succeeded.`,
+      `Semantic summarization was unavailable: ${failure.slice(0, 500)}. Recent transcript entries are preserved verbatim below this handoff.`,
+    ],
+    decisions: [],
+    remaining: ['Continue from the preserved recent transcript and re-check earlier work before treating any item as complete.'],
+    references: refs,
+  });
+};
+
 /**
  * Prompt for the handoff summarizer — structure ported from openai/codex
  * prompts/templates/compact/{prompt.md, summary_prefix.md} (Apache-2.0): a
@@ -88,4 +158,6 @@ export const HANDOFF_PROMPT = `Another AI agent already worked on this task for 
 2. Decisions made and their reasons.
 3. Remaining work and open questions.
 4. Key data references (ids, query texts, source titles) the successor will need.
-Do not redo work already described. Be concise and structured. Never invent facts absent from the transcript. Reply as {"summary": "<handoff text>"}.`;
+Do not redo work already described. Be concise and structured. Never invent facts absent from the transcript. Preserve at least one stable id/DOI/hash when the transcript contains one. Reply as exactly:
+{"objective":"...","completed":["..."],"decisions":["..."],"remaining":["..."],"references":["..."]}
+Use an empty decisions/references array only when the transcript truly contains none; completed and remaining must each contain at least one concrete entry.`;

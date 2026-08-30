@@ -19,6 +19,10 @@
     "far": "node dist/cli/main.js",
     "serve": "node scripts/serve.mjs",
     "fetch:asr-model": "node scripts/fetch-asr-model.mjs",
+    "endgame:sweep:sync": "node zcode-harness/scripts/endgame-sweep.mjs sync",
+    "endgame:sweep:status": "node zcode-harness/scripts/endgame-sweep.mjs status",
+    "endgame:sweep:check": "node zcode-harness/scripts/endgame-sweep.mjs check",
+    "endgame:sweep:complete": "node zcode-harness/scripts/endgame-sweep.mjs check --require-complete",
     "lint": "eslint ."
   },
   "dependencies": {

@@ -334,6 +334,7 @@ export const runEvidenceGapRefinement = async (deps: RefineDeps, runId: string, 
       priorTurns: number;
       priorTurnRecords: AgentTurnRecord[];
       startedAt: string;
+      committedEffects: Array<Extract<TranscriptEntry, { kind: 'tool_result' }>>;
       openTurn?: { turn: number; tool: string; disposition: InterruptedTurnDisposition };
     } | undefined;
     if (opts.resumeSessionId !== undefined) {
@@ -348,6 +349,7 @@ export const runEvidenceGapRefinement = async (deps: RefineDeps, runId: string, 
         priorTurns: rec.turns.length > 0 ? Math.max(...rec.turns.map((t) => t.turn)) : 0,
         priorTurnRecords: rec.turns,
         startedAt: rec.meta?.at ?? new Date().toISOString(),
+        committedEffects: rec.committedEffects,
         ...(rec.openTurn !== undefined ? { openTurn: rec.openTurn } : {}),
       };
     }
@@ -416,7 +418,11 @@ export const runEvidenceGapRefinement = async (deps: RefineDeps, runId: string, 
       task: `Refine the evidence base of run ${runId}: for each listed hypothesis, identify concrete evidence gaps and counter-evidence, verify against the run's own claims/relations with read_evidence, cross-check the sub-agent literature findings, and finish with the refinement report contract.`,
       initialTranscript: resumeCtx?.transcript,
       resume: resumeCtx !== undefined
-        ? { priorTurns: resumeCtx.priorTurns, ...(resumeCtx.openTurn !== undefined ? { openTurn: resumeCtx.openTurn } : {}) }
+        ? {
+          priorTurns: resumeCtx.priorTurns,
+          ...(resumeCtx.committedEffects.length > 0 ? { committedEffects: resumeCtx.committedEffects } : {}),
+          ...(resumeCtx.openTurn !== undefined ? { openTurn: resumeCtx.openTurn } : {}),
+        }
         : undefined,
       contextEntries: [
         { label: 'research_question', payload: { text: question.text, background: head(question.background, 400), domain: question.scope.domain, goalType: question.goalType } },

@@ -1,6 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
-import { microcompact, compactedTranscript, transcriptTokens, headTrim } from '../src/agent/compaction.js';
+import {
+  HandoffDraftSchema,
+  compactedTranscript,
+  deterministicHandoffFallback,
+  handoffQualityIssues,
+  headTrim,
+  microcompact,
+  renderHandoff,
+  transcriptTokens,
+} from '../src/agent/compaction.js';
 import { ToolRegistry } from '../src/agent/tool.js';
 import { defaultBudget, estimateTokens } from '../src/agent/budget.js';
 import type { TranscriptEntry } from '../src/agent/protocol.js';
@@ -87,5 +96,37 @@ describe('compaction (layered, by cost)', () => {
     const trimmed = headTrim({ a: 'x'.repeat(1_000) }, 100);
     expect(trimmed.truncated).toBe(true);
     expect(trimmed.originalChars).toBeGreaterThan(1_000);
+  });
+
+  it('handoff schema and quality gate require concrete structure and retain stable ids', () => {
+    const transcript: TranscriptEntry[] = [
+      { kind: 'task', text: 'inspect run_abcdef123456 and finish the audit' },
+      toolResult(1, { runId: 'run_abcdef123456', count: 12 }),
+    ];
+    const draft = HandoffDraftSchema.parse({
+      objective: 'Finish the audit of run_abcdef123456 without repeating completed checks.',
+      completed: ['Inspected the run and recorded 12 returned objects from the tool result.'],
+      decisions: ['Keep the persisted run as the authority for the remaining audit.'],
+      remaining: ['Verify the final evidence pointers and issue the audit verdict.'],
+      references: ['run_abcdef123456'],
+    });
+    expect(handoffQualityIssues(draft, transcript)).toEqual([]);
+    expect(renderHandoff(draft)).toContain('References\n- run_abcdef123456');
+
+    const dropped = { ...draft, references: [], objective: 'Finish the audit without repeating completed checks.' };
+    expect(handoffQualityIssues(dropped, transcript)).toContain('handoff dropped all 1 stable identifier(s)');
+  });
+
+  it('deterministic handoff fallback reports only transcript facts after summarizer failure', () => {
+    const transcript: TranscriptEntry[] = [
+      { kind: 'task', text: 'continue run_abcdef123456' },
+      { kind: 'action', turn: 1, action: 'use_tool', tool: 'search', args: {}, reason: 'inspect' },
+      toolResult(1, { runId: 'run_abcdef123456' }),
+    ];
+    const fallback = deterministicHandoffFallback(transcript, 'continue run_abcdef123456', 'provider unavailable');
+    expect(fallback).toContain('1 recorded action(s) and 1 tool result(s); 1 tool result(s) succeeded');
+    expect(fallback).toContain('provider unavailable');
+    expect(fallback).toContain('run_abcdef123456');
+    expect(fallback).toContain('re-check earlier work before treating any item as complete');
   });
 });

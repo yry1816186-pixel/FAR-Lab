@@ -97,6 +97,29 @@ export const createSidecar = (opts: SidecarOptions = {}) => {
   const pending = new Map<number, { resolve: (r: SidecarCallResult<unknown>) => void; reject: (e: Error) => void; timer: NodeJS.Timeout }>();
   const logLines: string[] = [];
   let env: SidecarEnvInfo | null = null;
+  let terminalError: Error | null = null;
+  let closed = false;
+
+  const failAll = (error: Error): void => {
+    if (terminalError === null) {
+      terminalError = error;
+      logLines.push(error.message);
+    }
+    for (const waiter of pending.values()) {
+      clearTimeout(waiter.timer);
+      waiter.reject(terminalError);
+    }
+    pending.clear();
+  };
+
+  // Spawn failure emits `error` but not reliably `exit`. Treat every terminal
+  // process/pipe signal as the same one-shot lifecycle settlement so pending and
+  // future calls fail immediately instead of waiting for their operation timeout.
+  child.once('error', (error) => failAll(new Error(`sidecar spawn failed: ${error.message}`, { cause: error })));
+  child.once('exit', (code, signal) => failAll(new Error(
+    `sidecar exited (code ${code ?? -1}${signal === null ? '' : `, signal ${signal}`})`,
+  )));
+  child.stdin.once('error', (error) => failAll(new Error(`sidecar stdin failed: ${error.message}`, { cause: error })));
 
   child.stdout.setEncoding('utf8');
   child.stdout.on('data', (chunk: string) => {
@@ -128,11 +151,9 @@ export const createSidecar = (opts: SidecarOptions = {}) => {
   child.stderr.setEncoding('utf8');
   child.stderr.on('data', (c: string) => { logLines.push(c.trimEnd()); });
 
-  const exited = new Promise<number>((resolve) => {
-    child.on('exit', (code) => resolve(code ?? -1));
-  });
-
   const call = async <T>(op: string, payload: unknown, timeoutMs: number): Promise<SidecarCallResult<T>> => {
+    if (terminalError !== null) throw terminalError;
+    if (closed) throw new Error('sidecar closed');
     const id = nextId;
     nextId += 1;
     const waiter = pending.get(id);
@@ -143,14 +164,13 @@ export const createSidecar = (opts: SidecarOptions = {}) => {
         reject(new Error(`sidecar call ${op} timed out after ${timeoutMs}ms`));
       }, timeoutMs);
       pending.set(id, { resolve, reject, timer });
-      exited.then((code) => {
-        if (pending.has(id)) {
-          pending.delete(id);
-          clearTimeout(timer);
-          reject(new Error(`sidecar exited (code ${code}) before answering ${op}`));
-        }
-      });
-      child.stdin.write(`${JSON.stringify({ id, op, payload })}\n`);
+      try {
+        child.stdin.write(`${JSON.stringify({ id, op, payload })}\n`, (error) => {
+          if (error !== null && error !== undefined) failAll(new Error(`sidecar stdin write failed: ${error.message}`, { cause: error }));
+        });
+      } catch (error) {
+        failAll(new Error(`sidecar stdin write failed: ${error instanceof Error ? error.message : String(error)}`, { cause: error }));
+      }
     });
     return result as SidecarCallResult<T>;
   };
@@ -167,11 +187,9 @@ export const createSidecar = (opts: SidecarOptions = {}) => {
       return r.result;
     },
     close: () => {
-      for (const w of pending.values()) {
-        clearTimeout(w.timer);
-        w.reject(new Error('sidecar closed'));
-      }
-      pending.clear();
+      if (closed) return;
+      closed = true;
+      failAll(new Error('sidecar closed'));
       child.stdin.end();
       child.kill();
     },

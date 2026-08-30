@@ -8,6 +8,7 @@ import { ExtensionBus } from '../src/agent/hooks.js';
 import type { AgentEvent, ReceiptSink } from '../src/agent/protocol.js';
 import type { ArtifactStore } from '../src/shared/ports.js';
 import { createTestStubProvider, type StubStep } from '../src/providers/test-stub.js';
+import { canonicalSha256 } from '../src/shared/crypto.js';
 
 const echoTool = (spy?: { calls: unknown[] }): AgentTool => ({
   name: 'echo',
@@ -69,6 +70,75 @@ describe('agent kernel loop', () => {
     expect(types.at(-1)).toBe('session_finished');
     const toolEvent = events.find((e) => e.type === 'tool_used');
     expect(toolEvent && toolEvent.type === 'tool_used' && toolEvent.tool).toBe('echo');
+  });
+
+  it('hash-deduplicates a repeated successful effectful action and replays its result', async () => {
+    const spy: { calls: unknown[] } = { calls: [] };
+    const { deps, events, telemetry } = depsFor([
+      { rawOutput: useTool('echo', { text: 'same effect' }) },
+      { rawOutput: useTool('echo', { text: 'same effect' }) },
+      { rawOutput: finish({ answer: 'ok' }) },
+    ]);
+    const res = await runAgentLoop(
+      baseCfg(),
+      { ...deps, tools: new ToolRegistry().register(echoTool(spy)) },
+    );
+    expect(res.status).toBe('completed');
+    expect(spy.calls).toHaveLength(1);
+    expect(telemetry.summary().toolCalls).toBe(1);
+    const results = res.transcript.filter((e) => e.kind === 'tool_result');
+    expect(results).toHaveLength(2);
+    expect(results[0]?.actionHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(results[1]?.actionHash).toBe(results[0]?.actionHash);
+    expect(results[1]?.deduplicatedFromTurn).toBe(1);
+    expect(results[1]?.payload).toEqual(results[0]?.payload);
+    const replay = events.find((e) => e.type === 'tool_used' && e.deduplicatedFromTurn === 1);
+    expect(replay?.durationMs).toBe(0);
+  });
+
+  it('does not deduplicate identical read actions because a fresh poll can be intentional', async () => {
+    const spy: { calls: unknown[] } = { calls: [] };
+    const readEcho: AgentTool = { ...echoTool(spy), riskClass: 'read' };
+    const { deps } = depsFor([
+      { rawOutput: useTool('echo', { text: 'poll' }) },
+      { rawOutput: useTool('echo', { text: 'poll' }) },
+      { rawOutput: finish({ answer: 'ok' }) },
+    ]);
+    const res = await runAgentLoop(baseCfg(), { ...deps, tools: new ToolRegistry().register(readEcho) });
+    expect(res.status).toBe('completed');
+    expect(spy.calls).toHaveLength(2);
+    expect(res.transcript.filter((e) => e.kind === 'tool_result' && e.deduplicatedFromTurn !== undefined)).toHaveLength(0);
+  });
+
+  it('deduplicates a committed effect after compaction and process resume', async () => {
+    const spy: { calls: unknown[] } = { calls: [] };
+    const args = { text: 'already written' };
+    const actionHash = canonicalSha256({
+      tool: 'echo', source: 'builtin', version: null, riskClass: 'execute', args,
+    });
+    const committed = {
+      kind: 'tool_result' as const,
+      turn: 1,
+      tool: 'echo',
+      ok: true,
+      payload: { echo: args.text },
+      actionHash,
+    };
+    const { deps } = depsFor([
+      { rawOutput: useTool('echo', args) },
+      { rawOutput: finish({ answer: 'ok' }) },
+    ]);
+    const res = await runAgentLoop(
+      baseCfg({
+        initialTranscript: [{ kind: 'task', text: 'do the thing' }, { kind: 'handoff', summary: 'write completed before restart' }],
+        resume: { priorTurns: 1, committedEffects: [committed] },
+      }),
+      { ...deps, tools: new ToolRegistry().register(echoTool(spy)) },
+    );
+    expect(res.status).toBe('completed');
+    expect(spy.calls).toHaveLength(0);
+    const replay = res.transcript.find((entry) => entry.kind === 'tool_result' && entry.deduplicatedFromTurn === 1);
+    expect(replay?.actionHash).toBe(actionHash);
   });
 
   it('feeds schema-invalid tool args back to the model instead of crashing', async () => {
@@ -231,7 +301,16 @@ describe('agent kernel loop', () => {
       { rawOutput: useTool('echo', { text: 'b' }) },
       { rawOutput: finish({ answer: 'ok' }) },
       // purpose-keyed handoff step: full-compaction model call (does not consume the cursor)
-      { rawOutput: '{"summary":"handoff: objective, one tool done, remaining finish"}', forPurpose: 'test:loop:compact' },
+      {
+        rawOutput: JSON.stringify({
+          objective: 'Complete the test task and return a contract-valid answer.',
+          completed: ['Ran two distinct echo actions and retained their successful outputs.'],
+          decisions: ['Use the successful echo outputs; do not execute those calls again.'],
+          remaining: ['Return the final answer from the preserved recent transcript.'],
+          references: [],
+        }),
+        forPurpose: 'test:loop:compact',
+      },
     ]);
     const res = await runAgentLoop(
       baseCfg({ maxTurns: 3, budget: { transcriptSoft: 60, transcriptHard: 120, maxToolResultChars: 100_000 } }),
@@ -245,6 +324,54 @@ describe('agent kernel loop', () => {
     const degradeEvent = events.find((e): e is Extract<AgentEvent, { type: 'compaction' }> => e.type === 'compaction' && e.layer === 'degrade');
     expect(degradeEvent?.tokensAfter).toBeLessThanOrEqual(120);
     expect(degradeEvent?.bySourceAfter).toBeDefined();
+  });
+
+  it('a malformed handoff summary degrades to a fact-only local handoff instead of crashing', async () => {
+    const big: AgentTool = {
+      name: 'echo',
+      description: 'echo text back',
+      inputSchema: z.object({ text: z.string() }),
+      riskClass: 'read',
+      async execute(args) { return { ok: true, data: { echo: (args as { text: string }).text, blob: 'x'.repeat(2_000) } }; },
+    };
+    const { deps, events } = depsFor([
+      { rawOutput: useTool('echo', { text: 'a' }) },
+      { rawOutput: useTool('echo', { text: 'b' }) },
+      { rawOutput: finish({ answer: 'ok' }) },
+      { rawOutput: '{"summary":"old unstructured shape"}', forPurpose: 'test:loop:compact' },
+    ]);
+    const res = await runAgentLoop(
+      baseCfg({ maxTurns: 3, budget: { transcriptSoft: 60, transcriptHard: 240, maxToolResultChars: 100_000 } }),
+      { ...deps, tools: new ToolRegistry().register(big) },
+    );
+    expect(res.status).toBe('completed');
+    const handoff = res.transcript.find((e) => e.kind === 'handoff');
+    expect(handoff?.summary).toContain('Semantic summarization was unavailable');
+    expect(handoff?.summary).toContain('handoff model call failed (invalid_output)');
+    expect(events.some((e) => e.type === 'compaction' && e.layer === 'degrade')).toBe(true);
+  });
+
+  it('fails visibly when the immutable task alone cannot fit the hard context budget', async () => {
+    const { deps, events, receipts } = depsFor([
+      {
+        rawOutput: JSON.stringify({
+          objective: 'Continue the oversized task without inventing prior progress.',
+          completed: ['Inspected the supplied task text and found it exceeds the configured context limit.'],
+          decisions: ['Do not truncate the researcher objective silently.'],
+          remaining: ['Shorten the task or raise the explicit context budget before resuming.'],
+          references: [],
+        }),
+        forPurpose: 'test:loop:compact',
+      },
+    ]);
+    const res = await runAgentLoop(
+      baseCfg({ task: 'research objective '.repeat(300), budget: { transcriptSoft: 1, transcriptHard: 20, maxToolResultChars: 100_000 } }),
+      deps,
+    );
+    expect(res.status).toBe('failed');
+    expect(res.error).toMatch(/task context alone exceeds transcriptHard/);
+    expect(receipts).toHaveLength(1);
+    expect(events.some((event) => event.type === 'compaction' && event.layer === 'degrade')).toBe(true);
   });
 });
 

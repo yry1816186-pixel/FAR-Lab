@@ -21,7 +21,9 @@ export type RolloutLine =
   | { type: 'resumed'; at: string; priorTurns: number; disposition?: string }
   | { type: 'transcript_item'; at: string; entry: TranscriptEntry }
   | { type: 'tool_lifecycle'; at: string; turn: number; tool: string; phase: 'started' | 'finished' }
-  | { type: 'compacted'; at: string; summary: string }
+  /** Durable effect ledger: survives transcript compaction and seeds resume deduplication. */
+  | { type: 'effect_committed'; at: string; entry: Extract<TranscriptEntry, { kind: 'tool_result' }> }
+  | { type: 'compacted'; at: string; summary: string; keptEntries?: TranscriptEntry[] }
   | { type: 'turn_record'; at: string; record: AgentTurnRecord }
   | { type: 'session_end'; at: string; status: string };
 
@@ -75,6 +77,8 @@ export interface ReconstructedSession {
   ended?: Extract<RolloutLine, { type: 'session_end' }>;
   transcript: TranscriptEntry[];
   turns: AgentTurnRecord[];
+  /** Successful effect results retained independently of the compacted model transcript. */
+  committedEffects: Array<Extract<TranscriptEntry, { kind: 'tool_result' }>>;
   /** Present when the rollout ends mid-turn with an executed-but-unresolved tool call. */
   openTurn?: { turn: number; tool: string; disposition: InterruptedTurnDisposition };
 }
@@ -89,7 +93,9 @@ export const reconstructSession = (lines: readonly RolloutLine[]): Reconstructed
   const transcript: TranscriptEntry[] = [];
   if (lastCompactedIdx >= 0) {
     const baseline = items[lastCompactedIdx] as Extract<RolloutLine, { type: 'compacted' }>;
-    transcript.push({ kind: 'task', text: meta?.task ?? '' }, { kind: 'handoff', summary: baseline.summary });
+    transcript.push({ kind: 'task', text: meta?.task ?? '' });
+    if (baseline.summary.length > 0) transcript.push({ kind: 'handoff', summary: baseline.summary });
+    transcript.push(...(baseline.keptEntries ?? []));
     for (const l of items.slice(lastCompactedIdx + 1)) {
       if (l.type === 'transcript_item') transcript.push(l.entry);
     }
@@ -100,6 +106,23 @@ export const reconstructSession = (lines: readonly RolloutLine[]): Reconstructed
   }
 
   const turns = lines.filter((l): l is Extract<RolloutLine, { type: 'turn_record' }> => l.type === 'turn_record').map((l) => l.record);
+
+  const effectsByHash = new Map<string, Extract<TranscriptEntry, { kind: 'tool_result' }>>();
+  for (const line of lines) {
+    if (line.type !== 'effect_committed') continue;
+    const entry = line.entry;
+    if (entry.ok && entry.actionHash !== undefined && !effectsByHash.has(entry.actionHash)) {
+      effectsByHash.set(entry.actionHash, entry);
+    }
+  }
+  // Compatibility for rollouts written after action hashes existed but before the
+  // dedicated effect line: a still-live transcript result remains usable.
+  for (const entry of transcript) {
+    if (entry.kind === 'tool_result' && entry.ok && entry.actionHash !== undefined && !effectsByHash.has(entry.actionHash)) {
+      effectsByHash.set(entry.actionHash, entry);
+    }
+  }
+  const committedEffects = [...effectsByHash.values()];
 
   // dsh interruptedTurnClosers: an action(use_tool) with no tool_result after it is an open turn.
   // With the write order tool_lifecycle(started) → [execute] → transcript_item(tool_result) →
@@ -121,5 +144,5 @@ export const reconstructSession = (lines: readonly RolloutLine[]): Reconstructed
     break;
   }
 
-  return { meta, ended, transcript, turns, ...(openTurn !== undefined ? { openTurn } : {}) };
+  return { meta, ended, transcript, turns, committedEffects, ...(openTurn !== undefined ? { openTurn } : {}) };
 };

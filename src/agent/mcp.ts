@@ -75,8 +75,16 @@ export class McpStdioClient {
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
     });
-    child.on('error', (e) => this.failAll(new Error(`mcp: spawn failed: ${e.message}`)));
-    child.on('close', () => this.failAll(new Error('mcp: server exited')));
+    child.on('error', (e) => {
+      if (this.child === child) this.child = null;
+      this.failAll(new Error(`mcp: spawn failed: ${e.message}`));
+    });
+    child.on('close', () => {
+      // Clear the dead process immediately. Otherwise a manager reconnect first
+      // calls close(), which waits two seconds for an exit event that already fired.
+      if (this.child === child) this.child = null;
+      this.failAll(new Error('mcp: server exited'));
+    });
     child.stdout.setEncoding('utf8');
     child.stdout.on('data', (chunk: string) => this.onStdout(chunk));
     this.child = child;

@@ -1,12 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
-import { runSubagents } from '../src/agent/subagents.js';
+import { runSubagents, splitSubagentBudgets } from '../src/agent/subagents.js';
 import type { AgentLoopConfig, AgentLoopDeps } from '../src/agent/loop.js';
 import { ToolRegistry } from '../src/agent/tool.js';
 import { PermissionEngine } from '../src/agent/permissions.js';
 import { SessionTelemetry } from '../src/agent/telemetry.js';
 import type { AgentEvent } from '../src/agent/protocol.js';
 import { createTestStubProvider, type StubStep } from '../src/providers/test-stub.js';
+import type { RunBudgetView } from '../src/app/run-budget.js';
 
 const echoTool = () => ({
   name: 'echo',
@@ -38,7 +39,44 @@ const cfg: AgentLoopConfig = {
   maxTurns: 4,
 };
 
+const finiteBudget = (cap: number, initialSpent = 0): RunBudgetView => {
+  let spent = initialSpent;
+  return {
+    cap,
+    get spent() { return spent; },
+    remaining: () => Math.max(0, cap - spent),
+    hasRemaining: () => spent < cap,
+    spend: (n) => { if (n !== undefined && n > 0) spent += n; },
+    nearLimit: () => spent >= cap * 0.8,
+  };
+};
+
 describe('sub-agent fan-out', () => {
+  it('splits finite parent tokens deterministically and forwards real spend to the parent', () => {
+    const parent = finiteBudget(120, 20);
+    const children = splitSubagentBudgets(parent, [
+      { label: 'a', task: 'a' },
+      { label: 'b', task: 'b' },
+      { label: 'c', task: 'c', tokenBudget: 7 },
+    ]);
+    expect(children.map((b) => b?.cap)).toEqual([34, 33, 7]);
+    expect(children.map((b) => b?.remaining())).toEqual([34, 33, 7]);
+    children[0]!.spend(10);
+    expect(children[0]!.spent).toBe(10);
+    expect(parent.spent).toBe(30);
+    expect(children[1]!.remaining()).toBe(33);
+  });
+
+  it('an exhausted parent gives every child an honest zero reservation without model calls', async () => {
+    const { deps } = depsWith([]);
+    const results = await runSubagents(cfg, { ...deps, budget: finiteBudget(0) }, [
+      { label: 'a', task: 'a' },
+      { label: 'b', task: 'b' },
+    ], { maxConcurrent: 2 });
+    expect(results.map((r) => r.status)).toEqual(['stop_condition', 'stop_condition']);
+    expect(results.every((r) => r.error?.includes('run token budget exhausted'))).toBe(true);
+  });
+
   it('runs isolated child loops sequentially (maxConcurrent 1) with own sessions and shared provider', async () => {
     const useTool = JSON.stringify({ action: 'use_tool', tool: 'echo', args: { text: 'x' }, reason: 'r' });
     const finishA = JSON.stringify({ action: 'finish', reason: 'done', result: { answer: 'A' } });

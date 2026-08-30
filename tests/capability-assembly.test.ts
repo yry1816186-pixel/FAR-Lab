@@ -18,8 +18,8 @@ import type { ArtifactStore } from '../src/shared/ports.js';
 /**
  * Capability-assembly proof (R2-09): REAL child-process MCP servers through the
  * authoritative assembly into the authoritative agent loop — capability
- * discovery (list_capabilities) → real use → honest failure semantics
- * (server death, broken spawn, oversize spill, policy refusal, hook-rule
+ * discovery (list_capabilities) → real use → bounded recovery/failure semantics
+ * (server death+reconnect, broken spawn, oversize spill, policy refusal, hook-rule
  * denial, malicious/lying server metadata). No in-process MCP fakes: framing,
  * process lifecycle, receipts and permission decisions are exercised for real.
  */
@@ -207,7 +207,7 @@ describe('capability assembly (real child-process MCP through the authoritative 
     expect((spilled as string).length).toBeGreaterThan(10000);
   });
 
-  it('server death mid-session is an honest per-call failure; the session survives and the next assembly reconnects', async () => {
+  it('server death mid-session reconnects once and retries the logical call; the next assembly also starts clean', async () => {
     const h = makeHarness();
     const first = await assembleSessionCapabilities({
       builtinTools: [builtinPing],
@@ -217,15 +217,21 @@ describe('capability assembly (real child-process MCP through the authoritative 
     cleanup.push(() => first.close());
     const res = await h.run([
       useTool('capfix_die_after_reply'), // succeeds, server exits right after
-      useTool('capfix_lookup_marker'),   // now fails: server gone
+      useTool('capfix_lookup_marker'),   // server is gone: manager reconnects once, then retries
       finish(),
     ], first);
-    expect(res.status).toBe('completed'); // the loop converts the failure into model-visible error, never a crash
+    expect(res.status).toBe('completed');
     const results = res.transcript.filter((e) => e.kind === 'tool_result') as Array<Extract<TranscriptEntry, { kind: 'tool_result' }>>;
     expect(results[0]?.ok).toBe(true);
-    expect(results[1]?.ok).toBe(false);
-    const err = results[1]?.payload as { error: { message: string } };
-    expect(err.error.message).toMatch(/server exited|mcp:/);
+    expect(results[1]?.ok).toBe(true);
+    const recoveredContent = results[1]?.payload as Array<{ type: string; text: string }>;
+    expect(recoveredContent).toHaveLength(1);
+    expect(recoveredContent[0]?.type).toBe('text');
+    expect(JSON.parse(recoveredContent[0]!.text)).toEqual({ marker: 'ok', args: {} });
+    const recovered = first.mcpManager.statusOf().find((status) => status.label === 'Capability Fixture');
+    expect(recovered?.state).toBe('connected');
+    expect(recovered?.reconnectCount).toBe(1);
+    expect(recovered?.lastReconnectAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
 
     // reconnect = next session's assembly rebuilds from current truth
     const second = await assembleSessionCapabilities({

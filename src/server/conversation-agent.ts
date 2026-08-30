@@ -94,7 +94,11 @@ export const conversationSessionId = (conversationId: string, anchor: string): s
 export interface ConversationResumePlan {
   sessionId: string;
   initialTranscript: TranscriptEntry[];
-  resume: { priorTurns: number; openTurn?: { turn: number; tool: string; disposition: InterruptedTurnDisposition } };
+  resume: {
+    priorTurns: number;
+    openTurn?: { turn: number; tool: string; disposition: InterruptedTurnDisposition };
+    committedEffects?: Array<Extract<TranscriptEntry, { kind: 'tool_result' }>>;
+  };
 }
 
 /**
@@ -120,6 +124,7 @@ export const planConversationResume = (rolloutDir: string, conversationId: strin
     initialTranscript: rec.transcript,
     resume: {
       priorTurns: rec.turns.length,
+      ...(rec.committedEffects.length > 0 ? { committedEffects: rec.committedEffects } : {}),
       ...(rec.openTurn !== undefined ? { openTurn: rec.openTurn } : {}),
     },
   };

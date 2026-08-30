@@ -40,8 +40,16 @@ const useTool = (tool: string, args: Record<string, unknown> = {}): StubStep =>
   ({ rawOutput: JSON.stringify({ action: 'use_tool', tool, args, reason: 'progress' }) });
 const finish = (result: Record<string, unknown>): StubStep =>
   ({ rawOutput: JSON.stringify({ action: 'finish', reason: 'done', result }) });
-const compactStep = (summary: string): StubStep =>
-  ({ rawOutput: JSON.stringify({ summary }), forPurpose: 'test:loop:compact' });
+const compactStep = (summary: string): StubStep => ({
+  rawOutput: JSON.stringify({
+    objective: 'Collect every evidence fragment and report the key tokens without redoing completed work.',
+    completed: [summary],
+    decisions: ['Keep the evidence-fragment route because its tool calls returned concrete payloads.'],
+    remaining: ['Collect any named missing fragments, then finish with the retained keys.'],
+    references: [],
+  }),
+  forPurpose: 'test:loop:compact',
+});
 
 /** Big, distinctive fragment payloads — the context pressure source. */
 const fragment = (i: number): string =>

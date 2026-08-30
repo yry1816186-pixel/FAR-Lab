@@ -21,6 +21,9 @@ export interface McpServerStatus {
   state: 'connected' | 'failed' | 'disabled';
   toolCount?: number;
   error?: string;
+  /** Bounded transport recoveries completed during this manager lifetime. */
+  reconnectCount?: number;
+  lastReconnectAt?: string;
 }
 
 export interface McpRegistration {
@@ -62,12 +65,27 @@ const isValidToolName = (name: string): boolean => TOOL_NAME_RE.test(name);
 export interface McpManagerDeps {
   /** Enabled+disabled mcp_server integrations as they currently exist. */
   listServers: () => McpServerIntegration[];
+  /** Test seam; production uses a real bounded timer. */
+  sleep?: (ms: number) => Promise<void>;
+  /** Test seam for retry jitter; production uses Math.random. */
+  random?: () => number;
+  /** First reconnect delay before jitter, default 100ms. */
+  reconnectBaseMs?: number;
 }
+
+const RETRYABLE_TRANSPORT = /server exited|not connected|session terminated|fetch failed|timed out|econn(?:reset|refused|aborted)|epipe|socket|network|connection (?:closed|reset|lost)|http (?:408|425|429|5\d\d)\b/i;
+
+/** JSON-RPC/application/schema failures are not cured by reconnecting. */
+export const isRetryableMcpTransportError = (error: unknown): boolean =>
+  RETRYABLE_TRANSPORT.test(error instanceof Error ? error.message : String(error));
 
 export class McpManager {
   private readonly clients = new Map<string, ManagedClient>();
   private readonly statuses = new Map<string, McpServerStatus>();
   private readonly unsubscribers: Array<() => void> = [];
+  /** Single-flight fence: concurrent tool failures must not start reconnect storms. */
+  private readonly reconnecting = new Map<string, Promise<ManagedClient>>();
+  private closed = false;
 
   constructor(private readonly deps: McpManagerDeps) {}
 
@@ -123,6 +141,133 @@ export class McpManager {
     }
   }
 
+  /**
+   * Replace one failed transport and re-run the initialize handshake. One logical
+   * tool call gets at most one reconnect+retry; concurrent callers share this
+   * reconnect promise. A changed server identity fails closed because registry
+   * provenance was stamped from the original handshake.
+   */
+  private async reconnectOne(integrationId: string, firstError: unknown): Promise<ManagedClient> {
+    const inFlight = this.reconnecting.get(integrationId);
+    if (inFlight !== undefined) return inFlight;
+    const current = this.clients.get(integrationId);
+    if (current === undefined) throw new Error(`mcp: cannot reconnect unknown integration '${integrationId}'`);
+    if (this.closed) throw new Error('mcp: manager is closed');
+
+    const task = (async (): Promise<ManagedClient> => {
+      const baseMs = Math.max(0, Math.floor(this.deps.reconnectBaseMs ?? 100));
+      const random = Math.min(1, Math.max(0, this.deps.random?.() ?? Math.random()));
+      // One allowed reconnect means exponent 2^0; full jitter prevents many
+      // sessions from reconnecting to the same recovering server in lockstep.
+      const delayMs = baseMs + Math.floor(baseMs * random);
+      await (this.deps.sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms))))(delayMs);
+      if (this.closed) throw new Error('mcp: manager closed during reconnect backoff');
+      const beforeIdentity = current.client.serverInfo();
+      await current.client.close().catch(() => {});
+      const nextClient = this.makeClient(current.integration);
+      try {
+        await nextClient.connect();
+        const afterIdentity = nextClient.serverInfo();
+        if (JSON.stringify(afterIdentity) !== JSON.stringify(beforeIdentity)) {
+          throw new Error(
+            `server identity changed across reconnect (${JSON.stringify(beforeIdentity)} -> ${JSON.stringify(afterIdentity)}); reassemble the agent tool registry`,
+          );
+        }
+        const next = { integration: current.integration, client: nextClient };
+        this.clients.set(integrationId, next);
+        const unsub = nextClient.onToolsChanged(() => { void this.refresh(integrationId); });
+        this.unsubscribers.push(unsub);
+        const previous = this.statuses.get(integrationId);
+        this.statuses.set(integrationId, {
+          integrationId,
+          label: current.integration.label,
+          state: 'connected',
+          ...(previous?.toolCount !== undefined ? { toolCount: previous.toolCount } : {}),
+          reconnectCount: (previous?.reconnectCount ?? 0) + 1,
+          lastReconnectAt: new Date().toISOString(),
+        });
+        return next;
+      } catch (e) {
+        await nextClient.close().catch(() => {});
+        const first = firstError instanceof Error ? firstError.message : String(firstError);
+        const second = e instanceof Error ? e.message : String(e);
+        const previous = this.statuses.get(integrationId);
+        const message = `transport failed (${first}); reconnect failed (${second})`;
+        this.statuses.set(integrationId, {
+          integrationId,
+          label: current.integration.label,
+          state: 'failed',
+          error: message,
+          ...(previous?.reconnectCount !== undefined ? { reconnectCount: previous.reconnectCount } : {}),
+          ...(previous?.lastReconnectAt !== undefined ? { lastReconnectAt: previous.lastReconnectAt } : {}),
+        });
+        throw new Error(`mcp:${current.integration.label}: ${message}`, { cause: e });
+      }
+    })();
+    this.reconnecting.set(integrationId, task);
+    try {
+      return await task;
+    } finally {
+      this.reconnecting.delete(integrationId);
+    }
+  }
+
+  private async callToolWithReconnect(
+    integrationId: string,
+    name: string,
+    args: unknown,
+  ): Promise<{ ok: boolean; content: unknown; isError: boolean }> {
+    const current = this.clients.get(integrationId);
+    if (current === undefined) throw new Error(`mcp: integration '${integrationId}' is not connected`);
+    try {
+      return await current.client.callTool(name, args);
+    } catch (firstError) {
+      if (!isRetryableMcpTransportError(firstError)) throw firstError;
+      const reconnected = await this.reconnectOne(integrationId, firstError);
+      try {
+        return await reconnected.client.callTool(name, args);
+      } catch (retryError) {
+        const message = retryError instanceof Error ? retryError.message : String(retryError);
+        const status = this.statuses.get(integrationId);
+        this.statuses.set(integrationId, {
+          integrationId,
+          label: current.integration.label,
+          state: 'failed',
+          error: `tool retry failed after reconnect: ${message}`,
+          ...(status?.reconnectCount !== undefined ? { reconnectCount: status.reconnectCount } : {}),
+          ...(status?.lastReconnectAt !== undefined ? { lastReconnectAt: status.lastReconnectAt } : {}),
+        });
+        throw new Error(`mcp:${current.integration.label}: tool retry failed after reconnect: ${message}`, { cause: retryError });
+      }
+    }
+  }
+
+  private async listToolsWithReconnect(integrationId: string): Promise<McpToolInfo[]> {
+    const current = this.clients.get(integrationId);
+    if (current === undefined) throw new Error(`mcp: integration '${integrationId}' is not connected`);
+    try {
+      return await current.client.listTools();
+    } catch (firstError) {
+      if (!isRetryableMcpTransportError(firstError)) throw firstError;
+      const reconnected = await this.reconnectOne(integrationId, firstError);
+      try {
+        return await reconnected.client.listTools();
+      } catch (retryError) {
+        const message = retryError instanceof Error ? retryError.message : String(retryError);
+        const status = this.statuses.get(integrationId);
+        this.statuses.set(integrationId, {
+          integrationId,
+          label: current.integration.label,
+          state: 'failed',
+          error: `tools/list retry failed after reconnect: ${message}`,
+          ...(status?.reconnectCount !== undefined ? { reconnectCount: status.reconnectCount } : {}),
+          ...(status?.lastReconnectAt !== undefined ? { lastReconnectAt: status.lastReconnectAt } : {}),
+        });
+        throw new Error(`mcp:${current.integration.label}: tools/list retry failed after reconnect: ${message}`, { cause: retryError });
+      }
+    }
+  }
+
   /** Register connected servers' tools into a registry (additive; kernel registries have no remove). */
   async registerTools(registry: ToolRegistry): Promise<{ registered: McpRegistration[]; skipped: McpSkip[] }> {
     const registered: McpRegistration[] = [];
@@ -130,7 +275,7 @@ export class McpManager {
     for (const [id, { integration, client }] of this.clients) {
       let tools: McpToolInfo[];
       try {
-        tools = await client.listTools();
+        tools = await this.listToolsWithReconnect(id);
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
         this.statuses.set(id, { integrationId: id, label: integration.label, state: 'failed', error: `tools/list failed: ${message}` });
@@ -138,8 +283,16 @@ export class McpManager {
         continue;
       }
       const prefix = integration.toolNamePrefix ?? `mcp_${sanitizeLabel(integration.label)}`;
-      this.statuses.set(id, { integrationId: id, label: integration.label, state: 'connected', toolCount: tools.length });
-      const serverVersion = client.serverInfo().version;
+      const previous = this.statuses.get(id);
+      this.statuses.set(id, {
+        integrationId: id,
+        label: integration.label,
+        state: 'connected',
+        toolCount: tools.length,
+        ...(previous?.reconnectCount !== undefined ? { reconnectCount: previous.reconnectCount } : {}),
+        ...(previous?.lastReconnectAt !== undefined ? { lastReconnectAt: previous.lastReconnectAt } : {}),
+      });
+      const serverVersion = this.clients.get(id)?.client.serverInfo().version ?? client.serverInfo().version;
       const usedNames = new Set(registry.names());
       for (const info of tools) {
         const base = sanitizeMcpToolName(prefix, info.name);
@@ -160,7 +313,11 @@ export class McpManager {
           continue;
         }
         usedNames.add(name);
-        const adapter = mcpToolAdapter(client, info, integration.label);
+        const adapter = mcpToolAdapter(
+          { callTool: (name, args) => this.callToolWithReconnect(id, name, args) },
+          info,
+          integration.label,
+        );
         // RU-3 T1: MCP server output is third-party content — mark trust 'external'
         // so the loop flags every tool_result from it as untrusted data.
         // R2-09 identity: source label + handshake version stamp the adapted
@@ -194,8 +351,16 @@ export class McpManager {
     // is impossible here (registry identity is caller-owned). Additive refresh is done
     // by the session assembler on next assembly; here we only refresh status truth.
     try {
-      const tools = await managed.client.listTools();
-      this.statuses.set(integrationId, { integrationId, label: managed.integration.label, state: 'connected', toolCount: tools.length });
+      const tools = await this.listToolsWithReconnect(integrationId);
+      const previous = this.statuses.get(integrationId);
+      this.statuses.set(integrationId, {
+        integrationId,
+        label: managed.integration.label,
+        state: 'connected',
+        toolCount: tools.length,
+        ...(previous?.reconnectCount !== undefined ? { reconnectCount: previous.reconnectCount } : {}),
+        ...(previous?.lastReconnectAt !== undefined ? { lastReconnectAt: previous.lastReconnectAt } : {}),
+      });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       this.statuses.set(integrationId, { integrationId, label: managed.integration.label, state: 'failed', error: message });
@@ -222,7 +387,9 @@ export class McpManager {
   }
 
   async close(): Promise<void> {
+    this.closed = true;
     for (const unsub of this.unsubscribers.splice(0)) unsub();
+    await Promise.allSettled(this.reconnecting.values());
     await Promise.allSettled([...this.clients.values()].map(({ client }) => client.close()));
     this.clients.clear();
   }
