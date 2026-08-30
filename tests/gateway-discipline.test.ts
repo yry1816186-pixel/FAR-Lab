@@ -36,3 +36,23 @@ describe('truncateOutput (ag2: fixed marker, never silent clipping)', () => {
     expect(out.endsWith(TRUNCATION_MARKER)).toBe(true);
   });
 });
+
+describe('parseProbeReport (FA-REM-03: environment fingerprint payload)', () => {
+  it('parses a full report: python/numpy versions, cpu, pip-freeze hash', async () => {
+    const { parseProbeReport } = await import('../src/experiment/gateway.js');
+    const r = parseProbeReport('{"python": "3.11.2", "numpy": "1.26.4", "cpu": 8, "pipFreeze": "ab12cd34"}');
+    expect(r).toMatchObject({ pythonVersion: '3.11.2', numpyVersion: '1.26.4', numpy: true, cpuCount: 8, pipFreezeSha256: 'ab12cd34' });
+  });
+
+  it('minimal containers degrade honestly: numpy/pipFreeze absent -> null, numpy=false', async () => {
+    const { parseProbeReport } = await import('../src/experiment/gateway.js');
+    const r = parseProbeReport('{"python": "3.12.1", "numpy": null, "cpu": 2, "pipFreeze": null}');
+    expect(r).toMatchObject({ pythonVersion: '3.12.1', numpyVersion: null, numpy: false, pipFreezeSha256: null });
+  });
+
+  it('malformed stdout -> null (fail-visible to the probe caller)', async () => {
+    const { parseProbeReport } = await import('../src/experiment/gateway.js');
+    expect(parseProbeReport('Traceback (most recent call last): ...')).toBeNull();
+    expect(parseProbeReport('{"numpy": "1.0"}')).toBeNull(); // python missing = unusable report
+  });
+});

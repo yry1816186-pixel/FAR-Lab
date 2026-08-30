@@ -173,6 +173,25 @@ describe('verifyBundle', () => {
     expect(() => VerificationReport.parse(report)).not.toThrow();
   });
 
+  it('marks vacuous passes on a minimal (pre-feature) bundle — never readable as strong verification', async () => {
+    const w = await buildWorld();
+    const report = await verifyBundle(w.bundle.id, { store, artifacts });
+    expect(report.verdict).toBe('verified');
+    expect(report.vacuousChecks).toEqual(expect.arrayContaining([
+      'claim_taint_labels_present',
+      'paper_outline_ref_resolvable',
+      'figures_tables_refs_resolvable',
+      'protocol_evidence_resolvable',
+      'data_plane_evidence_resolvable',
+    ]));
+    const m = byName(report);
+    for (const name of report.vacuousChecks ?? []) expect(m.get(name)?.vacuous).toBe(true);
+    for (const name of VERIFY_CHECK_NAMES) {
+      if ((report.vacuousChecks ?? []).includes(name)) continue;
+      expect(m.get(name)?.vacuous ?? false, name).toBe(false);
+    }
+  });
+
   it('fails when a sourceArtifactHash is tampered (artifact not found at that address)', async () => {
     const tampered = sha256Hex('tampered-source');
     const w = await buildWorld((draft) => {

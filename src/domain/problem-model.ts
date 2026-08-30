@@ -204,7 +204,7 @@ export type ScientificProblemModel = z.infer<typeof ScientificProblemModel>;
  * routing vocabulary; each family maps to the executor/leg that can actually
  * validate it — see AOSSA-CONVERGENCE-PLAN §3):
  *   analytic_symbolic    -> theory_identity leg (numerical spot-check of closed forms)
- *   numerical_simulation -> experiment-runtime numerical ops (FEM/ODE; convergence verification)
+ *   numerical_simulation -> experiment-runtime numerical ops (FEM/AFEM convergence + Monte-Carlo templates; a dedicated ODE-integration leg is NOT yet implemented — tracked in FINAL_ACCEPTANCE FA-SCI-05; ODE-typed plans fall through to the protocol leg today)
  *   statistical_inference-> EEL stats ops (preregistered tests) / meta-analysis leg
  *   causal_inference     -> declared; validator = the identification strategy itself
  *   optimization         -> declared; requires domain_software or sidecar op

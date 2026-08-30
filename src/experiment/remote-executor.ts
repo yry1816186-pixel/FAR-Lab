@@ -113,8 +113,19 @@ export const executeRemoteExperiment = async (
     });
     const probe = await opts.gateway.probe();
     if (!probe.reachable || probe.pythonVersion === null) fail(`device ${opts.deviceId} unreachable or has no python3`);
-    logLines.push(`device=${opts.deviceId} python=${probe.pythonVersion} numpy=${probe.numpy}`);
-    persist({ ...expRun, status: 'running', startedAt: now(), executor: 'remote', environment: { pythonVersion: `remote:${probe.pythonVersion}`, versions: { remoteDevice: opts.deviceId, remoteNumpy: String(probe.numpy) } } }, 'experiment_started', { id: expRun.id, device: opts.deviceId, python: probe.pythonVersion });
+    logLines.push(`device=${opts.deviceId} python=${probe.pythonVersion} numpy=${probe.numpyVersion ?? 'absent'} cpu=${probe.cpuCount ?? '?'} gpu=${probe.gpu ?? 'none'} pipFreeze=${probe.pipFreezeSha256?.slice(0, 12) ?? 'absent'}`);
+    persist({ ...expRun, status: 'running', startedAt: now(), executor: 'remote', environment: {
+      pythonVersion: `remote:${probe.pythonVersion}`,
+      versions: {
+        remoteDevice: opts.deviceId,
+        remoteNumpy: probe.numpyVersion ?? 'absent',
+        ...(probe.pipFreezeSha256 !== null ? { remotePipFreezeSha256: probe.pipFreezeSha256 } : {}),
+      },
+      ...(probe.cpuCount !== null || probe.gpu !== null ? { hardware: {
+        ...(probe.cpuCount !== null ? { cpuCount: String(probe.cpuCount) } : {}),
+        ...(probe.gpu !== null ? { gpu: probe.gpu } : {}),
+      } } : {}),
+    } }, 'experiment_started', { id: expRun.id, device: opts.deviceId, python: probe.pythonVersion });
 
     const remoteDir = `/tmp/farlab/${expRun.id}`;
     await opts.gateway.exec(`mkdir -p ${remoteDir}`);
@@ -160,6 +171,7 @@ export const executeRemoteExperiment = async (
         modelIdx, modelName: model.name, metrics: res.metrics, perRowRef, tags: model.tags,
         fingerprint: createHash('sha256').update(JSON.stringify({
           specHash, contentRef: record.contentRef, device: opts.deviceId, remotePython: probe.pythonVersion,
+          remotePipFreeze: probe.pipFreezeSha256,
           modelIdx, seed: model.seed, builder: model.builderId, hyperparams: model.hyperparams,
         })).digest('hex'),
         nTrain: res.nTrain, nTest: res.nTest, timingMs: Date.now() - t0,

@@ -93,8 +93,12 @@ Usage:
   far inspect <runId> [seq] [--json]             Time-travel projection of a run AS OF an event seq
   far memory <query> [--kind <k>] [--json]       Search the re-audit memory queue (kind:
                                                   episodic|semantic|experiment_outcome|profile)
-  far backup [<dest.db>]                         Consistent DB snapshot via VACUUM INTO (never
-                                                  overwrites; restore drill: docs/backup-restore.md)
+  far backup [<dest-dir>]                        Full 3-DB workspace backup set (far.db + scheduler
+                                                  + cache) via VACUUM INTO + MANIFEST.json; never
+                                                  overwrites
+  far restore <set-dir> --replace                Verified restore: hash + integrity check every
+                                                  member read-only, move live files aside (rollback
+                                                  path), then copy in (drill: docs/backup-restore.md)
   far verify <bundle-id> [--json]                Independently verify a reproducibility bundle
                                                   (exit 0=verified, 1=failed/degraded)
   far completion <bash|zsh|pwsh>                 Print a static shell completion script (real command

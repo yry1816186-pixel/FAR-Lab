@@ -912,27 +912,60 @@ const main = async (): Promise<void> => {
   }
 
   if (cmd === 'backup') {
-    // RU-7.1 production caller (re-audit fix): VACUUM INTO snapshot — the
-    // WAL-copy trap (plain file copy silently loses recent WAL commits) is
-    // structurally avoided. Refuses to overwrite; drill in docs/backup-restore.md.
+    // FA-DAT-02: full three-database workspace set (far.db + scheduler + cache),
+    // one VACUUM INTO per member + MANIFEST.json with hashes/user_versions.
+    // Restorable via `far restore <set-dir> --replace`.
     const path = await import('node:path');
     const args = (await import('node:util')).parseArgs({ allowPositionals: true, args: process.argv.slice(3) });
     const dataDir = path.resolve(process.env.FARLAB_DATA_DIR ?? '.far-run');
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     const dest = typeof args.positionals[0] === 'string'
       ? path.resolve(String(args.positionals[0]))
-      : path.join(dataDir, 'backup', `far-${stamp}.db`);
-    const fs = await import('node:fs');
-    fs.mkdirSync(path.dirname(dest), { recursive: true });
-    const app = await createApp({ dataDir });
+      : path.join(dataDir, 'backup', `set-${stamp}`);
+    const { backupWorkspace } = await import('../app/backup-restore.js');
+    let result;
     try {
-      app.store.backupTo(dest);
+      result = backupWorkspace(dataDir, dest);
     } catch (e) {
       die(e instanceof Error ? e.message : String(e), 1);
-    } finally { app.close(); }
-    const bytes = fs.statSync(dest).size;
-    console.log(`backup written: ${dest} (${bytes} B)`);
-    if (!json()) console.log('restore drill: see docs/backup-restore.md');
+    }
+    if (json()) jsonOutput(result.manifest);
+    else {
+      console.log(`backup set written: ${result.dir}`);
+      for (const f of result.manifest.files) console.log(`  ${f.name}  ${f.bytes} B  sha256 ${f.sha256.slice(0, 16)}…  user_version ${f.userVersion}`);
+      console.log('restore: far restore <set-dir> --replace   (drill in docs/backup-restore.md)');
+    }
+    return;
+  }
+
+  if (cmd === 'restore') {
+    // FA-DAT-02: verified restore of a backup set into the live workspace.
+    // Every member is hash+integrity verified READ-ONLY before anything moves;
+    // live files are moved aside (not deleted) as the rollback path.
+    const path = await import('node:path');
+    const args = (await import('node:util')).parseArgs({
+      allowPositionals: true,
+      options: { replace: { type: 'boolean' } },
+      args: process.argv.slice(3),
+    });
+    const backupDir = typeof args.positionals[0] === 'string' ? path.resolve(String(args.positionals[0])) : null;
+    if (backupDir === null) die('restore requires a backup set directory (produced by `far backup`)', 2);
+    const dataDir = path.resolve(process.env.FARLAB_DATA_DIR ?? '.far-run');
+    const { restoreWorkspace } = await import('../app/backup-restore.js');
+    let report;
+    try {
+      report = restoreWorkspace(backupDir, dataDir, { replace: args.values['replace'] === true });
+    } catch (e) {
+      die(e instanceof Error ? e.message : String(e), 1);
+    }
+    if (json()) jsonOutput(report);
+    else {
+      console.log(`restored into ${dataDir}: ${report.restored.join(', ')} (verified: ${report.verified.join(', ')})`);
+      if (report.movedAside.length > 0) {
+        console.log('previous live files moved aside (rollback = rename back):');
+        for (const m of report.movedAside) console.log(`  ${m.from} -> ${m.to}`);
+      }
+    }
     return;
   }
 
@@ -975,7 +1008,9 @@ const main = async (): Promise<void> => {
       else {
         out(`bundle ${report.bundleId} (run ${report.runId}) — declared evidence level: ${report.declaredEvidenceLevel}`);
         out(`verdict: ${ink.bold(report.verdict)} (${report.checks.filter((c) => c.passed).length}/${report.checks.length} checks passed)`);
-        for (const c of report.checks) out(`  ${c.passed ? ink.ok('PASS') : ink.err('FAIL')}  ${c.name} — ${c.detail}`);
+        for (const c of report.checks) out(`  ${c.passed ? ink.ok('PASS') : ink.err('FAIL')}${c.vacuous === true ? '(vacuous)' : ' '} ${c.name} — ${c.detail}`);
+        const vac = report.vacuousChecks ?? [];
+        if (vac.length > 0) out(`\n${vac.length} 项空转通过（该 bundle 未声明这些检查所审查的内容 — 不得读作强验证）: ${vac.join(', ')}`);
         if (report.replayGuidance) out(`\n${report.replayGuidance}`);
       }
       process.exitCode = report.verdict === 'verified' ? 0 : 1;

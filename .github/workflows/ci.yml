@@ -45,7 +45,7 @@ jobs:
       # Experiment sidecar bootstrap scripts run `python -c "import numpy..."`;
       # the runner image ships python3 without numpy.
       - name: Install python deps for the experiment sidecar
-        run: pip install numpy --quiet
+        run: pip install "numpy>=2.4,<3" --quiet  # pinned to the uv.lock family (experiment-runtime/uv.lock resolves 2.4.x/2.5.x)
       - name: Typecheck (backend + CLI)
         run: npm run typecheck
       - name: Lint
@@ -125,7 +125,7 @@ jobs:
         working-directory: packages/tui
         run: npm ci
       - name: Install python deps for the experiment sidecar
-        run: pip install numpy --quiet
+        run: pip install "numpy>=2.4,<3" --quiet  # pinned to the uv.lock family (experiment-runtime/uv.lock resolves 2.4.x/2.5.x)
       - name: Build public-release pack (self-verifying exporter)
         run: node scripts/export-public.mjs
       - name: Upload release pack

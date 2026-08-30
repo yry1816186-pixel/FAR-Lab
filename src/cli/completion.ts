@@ -89,7 +89,8 @@ export const FAR_COMMANDS: readonly CompletionCommand[] = [
   },
   { name: 'probe-custom', help: 'health check for user-defined model configs', subs: [] },
   { name: 'memory', help: 'search the re-audit memory queue', subs: [] },
-  { name: 'backup', help: 'VACUUM INTO snapshot of the database', subs: [] },
+  { name: 'backup', help: 'full 3-DB workspace backup set via VACUUM INTO + MANIFEST', subs: [] },
+  { name: 'restore', help: 'verified restore of a backup set (hash+integrity first)', subs: [] },
   { name: 'gc', help: 'sweep unreferenced artifact blobs (dry-run by default)', subs: [] },
   { name: 'data', help: 'data footprint', subs: [
     { name: 'info', help: 'runs, db size, artifacts, exports' },

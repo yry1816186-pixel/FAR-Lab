@@ -33,6 +33,38 @@ export interface ExecResult {
   stderr: string;
 }
 
+/** Full remote-environment fingerprint emitted by probe() (absence = null, honestly). */
+export interface ProbeReport {
+  reachable: boolean;
+  pythonVersion: string | null;
+  numpyVersion: string | null;
+  /** Back-compat boolean view of numpyVersion. */
+  numpy: boolean;
+  cpuCount: number | null;
+  gpu: string | null;
+  /** sha256 of the remote `pip freeze` output — dependency identity for fingerprints. */
+  pipFreezeSha256: string | null;
+}
+
+/** Parse the probe's json payload; null on any malformation (fail-visible to caller). */
+export const parseProbeReport = (stdout: string): Omit<ProbeReport, 'reachable' | 'gpu'> | null => {
+  try {
+    const line = stdout.trim().split('\n').find((l) => l.startsWith('{'));
+    if (line === undefined) return null;
+    const j = JSON.parse(line) as { python?: string; numpy?: string | null; cpu?: number | null; pipFreeze?: string | null };
+    if (typeof j.python !== 'string') return null;
+    return {
+      pythonVersion: j.python,
+      numpyVersion: typeof j.numpy === 'string' ? j.numpy : null,
+      numpy: typeof j.numpy === 'string',
+      cpuCount: typeof j.cpu === 'number' ? j.cpu : null,
+      pipFreezeSha256: typeof j.pipFreeze === 'string' ? j.pipFreeze : null,
+    };
+  } catch {
+    return null;
+  }
+};
+
 const baseArgs = (t: SSHTarget): string[] => [
   '-i', t.identityFile,
   '-o', `UserKnownHostsFile=${t.knownHostsFile}`,
@@ -85,20 +117,42 @@ export class SSHGateway {
     throw lastErr;
   }
 
-  /** Capability probe: interpreter presence + core scientific stack. */
-  async probe(): Promise<{ reachable: boolean; pythonVersion: string | null; numpy: boolean }> {
+  /**
+   * Capability & environment fingerprint probe (FA-REM-03, endgame audit: probe
+   * used to check two booleans; provenance needs versions + hardware). The remote
+   * side emits ONE json object; every optional field degrades to null (minimal
+   * containers lack pip/nvidia-smi — absence is honest data, not failure).
+   */
+  async probe(): Promise<ProbeReport> {
     // Retry the capability probe: a single transient connection reset (Windows
     // Docker NAT under load) would otherwise report a healthy device as
     // unreachable and fail the whole experiment. The probe is read-only.
+    const script = [
+      'import json,sys,os,hashlib',
+      'out={"python":sys.version.split()[0],"numpy":None,"cpu":os.cpu_count(),"pipFreeze":None}',
+      'try:',
+      ' import numpy; out["numpy"]=numpy.__version__',
+      'except Exception: pass',
+      'try:',
+      ' import subprocess as sp',
+      ' fr=sp.run([sys.executable,"-m","pip","freeze"],capture_output=True,text=True,timeout=60)',
+      ' if fr.returncode==0: out["pipFreeze"]=hashlib.sha256(fr.stdout.encode()).hexdigest()',
+      'except Exception: pass',
+      'print(json.dumps(out))',
+    ].join('\n');
     let r = { code: -1, stdout: '', stderr: '' };
     for (let attempt = 0; attempt < 3; attempt++) {
-      r = await this.exec('python3 -c "import sys;print(sys.version.split()[0]);import numpy;print(\'numpy\',numpy.__version__)"');
+      r = await this.exec(`python3 -c ${shellQuote(script)}`);
       if (r.code === 0) break;
       await new Promise<void>((res) => setTimeout(res, 500 * (attempt + 1)));
     }
-    if (r.code !== 0) return { reachable: false, pythonVersion: null, numpy: false };
-    const [versionLine, numpyLine] = r.stdout.trim().split('\n');
-    return { reachable: true, pythonVersion: versionLine ?? null, numpy: numpyLine?.startsWith('numpy ') ?? false };
+    if (r.code !== 0) return { reachable: false, pythonVersion: null, numpyVersion: null, numpy: false, cpuCount: null, gpu: null, pipFreezeSha256: null };
+    const parsed = parseProbeReport(r.stdout);
+    if (parsed === null) return { reachable: false, pythonVersion: null, numpyVersion: null, numpy: false, cpuCount: null, gpu: null, pipFreezeSha256: null };
+    // GPU presence is a separate, strictly optional exec (most targets have none).
+    const gpu = await this.exec('nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -n 1');
+    const gpuName = gpu.code === 0 ? gpu.stdout.trim().split('\n')[0] ?? null : null;
+    return { ...parsed, reachable: true, gpu: gpuName !== '' ? gpuName : null };
   }
 
   /**

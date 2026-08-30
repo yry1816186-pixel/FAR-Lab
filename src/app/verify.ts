@@ -40,6 +40,12 @@ export const VerificationCheck = z.object({
   name: z.string(),
   passed: z.boolean(),
   detail: z.string(),
+  /**
+   * True when the check passed VACUOUSLY (the bundle declares nothing this
+   * check inspects — legacy/pre-feature bundles). A vacuous pass must never be
+   * read as strong verification; consumers aggregate it into vacuousChecks.
+   */
+  vacuous: z.boolean().optional(),
 });
 export type VerificationCheck = z.infer<typeof VerificationCheck>;
 
@@ -52,6 +58,8 @@ export const VerificationReport = z.object({
   /** 'verified' all pass | 'degraded' only env/lock drift (check 9) fails | 'failed' anything else fails. */
   verdict: z.enum(['verified', 'failed', 'degraded']),
   failedChecks: z.array(z.string()),
+  /** Checks that passed vacuously (legacy bundle declares nothing they inspect) — never read as strong verification. */
+  vacuousChecks: z.array(z.string()).optional(),
   /** Present when the declared level implies re-execution (replay/recompute). */
   replayGuidance: z.string().optional(),
 });
@@ -347,6 +355,7 @@ export async function verifyBundle(bundleId: string, deps: VerifyDeps): Promise<
     checks.push({
       name: 'claim_taint_labels_present',
       passed: runClaims.length === 0 || unlabeled === 0,
+      vacuous: runClaims.length === 0,
       detail: runClaims.length === 0
         ? '（本 run 无 claim — 检查空转通过）'
         : unlabeled === 0
@@ -393,6 +402,7 @@ export async function verifyBundle(bundleId: string, deps: VerifyDeps): Promise<
     checks.push({
       name: 'paper_outline_ref_resolvable',
       passed: paperRefProblem === null,
+      vacuous: paperRef === undefined,
       detail: paperRef === undefined
         ? '（pre-BP3 bundle：未声明 paperOutlineRef — 检查空转通过）'
         : paperRefProblem === null
@@ -413,6 +423,7 @@ export async function verifyBundle(bundleId: string, deps: VerifyDeps): Promise<
     checks.push({
       name: 'figures_tables_refs_resolvable',
       passed: refProblems.length === 0,
+      vacuous: figures.length + tables.length === 0,
       detail: figures.length + tables.length === 0
         ? '（本 bundle 未声明 figures/tables 引用 — 检查空转通过）'
         : refProblems.length === 0
@@ -463,6 +474,7 @@ export async function verifyBundle(bundleId: string, deps: VerifyDeps): Promise<
     checks.push({
       name: 'protocol_evidence_resolvable',
       passed: protoProblems.length === 0,
+      vacuous: protoEvidence.length === 0,
       detail: protoEvidence.length === 0
         ? '（pre-protocol bundle：未声明 protocolEvidence — 检查空转通过）'
         : protoProblems.length === 0
@@ -498,6 +510,7 @@ export async function verifyBundle(bundleId: string, deps: VerifyDeps): Promise<
     checks.push({
       name: 'data_plane_evidence_resolvable',
       passed: dataProblems.length === 0,
+      vacuous: dataEvidence.length === 0 && (bundle.experimentEvidence ?? []).length === 0,
       detail: dataEvidence.length === 0 && (bundle.experimentEvidence ?? []).length === 0
         ? '（pre-data-plane bundle：未声明 datasetEvidence/experimentEvidence — 检查空转通过）'
         : dataProblems.length === 0
@@ -521,6 +534,7 @@ export async function verifyBundle(bundleId: string, deps: VerifyDeps): Promise<
     checks,
     verdict,
     failedChecks: failed.map((c) => c.name),
+    vacuousChecks: checks.filter((c) => c.vacuous === true).map((c) => c.name),
     ...(replayGuidance.length > 0 ? { replayGuidance } : {}),
   });
 }

@@ -1,67 +1,72 @@
-# Backup & Restore Drill (RU-7.1)
+# Backup & Restore Drill (RU-7.1 + FA-DAT-02)
 
-`far backup` is the production caller of `Store.backupTo` — a single
-`VACUUM INTO` statement producing a standalone, consistent snapshot. The
-WAL-copy trap (copying `far.db` while its `-wal` holds recent commits
-silently loses them) is structurally avoided: `VACUUM INTO` runs inside the
-engine and writes a fully checkpointed copy.
+`far backup` writes a **workspace backup set** — one `VACUUM INTO` snapshot per
+database plus a `MANIFEST.json` — and `far restore` performs a **verified**
+restore of that set. The WAL-copy trap (copying `far.db` while its `-wal`
+holds recent commits silently loses them) is structurally avoided: `VACUUM
+INTO` runs inside the engine and writes fully checkpointed standalone copies.
+
+## What is backed up
+
+| member | role | loss impact |
+| --- | --- | --- |
+| `far.db` | scientific authority (runs, events, objects, memory, lineage, receipts) | catastrophic — this is the product |
+| `far-scheduler.db` | experiment job queue | operational; queues recreatable via `far experiment enqueue` |
+| `source-cache.db` | retrieval response cache | QoS only; safe to lose |
+
+Absent members are honestly omitted from the manifest; a set without `far.db`
+is refused (absence must never verify as success).
 
 ## Backup
 
 ```bash
-# default: <dataDir>/backup/far-<timestamp>.db (never overwrites)
-far backup
-
-# explicit destination (must not exist)
-far backup /path/to/snapshot.db
+far backup                      # <dataDir>/backup/set-<timestamp>/
+far backup /path/to/set-dir     # explicit destination (must not exist)
 ```
 
-Refuses to overwrite an existing destination — a good backup is never
-replaced by a possibly-bad one. Far-Lab locks the snapshot against
-concurrent writes for the duration.
+The manifest carries per-member sha256 + `user_version`. Refuses to overwrite
+an existing destination — a good backup is never replaced by a possibly-bad one.
 
-## Scheduler database
-
-`far backup` covers `far.db` (runs, events, objects, memory, lineage,
-receipts). The experiment job queue lives in `<dataDir>/far-scheduler.db`;
-back it up separately if you rely on queued/in-flight experiment jobs:
+## Restore (FA-DAT-02)
 
 ```bash
-cp <dataDir>/far-scheduler.db <backup>/far-scheduler.db   # only with the worker stopped
+far restore <set-dir> --replace
 ```
 
-Job state is operational (recreatable via `far experiment enqueue`); far.db
-is the scientific authority — losing the scheduler db loses queues, not results.
+Order of operations (each step is load-bearing):
 
-## Restore drill (verified procedure)
+1. **Verify first, read-only**: every member's sha256 is checked against the
+   manifest, then `PRAGMA integrity_check` runs through READ-ONLY sqlite
+   connections (never `openDb` — that would run forward migrations on the
+   backup). Any mismatch aborts before the live workspace is touched.
+2. **Hot-writer guard**: a `-wal` sibling next to a live database means a
+   server/worker may be running; restore refuses. Stop it first.
+3. **Move-aside, not delete**: live files become `<name>.pre-restore-<stamp>`.
+   Rollback is literally renaming them back — no destructive step exists.
+4. Copy the verified members in; an aborted restore rolls back its own
+   partial moves.
 
-1. Stop any server/worker using the data dir.
-2. Move the current data dir aside: `mv .far-run .far-run.broken`.
-3. Create a fresh dir and restore the snapshot as the database:
-   ```bash
-   mkdir -p .far-run
-   cp <snapshot>.db .far-run/far.db
-   cp -r .far-run.broken/artifacts .far-run/artifacts   # content-addressed blobs live outside the db
-   cp -r .far-run.broken/exports .far-run/exports 2>/dev/null || true
-   ```
-4. Verify integrity from the restored copy:
-   ```bash
-   far data info        # runs visible
-   far runs            # history intact
-   far verify <bundle-id>   # export bundles still verify against restored receipts
-   ```
-5. The audit chain check rides `/health` (`auditChain.ok`) on the next server
-   start — a tampered or truncated restore is visible there, not silent.
+`--replace` is REQUIRED when a live file exists — restoring is deliberately
+not a silent clobber.
 
-## What the snapshot does NOT include
+## Verified drills (tests/restore-drill.test.ts + tests/storage-hardening.test.ts)
 
-- `artifacts/` content-addressed blobs (restored from the file copy in step 3;
-  `far gc --dry-run` reports orphans if a blob is missing).
+- round-trip: seed run → backup → byte-corrupt live `far.db` (real mid-file
+  flip) → restore → run readable again, integrity ok
+- refuse without `--replace`; live file untouched
+- refuse a hash-tampered backup set before touching the live workspace
+- refuse under a live `-wal` (hot writer)
+- refuse an empty "backup" (no far.db)
+
+## What the backup set does NOT include
+
+- `artifacts/` content-addressed blobs — copy the directory alongside the
+  restore (`cp -r .far-run.broken/artifacts .far-run/artifacts`);
+  `far gc --dry-run` reports orphans if a blob is missing.
 - `.far-run/devices.json` (SSH device registry) — copy alongside if present.
-- `far-scheduler.db` (see above).
 
 ## Cadence
 
 No automatic schedule is imposed. For active research sessions, a manual
-`far backup` after completing a run is the recommended rhythm; the snapshot is
+`far backup` after completing a run is the recommended rhythm; the set is
 cheap (single-pass, size-proportional) and never blocks a later one.

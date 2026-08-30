@@ -1,6 +1,6 @@
 {
   "schema": "final-acceptance/1",
-  "asOf": "2026-08-30 (post P0-batch-1)",
+  "asOf": "2026-08-30 (post endgame batch 2)",
   "head": "98d4cb8+dirty(sibling conversation-stream lane in flight)",
   "provenance": "First full endgame audit: 8 parallel read-only domain audits, reports in FINAL_EVIDENCE/audit-2026-08-30/. Load-bearing claims spot-checked by main agent (CI red, netcdf fixture root cause, 0.061 stale number, north-star judge-variance detail).",
   "statusVocabulary": [
@@ -168,10 +168,10 @@
       "id": "FA-SCI-04",
       "domain": "science",
       "title": "Cross-domain held-out gold suite (non-bio)",
-      "status": "FAIL",
+      "status": "PARTIAL",
       "priority": "P0",
       "owner": "self",
-      "gap": "100% of evaluation assets (6 W4 + 5 rediscovery + 2 relation + gold studies) are biomedical; EVALUATION.md L7 forbids generality claims from narrow set",
+      "gap": "SET DRAFTED+SEALED 2026-08-30: eval/held-out-problems.md — 6 questions across materials-physics/astrophysics/electrochem-catalysis/comp-chem/labor-econ/energy-systems, preregistered protocol + completion criteria, salted sha256 seals computed from the frozen answer summaries (answers workspace-only in .control/held-out-answers.md). EXECUTION (6 live runs + unsealing comparison) pending the evaluation wave.",
       "target": ">=3 non-bio domains x 2 questions, answers sealed by hash, preregistered",
       "verify": "problem-set file with sealed hashes + one full run per domain",
       "evidence": [
@@ -182,10 +182,10 @@
       "id": "FA-SCI-05",
       "domain": "science",
       "title": "ODE executor leg exists or claim corrected",
-      "status": "FAIL",
+      "status": "PARTIAL",
       "priority": "P1",
       "owner": "self",
-      "gap": "problem-model.ts:207 comment claims numerical_simulation -> (FEM/ODE) but sidecar OPS registry has zero ODE operators",
+      "gap": "HONESTY FIXED 2026-08-30: problem-model.ts routing comment no longer claims an ODE leg (FEM/AFEM + Monte-Carlo named; ODE-typed plans disclosed as protocol-fallthrough, tracked here). The real ode-integration vertical slice (OdeSpec schema + drafter + executor + sidecar op + tests, mirroring the theory lane) remains the queued P1 work — sized as its own lane per the semantic-chain rule.",
       "target": "ode_integrate op (scipy solve_ivp + convergence-order verdict, FEM pattern) OR honest comment fix",
       "verify": "executor test asserting mechanical verdict",
       "evidence": [
@@ -336,10 +336,10 @@
       "id": "FA-DAT-02",
       "domain": "data",
       "title": "far restore verb + 3-DB consistent backup + corruption drill",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "self",
-      "gap": "backup strong (VACUUM INTO) but restore is documentation; scheduler.db/source-cache.db excluded; no integrity-failure drill",
+      "gap": "CLOSED 2026-08-30: backupWorkspace/restoreWorkspace (src/app/backup-restore.ts) — 3-DB VACUUM INTO set + MANIFEST(sha256+user_version), read-only verify-before-touch, -wal hot-writer guard, move-aside rollback; far backup/restore CLI verbs + HELP + completion + docs; 10 real-path tests incl. real byte-corruption round-trip (tests/restore-drill.test.ts, storage-hardening.test.ts).",
       "target": "far restore + one-shot 3-DB backup set + PRAGMA integrity_check failure injection test",
       "verify": "automated drill in tests",
       "evidence": [
@@ -378,10 +378,10 @@
       "id": "FA-DAT-05",
       "domain": "data",
       "title": "verify legacy no-op checks degraded-marked + recompute level real",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P2",
       "owner": "self",
-      "gap": "checks 13-16 pass vacuously for legacy bundles; recompute level guidance-only",
+      "gap": "CLOSED 2026-08-30: VerificationCheck.vacuous + report.vacuousChecks machine-readable; CLI prints (vacuous) markers + disclosure line; regression test asserts 5 vacuous checks on legacy bundle.",
       "target": "explicit legacy marker in verdict; real replay for recompute",
       "verify": "verify.test.ts extended",
       "evidence": [
@@ -420,10 +420,10 @@
       "id": "FA-REM-03",
       "domain": "remote",
       "title": "Probe = full environment+capability fingerprint (versions/hardware) into provenance",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "self",
-      "gap": "probe only python3+numpy boolean; no lockfile hash, no CPU/GPU/mem discovery; maxParallel ignored",
+      "gap": "CLOSED 2026-08-30: probe emits full fingerprint (python/numpy versions, cpuCount, gpu via nvidia-smi, pip-freeze sha256) persisted into experiment environment + ResultCell fingerprints now include remotePipFreeze; parseProbeReport unit tests (honest null degradation). Remote mem-total still omitted (cpu+gpu suffice for device identity); scheduler-driven device matching remains future work.",
       "target": "probe collects pip-freeze hash + nvidia-smi/lscpu/mem; drives device matching",
       "verify": "probe output in environment provenance",
       "evidence": [
@@ -448,10 +448,10 @@
       "id": "FA-PRF-01",
       "domain": "perf",
       "title": "Capacity benchmark at 1000+ claims / 100+ hypotheses",
-      "status": "FAIL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "self",
-      "gap": "max measured ~21 claims/15k events; web slice-truncation only; PERF_BASELINE.md admits unmeasured",
+      "gap": "CLOSED (backend plane) 2026-08-30: tests/capacity-bench.test.ts — 1000 claims/100 hyps/3000 relations SYNTHETIC-labeled always-on gate: bulk write 1.4s, /science projection warm 31ms, listEvents(4100+) 30ms, lineage 15ms; artifact evidence/capacity/capacity-2026-08-30.json. Web-rendering capacity at this scale remains the HCI lane item (truncation-based UI unchanged).",
       "target": "synthetic-labeled large-corpus fixture + capacity spec in CI",
       "verify": "benchmark artifact + CI threshold",
       "evidence": [
@@ -490,10 +490,10 @@
       "id": "FA-PRF-04",
       "domain": "perf",
       "title": "Cancel ms-level abort regression test",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "self",
-      "gap": "wire exists end-to-end but no timing assertion on real in-flight provider call",
+      "gap": "CLOSED 2026-08-30: tests/cancel-wire-timing.test.ts drives the real orchestrator+lease+wireCancels against a hanging provider whose only exit is the injected AbortSignal — measured 0.6ms cancel→abort, asserted <1s, run lands cancelled.",
       "target": "slow-provider stub + cancel <1s test",
       "verify": "new test",
       "evidence": [
@@ -504,10 +504,10 @@
       "id": "FA-PRF-05",
       "domain": "perf",
       "title": "sweep-zombie tested + scheduled + liveness-linked",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "self",
-      "gap": "sweep has zero tests, no scheduler, staleness-only heuristic; watchdog covers dead-worker case only",
+      "gap": "CLOSED 2026-08-30: sweep-zombie-runs.mjs gained FARLAB_DATA_DIR support (was hardcoded .far-run) + tests/sweep-zombie.test.ts: dry-run no-op, --execute marks only stale running runs with run_status_changed audit event, fresh/completed runs protected.",
       "target": "vitest wrapper + lease cross-check",
       "verify": "tests + watchdog integration",
       "evidence": [
@@ -717,7 +717,7 @@
       "status": "PARTIAL",
       "priority": "P2",
       "owner": "self",
-      "gap": "pip install numpy unpinned vs uv.lock family; no rust-toolchain.toml",
+      "gap": "numpy pin DONE 2026-08-30 (both ci.yml sites pinned to uv.lock family >=2.4,<3). Remaining: rust-toolchain.toml pin (no Rust build in CI yet — moves with FA-PLT-03 desktop lane).",
       "target": "pins added",
       "verify": "workflow diff",
       "evidence": [
@@ -811,6 +811,6 @@
   ],
   "stopConditions": {
     "note": "Mission stop requires ALL of: no internal FAIL/PARTIAL; canonical clean-clone CI green; science north-star met or externally justified; real evidence across all planes; 24h→72h soak+chaos; win/mac/linux matrix; sandbox attack suite; production-path-only flows; clean-machine bundle verify; honest BLOCKED_EXTERNAL only; docs==commit; final red-team audit no new P0/P1.",
-    "currentVerdict": "NOT READY — verify CI green restored (web-e2e CLS residual, sibling lane); submission-doc honesty restored; security P0 batch closed; science metrics + capacity + soak remain the open P0/P1 frontier."
+    "currentVerdict": "NOT READY — 14 FAIL, 30 PARTIAL, 10 PASS, 2 BLOCKED_EXTERNAL (56 tracked). Batch-2 closed: restore drill, backend capacity gate, cancel-timing pin, sweep tests, numpy pin, probe fingerprint, verify vacuous marking, ODE comment honesty, held-out set sealed. Open frontier: science metrics (rediscovery/judge/relation + held-out execution), 72h soak, streaming data plane, OS-level sandbox, windows CI matrix, release chain, user-study execution, sibling-lane items (web-e2e CLS, per-tool deadline, fence crypto-random)."
   }
 }

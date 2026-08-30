@@ -28,7 +28,9 @@
 
 ## P1 队列（acceptance/reliability/reproducibility 摘要）
 
-FA-HAR-01 per-tool 超时缝（等兄弟车道落地）· FA-HAR-02 预算/pacing 默认化 · FA-HAR-03 failover live 实证 · FA-HAR-04 72h soak · FA-DAT-01 数据面流式化 · FA-DAT-02 far restore + 三库备份 · FA-SCI-05 ODE 腿（先修注释诚实）· FA-SCI-06 结构化输出复测 · FA-SCI-07 AstaBench/MLR 接入 · FA-REM-02 远程 cell 级去重 · FA-REM-03 probe 指纹 · FA-PRF-01 容量基准 · FA-PRF-02 后端 perf gate · FA-PRF-03 混沌矩阵补 4 项 · FA-PRF-04 cancel 计时回归 · FA-PRF-05 sweep 测试化 · FA-SEC-08 fence crypto-random（兄弟车道）· FA-SEC-09 SBOM/SAST/audit 门 · FA-SEC-11 威胁登记补全 · FA-PLT-01 windows CI + firefox · FA-PLT-03 release-pack 真跑 · FA-HCI-01..03（兄弟车道）· FA-EVAL-02 user-study 协议开发 · FA-EVAL-04 控制面鲜活度。
+**批 2 已闭（2026-08-30）**：FA-DAT-02 far restore+三库备份+损坏 drill（PASS）· FA-DAT-05 verify vacuous 机器可读降级（PASS）· FA-PRF-01 后端容量门 1000+ claims（PASS，明示 SYNTHETIC）· FA-PRF-04 cancel 0.6ms 计时钉死（PASS）· FA-PRF-05 sweep 三测试+FARLAB_DATA_DIR（PASS）· FA-PLT-06 numpy pin（PARTIAL→numpy 已 pin，rust-toolchain 随桌面车道）· FA-REM-03 probe 全指纹入 provenance+fingerprint（PASS）· FA-SCI-05 注释诚实化（PARTIAL，真 ODE 腿=独立车道）· FA-SCI-04 跨领域 6 题+真实 salted seal 封存（PARTIAL，执行待评估波）。
+
+仍开放：FA-HAR-01 per-tool 超时缝（兄弟车道）· FA-HAR-02 预算/pacing 默认化 · FA-HAR-03 failover live 实证 · FA-HAR-04 72h soak · FA-DAT-01 数据面流式化 · FA-SCI-05 ODE 腿实现 · FA-SCI-06 结构化输出复测 · FA-SCI-07 AstaBench/MLR 接入 · FA-SCI-04 执行 · FA-REM-02 远程 cell 级去重 · FA-PRF-02 后端 perf gate · FA-PRF-03 混沌矩阵补 4 项 · FA-SEC-08 fence crypto-random（兄弟车道）· FA-SEC-09 SBOM/SAST/audit 门 · FA-SEC-11 威胁登记（R-19/20/21 已登，条目闭待能力闭）· FA-PLT-01 windows CI + firefox · FA-PLT-03 release-pack 真跑 · FA-HCI-01..03（兄弟车道）· FA-EVAL-02 user-study 协议开发 · FA-EVAL-04 控制面鲜活度。
 
 ## P2 队列（architecture/product/performance/frontier 摘要）
 

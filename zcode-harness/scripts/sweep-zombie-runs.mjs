@@ -8,12 +8,12 @@
  *
  * SAFETY: dry-run by default (prints what would change); --execute applies changes.
  * A run updated within the staleness window is left alone (its worker may be live).
- * Usage: node zcode-harness/scripts/sweep-zombie-runs.mjs [--stale-minutes 30] [--execute]
+ * Usage: FARLAB_DATA_DIR=<dir> node zcode-harness/scripts/sweep-zombie-runs.mjs [--stale-minutes 30] [--execute]
  */
 import { DatabaseSync } from 'node:sqlite';
 import { resolve } from 'node:path';
 
-const DB = resolve(process.cwd(), '.far-run/far.db');
+const DB = resolve(process.env.FARLAB_DATA_DIR ?? resolve(process.cwd(), '.far-run'), 'far.db');
 const EXECUTE = process.argv.includes('--execute');
 const STALE_MIN = Number(process.argv.find((_, i, a) => a[i - 1] === '--stale-minutes') ?? 30);
 const db = new DatabaseSync(DB, EXECUTE ? {} : { readOnly: true });

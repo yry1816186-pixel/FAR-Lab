@@ -97,7 +97,7 @@ describe('R2-12 concurrent access (two connections, one far.db)', () => {
 });
 
 describe('RU-7.1 backup CLI verb (far backup)', () => {
-  it('end-to-end via main(): writes a restorable snapshot under backup/, refuses overwrite', async () => {
+  it('end-to-end via main(): writes a restorable SET under backup/, refuses overwrite', async () => {
     const { execFileSync } = await import('node:child_process');
     const path = await import('node:path');
     const fsMod = await import('node:fs');
@@ -109,22 +109,57 @@ describe('RU-7.1 backup CLI verb (far backup)', () => {
       env: { ...process.env, FARLAB_DATA_DIR: dir },
       encoding: 'utf8',
     });
-    expect(out).toContain('backup written');
-    const backupDir = path.join(dir, 'backup');
-    const files = fsMod.readdirSync(backupDir);
-    expect(files).toHaveLength(1);
+    expect(out).toContain('backup set written');
+    const sets = fsMod.readdirSync(path.join(dir, 'backup'));
+    expect(sets).toHaveLength(1);
+    const setDir = path.join(dir, 'backup', sets[0]!);
+    // a set = member db + manifest; the member opens as a live store
+    expect(fsMod.existsSync(path.join(setDir, 'MANIFEST.json'))).toBe(true);
     const snap = new (await import('../src/persistence/store.js')).Store(
-      (await import('../src/persistence/db.js')).openDb(path.join(backupDir, files[0]!)));
+      (await import('../src/persistence/db.js')).openDb(path.join(setDir, 'far.db')));
     expect(snap.listRuns(10)).toHaveLength(1);
     expect(snap['db'].prepare('PRAGMA integrity_check').get()?.integrity_check).toBe('ok');
     snap['db'].close();
-    // second backup to the SAME explicit path must refuse
-    const dest = path.join(dir, 'explicit.db');
+    // second backup to the SAME explicit dir must refuse
+    const dest = path.join(dir, 'explicit-set');
     const proc = await import('node:child_process');
     const first = proc.spawnSync(process.execPath, ['dist/cli/main.js', 'backup', dest], { env: { ...process.env, FARLAB_DATA_DIR: dir }, encoding: 'utf8' });
     expect(first.status).toBe(0);
     const second = proc.spawnSync(process.execPath, ['dist/cli/main.js', 'backup', dest], { env: { ...process.env, FARLAB_DATA_DIR: dir }, encoding: 'utf8' });
     expect(second.status).toBe(1);
     expect(second.stderr).toContain('refusing to overwrite');
+  });
+
+  it('far restore CLI round-trips a corrupted live far.db from a backup set (FA-DAT-02)', async () => {
+    const { execFileSync, spawnSync } = await import('node:child_process');
+    const path = await import('node:path');
+    const fsMod = await import('node:fs');
+    const { dir, store } = mkStore();
+    mkRun(store);
+    const runId = store.listRuns(1)[0]!.id;
+    store['db'].close();
+    execFileSync(process.execPath, ['dist/cli/main.js', 'backup'], {
+      env: { ...process.env, FARLAB_DATA_DIR: dir }, encoding: 'utf8',
+    });
+    const setDir = path.join(dir, 'backup', fsMod.readdirSync(path.join(dir, 'backup'))[0]!);
+
+    // disaster: corrupt the live far.db mid-file
+    const live = path.join(dir, 'far.db');
+    const fd = fsMod.openSync(live, 'r+');
+    try { fsMod.writeSync(fd, Buffer.from('X'), 0, 1, Math.floor(fsMod.statSync(live).size / 2)); }
+    finally { fsMod.closeSync(fd); }
+
+    // restore refuses without --replace; succeeds with it
+    const noReplace = spawnSync(process.execPath, ['dist/cli/main.js', 'restore', setDir], { env: { ...process.env, FARLAB_DATA_DIR: dir }, encoding: 'utf8' });
+    expect(noReplace.status).toBe(1);
+    expect(noReplace.stderr).toContain('--replace');
+    const yes = spawnSync(process.execPath, ['dist/cli/main.js', 'restore', setDir, '--replace'], { env: { ...process.env, FARLAB_DATA_DIR: dir }, encoding: 'utf8' });
+    expect(yes.status).toBe(0);
+    expect(yes.stdout).toContain('restored');
+
+    const back = new (await import('../src/persistence/store.js')).Store(
+      (await import('../src/persistence/db.js')).openDb(live));
+    expect(back.listRuns(10).some((r) => r.id === runId)).toBe(true);
+    back['db'].close();
   });
 });
