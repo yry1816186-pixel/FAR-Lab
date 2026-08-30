@@ -49,6 +49,14 @@ export function LabHome({
   onJudgmentCount?: (n: number) => void;
 }): JSX.Element {
   const { t } = useI18n();
+/** Fixed-height placeholders shown while runs load: the queue layout keeps its
+ * final footprint from first paint, so late-arriving rows cannot shift it
+ * (perf §21 CLS ceiling 0.1; live-observed 0.135 under a loaded suite). */
+const QueueSkeleton = ({ rows = 2 }: { rows?: number }): JSX.Element => (
+  <>
+    {Array.from({ length: rows }, (_, i) => <div key={i} className="queue-item queue-item--skeleton" />)}
+  </>
+);
   const fresh = !runsLoading && runs.length === 0;
   const [counterStudyIds, setCounterStudyIds] = useState<string[]>([]);
   const [query, setQuery] = useState('');
@@ -158,7 +166,9 @@ export function LabHome({
             <section className="queue-section" aria-labelledby="labq-judgment">
               <h2 className="queue-section-title" id="labq-judgment">{t('labhome.judgmentTitle')}</h2>
               <p className="queue-section-sub">{t('labhome.judgmentSub')}</p>
-              {live.length === 0 && attention.length === 0 && counterStudies.length === 0 && drafts.length === 0
+              {runsLoading
+                ? <QueueSkeleton rows={4} />
+                : live.length === 0 && attention.length === 0 && counterStudies.length === 0 && drafts.length === 0
                 ? <p className="queue-empty">{t('labhome.judgmentEmpty')}</p>
                 : (
                   <>
@@ -227,7 +237,9 @@ export function LabHome({
                 </div>
               </div>
               <p className="queue-section-sub">{t('labhome.studiesSub')}</p>
-              {studies.length === 0
+              {runsLoading
+                ? <QueueSkeleton rows={5} />
+                : studies.length === 0
                 ? <p className="queue-empty">{t('labhome.studiesNoMatch')}</p>
                 : visibleStudies.map((g) => {
                   const active = g.activeCount > 0;

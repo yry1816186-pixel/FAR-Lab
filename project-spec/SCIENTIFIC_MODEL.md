@@ -76,6 +76,52 @@ A **ProtocolExecution** is the append-only, human-attested ledger of what actual
 
 The model may propose inside a closed declarative space when drafting a protocol; ids, seeds, allocation sequences, collection forms and every validation verdict are owned by deterministic code. Adjustments the code makes to a draft are disclosed, never silent. A product run on the deterministic development wire is refused (template protocol ≠ preregistered science).
 
+## 7.6 Scientific Problem Model + Method Selection (AOSSA convergence, 2026-08-30)
+A run forms its **ScientificProblemModel** at the scope stage, BEFORE any
+hypothesis exists: objectives, variables (role/unit/value-type), a
+formalization (problem class, governing relations, boundary conditions,
+well-posedness notes), a data inventory with access states, statistical/
+causal premises, checkable metrics, stop conditions, and honest unknowns
+(an empty unknown list on a frontier question is a defect). One per run;
+absent on pre-AOSSA runs — never fabricated.
+A **MethodSelection** decides method families per objective: 2–12 candidates
+each, assessed `selected`/`viable_alternative`/`rejected_inappropriate`/
+`insufficient_information` with rationale; every selected family MUST carry a
+real validation plan (convergence order vs analytic rates, preregistered
+test, held-out set, protocol QC rule, replication). Families form a closed
+12-value enum (analytic_symbolic … archival_analysis). At most 2 selected per
+objective; zero selected requires an undecidedReason.
+Discipline (all deterministic, model proposals only fill draft schemas):
+- Draft guards fire at the model-call boundary (callStructured) — a draft
+  that cannot satisfy the guards fails there, never after persistence. Short
+  placeholder validationPlans on non-selected candidates pass the draft and
+  are stripped before the canonical parse (canonical min-lengths unchanged).
+- Test-double output is refused in product runs via a MARKER SKIPPED stage
+  outcome — resume reopens the whole scope stage (the run is never left
+  permanently without a problem model).
+- Hypothesis generation runs UNDER the model (objectives + selected families
+  ride every strategy prompt and its cache fingerprint); plans must stay
+  inside the selected families; execution routes by selection (below).
+## 7.7 Method-selection routing + dataset auto-serialization (2026-08-30)
+The execute stage drafts legs in a fixed cascade (tabular EEL → statistical
+meta → theory identity → numerical PDE → frozen protocol). Method selection
+hard-routes it: a leg whose every backing family was assessed
+`rejected_inappropriate` at scope time is NOT drafted (an honest
+`method_selection_routing` note records the skip); unmentioned families stay
+reachable; pre-AOSSA runs keep the fixed order.
+Auto-serialization closes data → execution: operator-registered CSV
+dataset_records on the run ride the spec-draft payload as ids/columns only —
+local paths NEVER enter a prompt. The draft binds one by `datasetRecordId`
+(XOR `openmlDatasetId`); deterministic code resolves the local path after the
+draft names the id and refuses unknown ids. Regression drafts (numeric
+target) use the regression builder set with mse/r2 metrics, `below`
+comparisons and plain random splits (stratified is wrong on continuous
+targets). `allowLocalDatasets` is true exactly when a spec binds an
+operator-registered record — the record IS the operator acquisition act.
+The revise stage sees registered datasets in its causal analysis, so a
+new_dataset feedback can force a PLAN revision (dataRequirements re-bound,
+re-frozen); a stale execute-skip verdict predating the new freeze re-arms
+(freeze-time discipline, same as the protocol gate).
 ## 8. Feedback and revision
 
 **FeedbackSignal** identifies source/type (human, evidence, tool/validation), target object, content and provenance.
@@ -102,6 +148,35 @@ Improvement is a claim requiring evaluation evidence; some revisions may be neut
 
 **ExperimentRun** owns a persisted lifecycle like ResearchRun (queued/running/checkpointed/completed/failed/canceled) with lease/cancel/resume semantics. Executed-once determinism: identical (spec, seed, environment hash) re-executions must reproduce identical results or report the divergence honestly.
 
+## 10.1 Data-plane + numerical-leg semantics (2026-08-30)
+**NetCDF acquisition** (operator act): raw bytes hashed (sha256), stored
+content-addressed, xarray-profiled by the sidecar (dims/coords/units/attrs +
+record-time QC: NaN/Inf/missing/monotonic time/structure hash), lineage
+`acquired`. The profile's bytes are re-hashed after profiling and must match
+(TOCTOU closed at acquisition); `sha256Expected` recorded then VERIFIED again
+at feature extraction — bytes that changed between acquire and extract never
+produce a derived record. Path defense is double-gated (TS boundary + op
+layer): URIs rejected before libnetcdf's DAP can fire an outbound request;
+relative paths rejected; FARLAB_DATA_ROOT fences reads when set.
+**Derived features** are closed-enum aggregations (global mean timeseries /
+monthly mean per gridpoint / flatten) — spatial structure is claimed only as
+the named mode states; gridpoint coordinates come from the file's own
+coordinate arrays, never fabricated from flat indices.
+**Numerical PDE leg (FemSpec)**: a preregistered manufactured solution lives
+as whitelisted-AST expression DATA; sympy derives the forcing and Neumann
+fluxes exactly. P1 triangles, mixed Dirichlet/Neumann assembly (symmetric
+elimination), uniform ladders and residual-driven adaptive refinement
+(Dörfler marking, newest-vertex bisection with conformity closure; the
+residual estimator carries the volume, edge-jump AND Neumann boundary terms).
+Verdicts are mechanical against theory-fixed P1 rates (never model-chosen
+thresholds), honestly scoped to the unit square; adaptive slope/effectivity
+bands are predeclared.
+**Bundle data-plane evidence**: dataset_records ride the reproducibility
+bundle (`datasetEvidence`: id/name/format/contentRef/lineage kinds) and FEM
+measurement tables join `experimentEvidence.artifactHashes`; verification
+re-derives every field from the store and probes the artifacts (binary-safe —
+content-addressed files are hashed as bytes, never round-tripped through a
+text decode).
 ## 11. Non-goals
 
 - LLM output is never a scientific source by itself.

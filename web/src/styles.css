@@ -2656,3 +2656,6 @@ select option { color: var(--text); background: var(--surface); }
 /* AOSSA product visibility: data-plane section in the experiments tab */
 .exp-dataplane { margin: 12px 0 18px; }
 .exp-dataplane table { margin-top: 4px; }
+
+/* Dataset raw drilldown preview */
+.exp-dp-raw { max-height: 260px; overflow: auto; background: var(--v2-surface); border: 1px solid var(--v2-border); border-radius: 8px; padding: 10px 12px; margin: 6px 0 0; white-space: pre; }

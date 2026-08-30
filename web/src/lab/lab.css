@@ -199,7 +199,7 @@
 
 /* ---------- shared queue rows (workspace layer + judgment items) ---------- */
 .queue-canvas { max-width: 880px; margin: 0 auto; padding: 26px 28px 120px; }
-.queue-section { margin-bottom: 34px; }
+.queue-section { margin-bottom: 34px; min-height: 168px; } /* reserved footprint: late data must not shift the page (perf CLS) */
 .queue-section-title { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
 .queue-section-sub { font-size: 12px; color: var(--v2-text-3); margin-bottom: 12px; }
 .queue-item {
@@ -1298,3 +1298,12 @@ body.is-resizing-panel { cursor: row-resize; user-select: none; }
 /* AOSSA problem-model band (pre-hypothesis layer) */
 .pm-objectives { margin: 8px 0 6px; padding: 0; list-style: none; }
 .pm-objectives li { margin: 4px 0; }
+
+/* Loading footprint: skeleton rows keep the queue layout's final size from
+ * first paint (perf §21 CLS ceiling; late data must not shift the page). */
+.queue-item--skeleton {
+  min-height: 46px;
+  border-color: var(--v2-border);
+  animation: labPulse 1.6s ease-in-out infinite;
+  opacity: 0.55;
+}

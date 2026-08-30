@@ -161,6 +161,12 @@ export interface ExperimentEvidence {
   statReports: Array<Record<string, unknown>>;  femSpecs: Array<Record<string, unknown>>;
   datasetRecords: Array<Record<string, unknown>>;
 }
+/** Raw drilldown: head rows of a dataset record's content-addressed artifact (csv) or the honest binary notice. */
+export const getDatasetSample = async (runId: string, datasetRecordId: string, signal?: AbortSignal) =>
+  (await api.getJson(`${BASE}/runs/${encodeURIComponent(runId)}/datasets/${encodeURIComponent(datasetRecordId)}/sample`, signal)) as
+    | { datasetRecordId: string; format: string; binary: true; note: string; lineageKinds: string }
+    | { datasetRecordId: string; format: string; binary: false; header: string; totalLines: number; preview: string; contentRef: string };
+
 export const getExperiments = async (runId: string, signal?: AbortSignal): Promise<ExperimentEvidence> => {
   const data = (await api.getJson(`${BASE}/runs/${encodeURIComponent(runId)}/experiments`, signal)) as ExperimentEvidence;
   return {

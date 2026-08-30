@@ -43,7 +43,7 @@ test('full journey: formation -> launch -> study map -> inspector -> home', asyn
   await q.fill(QUESTION);
   const route = page.locator('.nr-route');
   await expect(route).toBeVisible();
-  await expect(route.locator('option', { hasText: /离线|offline/i }).first()).toBeAttached();
+  await expect(route.locator('option', { hasText: /测试替身|test.?double/i }).first()).toBeAttached();
 
   // 3. Launch -> lands DIRECTLY on the study map (#study/<runId>)
   await page.getByRole('button', { name: /启动研究|Start research/ }).click();

@@ -2464,6 +2464,30 @@ function parseSeedSources(raw: unknown): string | {
         });
         return;
       }
+      // Raw drilldown (product HCI §7: any visible result drills to raw data):
+      // head rows of a dataset_record's CONTENT — csv from the content-addressed
+      // artifact (text-safe); binary formats serve an honest notice instead of
+      // a fabricated text preview.
+      if (segments.length === 7 && segments[4] === 'datasets' && segments[5] !== undefined && segments[6] === 'sample' && method === 'GET') {
+        mustGetRun(runId);
+        const rec = app.store.getObject('dataset_record', segments[5]!) ?? app.store.listObjects('dataset_record', runId).find((d) => d.id === segments[5]!);
+        if (rec === null || rec === undefined) return sendJson(res, 404, { error: { code: 'not_found', message: `dataset_record ${segments[5]} not found` } });
+        if (rec.format !== 'csv') {
+          return sendJson(res, 200, {
+            datasetRecordId: rec.id, format: rec.format, binary: true,
+            note: `raw ${rec.format} bytes are content-addressed (${rec.contentRef.slice(0, 19)}…) — profile/QC live in the lineage events; a text preview would be fabricated`,
+            lineageKinds: rec.lineage.map((l) => l.kind).join(' -> '),
+          });
+        }
+        const text = await app.artifacts.get(rec.contentRef);
+        if (text === null) return sendJson(res, 404, { error: { code: 'artifact_missing', message: `content artifact ${rec.contentRef.slice(0, 19)}… not in store` } });
+        const lines = text.split(/\r?\n/);
+        return sendJson(res, 200, {
+          datasetRecordId: rec.id, format: 'csv', binary: false,
+          header: lines[0] ?? '', totalLines: Math.max(0, lines.length - 1 - (text.endsWith('\n') ? 1 : 0)),
+          preview: lines.slice(0, 11).join('\n'), contentRef: rec.contentRef,
+        });
+      }
       if (segments.length === 5) {
         const leaf = segments[4]!;
         if (leaf === 'events' && method === 'GET') return runEvents(res, runId, url);

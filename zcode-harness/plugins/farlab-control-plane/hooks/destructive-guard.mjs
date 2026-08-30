@@ -49,6 +49,18 @@ if (rm) {
   if (recursive && force && targets.some(x => x === '.git' || x === './.git')) respond('ask', 'deleting .git destroys repository history and recovery metadata');
 }
 
+// PowerShell mirror of the rm parser: tokens are order-independent (flags may
+// precede the path), so parse tokens instead of regexing positions.
+const psri = normalized.match(/(?:^|[;&|]\s*)R[e]move-Item\s+([^;&|]+)/i);
+if (psri) {
+  const tokens = psri[1].trim().split(/\s+/).map(unquote);
+  const recursive = tokens.some(x => /^-[^-]/.test(x) && x.toLowerCase().includes('r'));
+  const force = tokens.some(x => /^-[^-]/.test(x) && x.toLowerCase().includes('f'));
+  const targets = tokens.filter(x => x !== '--' && !x.startsWith('-'));
+  if (recursive && force && targets.some(dangerousResolvedTarget)) respond('deny', 'recursive forced PowerShell deletion targets root/home/workspace/current/parent or a drive root');
+  if (recursive && force && targets.some(x => x === '*' || x === './*')) respond('ask', 'recursive forced wildcard deletion can erase broad workspace contents');
+}
+
 const askRules = [
   [/\bgit\s+clean\b[^\n]*(?:-f|--force)/i, 'git clean with force can erase untracked/ignored work'],
   [/\bgit\s+reset\s+--hard\b/i, 'git reset --hard can erase uncommitted work'],

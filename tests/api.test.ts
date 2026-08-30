@@ -23,7 +23,7 @@ import {
   ReproducibilityBundle,
   Revision,
   ScientificClaim,
-  SourceDocument,
+  SourceDocument, DatasetRecord,
   VersionDiff,
   newId,
 } from '../src/domain/index.js';
@@ -848,6 +848,46 @@ describe('GET /api/v1/runs/:id/events', () => {
 
 // ---- resource endpoints -----------------------------------------------------
 
+  it('GET /runs/:id/datasets/:dsId/sample — csv head rows from the content-addressed artifact; binary format serves an honest notice', async () => {
+    const csv = 'month,lat,lon,value\n1,15.0,200.0,298.2\n2,15.0,200.0,299.1\n3,15.0,200.0,300.4\n';
+    const put = await app.artifacts.put(csv);
+    const ds = DatasetRecord.parse({
+      id: newId('ds') as never,
+      runId: run1 as never,
+      name: 'fixture:monthly',
+      source: { resolver: 'local', path: 'C:/fixture/monthly.csv' },
+      license: 'unknown',
+      format: 'csv',
+      contentRef: put.ref,
+      targetColumn: 'value',
+      columns: ['month', 'lat', 'lon', 'value'],
+      nRows: 3,
+      lineage: [{ kind: 'acquired', detail: 'fixture', at: ts(5) }],
+      fetchedAt: ts(5),
+    });
+    app.store.putObject('dataset_record', ds);
+    const ok = await getJson(`${base}/api/v1/runs/${run1}/datasets/${ds.id}/sample`);
+    expect(ok.status).toBe(200);
+    expect(ok.body.binary).toBe(false);
+    expect(ok.body.header).toBe('month,lat,lon,value');
+    expect(ok.body.totalLines).toBe(3);
+    expect(ok.body.preview).toContain('298.2');
+    const raw = DatasetRecord.parse({
+      ...ds,
+      id: newId('ds') as never,
+      name: 'fixture:raw.nc',
+      format: 'netcdf',
+      source: { resolver: 'local_netcdf', path: 'C:/fixture/raw.nc', variable: 'air' } as never,
+      lineage: [...ds.lineage, { kind: 'preprocess', detail: 'fixture', at: ts(6) }],
+    });
+    app.store.putObject('dataset_record', raw);
+    const bin = await getJson(`${base}/api/v1/runs/${run1}/datasets/${raw.id}/sample`);
+    expect(bin.status).toBe(200);
+    expect(bin.body.binary).toBe(true);
+    expect(bin.body.note).toContain('profile/QC');
+    const ghost = await getJson(`${base}/api/v1/runs/${run1}/datasets/ds_${'0'.repeat(25)}/sample`);
+    expect(ghost.status).toBe(404);
+  });
 describe('run resource endpoints', () => {
   it('GET question returns the question object', async () => {
     const { status, body } = await getJson(`${base}/api/v1/runs/${run1}/question`);

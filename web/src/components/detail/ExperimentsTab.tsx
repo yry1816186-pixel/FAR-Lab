@@ -1,7 +1,7 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { ResearchRun } from '../../api/types';
-import { getExperiments } from '../../api/endpoints';
 import { useResource } from '../../hooks/useResource';
+import { getDatasetSample, getExperiments } from '../../api/endpoints';
 import { useI18n } from '../../i18n/LanguageContext';
 import { Badge, EmptyState, ErrorBox, IdText, TimeText } from '../common';
 import { ForestPlot } from './viz/ForestPlot';
@@ -68,6 +68,17 @@ export function ExperimentsTab({ run }: { run: ResearchRun }): JSX.Element {
   const sets = data?.resultSets ?? [];
   const reports = data?.statReports ?? [];
 
+  // Raw drilldown state: one dataset sample at a time (click toggles).
+  const [sample, setSample] = useState<Awaited<ReturnType<typeof getDatasetSample>> | null>(null);
+  const loadSample = async (datasetRecordId: string): Promise<void> => {
+    if (sample?.datasetRecordId === datasetRecordId) { setSample(null); return; }
+    try {
+      setSample(await getDatasetSample(run.id, datasetRecordId));
+    } catch {
+      setSample(null);
+    }
+  };
+
   return (
     <>
       <p className="muted small">
@@ -85,12 +96,13 @@ export function ExperimentsTab({ run }: { run: ResearchRun }): JSX.Element {
         />
       )}
       {reports.length > 0 && <VerdictTallyStrip reports={reports as ReportLike[]} />}
-      {/* AOSSA data plane (product visibility): acquired/derived datasets + numerical-PDE specs */}
+      {/* AOSSA data plane (product visibility): acquired/derived datasets + numerical-PDE specs.
+       * Raw drilldown: a row click loads head rows from the content-addressed artifact. */}
       {(data?.datasetRecords?.length ?? 0) > 0 && (
         <section className="exp-dataplane">
           <p className="muted small">{t('exp.dataplaneTitle')}</p>
           <table className="table table--compact">
-            <thead><tr><th>{t('exp.dpName')}</th><th>{t('exp.dpFormat')}</th><th>{t('exp.dpRows')}</th><th>{t('exp.dpLineage')}</th><th>contentRef</th></tr></thead>
+            <thead><tr><th>{t('exp.dpName')}</th><th>{t('exp.dpFormat')}</th><th>{t('exp.dpRows')}</th><th>{t('exp.dpLineage')}</th><th>contentRef</th><th /></tr></thead>
             <tbody>
             {data!.datasetRecords.map((d) => (
               <tr key={str(d.id)}>
@@ -99,10 +111,18 @@ export function ExperimentsTab({ run }: { run: ResearchRun }): JSX.Element {
                 <td>{typeof d.nRows === 'number' ? d.nRows : '—'}</td>
                 <td>{Array.isArray(d.lineage) ? d.lineage.map((l) => str((l as Record<string, unknown>).kind)).join(' → ') : '—'}</td>
                 <td><code>{str(d.contentRef).slice(0, 19)}…</code></td>
+                <td><button type="button" className="btn btn--sm" onClick={() => void loadSample(str(d.id))}>{sample?.datasetRecordId === str(d.id) ? t('exp.dpHideRaw') : t('exp.dpShowRaw')}</button></td>
               </tr>
             ))}
             </tbody>
           </table>
+          {sample !== null && (
+            <pre className="mono small exp-dp-raw" aria-label={t('exp.dpRawLabel')}>
+              {sample.binary
+                ? `${sample.note}\nlineage: ${sample.lineageKinds}`
+                : `${sample.header}\n— ${sample.totalLines} rows total; contentRef ${sample.contentRef}\n${sample.preview}`}
+            </pre>
+          )}
         </section>
       )}
       {(data?.femSpecs?.length ?? 0) > 0 && (
