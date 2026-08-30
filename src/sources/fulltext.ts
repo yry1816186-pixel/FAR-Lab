@@ -357,10 +357,13 @@ export const fetchOpenAlexTeiFullText = async (
     };
   }
   try {
-    const res = await httpGet(`${route.sourceUrl}?api_key=${encodeURIComponent(apiKey)}`, {
+    // Security (endgame audit B): the key rides the Authorization header, never
+    // the URL — error paths persist URLs and query strings leak via logs/proxies
+    // (OpenAlex documents Bearer as a supported auth method).
+    const res = await httpGet(route.sourceUrl, {
       fetchImpl: opts.fetchImpl,
       timeoutMs: opts.timeoutMs,
-      headers: { 'User-Agent': USER_AGENT },
+      headers: { 'User-Agent': USER_AGENT, Authorization: `Bearer ${apiKey}` },
       context: { family: 'openalex_tei', query: route.id },
     });
     if (res.status === 404) {

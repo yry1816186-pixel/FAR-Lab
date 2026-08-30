@@ -80,7 +80,6 @@ describe.skipIf(!fs.existsSync(REAL_NC))('netcdf data plane (real NCEP file, rea
     const derived = await artifacts.get(record.contentRef);
     expect(derived).toBe(csv);
   }, 180_000);
-});
 
   it('sha256Expected gate: bytes tampered between acquire and extract are refused (W5 residual)', async () => {
     const { store, runId, artifacts } = makeEnv();
@@ -102,7 +101,9 @@ describe.skipIf(!fs.existsSync(REAL_NC))('netcdf data plane (real NCEP file, rea
       fs.rmSync(copy, { force: true });
     }
   }, 180_000);
-describe('audit C1 regression: monthly gridpoint coordinates are physical, never index-fabricated', () => {
+});
+
+describe.skipIf(!fs.existsSync(REAL_NC))('audit C1 regression: monthly gridpoint coordinates are physical, never index-fabricated', () => {
   it('monthly_mean_per_gridpoint emits lat in the file coordinate range and lon likewise', async () => {
     const { createSidecar } = await import('../src/experiment/python.js');
     const sidecar = createSidecar();
@@ -143,6 +144,31 @@ describe('netcdf source path guard (fires before any file access)', () => {
     try {
       await expect(acquireNetcdfDataset(store, artifacts, runId, path.resolve('work/scenario-b/air_temperature.nc'), 'air'))
         .rejects.toThrow(/FARLAB_DATA_ROOT/);
+    } finally {
+      if (prev === undefined) delete process.env.FARLAB_DATA_ROOT;
+      else process.env.FARLAB_DATA_ROOT = prev;
+    }
+  });
+
+  it('rejects a symlink inside FARLAB_DATA_ROOT that resolves outside it (security W2b)', async (ctx) => {
+    const { store, runId, artifacts } = makeEnv();
+    const outer = fs.mkdtempSync(path.join(os.tmpdir(), 'farlab-nc-out-'));
+    const inner = fs.mkdtempSync(path.join(os.tmpdir(), 'farlab-nc-in-'));
+    dirs.push(outer, inner);
+    const target = path.join(outer, 'outside.nc');
+    fs.writeFileSync(target, 'not-a-netcdf');
+    const link = path.join(inner, 'inside-link.nc');
+    try {
+      fs.symlinkSync(target, link);
+    } catch (e) {
+      ctx.skip(`symlink creation unavailable on this platform/privilege: ${(e as Error).message}`);
+      return;
+    }
+    const prev = process.env.FARLAB_DATA_ROOT;
+    process.env.FARLAB_DATA_ROOT = inner;
+    try {
+      await expect(acquireNetcdfDataset(store, artifacts, runId, link, 'air'))
+        .rejects.toThrow(/resolves outside FARLAB_DATA_ROOT/);
     } finally {
       if (prev === undefined) delete process.env.FARLAB_DATA_ROOT;
       else process.env.FARLAB_DATA_ROOT = prev;

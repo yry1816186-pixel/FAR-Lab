@@ -48,19 +48,46 @@ export interface SidecarOptions {
   cwd?: string;
 }
 
+/**
+ * Security (endgame audit, sandbox env minimization): the sidecar executes
+ * agent-drafted exploration code, so a sandbox escape must not inherit the
+ * researcher's provider keys. Only what the pinned family env needs to RUN
+ * (process/uv/interpreter plumbing + the FARLAB_ fence config the netcdf op
+ * layer itself reads) is forwarded; everything else — API keys included — is
+ * dropped at spawn. Exported for a direct regression test on the allowlist.
+ */
+const SIDECAR_ENV_ALLOW_EXACT = new Set([
+  'PATH', 'PATHEXT', 'SYSTEMROOT', 'SYSTEMDRIVE', 'COMSPEC', 'WINDIR',
+  'TEMP', 'TMP', 'HOME', 'USER', 'USERNAME', 'USERPROFILE', 'HOMEDRIVE', 'HOMEPATH',
+  'APPDATA', 'LOCALAPPDATA', 'PROGRAMDATA', 'PROGRAMFILES', 'PROGRAMFILES(X86)', 'PROGRAMW6432',
+  'PUBLIC', 'ALLUSERSPROFILE', 'LANG', 'LC_ALL', 'TERM', 'SHELL',
+  'NUMBER_OF_PROCESSORS', 'PROCESSOR_ARCHITECTURE', 'OS',
+]);
+const SIDECAR_ENV_ALLOW_PREFIX = ['UV_', 'PYTHON', 'FARLAB_', 'XDG_', 'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'ALL_PROXY'];
+
+export const buildSidecarEnv = (): NodeJS.ProcessEnv => {
+  const env: NodeJS.ProcessEnv = {};
+  for (const [k, v] of Object.entries(process.env)) {
+    if (v === undefined) continue;
+    const upper = k.toUpperCase();
+    if (SIDECAR_ENV_ALLOW_EXACT.has(upper) || SIDECAR_ENV_ALLOW_PREFIX.some((p) => upper.startsWith(p))) {
+      env[k] = v;
+    }
+  }
+  // Thread pinning: float reduction order must not vary run-to-run (D-086-3).
+  env.OMP_NUM_THREADS = '1';
+  env.OPENBLAS_NUM_THREADS = '1';
+  env.MKL_NUM_THREADS = '1';
+  env.NUMEXPR_NUM_THREADS = '1';
+  env.PYTHONHASHSEED = '0';
+  return env;
+};
+
 export const createSidecar = (opts: SidecarOptions = {}) => {
   const command = opts.command ?? ['uv', 'run', '--frozen', '--project', RUNTIME_DIR, 'python', '-m', 'farlab_experiment_runtime'];
   const child: ChildProcessWithoutNullStreams = spawn(command[0] ?? 'uv', command.slice(1), {
     cwd: opts.cwd ?? RUNTIME_DIR,
-    env: {
-      ...process.env,
-      // Thread pinning: float reduction order must not vary run-to-run (D-086-3).
-      OMP_NUM_THREADS: '1',
-      OPENBLAS_NUM_THREADS: '1',
-      MKL_NUM_THREADS: '1',
-      NUMEXPR_NUM_THREADS: '1',
-      PYTHONHASHSEED: '0',
-    },
+    env: buildSidecarEnv(),
     stdio: ['pipe', 'pipe', 'pipe'],
     windowsHide: true,
   });

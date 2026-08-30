@@ -67,6 +67,21 @@ const assertLocalNetcdfPath = (path: string): void => {
     if (resolved !== resolvedRoot && !resolved.startsWith(resolvedRoot + nodePath.sep)) {
       throw new Error(`netcdf source escapes FARLAB_DATA_ROOT ${resolvedRoot}: ${path}`);
     }
+    // Symlink escape fence (same pattern as workspace-tools): a link planted
+    // inside the data root must not read outside it. Lexical containment alone
+    // is defeatable by a symlink whose target lives beyond the root.
+    let realRoot: string | undefined;
+    let real: string | undefined;
+    try {
+      realRoot = fs.realpathSync(resolvedRoot);
+      real = fs.realpathSync(resolved);
+    } catch {
+      // realpath unavailable (missing target / exotic FS): lexical containment already holds.
+    }
+    if (realRoot !== undefined && real !== undefined &&
+        real !== realRoot && !real.startsWith(realRoot + nodePath.sep)) {
+      throw new Error(`netcdf source resolves outside FARLAB_DATA_ROOT ${realRoot} (symlink?): ${path}`);
+    }
   }
 };
 

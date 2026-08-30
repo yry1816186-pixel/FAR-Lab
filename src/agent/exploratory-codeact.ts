@@ -110,7 +110,7 @@ const ESCAPE_ATTRS = [
 ];
 
 /**
- * P0 fix (adversarial review 06, live-confirmed escape): numpy auto-imports
+ * P0 fix (review 06, live-confirmed escape): numpy auto-imports
  * submodules that re-export os/sys — `np.f2py.os.system("...")` executed a
  * real command with no import and no dunder. Any attribute chain of depth >= 3
  * rooted at a pre-bound module name is rejected outright; legitimate analysis
@@ -118,18 +118,52 @@ const ESCAPE_ATTRS = [
  */
 const BOUND_ROOTS = ['np', 'json', 'math', 'statistics', 're', 'itertools', 'collections', 'csv', 'datetime', 'decimal', 'fractions', 'hashlib'];
 
+/**
+ * P0 fix (endgame audit 2026-08-30): the deep-chain check only matched literal
+ * bound-root names, so aliasing (`p = np`) or partial binding (`m = np.f2py`)
+ * renamed the root out of the check while reaching the same escape surface.
+ * Aliases of bound roots are tracked with their binding depth; each level of
+ * binding depth lowers the remaining-chain threshold by one.
+ */
+const findAliasRoots = (code: string): Map<string, number> => {
+  const aliases = new Map<string, number>();
+  for (const line of code.split(/\r?\n/)) {
+    for (const root of BOUND_ROOTS) {
+      const re = new RegExp(`^\\s*([A-Za-z_]\\w*)\\s*=\\s*${root}((?:\\.[A-Za-z_]\\w*)*)\\s*$`);
+      const m = re.exec(line);
+      if (m && m[1] !== root) {
+        const depth = (m[2]?.match(/\./g) ?? []).length;
+        aliases.set(m[1]!, depth);
+      }
+    }
+  }
+  return aliases;
+};
+
 const findDeepModuleChain = (code: string): { line: number } | undefined => {
+  const aliases = findAliasRoots(code);
+  const roots: Array<[string, number]> = [
+    ...BOUND_ROOTS.map((r) => [r, 0] as [string, number]),
+    ...[...aliases.entries()],
+  ];
   const lines = code.split('\n');
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
-    for (const root of BOUND_ROOTS) {
-      const re = new RegExp(`\\b${root}(?:\\.[A-Za-z_]\\w*){3,}\\s*\\(`);
+    for (const [root, bindDepth] of roots) {
+      const threshold = bindDepth >= 1 ? 2 : 3;
+      const re = new RegExp(`\\b${root}(?:\\.[A-Za-z_]\\w*){${threshold},}\\s*\\(`);
       if (re.test(line)) return { line: i + 1 };
     }
   }
   return undefined;
 };
-const ESCAPE_MARKERS = ESCAPE_ATTRS.map((a) => new RegExp(a.replace(/_/g, '\\_')));
+const ESCAPE_MARKERS = [
+  ...ESCAPE_ATTRS.map((a) => new RegExp(a.replace(/_/g, '\\_'))),
+  // P0 (endgame audit 2026-08-30): getattr/setattr resolve attributes through
+  // dynamic strings and defeat every name-based ban; legitimate analysis code
+  // never needs them.
+  /\b(getattr|setattr|delattr)\s*\(/,
+];
 
 const firstMatch = (code: string, patterns: RegExp[]): { line: number; matched: RegExp } | null => {
   const lines = code.split(/\r?\n/);

@@ -359,10 +359,12 @@ describe('fetchOpenAlexTeiFullText', () => {
     expect(called).toBe(0);
   });
 
-  it('fetches GROBID TEI into text with the key on the query string', async () => {
+  it('fetches GROBID TEI with the key on the Authorization header, never the URL (endgame audit B)', async () => {
     let seenUrl = '';
-    const fetchImpl: FetchLike = async (url) => {
+    let seenAuth = '';
+    const fetchImpl: FetchLike = async (url, init) => {
       seenUrl = String(url);
+      seenAuth = init?.headers?.['Authorization'] ?? '';
       return { ok: true, status: 200, text: async () => grobidTei(LONG_PROSE) };
     };
     const res = await fetchOpenAlexTeiFullText(route, { fetchImpl, apiKey: 'test-key' });
@@ -372,7 +374,9 @@ describe('fetchOpenAlexTeiFullText', () => {
       expect(res.fetch.text).toContain('Deep sequencing');
       expect(res.fetch.license).toBeUndefined();
     }
-    expect(seenUrl).toContain('api_key=test-key');
+    expect(seenUrl).not.toContain('api_key');
+    expect(seenUrl).not.toContain('test-key');
+    expect(seenAuth).toBe('Bearer test-key');
   });
 
   it('401/403 (key rejected) and 404 (no content) are not_available, not errors', async () => {

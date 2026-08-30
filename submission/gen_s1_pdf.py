@@ -212,7 +212,7 @@ story.append(P('<b>受治理记忆</b>：终态运行确定性投影为情景记
 
 # ============ 7 ============
 story.append(H1('7. 数据或资料来源说明'))
-story.append(P('文献证据全部来自真实检索源：OpenAlex、arXiv、CrossRef、EuropePMC（+全文阶段：arXiv LaTeXML / OpenAlex GROBID TEI）。每个来源保存不可变快照（内容寻址 artifact + 可解析溯源），主张-来源绑定逐字可验证；统计实验数据来自 OpenML 真实数据集（校验和/许可/谱系持久化，种子可复现切分）。评测基准：MLR-Bench；W4R 现架构基线对比（案例 H）；POPPER 式重发现（判官 gold 锁定重校后 mean F1 0.226，判官方差 4/5 任务 swing ≤0.045、gold 精度 0.826 实测；历史 0.58 已证伪留档）；裁判方差研究（worstTaskSwing 0.061 < 0.15 目标）。'))
+story.append(P('文献证据全部来自真实检索源：OpenAlex、arXiv、CrossRef、EuropePMC（+全文阶段：arXiv LaTeXML / OpenAlex GROBID TEI）。每个来源保存不可变快照（内容寻址 artifact + 可解析溯源），主张-来源绑定逐字可验证；统计实验数据来自 OpenML 真实数据集（校验和/许可/谱系持久化，种子可复现切分）。评测基准：MLR-Bench；W4R 现架构基线对比（案例 H）；POPPER 式重发现（判官 gold 锁定重校后 mean F1 0.226，判官方差 4/5 任务 swing ≤0.045、gold 精度 0.826 实测；历史 0.58 已证伪留档）；裁判方差研究（2026-08-29 三次全量重判实测：4/5 任务 swing ≤0.045、worstTaskSwing 0.267，残余离群归因 agent 侧分解方差，0.15 设计目标未整体达成；早期 0.061 小样本值已被复测否决并留档）。'))
 
 # ============ 8 ============
 story.append(H1('8. 结果展示与反馈迭代过程'))

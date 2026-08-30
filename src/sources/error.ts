@@ -26,6 +26,18 @@ export interface SourceAdapterErrorInit {
   bodyPreview?: string;
 }
 
+/**
+ * Security chokepoint (endgame audit B): URLs and messages persisted into
+ * errors must never carry credential material — query-string keys leak via
+ * logs, proxies and receipts. Sensitive parameters are masked at the single
+ * construction site so no caller can forget.
+ */
+const CREDENTIAL_QUERY =
+  /([?&])(api_?key|key|token|access_?token|secret|signature|password|passwd|client_secret)=[^&#\s]*/gi;
+
+export const redactUrlCredentials = (text: string): string =>
+  text.replace(CREDENTIAL_QUERY, (_m, sep: string, k: string) => `${sep}${k}=REDACTED`);
+
 export class SourceAdapterError extends Error {
   readonly family: string;
   readonly query: string;
@@ -36,14 +48,16 @@ export class SourceAdapterError extends Error {
 
   constructor(init: SourceAdapterErrorInit) {
     super(
-      `[${init.family}] ${init.kind} httpStatus=${init.httpStatus} query=${JSON.stringify(init.query)}: ${init.message}`,
+      redactUrlCredentials(
+        `[${init.family}] ${init.kind} httpStatus=${init.httpStatus} query=${JSON.stringify(init.query)}: ${init.message}`,
+      ),
     );
     this.name = 'SourceAdapterError';
     this.family = init.family;
     this.query = init.query;
     this.httpStatus = init.httpStatus;
     this.kind = init.kind;
-    this.url = init.url;
+    this.url = init.url !== undefined ? redactUrlCredentials(init.url) : init.url;
     this.bodyPreview = init.bodyPreview;
   }
 }

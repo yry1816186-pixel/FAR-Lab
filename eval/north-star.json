@@ -28,7 +28,7 @@
         "unit": "max abs swing, task-level F1",
         "detail": "LIVE MEASURED 2026-08-29 on judge v2.2 (3 full re-judges, glm-5.3, all votes scored): arg 0/0/0, cdiff 0/0/0, egfr 0.111/0.111/0.118 (swing 0.007), crc 0.500/0.545/0.522 (swing 0.045), crispr 0.267/0.000/0.267 (swing 0.267). Hardening verdict: 4/5 tasks now swing <=0.045 (the v2.1-era 0.19 on crc collapsed to 0.045 with 5-vote boolean-strict adjudication — the object-verdict silent-NO bug was a major flip source); the residual outlier is crispr, whose middle repeat's 3-pass-median decomposition dropped the mechanistic claims that carry its matches — agent-side decomposition variance, NOT matching variance. Target 0.15 still NOT met on worst task. Next levers (ranked): stabilize decomposition (anchor claim vocabulary or raise passes 3->5 on borderline-heavy tasks), or accept crispr-class instability as disclosed measurement noise with per-task error bars.",
         "at": "2026-08-29",
-        "evidence": "eval/results/judge-variance-live-R3.json (v2.2, 2026-08-29); v2.1-era baseline preserved at judge-variance-live-R3-v21era-20260822.json.bak; evidence/W-EV2/rediscovery.md",
+        "evidence": "eval/results/judge-variance-live-R3-v22-20260829.json (v2.2, 2026-08-29, 3 full re-judges, worstTaskSwing 0.267); same-day secondary run at eval/results/judge-variance-live-R3.json (0.183, also above target); v2.1-era baseline preserved at judge-variance-live-R3-v21era-20260822.json.bak; evidence/W-EV2/rediscovery.md",
         "note": "target 0.15 unchanged; 4/5-task median swing is 0.007-0.045 (within stretch) — the miss is one decomposition-unstable task"
       },
       "target": 0.15,

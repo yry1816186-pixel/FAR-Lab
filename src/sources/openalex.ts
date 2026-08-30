@@ -115,7 +115,7 @@ export const createOpenAlexAdapter = (opts: OpenAlexAdapterOptions = {}): Source
 
   const requestUrl = (pathAndQuery: string): string => `${baseUrl}${pathAndQuery}`;
   const apiKey = opts.apiKey ?? process.env['OPENALEX_API_KEY'] ?? '';
-  const mailtoQuery = `mailto=${encodeURIComponent(mailto)}${apiKey ? `&api_key=${encodeURIComponent(apiKey)}` : ''}`;
+  const mailtoQuery = `mailto=${encodeURIComponent(mailto)}`;
 
   // One bounded retry on 429 (2026-08-22 eval burst evidence: the keyless shared
   // pool rate-limited every query after a heavy run, silently zeroing the novelty
@@ -127,7 +127,11 @@ export const createOpenAlexAdapter = (opts: OpenAlexAdapterOptions = {}): Source
     url: string,
     context: { family: string; query: string },
   ): Promise<HttpGetResult> => {
-    const headers = { 'User-Agent': userAgent };
+    // Security (endgame audit B): the key rides the Authorization header, never
+    // the URL — error paths persist URLs and query strings leak via logs/proxies
+    // (OpenAlex documents Bearer as a supported auth method).
+    const headers: Record<string, string> = { 'User-Agent': userAgent };
+    if (apiKey !== '') headers['Authorization'] = `Bearer ${apiKey}`;
     const call = (): Promise<HttpGetResult> =>
       httpGet(url, { fetchImpl: opts.fetchImpl, timeoutMs: opts.timeoutMs, headers, context });
     return call().then((first) => {

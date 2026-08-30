@@ -353,14 +353,83 @@ describe('openalex adapter', () => {
     });
   });
 
-  it('optional API key rides the query string when provided (OpenAlex policy-drift adaptation)', async () => {
-    const { fetch, urls } = fakeFetch([jsonResponse(200, oaSearchFixture)]);
+  it('optional API key rides the Authorization header, never the URL (endgame audit B)', async () => {
+    const urls: string[] = [];
+    const headerList: Array<Record<string, string> | undefined> = [];
+    const keyedFetch: FetchLike = async (url, init) => {
+      urls.push(String(url));
+      headerList.push(init?.headers);
+      return jsonResponse(200, oaSearchFixture);
+    };
     const adapter = createOpenAlexAdapter({
-      fetchImpl: fetch, baseUrl: 'https://openalex.test', mailto: TEST_MAILTO, apiKey: 'test-key-123',
+      fetchImpl: keyedFetch, baseUrl: 'https://openalex.test', mailto: TEST_MAILTO, apiKey: 'test-key-123',
     });
     await adapter.search('keyed query');
     expect(urls[0]).toContain('mailto=unit-test%40example.com');
-    expect(urls[0]).toContain('api_key=test-key-123');
+    expect(urls[0]).not.toContain('api_key=');
+    expect(urls[0]).not.toContain('test-key-123');
+    expect(headerList[0]?.['Authorization']).toBe('Bearer test-key-123');
+  });
+
+  it('persisted error URLs never carry credential query values (redaction chokepoint)', async () => {
+    const failing: FetchLike = async () => { throw new TypeError('fetch failed'); };
+    const { httpGet } = await import('../src/sources/http.js');
+    const err = await httpGet('https://openalex.test/works?search=x&api_key=SECRET-123&token=T1', {
+      fetchImpl: failing, context: { family: 'openalex', query: 'redaction probe' },
+    }).then(() => null, (e: unknown) => e);
+    expect(isSourceAdapterError(err)).toBe(true);
+    if (!isSourceAdapterError(err)) return;
+    expect(err.url).toContain('api_key=REDACTED');
+    expect(err.url).toContain('token=REDACTED');
+    expect(String(err)).not.toContain('SECRET-123');
+    expect(String(err)).not.toContain('T1&');
+  });
+
+  it('egress destination guard: non-https public hosts are rejected before any fetch', async () => {
+    let called = false;
+    const f: FetchLike = async () => { called = true; return { ok: true, status: 200, text: async () => '{}' }; };
+    const { httpGet } = await import('../src/sources/http.js');
+    await expect(httpGet('http://internal.corp/api', { fetchImpl: f, context: { family: 'openalex', query: 'g' } }))
+      .rejects.toThrow(/destination blocked.*non-https/);
+    expect(called).toBe(false);
+  });
+
+  it('egress destination guard: IP-literal destinations are rejected (metadata / RFC1918 probes)', async () => {
+    const ok: FetchLike = async () => ({ ok: true, status: 200, text: async () => '{}' });
+    const { httpGet } = await import('../src/sources/http.js');
+    for (const u of ['https://169.254.169.254/latest/meta-data', 'https://10.0.0.5/x', 'https://192.168.1.4/x', 'https://[fe80::1]/x']) {
+      await expect(httpGet(u, { fetchImpl: ok, context: { family: 'openalex', query: 'g' } }), u)
+        .rejects.toThrow(/destination blocked/);
+    }
+  });
+
+  it('egress destination guard: https and loopback destinations pass', async () => {
+    const ok: FetchLike = async () => ({ ok: true, status: 200, text: async () => '{}' });
+    const { httpGet } = await import('../src/sources/http.js');
+    for (const u of ['https://api.openalex.org/works', 'http://127.0.0.1:23119/api', 'http://localhost:5173/']) {
+      const r = await httpGet(u, { fetchImpl: ok, context: { family: 'openalex', query: 'g' } });
+      expect(r.status, u).toBe(200);
+    }
+  });
+
+  it('redirects are followed manually; a redirect onto a blocked destination is refused', async () => {
+    const redirectFetch: FetchLike = async (u) => {
+      const s = String(u);
+      if (s.includes('publisher.example')) {
+        return { status: 302, ok: false, headers: { get: (n: string) => (n.toLowerCase() === 'location' ? 'https://cdn.example/paper.pdf' : null) }, text: async () => '' };
+      }
+      if (s.includes('evil.example')) {
+        return { status: 302, ok: false, headers: { get: (n: string) => (n.toLowerCase() === 'location' ? 'http://169.254.169.254/x' : null) }, text: async () => '' };
+      }
+      return { ok: true, status: 200, text: async () => 'PDFBYTES' };
+    };
+    const { httpGet } = await import('../src/sources/http.js');
+    const good = await httpGet('https://publisher.example/paper', { fetchImpl: redirectFetch, context: { family: 'openalex', query: 'g' } });
+    expect(good.status).toBe(200);
+    expect(good.url).toBe('https://cdn.example/paper.pdf');
+    expect(good.bodyText).toBe('PDFBYTES');
+    await expect(httpGet('https://evil.example/x', { fetchImpl: redirectFetch, context: { family: 'openalex', query: 'g' } }))
+      .rejects.toThrow(/destination blocked/);
   });
 
   it('without a key the request stays keyless (polite pool)', async () => {

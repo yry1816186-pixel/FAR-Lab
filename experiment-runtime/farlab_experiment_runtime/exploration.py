@@ -16,8 +16,13 @@ only (research/avo-nooa/02-farlab-gap-analysis.md G4 verdict):
 Namespace contract:
 - available: print, json, math, statistics, re, itertools, collections,
   csv, io, datetime, decimal, fractions, hashlib, uuid4, numpy (as np)
+- getattr is GUARDED (dunder strings and dangerous-module resolutions raise);
+  setattr/delattr are unavailable
 - unavailable: open/exec/eval/compile/__import__/input/globals/locals/breakpoint
   and any import outside the allowlist (ImportError -> visible failure)
+- runtime containment: dangerous modules (os/sys/subprocess/socket, by
+  identity) are scrubbed from bound-module attribute sets for the duration of
+  each run and restored afterwards (np.f2py.os-style traversal finds nothing)
 """
 from __future__ import annotations
 
@@ -37,6 +42,13 @@ import datetime as _datetime
 import decimal as _decimal
 import fractions as _fractions
 import hashlib as _hashlib
+# Host-side identity anchors for the runtime scrub below. Importing them here
+# is a HOST privilege; they are never exposed to the sandboxed namespace.
+import os as _os
+import sys as _sys
+import subprocess as _subprocess
+import socket as _socket
+import types as _types
 
 from typing import Any
 
@@ -53,7 +65,15 @@ _ALLOWED_MODULES = {
 _FORBIDDEN_BUILTINS = (
     "open", "exec", "eval", "compile", "__import__", "input",
     "globals", "locals", "breakpoint", "vars", "dir",
+    # Endgame audit 2026-08-30: attribute mutation defeats every static name
+    # ban; legitimate analysis code never needs these.
+    "setattr", "delattr",
 )
+
+# Host-side identity set for the runtime scrub: modules that must never be
+# reachable from the sandboxed namespace, even through bound-module attribute
+# traversal (np.f2py.os was a live-confirmed escape surface).
+_DANGEROUS_MODULES = frozenset({_os, _sys, _subprocess, _socket})
 
 # Dunder introspection names banned at AST level (mirror of the TS gate's
 # E-ESCAPE). Adversarial audit 2026-08-24: without this ban the restricted
@@ -133,6 +153,25 @@ def _check_source(code: str) -> None:
                 )
     # Second pass over Attribute CHAINS (not single nodes): np.a.b... is an
     # escape regardless of the individual names.
+    # Endgame audit 2026-08-30: aliasing (p = np / m = np.f2py) renamed the
+    # root out of the depth check. Track alias bindings of allowed roots and
+    # lower the threshold by the binding depth so the SAME escape surface stays
+    # rejected regardless of what the root is called this line.
+    aliases: dict[str, int] = {}
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+        ):
+            target = node.targets[0].id
+            value: ast.expr = node.value
+            depth = 0
+            while isinstance(value, ast.Attribute):
+                value = value.value
+                depth += 1
+            if isinstance(value, ast.Name) and value.id in _ALLOWED_ROOTS and target != value.id:
+                aliases[target] = depth
     for node in ast.walk(tree):
         if isinstance(node, ast.Call):
             func = node.func
@@ -140,11 +179,48 @@ def _check_source(code: str) -> None:
             while isinstance(func, ast.Attribute):
                 func = func.value
                 depth += 1
-            if depth >= 3 and isinstance(func, ast.Name) and func.id in _ALLOWED_ROOTS:
-                raise ValueError(
-                    "deep module-attribute chain from a bound root (e.g. np.x.y(...)) "
-                    "is forbidden — numpy re-exports os/sys via auto-imported submodules"
-                )
+            if isinstance(func, ast.Name):
+                if func.id in _ALLOWED_ROOTS and depth >= 3:
+                    raise ValueError(
+                        "deep module-attribute chain from a bound root (e.g. np.x.y(...)) "
+                        "is forbidden — numpy re-exports os/sys via auto-imported submodules"
+                    )
+                bind_depth = aliases.get(func.id)
+                if bind_depth is not None and depth >= max(1, 3 - bind_depth):
+                    raise ValueError(
+                        f"deep module-attribute chain through alias {func.id!r} of a bound root "
+                        "is forbidden — renaming the root does not change the escape surface"
+                    )
+
+
+def _scrub_dangerous(
+    obj: Any, removed: list[tuple[Any, str, Any]], depth: int = 0, seen: set[int] | None = None
+) -> None:
+    """Runtime containment (endgame audit 2026-08-30): delete attributes that
+    ARE dangerous modules (by identity — e.g. np.f2py.os is the real `os`)
+    from the bound modules the sandbox exposes, recording every deletion for
+    restoration after the run. This is the layer a static gate cannot provide:
+    even a chain the AST pass misses finds the module GONE. Sidecar calls are
+    serialized, so scrub→exec→restore cannot interleave; a failed best-effort
+    restore is self-healing because the next run scrubs again.
+    """
+    if seen is None:
+        seen = set()
+    if id(obj) in seen:
+        return
+    seen.add(id(obj))
+    if not isinstance(obj, _types.ModuleType):
+        return
+    for name, val in list(vars(obj).items()):
+        if isinstance(val, _types.ModuleType):
+            if val in _DANGEROUS_MODULES:
+                try:
+                    delattr(obj, name)
+                    removed.append((obj, name, val))
+                except (AttributeError, TypeError):
+                    pass
+            elif depth < 2:
+                _scrub_dangerous(val, removed, depth + 1, seen)
 
 
 def run_exploration(payload: dict[str, Any]) -> dict[str, Any]:
@@ -161,10 +237,33 @@ def run_exploration(payload: dict[str, Any]) -> dict[str, Any]:
     except ImportError as exc:  # pragma: no cover - env contract
         raise RuntimeError(f"family env missing numpy: {exc}") from exc
 
+    # Runtime containment: strip dangerous-module attributes (identity check)
+    # from every module the namespace binds, restore afterwards.
+    removed: list[tuple[Any, str, Any]] = []
+    _scrub_dangerous(np, removed)
+    for bound in _ALLOWED_MODULES.values():
+        _scrub_dangerous(bound, removed)
+
+    # Guarded getattr (defense in depth behind the TS-side total ban): dunder
+    # resolution via dynamic strings and any resolution onto a dangerous
+    # module both fail loudly inside the sandbox.
+    _real_getattr = builtins.getattr
+
+    def _guarded_getattr(obj: Any, name: Any, *default: Any) -> Any:
+        if isinstance(name, str) and name.startswith("__") and name.endswith("__"):
+            raise ValueError("getattr dunder access is forbidden in the exploration sandbox")
+        val = _real_getattr(obj, name, *default)
+        if isinstance(val, _types.ModuleType) and val in _DANGEROUS_MODULES:
+            raise ValueError(
+                f"getattr resolved to a forbidden module: {_real_getattr(val, '__name__', 'module')!r}"
+            )
+        return val
+
     namespace: dict[str, Any] = {
         "__builtins__": {**safe_builtins, "__import__": _make_import({**_ALLOWED_MODULES, "numpy": np})},
         "print": lambda *a, **k: print(*a, file=stdout, **k),
         "np": np,
+        "getattr": _guarded_getattr,
         **_ALLOWED_MODULES,
     }
 
@@ -179,6 +278,12 @@ def run_exploration(payload: dict[str, Any]) -> dict[str, Any]:
             "errorMessage": str(exc)[:500],
             "stdout": stdout.getvalue()[-4000:],
         }
+    finally:
+        for obj, name, val in removed:
+            try:
+                setattr(obj, name, val)
+            except Exception:  # best-effort restore; next run scrubs again
+                pass
 
     return {
         "ok": True,

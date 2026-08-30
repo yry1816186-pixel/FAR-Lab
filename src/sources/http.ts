@@ -7,12 +7,14 @@ import { SourceAdapterError } from './error.js';
 export interface FetchResponseLike {
   readonly ok: boolean;
   readonly status: number;
+  /** Present on real fetch responses; read for manual redirect handling. */
+  readonly headers?: { get(name: string): string | null };
   text(): Promise<string>;
 }
 
 export type FetchLike = (
   url: string,
-  init?: { headers?: Record<string, string>; signal?: AbortSignal },
+  init?: { headers?: Record<string, string>; signal?: AbortSignal; redirect?: 'manual' | 'follow' | 'error' },
 ) => Promise<FetchResponseLike>;
 
 /** Options shared by every source adapter factory. */
@@ -40,11 +42,48 @@ export interface HttpGetResult {
 
 export const DEFAULT_TIMEOUT_MS = 30_000;
 
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
+
+/**
+ * Egress destination guard (endgame audit, security W: no network-layer
+ * allowlist existed — an injected tool or redirect pivot could probe internal
+ * ranges through the scholarly-fetch chokepoint). Static layer, applied to
+ * every hop including manual redirect follows:
+ * - https only (loopback exempt, for local dev/test surfaces);
+ * - no public IP-literal hosts (cloud metadata / RFC1918 probes must not be
+ *   fetchable by address).
+ * Honest limit: a DNS NAME that privately resolves cannot be seen statically;
+ * the deny-by-default egress allowlist for the process boundary is tracked as
+ * a separate work item (see FINAL_ACCEPTANCE FA-SEC-04).
+ */
+export const assertFetchDestination = (url: string): void => {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    throw new Error(`destination guard: not a valid absolute URL: ${url}`);
+  }
+  const host = u.hostname.toLowerCase();
+  if (LOOPBACK_HOSTS.has(host)) return;
+  if (u.protocol !== 'https:') {
+    throw new Error(`destination guard: non-https scheme to a public host is not allowed (${u.protocol}//${host})`);
+  }
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
+    throw new Error(`destination guard: IPv4-literal hosts are not allowed (${host})`);
+  }
+  if (host.includes(':')) {
+    throw new Error(`destination guard: IPv6-literal hosts are not allowed (${host})`);
+  }
+};
+
 /**
  * Single GET with abort timeout. No built-in retry — retry budgets are owned by the
  * calling plane (ports.ts philosophy), and silent retries would hide rate limits.
  * Network failures throw SourceAdapterError(kind='network', httpStatus=0).
  * Non-2xx statuses are RETURNED; each adapter decides 404-vs-error semantics.
+ * Redirects are followed MANUALLY (max 3 hops) so every hop passes the same
+ * destination guard — an upstream or proxy redirect cannot pivot an academic
+ * fetch onto a blocked destination.
  */
 export async function httpGet(
   url: string,
@@ -59,17 +98,42 @@ export async function httpGet(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   const startedAt = performance.now();
+  const guard = (target: string): void => {
+    try {
+      assertFetchDestination(target);
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : String(e);
+      throw new SourceAdapterError({
+        ...opts.context,
+        kind: 'network',
+        httpStatus: 0,
+        message: `destination blocked: ${reason}`,
+        url: target,
+      });
+    }
+  };
   try {
-    const res = await doFetch(url, { headers: opts.headers, signal: controller.signal });
+    guard(url);
+    let res = await doFetch(url, { headers: opts.headers, signal: controller.signal, redirect: 'manual' });
+    let finalUrl = url;
+    for (let hop = 0; hop < 3 && res.status >= 300 && res.status < 400; hop++) {
+      const loc = res.headers !== undefined ? res.headers.get('location') : null;
+      if (loc === null) break; // opaque/missing location: surface the 3xx to the caller as-is
+      const next = new URL(loc, finalUrl).toString();
+      guard(next);
+      finalUrl = next;
+      res = await doFetch(next, { headers: opts.headers, signal: controller.signal, redirect: 'manual' });
+    }
     const bodyText = await res.text();
     return {
       ok: res.ok,
       status: res.status,
       bodyText,
       latencyMs: Math.round(performance.now() - startedAt),
-      url,
+      url: finalUrl,
     };
   } catch (err) {
+    if (err instanceof SourceAdapterError) throw err;
     const reason = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
     throw new SourceAdapterError({
       ...opts.context,
