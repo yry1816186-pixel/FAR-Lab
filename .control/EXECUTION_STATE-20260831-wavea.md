@@ -86,3 +86,35 @@ FA-PLT-02 remains PARTIAL rather than PASS: canonical `main@cc4009c` still has
 the red hosted run recorded above. The local root cause is closed at `87a1f3f`,
 but a canonical hosted verify+web-e2e green run must be observed after this lane
 is integrated before the hosted-CI acceptance criterion can change state.
+
+## FA-PLT-07 — Web production artifact weight (finding before repair)
+
+Pre-repair production-build inventory at `f058934`:
+
+- `web/dist`: 47,856,580 bytes; the 17 production source maps alone are
+  16,395,647 bytes.
+- `ort-wasm-simd-threaded.asyncify-*.wasm`: 23,567,050 bytes in the default
+  artifact even though clean source has no vendored Whisper model and the
+  dictation path must report `model_missing`. Root cause is ORT's default
+  bundled-wasm export condition; the worker later points at separately
+  vendored `/models/ort`, so a populated ASR distribution would carry both.
+- Both browser pdfjs implementations are emitted: modern 479,385 bytes and
+  legacy 535,249 bytes. The Node-only branch inside `pdfCollect.ts` remains
+  statically discoverable to the browser bundler.
+- The main entry is 1,313,137 bytes and its source map confirms KaTeX remains
+  static (618,563 source bytes) even though only hypothesis statements with
+  `$...$` need it. Radar/ECharts, XLSX, mammoth/office, citation parsers and the
+  ASR worker are already separate chunks, but there is no deterministic gate
+  proving they stay off the cold shell.
+
+Predeclared repair contract (no post-hoc budget movement):
+
+- application shell excluding explicit optional `/models` assets stays below
+  10,000,000 bytes, contains no `.map`, and contains no ORT wasm outside that
+  optional asset directory;
+- browser output has one pdfjs runtime, with no legacy pdfjs chunk;
+- KaTeX, ASR, ingest and comparison visualization remain lazy and absent from
+  the initial HTML dependency closure;
+- a deterministic inventory gate records shell, initial and optional assets
+  and fails the budgets; real PDF ingestion, visible ASR-unavailable behavior,
+  production build and cold-shell browser requests must still pass.

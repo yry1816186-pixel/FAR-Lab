@@ -5,7 +5,7 @@
 
 ## 总判（2026-08-31，Wave A 本地 CLS 修复已闭，托管核验待集成）
 
-当前 64 项终局标准为 16 PASS / 32 PARTIAL / 14 FAIL / 2
+当前 65 项终局标准为 16 PASS / 32 PARTIAL / 15 FAIL / 2
 BLOCKED_EXTERNAL。Wave 0 的五项实现标准已经集成并通过全门禁；Wave A 已在
 独立车道关闭 loaded-shell CLS 的本地根因，但 canonical hosted 绿仍未发生，
 不能提前翻 PASS。当前阻断完成的是四类真相缺口：
@@ -37,7 +37,7 @@ BLOCKED_EXTERNAL。Wave 0 的五项实现标准已经集成并通过全门禁；
 
 **批 2 已闭（2026-08-30）**：FA-DAT-02 far restore+三库备份+损坏 drill（PASS）· FA-DAT-05 verify vacuous 机器可读降级（PASS）· FA-PRF-01 后端容量门 1000+ claims（PASS，明示 SYNTHETIC）· FA-PRF-04 cancel 0.6ms 计时钉死（PASS）· FA-PRF-05 sweep 三测试+FARLAB_DATA_DIR（PASS）· FA-PLT-06 numpy pin（PARTIAL→numpy 已 pin，rust-toolchain 随桌面车道）· FA-REM-03 probe 全指纹入 provenance+fingerprint（PASS）· FA-SCI-05 注释诚实化（PARTIAL，真 ODE 腿=独立车道）· FA-SCI-04 跨领域 6 题+真实 salted seal 封存（PARTIAL，执行待评估波）。
 
-仍开放：FA-W0-05 五表 SWEEP 已建但仅裁决 5/902（runtime 2/378、tests/evaluation/evidence 2/321、delivery/operations 1/114、product/specs/docs 0/38、governance/assets 0/51）· FA-W0-06 浅断言 1/168 已裁决（扫描器夹具字符串 justified），167 项待逐项裁决 · FA-HAR-07 已闭（启动/管道终止单次结算，缺失 launcher <1s 失败且真实 sidecar 冒烟通过）· FA-HAR-01 per-tool 超时缝（兄弟车道）· FA-HAR-02 预算/pacing 默认化 · FA-HAR-03 failover live 实证 · FA-HAR-04 72h soak · FA-DAT-01 数据面流式化 · FA-SCI-05 ODE 腿实现 · FA-SCI-06 结构化输出复测 · FA-SCI-07 AstaBench/MLR 接入 · FA-SCI-04 执行 · FA-REM-02 远程 cell 级去重 · FA-PRF-02 后端 perf gate · FA-PRF-03 混沌矩阵补 4 项 · FA-SEC-08 fence crypto-random（兄弟车道）· FA-SEC-09 SBOM/SAST/audit 门 · FA-SEC-11 威胁登记（R-19/20/21 已登，条目闭待能力闭）· FA-PLT-01 windows CI + firefox · FA-PLT-03 release-pack 真跑 · FA-HCI-01..03（兄弟车道）· FA-EVAL-02 user-study 协议开发 · FA-EVAL-04 控制面鲜活度。
+仍开放：FA-W0-05 五表 SWEEP 已建但仅裁决 5/902（runtime 2/378、tests/evaluation/evidence 2/321、delivery/operations 1/114、product/specs/docs 0/38、governance/assets 0/51）· FA-W0-06 浅断言 1/168 已裁决（扫描器夹具字符串 justified），167 项待逐项裁决 · FA-PLT-07 Web 交付物预修复实测 47,856,580B（16,395,647B sourcemap + 23,567,050B 可选 ORT wasm 被装入默认工件，pdfjs 双运行时），已登记后再修 · FA-HAR-07 已闭（启动/管道终止单次结算，缺失 launcher <1s 失败且真实 sidecar 冒烟通过）· FA-HAR-01 per-tool 超时缝（兄弟车道）· FA-HAR-02 预算/pacing 默认化 · FA-HAR-03 failover live 实证 · FA-HAR-04 72h soak · FA-DAT-01 数据面流式化 · FA-SCI-05 ODE 腿实现 · FA-SCI-06 结构化输出复测 · FA-SCI-07 AstaBench/MLR 接入 · FA-SCI-04 执行 · FA-REM-02 远程 cell 级去重 · FA-PRF-02 后端 perf gate · FA-PRF-03 混沌矩阵补 4 项 · FA-SEC-08 fence crypto-random（兄弟车道）· FA-SEC-09 SBOM/SAST/audit 门 · FA-SEC-11 威胁登记（R-19/20/21 已登，条目闭待能力闭）· FA-PLT-01 windows CI + firefox · FA-PLT-03 release-pack 真跑 · FA-HCI-01..03（兄弟车道）· FA-EVAL-02 user-study 协议开发 · FA-EVAL-04 控制面鲜活度。
 
 ## P2 队列（architecture/product/performance/frontier 摘要）
 
@@ -51,7 +51,7 @@ outbox/lease/DLQ/原子落地/错误分类（faults.json 10 案全绿）；事�
 
 | # | 条件 | 现状 |
 |---|---|---|
-| 1 | 无内部 FAIL/PARTIAL | ✗（14 FAIL / 32 PARTIAL） |
+| 1 | 无内部 FAIL/PARTIAL | ✗（15 FAIL / 32 PARTIAL） |
 | 2 | clean-clone CI 全绿无隐藏依赖 | ✗（canonical main web-e2e CLS 红；本地修复尚未集成/hosted 核验） |
 | 3 | science north-star 达标 | ✗（4 项指标均未达） |
 | 4 | 六面真实证据 | 部分（工程强/科学-外部薄） |

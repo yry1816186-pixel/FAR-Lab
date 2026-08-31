@@ -1,7 +1,7 @@
 {
   "schema": "final-acceptance/1",
-  "asOf": "2026-08-31 (Wave A loaded-shell CLS root cause locally closed at 87a1f3f; canonical hosted CI remains open)",
-  "head": "87a1f3f implementation head on lane/endgame-wave0-root (loaded research shell stability after integrated Wave 0)",
+  "asOf": "2026-08-31 (Wave A loaded-shell CLS locally closed; web delivery-weight finding registered before repair; canonical hosted CI remains open)",
+  "head": "f058934 evidence head on lane/endgame-wave0-root (loaded research shell stability after integrated Wave 0)",
   "provenance": "First full endgame audit: 8 parallel read-only domain audits, reports in FINAL_EVIDENCE/audit-2026-08-30/. Load-bearing claims were spot-checked by the main agent. Wave 0 findings were registered before repair, the preserved conversation-stream lane was integrated without dropping its work, and the resulting clean lane passed targeted, browser, build, hygiene, and full-suite gates recorded in .control/EXECUTION_STATE-20260831-wave0.md. Wave A reproduced the hosted loaded-home CLS failure locally, attributed the exact shifting nodes before repair, and closed independent shell/science-projection races at 87a1f3f; local gates are recorded in .control/EXECUTION_STATE-20260831-wavea.md, while canonical hosted green remains deliberately unclaimed. Five-table and shallow-assertion coverage remain explicitly incomplete rather than inferred from passing mechanisms.",
   "statusVocabulary": [
     "PASS",
@@ -743,6 +743,24 @@
       "verify": "workflow diff",
       "evidence": [
         "FINAL_EVIDENCE/audit-2026-08-30/08-platform.md CAP-11"
+      ]
+    },
+    {
+      "id": "FA-PLT-07",
+      "domain": "platform",
+      "title": "Web production artifact budget and optional-capability loading",
+      "status": "FAIL",
+      "priority": "P1",
+      "owner": "self",
+      "gap": "PRE-REPAIR 2026-08-31 production build is 47,856,580 bytes: 16,395,647 bytes of shipped source maps plus a 23,567,050-byte ORT wasm copied into the default artifact even though the offline ASR model is absent and dictation must fail visibly. Browser output also contains both modern and legacy pdfjs runtimes (479,385 + 535,249 bytes), while KaTeX is statically retained in the 1,313,137-byte main entry. There is no deterministic bundle inventory/budget gate, so optional tools can silently become cold-shell payload or release bloat.",
+      "target": "application-shell artifact (excluding explicitly vendored /models optional assets) <10,000,000 bytes with zero .map and zero ORT wasm outside /models; optional ASR continues to use separately vendored version-matched assets and fails visibly when absent; exactly one browser pdfjs runtime; KaTeX, ASR, ingest and comparison visualization remain lazy; a deterministic gate records shell/initial/optional assets and fails budget regressions",
+      "verify": "production build + deterministic bundle-budget gate + cold-shell network inventory + real PDF/ASR-unavailable/browser regressions",
+      "evidence": [
+        ".control/EXECUTION_STATE-20260831-wavea.md",
+        "web/vite.config.ts",
+        "web/src/dictation/asr-worker.ts",
+        "web/src/utils/ingest.ts",
+        "web/src/utils/pdfCollect.ts"
       ]
     },
     {
