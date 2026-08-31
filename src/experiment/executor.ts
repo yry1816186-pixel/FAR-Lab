@@ -14,6 +14,7 @@ import { expandAblationModels } from './matrix.js';
 import { acquireDataset } from './datasets.js';
 import { applySplit } from './split.js';
 import { createSidecar, type Sidecar } from './python.js';
+import { elapsedMilliseconds, monotonicMilliseconds } from '../shared/timing.js';
 
 /**
  * Local experiment executor (P1 vertical slice). Real path only — no mocks; failures
@@ -361,7 +362,7 @@ export const executeExperiment = async (
         cells.push(cached);
         continue;
       }
-      const t0 = Date.now();
+      const t0 = monotonicMilliseconds();
       const r = await sidecar.call<TrainEvalResult>('train_eval', {
         csvPath: artifacts.path(record.contentRef),
         targetColumn: use.targetColumn,
@@ -385,7 +386,7 @@ export const executeExperiment = async (
       const cellConformal = rows.length >= 2 && spec.statistics.alpha >= 1 / (rows.length + 1)
         ? conformalInterval(rows, rows.reduce((a, b) => a + b, 0) / rows.length, spec.statistics.alpha)
         : undefined;
-      cells.push({ modelIdx, modelName: model.name, metrics: res.metrics, perRowRef, fingerprint, tags: model.tags, nTrain: res.nTrain, nTest: res.nTest, timingMs: Date.now() - t0, ...(cellConformal !== undefined ? { conformal: cellConformal } : {}) });
+      cells.push({ modelIdx, modelName: model.name, metrics: res.metrics, perRowRef, fingerprint, tags: model.tags, nTrain: res.nTrain, nTest: res.nTest, timingMs: elapsedMilliseconds(t0), ...(cellConformal !== undefined ? { conformal: cellConformal } : {}) });
     }
 
     const resultSet: ResultSet = {
