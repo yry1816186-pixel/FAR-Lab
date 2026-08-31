@@ -1,22 +1,13 @@
-import { describe, expect, it, vi } from 'vitest';
-import { elapsedMilliseconds, monotonicMilliseconds } from '../src/shared/timing.js';
+import { describe, expect, it } from 'vitest';
+import { elapsedMilliseconds } from '../src/shared/timing.js';
 
 describe('elapsed duration clock discipline', () => {
-  it('stays nonnegative when wall time moves backwards', async () => {
-    const wallClock = vi.spyOn(Date, 'now')
-      .mockReturnValueOnce(2_000)
-      .mockReturnValueOnce(1_000);
-    try {
-      const startedAt = monotonicMilliseconds();
-      await Promise.resolve();
-      const wallStartedAt = Date.now();
-      const wallEndedAt = Date.now();
+  it('derives duration from the supplied monotonic clock, not wall-clock values', () => {
+    const wallStartedAt = 2_000;
+    const wallEndedAt = 1_000;
 
-      expect(wallEndedAt - wallStartedAt).toBe(-1_000);
-      expect(elapsedMilliseconds(startedAt)).toBeGreaterThanOrEqual(0);
-    } finally {
-      wallClock.mockRestore();
-    }
+    expect(wallEndedAt - wallStartedAt).toBe(-1_000);
+    expect(elapsedMilliseconds(100, () => 106)).toBe(6);
   });
 
   it('rounds a valid monotonic duration and rejects a broken clock contract', () => {

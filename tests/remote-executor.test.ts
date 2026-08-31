@@ -163,6 +163,12 @@ describe('P3 remote executor: device-bound queue -> remote training -> local ver
       expect(run.executor).toBe('remote');
       expect(run.environment?.pythonVersion).toMatch(/^remote:/);
       expect(run.trainingLogRef).toMatch(/^sha256:/);
+      const resultSet = store.getObject('result_set', run.resultIds[0]!)!;
+      expect(resultSet.cells.length).toBeGreaterThan(0);
+      for (const cell of resultSet.cells) {
+        expect(Number.isFinite(cell.timingMs), cell.modelName).toBe(true);
+        expect(cell.timingMs, cell.modelName).toBeGreaterThanOrEqual(0);
+      }
       // Verdict chain completed locally on remote-produced cells.
       const rep = store.getObject('stat_report', run.statReportIds[0]!)!;
       expect(['supports', 'inconclusive']).toContain(rep.verdict);

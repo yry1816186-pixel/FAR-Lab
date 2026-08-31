@@ -14,7 +14,7 @@ import { applySplit } from './split.js';
 import { createSidecar, type Sidecar } from './python.js';
 import { SSHGateway, remoteTimeoutWrap, truncateOutput } from './gateway.js';
 import { experimentSpecHash, computeStatReports, buildFeedback } from './executor.js';
-import { elapsedMilliseconds, monotonicMilliseconds } from '../shared/timing.js';
+import { elapsedMilliseconds, monotonicMilliseconds, type MonotonicClock } from '../shared/timing.js';
 
 /**
  * Remote experiment executor (P3, D-084/D-087). Division of authority:
@@ -36,6 +36,8 @@ export interface RemoteExecuteOptions {
   existingRunId?: ExperimentRun['id'];
   shouldCancel?: () => boolean;
   now?: () => string;
+  /** Monotonic duration clock seam; production uses performance.now(). */
+  monotonicClock?: MonotonicClock;
 }
 
 export interface RemoteExecutedExperiment {
@@ -60,6 +62,7 @@ export const executeRemoteExperiment = async (
   opts: RemoteExecuteOptions,
 ): Promise<RemoteExecutedExperiment> => {
   const now = opts.now ?? (() => new Date().toISOString());
+  const monotonicClock = opts.monotonicClock ?? monotonicMilliseconds;
   const hypotheses = store.listObjects('hypothesis', spec.runId) as HypothesisCandidate[];
   const validation = checkExperimentSpec(spec, { hypothesisIds: hypotheses.map((h) => h.id), allowLocalDatasets: opts.allowLocalDatasets });
   if (!validation.passed) throw new Error(`spec failed validation: ${validation.missing.join('; ')}`);
@@ -146,7 +149,7 @@ export const executeRemoteExperiment = async (
       }), 'utf8');
       await opts.gateway.putFile(payloadPath, `${remoteDir}/payload.json`);
       fs.rmSync(path.dirname(payloadPath), { recursive: true, force: true });
-      const t0 = monotonicMilliseconds();
+      const t0 = monotonicClock();
       // ag2 remote kill discipline: the REMOTE side enforces the timeout (TERM→KILL),
       // so a hung training dies on the device instead of orphaning past a local ssh kill.
       // The local ssh timeout sits slightly beyond the remote one so the exit-124 DATA
@@ -175,7 +178,7 @@ export const executeRemoteExperiment = async (
           remotePipFreeze: probe.pipFreezeSha256,
           modelIdx, seed: model.seed, builder: model.builderId, hyperparams: model.hyperparams,
         })).digest('hex'),
-        nTrain: res.nTrain, nTest: res.nTest, timingMs: elapsedMilliseconds(t0),
+        nTrain: res.nTrain, nTest: res.nTest, timingMs: elapsedMilliseconds(t0, monotonicClock),
       });
     }
 

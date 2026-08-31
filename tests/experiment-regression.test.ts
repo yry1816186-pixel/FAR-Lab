@@ -169,10 +169,20 @@ describe('R2-10 regression executor end-to-end (real uv sidecar)', () => {
       const csvPath = join(w.dir, 'reg.csv');
       writeFileSync(csvPath, regressionCsv(), 'utf8');
       const spec = makeRegressionSpec(runId, csvPath, hypId);
+      // Deterministic producer-wiring regression: old Date.now()-based code ignores
+      // this seam and cannot produce the two exact persisted durations below.
+      const ticks = [100, 104, 200, 207];
+      const monotonicClock = (): number => {
+        const tick = ticks.shift();
+        if (tick === undefined) throw new Error('experiment requested an unexpected timing tick');
+        return tick;
+      };
 
-      const out = await executeExperiment(w.store, w.artifacts, spec, { allowLocalDatasets: true });
+      const out = await executeExperiment(w.store, w.artifacts, spec, { allowLocalDatasets: true, monotonicClock });
 
       expect(out.run.status).toBe('completed');
+      expect(out.resultSet.cells.map((cell) => cell.timingMs)).toEqual([4, 7]);
+      expect(ticks).toEqual([]);
       expect(out.run.environment?.hardware?.system).toBeTruthy();
       expect(out.run.environment?.hardware?.cpuCount).toBeTruthy();
       // per-row squared errors: mean(perRow) must equal the reported MSE exactly
