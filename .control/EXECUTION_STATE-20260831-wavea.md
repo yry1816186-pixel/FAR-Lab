@@ -215,3 +215,43 @@ Predeclared repair contract:
 - dependency auditing and JavaScript/TypeScript CodeQL become hosted gates;
 - no acceptance item moves to PASS until the hosted evidence exists, and no
   GitHub Release is published while R-21 remains open.
+
+### Local closure checkpoint (baseline `b4dc93b`, ledger update follows)
+
+- The public allowlist now carries root, Web, TUI, Python runtime, desktop,
+  public audit snapshots and community/source assets. It continues to exclude
+  `.control`, private research/evidence state, internal prompts and history.
+- Export refuses a dirty source tree, derives timestamps from the source
+  commit, constructs an ephemeral Git repository only for inventory tests,
+  and prunes `.git`, dependency trees, build products and caches in `finally`.
+  The archive builder independently rejects any `.git` residue.
+- The exact copied tree exported 888 source files and passed inside-copy gates:
+  root typecheck/build/lint plus 2342 tests passed / 12 honest skips; Web
+  production build and 7,346,964-byte bundle gate; TUI 49/49 plus an 18-file
+  clean npm pack; locked Python environment/import; desktop npm lock and Cargo
+  metadata under Rust 1.98.0.
+- An initial run failed truthfully because `FINAL_ACCEPTANCE.json` and a local
+  Git context were absent. Those hidden dependencies were fixed. A later run
+  exposed `onnxruntime-node` downloading an unused 44 MB partial CUDA package;
+  the task-owned partial file was removed and the Web/browser-only route now
+  sets `ONNXRUNTIME_NODE_INSTALL=skip`, reducing clean Web install from minutes
+  to seconds without changing `onnxruntime-web` output.
+- Syft 1.51.0 was downloaded from the immutable official release and checked
+  against the published SHA-256. A real CycloneDX 1.7 scan found 991 components:
+  npm 456, Cargo 494, PyPI 24, GitHub 9 and 8 without purls. The release builder
+  accepted all three required lock ecosystems.
+- The 890-file source archive, content manifest, SBOM, release notes and
+  SHA256SUMS passed independent safe-extraction and byte-level manifest checks.
+  A second build from the same source/SBOM was byte-identical; archive SHA-256:
+  `a221b8d9223fa3055bfd8c456453cd56bec09f4e9f034f22a2017ca9b467feeb`.
+- Tag publication remains fail closed: `v0.1.0` is rejected while its changelog
+  marker is `UNRELEASED`. No tag or public release was created.
+- Hosted workflow now gates release on Ubuntu+Windows verify, Chromium+Firefox,
+  four npm audit cells and CodeQL for Actions/JS-TS/Python/Rust; every Action is
+  pinned to a full commit SHA. It wires GitHub OIDC build/SBOM attestations and
+  verifies them before upload. None of these hosted results or signatures is
+  claimed locally. Run 33369651681 still renders `In progress`, 0/2 verify.
+- Acceptance truth after local closure: 20 PASS / 34 PARTIAL / 10 FAIL /
+  2 BLOCKED_EXTERNAL. FA-PLT-04 and FA-PLT-06 moved to PASS; FA-PLT-01,
+  FA-PLT-03, FA-SEC-09 and FA-SEC-10 remain PARTIAL pending hosted evidence
+  (and updater work for FA-SEC-10).

@@ -7,9 +7,10 @@ follows the version policy in `VERSIONING.md`.
 
 ### Changed
 
-- Release construction is being upgraded from a directory upload to a
-  self-verifying source archive with a content manifest, multi-ecosystem SBOM,
-  checksums and signed build/SBOM attestations.
+- Release construction now produces a self-verifying source archive with a
+  content manifest, multi-ecosystem SBOM and checksums; the hosted workflow is
+  wired for signed build/SBOM attestations, but no hosted attestation or public
+  release is claimed until that route completes successfully.
 
 ## [0.1.0] - UNRELEASED
 

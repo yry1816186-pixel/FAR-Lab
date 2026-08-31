@@ -1,8 +1,8 @@
 {
   "schema": "final-acceptance/1",
-  "asOf": "2026-08-31 (Wave A loaded-shell CLS locally closed; web artifact and static-cache contracts verified; canonical hosted CI remains open)",
-  "head": "62917fd implementation head on lane/endgame-wave0-root (web production artifact boundaries and deployment-safe static caching)",
-  "provenance": "First full endgame audit: 8 parallel read-only domain audits, reports in FINAL_EVIDENCE/audit-2026-08-30/. Load-bearing claims were spot-checked by the main agent. Wave 0 findings were registered before repair, the preserved conversation-stream lane was integrated without dropping its work, and the resulting clean lane passed targeted, browser, build, hygiene, and full-suite gates recorded in .control/EXECUTION_STATE-20260831-wave0.md. Wave A reproduced the hosted loaded-home CLS failure locally, attributed the exact shifting nodes before repair, and closed independent shell/science-projection races at 87a1f3f; local gates are recorded in .control/EXECUTION_STATE-20260831-wavea.md, while canonical hosted green remains deliberately unclaimed. Five-table and shallow-assertion coverage remain explicitly incomplete rather than inferred from passing mechanisms.",
+  "asOf": "2026-08-31 (Wave A Web fixes and the multi-runtime source release pack are locally verified; canonical hosted CI, OIDC attestations and a GitHub Release remain open)",
+  "head": "release hardening baseline b4dc93b on lane/endgame-wave0-root; the Git commit containing this snapshot is the authoritative content identity",
+  "provenance": "First full endgame audit: 8 parallel read-only domain audits, reports in FINAL_EVIDENCE/audit-2026-08-30/. Load-bearing claims were spot-checked by the main agent. Wave 0 findings were registered before repair, the preserved conversation-stream lane was integrated without dropping its work, and the resulting clean lane passed targeted, browser, build, hygiene, and full-suite gates recorded in .control/EXECUTION_STATE-20260831-wave0.md. Wave A reproduced the hosted loaded-home CLS failure locally, attributed the exact shifting nodes before repair, and closed independent shell/science-projection races at 87a1f3f. The release wave then verified an 888-source-file clean copy across root/Web/TUI/Python/desktop, generated a Syft 1.51.0 CycloneDX 1.7 SBOM with 991 components across npm/Cargo/PyPI, built an independently verified 890-file archive twice with byte-identical SHA-256, and kept tag publishing closed on UNRELEASED. Local gates are recorded in .control/EXECUTION_STATE-20260831-wavea.md; hosted CI, CodeQL result, OIDC attestation and GitHub Release remain deliberately unclaimed. Five-table and shallow-assertion coverage remain explicitly incomplete rather than inferred from passing mechanisms.",
   "statusVocabulary": [
     "PASS",
     "PARTIAL",
@@ -626,25 +626,32 @@
       "status": "PARTIAL",
       "priority": "P1",
       "owner": "self",
-      "gap": "no multi-ecosystem SBOM/SAST or npm audit gate; jszip/mammoth/pdfjs not override-pinned. Pre-repair inspection at 8a5200f also found that the public manifest omits experiment-runtime and packages/tui, while exporter verification covers only the root npm package.",
+      "gap": "IMPLEMENTED AND LOCALLY VERIFIED, hosted result still open. CI now has four production npm-audit cells, CodeQL security-extended matrices for Actions/JS-TS/Python/Rust, exact web overrides, immutable Action SHAs, and Syft 1.51.0 CycloneDX generation. A real local scan of the clean public copy produced CycloneDX 1.7 with 991 components (npm 456, Cargo 494, PyPI 24). Status stays PARTIAL until the hosted audit/CodeQL/SBOM jobs finish successfully and their artifacts are retained.",
       "target": "cyclonedx SBOM + npm audit --omit=dev gate + remaining overrides",
-      "verify": "CI artifacts",
+      "verify": "npm audit --omit=dev against registry.npmjs.org for root/web/tui/desktop; Syft 1.51.0 scan + node scripts/build-release-artifacts.mjs; hosted CI artifacts pending",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/03-security.md CAP-10"
+        "FINAL_EVIDENCE/audit-2026-08-30/03-security.md CAP-10",
+        ".github/workflows/ci.yml",
+        "scripts/release-artifacts-lib.mjs",
+        "tests/release-artifacts.test.ts"
       ]
     },
     {
       "id": "FA-SEC-10",
       "domain": "security",
       "title": "Release artifact signing (SHA256SUMS + sigstore) + update integrity",
-      "status": "FAIL",
+      "status": "PARTIAL",
       "priority": "P2",
       "owner": "self",
-      "gap": "no signing anywhere; no updater. release-pack currently uploads only a directory: no deterministic archive, content manifest, SHA256SUMS, provenance signature/attestation, or verification smoke.",
+      "gap": "SOURCE ARTIFACT INTEGRITY LOCALLY CLOSED; hosted signing and updater remain open. The release job now builds a deterministic tarball, per-file manifest, multi-ecosystem SBOM, release notes and SHA256SUMS; actions/attest v4 is wired for provenance plus SBOM attestations and gh verifies subjects before upload. Local construction and independent extraction/hash verification passed; at baseline b4dc93b two builds produced the identical archive SHA-256 a221b8d9223fa3055bfd8c456453cd56bec09f4e9f034f22a2017ca9b467feeb. No hosted OIDC bundle exists yet and the Tauri updater remains absent, so signing is not claimed.",
       "target": "signed release artifacts; Tauri updater signature when enabled",
-      "verify": "verification smoke on released artifact",
+      "verify": "node scripts/verify-release-artifacts.mjs build/release (local PASS); hosted gh attestation verify and updater e2e pending",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/03-security.md CAP-11"
+        "FINAL_EVIDENCE/audit-2026-08-30/03-security.md CAP-11",
+        ".github/workflows/ci.yml",
+        "scripts/build-release-artifacts.mjs",
+        "scripts/verify-release-artifacts.mjs",
+        "scripts/finalize-release-attestations.mjs"
       ]
     },
     {
@@ -679,42 +686,51 @@
       "id": "FA-PLT-01",
       "domain": "platform",
       "title": "CI matrix: windows runner + firefox/webkit smoke",
-      "status": "FAIL",
+      "status": "PARTIAL",
       "priority": "P1",
       "owner": "self",
-      "gap": "ubuntu-latest x node24 x chromium single cell; product claims Windows desktop",
+      "gap": "Workflow now defines Ubuntu+Windows verification and independent Chromium-full+Firefox-smoke browser cells, but no matrix run has completed. Hosted run 33369651681 for 8a5200f remains displayed as in progress with 0/2 verify jobs completed; WebKit and macOS remain outside this item's minimum target and are still open at the broader platform level.",
       "target": "os matrix (ubuntu+windows) + firefox smoke project",
       "verify": "workflow runs green on both",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/08-platform.md CAP-01/08"
+        "FINAL_EVIDENCE/audit-2026-08-30/08-platform.md CAP-01/08",
+        ".github/workflows/ci.yml",
+        "https://github.com/yry1816186-pixel/FAR-Lab/actions/runs/33369651681"
       ]
     },
     {
       "id": "FA-PLT-03",
       "domain": "platform",
       "title": "release-pack executed for real (tag → export-public self-check → GitHub Release)",
-      "status": "FAIL",
+      "status": "PARTIAL",
       "priority": "P1",
       "owner": "self",
-      "gap": "0 executions historically; blocked by verify red (FA-PLT-02). Pre-repair inspection at 8a5200f found that the allowlist omits the Python runtime and TUI, and self-verification exercises only the exported root package rather than every shipped runtime leg.",
+      "gap": "LOCAL REAL EXECUTION PASSED, hosted release remains open. A clean committed copy exported 888 source files and reinstalled/reverified root (2342 tests passed, 12 honest skips), Web production bundle, TUI 49/49 plus clean 18-file npm pack, locked Python import, and desktop Cargo metadata. Syft then produced the three-ecosystem SBOM and the 890-file release archive verified independently and reproduced byte-for-byte. No hosted release-pack artifact or GitHub Release exists yet; tag publication correctly fails while CHANGELOG is UNRELEASED.",
       "target": "one real release artifact from hosted runner",
-      "verify": "GitHub Release with artifact + manifest",
+      "verify": "local exporter + SBOM + artifact build/verify PASS; hosted GitHub Release with attestation still required",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/08-platform.md CAP-05/10"
+        "FINAL_EVIDENCE/audit-2026-08-30/08-platform.md CAP-05/10",
+        "zcode-harness/public-release-manifest.json",
+        "scripts/export-public.mjs",
+        "scripts/build-release-artifacts.mjs",
+        "tests/release-artifacts.test.ts"
       ]
     },
     {
       "id": "FA-PLT-04",
       "domain": "platform",
       "title": "CHANGELOG + version policy + TUI package publish hygiene",
-      "status": "FAIL",
+      "status": "PASS",
       "priority": "P2",
       "owner": "self",
-      "gap": "no CHANGELOG; local tag v1.1.0 orphaned; tui bin needs strip-types undeclared; version drift 0.3.0 vs 0.1.0",
+      "gap": "CLOSED 2026-08-31: CHANGELOG and explicit version policy exist; root/Web/TUI/Python/desktop/Tauri/Cargo all align at 0.1.0; tag gate requires an annotated matching tag and ISO-dated changelog section. TUI declares Node >=24, Apache-2.0, public publish config and a src/README files allowlist. Real npm pack --dry-run contained 18 intended files and no tests.",
       "target": "CHANGELOG.md + engines/files in tui + version strategy",
       "verify": "npm pack --dry-run clean",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/08-platform.md CAP-07/10"
+        "FINAL_EVIDENCE/audit-2026-08-30/08-platform.md CAP-07/10",
+        "CHANGELOG.md",
+        "VERSIONING.md",
+        "packages/tui/package.json"
       ]
     },
     {
@@ -735,14 +751,17 @@
       "id": "FA-PLT-06",
       "domain": "platform",
       "title": "CI numpy pin + rust-toolchain pin",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P2",
       "owner": "self",
-      "gap": "numpy pin DONE 2026-08-30 (both ci.yml sites pinned to uv.lock family >=2.4,<3). Remaining: rust-toolchain.toml pin (no Rust build in CI yet — moves with FA-PLT-03 desktop lane).",
+      "gap": "CLOSED 2026-08-31: NumPy remains constrained by the locked Python runtime and rust-toolchain.toml pins stable 1.98.0 with minimal profile plus clippy/rustfmt. The clean public copy successfully resolved desktop cargo metadata under the exact 1.98.0 toolchain.",
       "target": "pins added",
       "verify": "workflow diff",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/08-platform.md CAP-11"
+        "FINAL_EVIDENCE/audit-2026-08-30/08-platform.md CAP-11",
+        "rust-toolchain.toml",
+        "experiment-runtime/uv.lock",
+        ".github/workflows/ci.yml"
       ]
     },
     {
@@ -990,6 +1009,6 @@
   ],
   "stopConditions": {
     "note": "Mission stop requires ALL of: no internal FAIL/PARTIAL; canonical clean-clone CI green; science north-star met or externally justified; real evidence across all planes; 24h→72h soak+chaos; win/mac/linux matrix; sandbox attack suite; production-path-only flows; clean-machine bundle verify; honest BLOCKED_EXTERNAL only; docs==commit; final red-team audit no new P0/P1.",
-    "currentVerdict": "NOT READY — 14 FAIL, 32 PARTIAL, 18 PASS, 2 BLOCKED_EXTERNAL (66 tracked). Wave 0 implementation, scope convergence, streaming durability, deterministic hygiene, web artifact weight, and static-cache contracts are closed on the integrated lane. The exhaustive five-table review is still only 5/902 files and shallow-assertion adjudication is 1/168, so those two Wave 0 criteria remain PARTIAL; the earlier frontier remains open."
+    "currentVerdict": "NOT READY — 10 FAIL, 34 PARTIAL, 20 PASS, 2 BLOCKED_EXTERNAL (66 tracked). Wave 0 implementation, scope convergence, streaming durability, deterministic hygiene, Web artifact/static-cache contracts, version policy/TUI packaging, exact Rust pin, and the locally verified multi-runtime source release pack are closed at their stated scope. Hosted CI/CodeQL/OIDC release evidence, desktop distribution, scientific targets, soak/platform breadth, and several security boundaries remain open. The exhaustive five-table review is still only 5/902 files and shallow-assertion adjudication is 1/168, so those two Wave 0 criteria remain PARTIAL."
   }
 }
