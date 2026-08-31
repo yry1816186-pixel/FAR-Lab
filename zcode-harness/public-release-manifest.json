@@ -5,6 +5,7 @@
     ".github/**",
     "docs/**",
     "experiment-runtime/**",
+    "FINAL_EVIDENCE/**",
     "packages/**",
     "skills/**",
     "src/**",
@@ -18,6 +19,8 @@
     "README.md",
     ".env.example",
     "CHANGELOG.md",
+    "FINAL_ACCEPTANCE.json",
+    "FINAL_GAPS.md",
     "VERSIONING.md",
     "package.json",
     "package-lock.json",
@@ -57,5 +60,5 @@
     "__pycache__",
     ".pytest_cache"
   ],
-  "notes": "exclude wins over include; copyFilters prune directories at ANY depth. research/evidence/.control/spikes are the workspace fact system (constitution §2) — never published."
+  "notes": "exclude wins over include; copyFilters prune directories at ANY depth. research/evidence/.control/spikes are the workspace fact system (constitution §2) — never published. FINAL_ACCEPTANCE/FINAL_GAPS/FINAL_EVIDENCE are the immutable-at-commit public audit snapshot, not live control state."
 }

@@ -87,8 +87,11 @@ describe('endgame sweep ledger (real Git inventory)', () => {
   it('requires FA-first finding links and rationale/evidence for adjudication states', () => {
     const log = ledgerPath();
     expect(run(log, 'sync').status).toBe(0);
+    // Use a public, always-shipped governance input. AGENTS.md is intentionally
+    // absent from public source snapshots and must not be a hidden test fixture.
+    const governedPath = 'package.json';
 
-    const unknownFinding = run(log, 'record', ['--path', 'AGENTS.md', '--status', 'finding_open', '--fa', 'FA-NOT-REAL']);
+    const unknownFinding = run(log, 'record', ['--path', governedPath, '--status', 'finding_open', '--fa', 'FA-NOT-REAL']);
     expect(unknownFinding.status).toBe(1);
     expect(unknownFinding.stderr).toContain('add the finding to FINAL_ACCEPTANCE.json before linking it');
 
@@ -98,7 +101,7 @@ describe('endgame sweep ledger (real Git inventory)', () => {
     expect(missingRationale.status).toBe(1);
     expect(missingRationale.stderr).toContain('justified requires --rationale');
     expect(run(log, 'assertion', ['--id', id, '--status', 'justified', '--rationale', 'Presence itself is the explicit contract in this test.']).status).toBe(0);
-    expect(run(log, 'record', ['--path', 'AGENTS.md', '--status', 'reviewed_clean', '--evidence', 'manual constitution review']).status).toBe(0);
+    expect(run(log, 'record', ['--path', governedPath, '--status', 'reviewed_clean', '--evidence', 'manual package contract review']).status).toBe(0);
     expect(run(log, 'check').status).toBe(0);
   });
 

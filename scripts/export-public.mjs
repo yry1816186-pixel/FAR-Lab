@@ -122,7 +122,7 @@ const run = (cwd, command, args) => {
   console.log(`> (${relative(outDir, cwd) || '.'}) ${command} ${args.join(' ')}`);
   execFileSync(executable(command), args, { cwd, stdio: 'inherit' });
 };
-const generatedNames = new Set([...MANIFEST.copyFilters, '.venv', '__pycache__', '.pytest_cache']);
+const generatedNames = new Set([...MANIFEST.copyFilters, '.git', '.venv', '__pycache__', '.pytest_cache']);
 const pruneGenerated = (dir) => {
   if (!existsSync(dir)) return;
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -139,6 +139,26 @@ try {
   const tuiDir = join(outDir, 'packages', 'tui');
   const desktopDir = join(outDir, 'desktop');
   const rustDir = join(desktopDir, 'src-tauri');
+
+  // A source archive intentionally has no parent repository metadata, while
+  // the endgame inventory tests exercise real Git semantics. Create a throwaway
+  // repository around the exact copied tree, then remove it in `finally` so it
+  // can neither leak history nor affect the release bytes.
+  run(outDir, 'git', ['init', '-q', '--initial-branch', 'verification']);
+  run(outDir, 'git', ['add', '--all']);
+  execFileSync('git', [
+    '-c', 'user.name=FAR-Lab Release Verifier',
+    '-c', 'user.email=release-verifier@example.invalid',
+    'commit', '-qm', 'verification snapshot',
+  ], {
+    cwd: outDir,
+    stdio: 'inherit',
+    env: {
+      ...process.env,
+      GIT_AUTHOR_DATE: committedAt,
+      GIT_COMMITTER_DATE: committedAt,
+    },
+  });
 
   run(outDir, 'uv', ['sync', '--locked', '--project', 'experiment-runtime']);
   run(outDir, 'uv', ['run', '--project', 'experiment-runtime', 'python', '-c', 'import farlab_experiment_runtime, numpy']);
