@@ -626,7 +626,7 @@
       "status": "PARTIAL",
       "priority": "P1",
       "owner": "self",
-      "gap": "no SBOM/SAST; no npm audit gate; jszip/mammoth/pdfjs not override-pinned",
+      "gap": "no multi-ecosystem SBOM/SAST or npm audit gate; jszip/mammoth/pdfjs not override-pinned. Pre-repair inspection at 8a5200f also found that the public manifest omits experiment-runtime and packages/tui, while exporter verification covers only the root npm package.",
       "target": "cyclonedx SBOM + npm audit --omit=dev gate + remaining overrides",
       "verify": "CI artifacts",
       "evidence": [
@@ -640,7 +640,7 @@
       "status": "FAIL",
       "priority": "P2",
       "owner": "self",
-      "gap": "no signing anywhere; no updater",
+      "gap": "no signing anywhere; no updater. release-pack currently uploads only a directory: no deterministic archive, content manifest, SHA256SUMS, provenance signature/attestation, or verification smoke.",
       "target": "signed release artifacts; Tauri updater signature when enabled",
       "verify": "verification smoke on released artifact",
       "evidence": [
@@ -696,7 +696,7 @@
       "status": "FAIL",
       "priority": "P1",
       "owner": "self",
-      "gap": "0 executions historically; blocked by verify red (FA-PLT-02)",
+      "gap": "0 executions historically; blocked by verify red (FA-PLT-02). Pre-repair inspection at 8a5200f found that the allowlist omits the Python runtime and TUI, and self-verification exercises only the exported root package rather than every shipped runtime leg.",
       "target": "one real release artifact from hosted runner",
       "verify": "GitHub Release with artifact + manifest",
       "evidence": [

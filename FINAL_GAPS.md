@@ -5,7 +5,7 @@
 
 ## 总判（2026-08-31，Wave A 本地 CLS 修复已闭，托管核验待集成）
 
-当前 65 项终局标准为 16 PASS / 32 PARTIAL / 15 FAIL / 2
+当前 66 项终局标准为 18 PASS / 32 PARTIAL / 14 FAIL / 2
 BLOCKED_EXTERNAL。Wave 0 的五项实现标准已经集成并通过全门禁；Wave A 已在
 独立车道关闭 loaded-shell CLS 的本地根因，但 canonical hosted 绿仍未发生，
 不能提前翻 PASS。当前阻断完成的是四类真相缺口：
@@ -13,7 +13,7 @@ BLOCKED_EXTERNAL。Wave 0 的五项实现标准已经集成并通过全门禁；
 1. **平台事实链未闭合**：canonical `main@cc4009c` 的 hosted verify 已绿，但 web-e2e 因 loaded-home CLS 0.123795 连红；本地根因已在 `87a1f3f` 修复并通过 23/23 浏览器门，仍待集成后的 hosted 绿证。Windows/浏览器矩阵与 release 真跑仍开放；ACC-25 "real Linux target" 实为本机 Docker。
 2. **安全实边界**：CodeAct 别名/拆链/getattr、sidecar env、sources egress、OpenAlex key 与 netcdf symlink 已在静态/运行时层修复；真正的 OS 级隔离、provider/MCP 进程边界 egress、SBOM/SAST 与发布签名仍开放。
 3. **科学指标未达标**：rediscovery 0.226/0.7、judge variance 0.267/0.15、relation agreement 0.61/0.8、structured-output 0.011/0.005；评估集 100% 生物医学，无跨领域 held-out。
-4. **规模与长程证据空档**：后端 1000+ claim 门仅是明确标注的 SYNTHETIC 容量证据，浏览器真实路径当前只有 7 claims/0 admissible hypotheses；数据面仍受内存上限约束，无 6h+ soak、Windows CI/浏览器矩阵，release 链 0 次真实执行。
+4. **规模与长程证据空档**：后端 1000+ claim 门仅是明确标注的 SYNTHETIC 容量证据，浏览器真实路径当前只有 7 claims/0 admissible hypotheses；数据面仍受内存上限约束，无 6h+ soak、Windows CI/浏览器矩阵，release 链 0 次真实执行。发布包预修复审计还确认其清单漏掉 Python runtime/TUI，且所谓副本自检只覆盖根包；SBOM/校验和/签名均不存在。
 
 ## P0 队列（correctness/safety/scientific-truth/core-flow）
 

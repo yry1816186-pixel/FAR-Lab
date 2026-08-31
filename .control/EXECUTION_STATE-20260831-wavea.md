@@ -175,3 +175,43 @@ Predeclared repair contract:
 - Post-build production probes on isolated port 3321 observed `/` as
   `no-cache` and hashed JS as `public, max-age=31536000, immutable`; both exact
   validators returned 304 with zero response bytes and retained `nosniff`.
+
+## FA-PLT-03 / FA-SEC-09 / FA-SEC-10 — release evidence chain (finding before repair)
+
+Pre-repair inspection at `8a5200f` found that the hosted `release-pack` job is
+not yet a distributable or independently verifiable release path:
+
+- `zcode-harness/public-release-manifest.json` omits both
+  `experiment-runtime/**` (which `src/experiment/python.ts` and the remote
+  executor require) and the documented first-class optional TUI at
+  `packages/tui/**`. The exported source snapshot therefore cannot implement
+  all capabilities described by its own README.
+- `scripts/export-public.mjs` calls `npm ci`, typecheck, build, lint and tests
+  only at the exported root. It does not install/build the exported Web app,
+  does not test/package the TUI, and does not provision or directly verify the
+  Python sidecar. The workflow's pre-export installs happen in the private
+  workspace and cannot prove the copied tree is self-sufficient.
+- The job uploads a mutable directory artifact only. It emits no release
+  archive, content manifest, SHA256SUMS, SBOM, signed provenance/attestation,
+  or GitHub Release. `PROVENANCE.md` embeds wall-clock time, so even a later
+  archive would be nondeterministic without a source-date contract.
+- CI has no dependency-audit gate and no SAST workflow. `npm sbom
+  --package-lock-only --sbom-format=cyclonedx` is available in the pinned
+  Node/npm 24 toolchain and works for each npm lock, but an npm-only document
+  would not truthfully inventory the Rust and Python locks shipped here.
+- The TUI package dry run currently includes all seven test files and exposes
+  a TypeScript bin requiring Node's strip-types behavior, while declaring no
+  Node engine or publish file allowlist.
+
+Predeclared repair contract:
+
+- the allowlist ships every runtime leg it documents, and verification occurs
+  inside the exported copy for root, Web, TUI and the Python sidecar;
+- release construction produces one deterministic source archive plus a
+  machine-readable content manifest, SHA256SUMS and a multi-ecosystem
+  CycloneDX SBOM, with a local verification command that rejects tampering;
+- hosted release construction generates signed GitHub/Sigstore provenance and
+  an SBOM attestation before any public release asset may be published;
+- dependency auditing and JavaScript/TypeScript CodeQL become hosted gates;
+- no acceptance item moves to PASS until the hosted evidence exists, and no
+  GitHub Release is published while R-21 remains open.
