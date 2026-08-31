@@ -27,12 +27,13 @@ const COLLAPSE_KEY = 'farlab.railCollapsed';
  *  full width there); keyboard users reach the same surfaces via "/" palette
  *  and "n". */
 export function AppRail({
-  surface, runs, conversations, judgmentCount,
+  surface, runs, runsLoading, conversations, judgmentCount,
   onHome, onLibrary, onOpenStudy, onOpenConversation,
   onDeleteConversation, onRenameConversation, onNewConversation, onOpenSettings, onTerminal,
 }: {
   surface: RailSurface;
   runs: RunSummary[];
+  runsLoading: boolean;
   conversations: Conversation[];
   /** Studies awaiting the researcher (live/attention/drafts/counter) — the
    *  home's judgment queue, lifted so the badge and the queue can't diverge. */
@@ -111,10 +112,13 @@ export function AppRail({
         {onTerminal !== undefined && navItem('panel.terminal', <TerminalSquare size={15} aria-hidden="true" />, false, onTerminal)}
       </div>
 
-      {recentStudies.length > 0 && (
-        <div className="rail-group rail-group--scroll">
-          {!collapsed && <p className="rail-group-title">{t('rail.studies')}</p>}
-          {recentStudies.map((r) => {
+      <div className="rail-group rail-group--scroll rail-group--studies" aria-busy={runsLoading}>
+        {!collapsed && <p className="rail-group-title">{t('rail.studies')}</p>}
+        {!collapsed && runsLoading && <p className="rail-empty">{t('common.loading')}</p>}
+        {!collapsed && !runsLoading && recentStudies.length === 0 && (
+          <p className="rail-empty">{t('rail.noStudies')}</p>
+        )}
+        {!runsLoading && recentStudies.map((r) => {
             const label = runLabel(r);
             const short = label.length > 38 ? `${label.slice(0, 38)}…` : label;
             return (
@@ -130,8 +134,7 @@ export function AppRail({
               </button>
             );
           })}
-        </div>
-      )}
+      </div>
 
       <div className="rail-group rail-group--scroll">
         {/* The group renders even with zero conversations — "new conversation"

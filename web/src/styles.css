@@ -432,7 +432,14 @@ a:hover { text-decoration: underline; }
 .runs-group-title { font-size: var(--fs-aux); font-weight: 600; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.04em; margin: 0; }
 
 /* ---------- app frame ---------- */
-.app { min-height: 100vh; display: flex; flex-direction: column; }
+.app {
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 
 .app-header {
   display: flex;
@@ -1433,6 +1440,8 @@ select option { color: var(--text); background: var(--surface); }
   display: flex;
   align-items: center;
   gap: var(--sp-3);
+  flex: none;
+  height: 43px;
   padding: var(--sp-2) var(--sp-5);
   border-bottom: 1px solid var(--v2-border);
   background: var(--v2-surface);

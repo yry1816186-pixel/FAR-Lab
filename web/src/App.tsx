@@ -739,12 +739,18 @@ export function App(): JSX.Element {
         </div>
       )}
 
-      <AwarenessBar activeRuns={activeRuns} selectedRunId={selectedRunId} onSelect={selectStudy} />
+      <AwarenessBar
+        activeRuns={activeRuns}
+        loading={runsLoading}
+        selectedRunId={selectedRunId}
+        onSelect={selectStudy}
+      />
 
       <div className="app-body app-body--noshell">
         <AppRail
           surface={railSurface}
           runs={runs}
+          runsLoading={runsLoading}
           conversations={conversations}
           judgmentCount={judgmentCount}
           onHome={openHome}

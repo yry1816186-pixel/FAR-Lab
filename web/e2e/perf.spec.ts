@@ -13,10 +13,15 @@ import { expect, test, type APIRequestContext } from '@playwright/test';
 
 const QUESTION = 'Does moderate caffeine intake affect cognitive performance in healthy adults?';
 
-async function provisionStudy(request: APIRequestContext): Promise<string> {
+async function startStudy(request: APIRequestContext): Promise<string> {
   const res = await request.post('/api/v1/runs', { data: { text: QUESTION } });
   expect(res.ok()).toBeTruthy();
   const { runId } = await res.json() as { runId: string };
+  return runId;
+}
+
+async function provisionStudy(request: APIRequestContext): Promise<string> {
+  const runId = await startStudy(request);
   await expect
     .poll(async () => {
       // Offline-run execution can block the server event loop long enough for
@@ -30,13 +35,38 @@ async function provisionStudy(request: APIRequestContext): Promise<string> {
   return runId;
 }
 
-type Vitals = { fcp: number; lcp: number; cls: number; longTasks: number };
+async function waitForTerminalRun(request: APIRequestContext, runId: string): Promise<void> {
+  await expect
+    .poll(async () => {
+      try {
+        return (await (await request.get(`/api/v1/runs/${runId}`)).json() as { status?: string }).status ?? 'no-status';
+      } catch { return 'conn-error'; }
+    }, { timeout: 120_000 })
+    .toMatch(/^(cancelled|completed|partial|failed)$/);
+}
+
+type ShiftRect = { x: number; y: number; width: number; height: number };
+type ShiftSource = { node: string; previous: ShiftRect; current: ShiftRect };
+type ShiftEntry = { atMs: number; value: number; sources: ShiftSource[] };
+type Vitals = { fcp: number; lcp: number; cls: number; longTasks: number; shifts: ShiftEntry[] };
 
 async function measureVitals(page: import('@playwright/test').Page, goto: () => Promise<void>): Promise<Vitals> {
   await page.goto('about:blank');
   await page.addInitScript(() => {
-    (window as unknown as { __vitals?: unknown }).__vitals = { fcp: 0, lcp: 0, cls: 0, longTasks: 0 };
-    const w = window as unknown as { __vitals: { fcp: number; lcp: number; cls: number; longTasks: number } };
+    (window as unknown as { __vitals?: unknown }).__vitals = { fcp: 0, lcp: 0, cls: 0, longTasks: 0, shifts: [] };
+    const w = window as unknown as { __vitals: Vitals };
+    const rect = (r: DOMRectReadOnly | undefined): ShiftRect => ({
+      x: r?.x ?? 0,
+      y: r?.y ?? 0,
+      width: r?.width ?? 0,
+      height: r?.height ?? 0,
+    });
+    const nodeLabel = (node: Node | null | undefined): string => {
+      if (!(node instanceof Element)) return node?.nodeName ?? 'unknown';
+      const id = node.id.length > 0 ? `#${node.id}` : '';
+      const classes = [...node.classList].slice(0, 3).map((c) => `.${c}`).join('');
+      return `${node.tagName.toLowerCase()}${id}${classes}`;
+    };
     try {
       new PerformanceObserver((l) => {
         for (const e of l.getEntries()) {
@@ -49,8 +79,27 @@ async function measureVitals(page: import('@playwright/test').Page, goto: () => 
       }).observe({ type: 'largest-contentful-paint', buffered: true } as PerformanceObserverInit);
       new PerformanceObserver((l) => {
         for (const e of l.getEntries()) {
-          const shift = e as PerformanceEntry & { value: number; hadRecentInput: boolean };
-          if (!shift.hadRecentInput) w.__vitals.cls += shift.value;
+          const shift = e as PerformanceEntry & {
+            value: number;
+            hadRecentInput: boolean;
+            sources?: Array<{
+              node?: Node | null;
+              previousRect?: DOMRectReadOnly;
+              currentRect?: DOMRectReadOnly;
+            }>;
+          };
+          if (!shift.hadRecentInput) {
+            w.__vitals.cls += shift.value;
+            w.__vitals.shifts.push({
+              atMs: shift.startTime,
+              value: shift.value,
+              sources: (shift.sources ?? []).map((source) => ({
+                node: nodeLabel(source.node),
+                previous: rect(source.previousRect),
+                current: rect(source.currentRect),
+              })),
+            });
+          }
         }
       }).observe({ type: 'layout-shift', buffered: true } as PerformanceObserverInit);
       new PerformanceObserver((l) => { w.__vitals.longTasks += l.getEntries().length; })
@@ -62,13 +111,26 @@ async function measureVitals(page: import('@playwright/test').Page, goto: () => 
   return page.evaluate(() => (window as unknown as { __vitals: Vitals }).__vitals);
 }
 
-test('perf: home first paint and layout stability within "good" budgets', async ({ page }) => {
+test('perf: loaded home first paint and layout stability within "good" budgets', async ({ page, request }) => {
+  // Make the formerly order-dependent CI failure deterministic: a returning
+  // workspace with active work loads the multi-run awareness strip from the
+  // first /runs response. Before the boot-state fix that late 43px insertion
+  // moved the entire app body and produced CLS ~= 0.115 on every run.
+  const activeRunId = await startStudy(request);
   const v = await measureVitals(page, () => page.goto('/#/', { waitUntil: 'networkidle' }));
   console.log(`PERF home: FCP=${v.fcp.toFixed(0)}ms LCP=${v.lcp.toFixed(0)}ms CLS=${v.cls.toFixed(4)} longTasks=${v.longTasks}`);
+  if (v.shifts.length > 0) console.log(`PERF home shifts: ${JSON.stringify(v.shifts)}`);
+  await expect(page.locator('.awareness-bar')).toBeVisible();
   // Google "good": LCP <= 2500ms, CLS <= 0.1. Generous CI ceilings (runner
   // variance) — the committed baseline carries the measured local numbers.
   expect(v.lcp, 'home LCP within good budget').toBeLessThan(4_000);
   expect(v.cls, 'home layout stable').toBeLessThan(0.1);
+  const cancel = await request.post(`/api/v1/runs/${activeRunId}/cancel`, { data: {} });
+  expect(cancel.ok()).toBeTruthy();
+  // Test isolation is part of the performance contract: a cancel request is
+  // not cleanup until the worker reaches a terminal state. Leaving this run
+  // active made later resilience cases contend with an invisible predecessor.
+  await waitForTerminalRun(request, activeRunId);
 });
 
 test('perf: study map renders the full corpus without long-task storms', async ({ page, request }) => {
@@ -80,6 +142,7 @@ test('perf: study map renders the full corpus without long-task storms', async (
     hyps: document.querySelectorAll('.map-hyp-card, [class*="hyp-card"]').length,
   }));
   console.log(`PERF map(${runId}): FCP=${v.fcp.toFixed(0)}ms LCP=${v.lcp.toFixed(0)}ms CLS=${v.cls.toFixed(4)} longTasks=${v.longTasks} claims=${counts.claims} hyps=${counts.hyps}`);
+  if (v.shifts.length > 0) console.log(`PERF map shifts: ${JSON.stringify(v.shifts)}`);
   expect(v.lcp, 'map LCP within good budget').toBeLessThan(4_000);
   expect(v.cls, 'map layout stable').toBeLessThan(0.1);
   // Operability proxy (§21 "large data still operable"): the deterministic

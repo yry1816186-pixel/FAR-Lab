@@ -115,6 +115,10 @@ export function StudyMap({
   const [leaderCard, setLeaderCard] = useState<HypothesisScorecard | null>(null);
   const [adjusted, setAdjusted] = useState<AchResearcherAdjusted | null>(null);
   const [science, setScience] = useState<ScienceBundle | null>(null);
+  // The evidence and science-spine projections are independent requests.
+  // Keeping a distinct gate prevents a fast evidence response from removing
+  // the state placeholder while /science is still in flight (§21 CLS).
+  const [spineLoaded, setSpineLoaded] = useState(false);
   const [insp, setInsp] = useState<Insp | null>(null);
   const [loadError, setLoadError] = useState<ApiError | null>(null);
   // Spine projection 404 = the serving process predates the /science API
@@ -177,10 +181,16 @@ export function StudyMap({
         setProtocolError(e instanceof ApiError ? e : new ApiError({ code: 'unknown', message: String(e), retryable: true }));
       });
     void getScience(rid, c.signal)
-      .then((v) => { if (!c.signal.aborted) { setScience(v); setSpineUnavailable(false); } })
+      .then((v) => {
+        if (c.signal.aborted) return;
+        setScience(v);
+        setSpineUnavailable(false);
+        setSpineLoaded(true);
+      })
       .catch((e: unknown) => {
         if (c.signal.aborted) return;
         setSpineUnavailable(e instanceof ApiError && e.status === 404);
+        setSpineLoaded(true);
         if (!(e instanceof ApiError && e.status === 404)) visibleFailure(e);
       });
   }, []);
@@ -205,6 +215,7 @@ export function StudyMap({
     setAdjusted(null);
     setScience(null);
     setScienceLoaded(false);
+    setSpineLoaded(false);
   }, [run.id]);
   useEffect(() => {
     loadScience(run.id);
@@ -476,7 +487,7 @@ export function StudyMap({
           />
         )}
 
-        {!draftable && settled && science === null && !scienceLoaded && (
+        {!draftable && settled && science === null && !spineLoaded && (
           /* Same §21 CLS contract as the claims/hyps bands: the state band is the
              tallest top-of-map block — inserting it unreserved shifts everything
              below (measured 0.228 vs 0.1 budget). */
@@ -485,7 +496,7 @@ export function StudyMap({
             <div className="map-band map-band--reserving map-band--state" />
           </section>
         )}
-        {!draftable && settled && science === null && scienceLoaded && spineUnavailable && (
+        {!draftable && settled && science === null && spineLoaded && spineUnavailable && (
           <section className="map-node">
             <p className="map-node-label">{t('map.stateLabel')}</p>
             <div className="map-state map-state--insufficient" role="note">

@@ -937,11 +937,13 @@
 }
 .rail-group:first-of-type { border-top: none; }
 .rail-group--scroll { overflow-y: auto; scrollbar-width: thin; }
+.rail-group--studies { flex: 0 0 181px; min-height: 181px; }
 .rail-group--bottom { margin-top: auto; border-bottom: none; }
 .rail-group-title {
   margin: 0 6px 4px; font-size: 10.5px; font-weight: 600;
   letter-spacing: 0.08em; text-transform: uppercase; color: var(--v2-text-3);
 }
+.rail-empty { margin: 4px 8px; font-size: 11px; line-height: 1.45; color: var(--v2-text-3); }
 .rail-nav-item, .rail-link {
   display: flex; align-items: center; gap: var(--sp-2);
   padding: 6px 8px; border: none; border-radius: 7px;

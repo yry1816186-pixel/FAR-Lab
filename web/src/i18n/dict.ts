@@ -424,6 +424,8 @@ export const zh = {
   'exp.executorRemote': '远程设备',
 
   'awareness.title': '进行中的研究（{n}）',
+  'awareness.loading': '正在读取进行中的研究…',
+  'awareness.none': '当前没有进行中的研究',
   'awareness.current': '当前',
   'notify.doneTitle': '研究已完成',
   'notify.onHint': '完成通知已开启（点击关闭）',
@@ -1459,6 +1461,7 @@ export const zh = {
   'terminal.inputPlaceholder': '输入命令后回车（在工作区根目录执行）',
   'terminal.inputLabel': '终端输入',
   'rail.studies': '最近研究',
+  'rail.noStudies': '还没有研究',
   'rail.convs': '会话',
   'rail.settings': '设置',
   'rail.collapse': '收起导航',
@@ -2231,6 +2234,8 @@ export const en: Record<DictKey, string> = {
   'exp.executorRemote': 'remote device',
 
   'awareness.title': 'Research in progress ({n})',
+  'awareness.loading': 'Loading active studies…',
+  'awareness.none': 'No studies are currently running',
   'awareness.current': 'current',
   'notify.doneTitle': 'Research finished',
   'notify.onHint': 'Completion notifications on (click to disable)',
@@ -3264,6 +3269,7 @@ export const en: Record<DictKey, string> = {
   'terminal.inputPlaceholder': 'Type a command and press Enter (runs at the workspace root)',
   'terminal.inputLabel': 'Terminal input',
   'rail.studies': 'Recent studies',
+  'rail.noStudies': 'No studies yet',
   'rail.convs': 'Conversations',
   'rail.settings': 'Settings',
   'rail.collapse': 'Collapse navigation',
