@@ -118,3 +118,15 @@ Predeclared repair contract (no post-hoc budget movement):
 - a deterministic inventory gate records shell, initial and optional assets
   and fails the budgets; real PDF ingestion, visible ASR-unavailable behavior,
   production build and cold-shell browser requests must still pass.
+
+Additional pre-repair failure found by the required browser route (isolated
+port 3312, both attempts): the absent Whisper probe correctly returned HTTP
+404 and the worker diagnostic said `ASR model not vendored`, but the UI showed
+the generic “语音转写失败”. `asr-worker.ts` classifies the `load` message as
+`model_missing`, while its `transcribe` catch hard-codes every failure to
+`transcribe_failed`. Because recording warm-up and transcription are
+concurrent, the typed warm-up error can be dropped before the pending
+transcription promise exists, leaving the later hard-coded classification as
+the user-visible result. This is part of FA-PLT-07's honest optional-capability
+contract and must be fixed at the worker boundary; weakening the browser
+expectation to accept the generic error is forbidden.
