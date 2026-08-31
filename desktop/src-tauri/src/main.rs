@@ -21,12 +21,20 @@ use std::time::{Duration, Instant};
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
 struct ServerGuard(Option<Child>);
-impl Drop for ServerGuard {
-    fn drop(&mut self) {
+impl ServerGuard {
+    fn terminate(&mut self) {
         if let Some(mut child) = self.0.take() {
-            let _ = child.kill(); // graceful path; the Job Object below covers force-kill
+            // Explicit controlled exit. Child::kill is forceful; the future
+            // packaged-sidecar supervisor must add bounded graceful shutdown
+            // before falling back to this guarantee.
+            let _ = child.kill();
             let _ = child.wait();
         }
+    }
+}
+impl Drop for ServerGuard {
+    fn drop(&mut self) {
+        self.terminate();
     }
 }
 
@@ -600,8 +608,11 @@ fn main() {
         .run(|app_handle, event| {
             if let tauri::RunEvent::Exit = event {
                 if let Some(state) = app_handle.try_state::<ServerState>() {
-                    // Dropping the guard terminates the spawned node server.
-                    let _ = state.0.lock().map(|mut g| g.0.take());
+                    // Exit callbacks run before managed state is dropped. Kill
+                    // and reap explicitly: dropping std::process::Child alone
+                    // does not terminate it (and macOS has no PDEATHSIG/Job
+                    // Object fallback).
+                    let _ = state.0.lock().map(|mut guard| guard.terminate());
                 }
             }
         });
