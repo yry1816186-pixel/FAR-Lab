@@ -899,9 +899,9 @@
       "status": "FAIL",
       "priority": "P0",
       "owner": "self",
-      "gap": "Registered before repair from the preserved sibling-lane baseline: tests/thinking-display.test.ts fails because the streaming projection change removed thinking collection from model_call_done, removed thinking from ConversationTurnGeneration, and omitted it when persisting the final agent message. Tool trace still lands, so this is a bounded data-loss regression rather than a whole-turn failure.",
+      "gap": "Registered before repair from the preserved sibling-lane baseline: tests/thinking-display.test.ts fails because the streaming projection change removed thinking collection from model_call_done, removed thinking from ConversationTurnGeneration, and omitted it when persisting the final agent message. Follow-up protocol inspection before related repairs found two more bounded failures in the same slice: the live HTTP provider emits attempt_discarded on explicit user abort, which resets the schema-projected prefix instead of preserving it; and a retry initializes its durable draft from the prior failed prefix but appends new-attempt deltas without first resetting that draft. The new HTTP/SSE endpoints also have no dedicated production-path regression yet. Tool trace and the final reply path still land, so these are bounded stream/durability regressions rather than a whole-turn failure.",
       "target": "private reasoning never enters the public stream, but bounded provider reasoning is retained on the completed agent message exactly as before streaming",
-      "verify": "npm test -- --run tests/thinking-display.test.ts plus conversation streaming/cancellation regressions and full gate",
+      "verify": "npm test -- --run tests/thinking-display.test.ts tests/conversation-stream.test.ts tests/providers.test.ts plus full gate",
       "evidence": [
         "tests/thinking-display.test.ts",
         "src/server/conversation-agent.ts",
