@@ -15,6 +15,12 @@ on:
 permissions:
   contents: read
 
+# @huggingface/transformers carries onnxruntime-node for server consumers. Its
+# Linux installer otherwise downloads optional CUDA providers although FAR-Lab's
+# Web build uses onnxruntime-web. Keep CI/source verification CPU/browser-only.
+env:
+  ONNXRUNTIME_NODE_INSTALL: skip
+
 jobs:
   verify:
     name: Verify (${{ matrix.os }})

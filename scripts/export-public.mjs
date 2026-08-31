@@ -118,9 +118,16 @@ if (process.argv.includes('--skip-verify')) {
   process.exit(0);
 }
 const executable = (name) => process.platform === 'win32' && name === 'npm' ? 'npm.cmd' : name;
+const verificationEnv = {
+  ...process.env,
+  // The Web leg consumes onnxruntime-web. onnxruntime-node's optional Linux
+  // CUDA provider is neither shipped nor exercised, and its install-time NuGet
+  // download would make a source-only verification depend on a huge GPU blob.
+  ONNXRUNTIME_NODE_INSTALL: 'skip',
+};
 const run = (cwd, command, args) => {
   console.log(`> (${relative(outDir, cwd) || '.'}) ${command} ${args.join(' ')}`);
-  execFileSync(executable(command), args, { cwd, stdio: 'inherit' });
+  execFileSync(executable(command), args, { cwd, stdio: 'inherit', env: verificationEnv });
 };
 const generatedNames = new Set([...MANIFEST.copyFilters, '.git', '.venv', '__pycache__', '.pytest_cache']);
 const pruneGenerated = (dir) => {
@@ -154,7 +161,7 @@ try {
     cwd: outDir,
     stdio: 'inherit',
     env: {
-      ...process.env,
+      ...verificationEnv,
       GIT_AUTHOR_DATE: committedAt,
       GIT_COMMITTER_DATE: committedAt,
     },

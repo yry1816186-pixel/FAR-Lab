@@ -75,6 +75,9 @@
 - `node scripts/export-public.mjs` 只接受 clean Git tree。允许清单必须包含产品声明的
   root/Web/TUI/Python/desktop 腿；自检在复制后的目录内分别执行，原工作区预装依赖不能
   充当副本可用证据。
+- Web 使用 `onnxruntime-web`；`@huggingface/transformers` 间接携带的
+  `onnxruntime-node` Linux CUDA provider 不属于浏览器源码包，CI 与副本自检必须显式
+  `ONNXRUNTIME_NODE_INSTALL=skip`，避免安装阶段下载不被产品调用的 GPU NuGet 二进制。
 - 托管 `release-pack` 先等待 verify、浏览器矩阵、dependency audit 和多语言 CodeQL，
   再生成 CycloneDX SBOM、规范化 `.tar.gz`、逐文件 manifest 与 `SHA256SUMS`。
 - 源码归档的路径顺序、mtime、uid/gid 与 pax 时间字段固定；同一提交应产生相同归档。
