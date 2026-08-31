@@ -14,13 +14,22 @@ on:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    name: Verify (${{ matrix.os }})
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
@@ -43,9 +52,9 @@ jobs:
       - name: Build backend dist
         run: npm run build
       # Experiment sidecar bootstrap scripts run `python -c "import numpy..."`;
-      # the runner image ships python3 without numpy.
+      # use the same explicit interpreter on Linux and Windows.
       - name: Install python deps for the experiment sidecar
-        run: pip install "numpy>=2.4,<3" --quiet  # pinned to the uv.lock family (experiment-runtime/uv.lock resolves 2.4.x/2.5.x)
+        run: python -m pip install "numpy>=2.4,<3" --quiet  # pinned to the uv.lock family (experiment-runtime/uv.lock resolves 2.4.x/2.5.x)
       - name: Typecheck (backend + CLI)
         run: npm run typecheck
       - name: Lint
@@ -71,9 +80,21 @@ jobs:
 
   # HX §19: browser E2E over the Research Map core journey (home -> formation
   # -> launch -> study map -> inspector -> home) on the deterministic offline
-  # route. Depends on both builds; chromium via the official action.
+  # route. Chromium owns the complete suite; Firefox independently exercises
+  # the core journey plus optional PDF/ASR boundaries. A retry-recovered test
+  # still fails the job so CI cannot launder a product race as green.
   web-e2e:
+    name: Web E2E (${{ matrix.browser }} / ${{ matrix.scope }})
     needs: verify
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - browser: chromium
+            scope: full
+          - browser: firefox
+            scope: smoke
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -91,21 +112,37 @@ jobs:
       - name: Build web dist
         working-directory: web
         run: npm run build
-      - name: Install Playwright chromium
+      - name: Install Playwright browser
         working-directory: web
-        run: npx playwright install --with-deps chromium
-      - name: Run core-journey E2E (offline deterministic route)
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+      - name: Run full Chromium E2E (offline deterministic route)
+        if: matrix.scope == 'full'
         working-directory: web
         env:
           PLAYWRIGHT_CHANNEL: ''
-        run: npx playwright test
+        run: npx playwright test --browser=chromium --workers=1 --fail-on-flaky-tests
+      - name: Run Firefox core + optional-capability smoke
+        if: matrix.scope == 'smoke'
+        working-directory: web
+        env:
+          PLAYWRIGHT_CHANNEL: ''
+        run: npx playwright test e2e/core-journey.spec.ts e2e/optional-assets.spec.ts --browser=firefox --workers=1 --retries=0
+      - name: Upload browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-${{ matrix.browser }}-${{ github.run_attempt }}
+          path: web/test-results/
+          if-no-files-found: ignore
+          retention-days: 14
 
   # Release artifact: the public-release pack is built only on explicit demand
   # (tag push or manual dispatch) because export-public.mjs re-verifies the
   # copy with a fresh install + typecheck + lint + test + build inside it.
   release-pack:
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-    needs: verify
+    needs: [verify, web-e2e]
+    timeout-minutes: 90
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -113,6 +150,9 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
@@ -125,7 +165,7 @@ jobs:
         working-directory: packages/tui
         run: npm ci
       - name: Install python deps for the experiment sidecar
-        run: pip install "numpy>=2.4,<3" --quiet  # pinned to the uv.lock family (experiment-runtime/uv.lock resolves 2.4.x/2.5.x)
+        run: python -m pip install "numpy>=2.4,<3" --quiet  # pinned to the uv.lock family (experiment-runtime/uv.lock resolves 2.4.x/2.5.x)
       - name: Build public-release pack (self-verifying exporter)
         run: node scripts/export-public.mjs
       - name: Upload release pack
