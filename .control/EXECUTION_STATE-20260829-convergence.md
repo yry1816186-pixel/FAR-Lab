@@ -861,3 +861,25 @@ runner 上 home/map ≥0.1；本地（含兄弟 WIP）home 0.0000 / map 0.0774
 门禁：tsc/eslint/secret-scan 绿；全量 2306 过/2 败（1=补全树漂移已修转
 绿；1=兄弟 thinking-display 在制品，非主干）。hosted CI 结果待验。
 FA 计：14F/30P/10PASS/2B（56 项）。
+
+## v9 终局任务书交付（2026-08-31，主会话——本会话无波次执行）
+
+- 产出：`.control/ENDGAME-PLAN-v9.md`——用户将交给 Claude Code CLI
+  （GLM-5.3，/goal 彻夜）的唯一权威任务书。v8 十二波 ~150 项条目全量
+  保留；新增契约层：六维最高标准法（性能双实测数字/设计美学绑定
+  impeccable+frontend-design 磁盘方法论/规范/能力/技术含量对照验证/
+  诚实）、单项状态机+完成断言三问、选择函数与反空转、决策权限
+  （任务书点名=已授权；对外发布/平台设置=登记待批不等待）、抗压缩
+  启动协议（第一动作=落盘+三方对账）、两态停止条件。4 处 [v9增补]：
+  浅断言清点→修复队列入册；Wave A 末设计基线走查；Wave D 末美学终审；
+  Wave F 类型逃逸存量清零。
+- 本会话未执行任何波次工作、未触碰代码，不声称任何完成。终局状态与
+  stop-guard 一致：ACC-02/B-QWEN 凭证（09-05 用户窗口）、CPS-P6 用户
+  验收、演示视频=USER-OWNED；对抗审计/frontier sweep 两门未跑；
+  completion-gate 维持 NOT_READY。
+- 对账提示：工作树仍有 ~22 未提交文件（conversation-stream 面+规范
+  文档，兄弟车道在制）+未跟踪 1.md；夜间代理按任务书§1 对账接管。
+- 补充（同日）：用户告知 Claude Code /goal 输入上限 4000 字符——已产出
+  内核版 `.control/ENDGAME-GOAL-v9-4000.md`（实测 3950 字符，node .length），
+  架构=内核承担红线/纪律/波次地图/停止条件，全文契约留在磁盘由第一动作
+  读入；两文件配合使用。
