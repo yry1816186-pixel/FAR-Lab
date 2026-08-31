@@ -67,6 +67,14 @@ async function ensureLoaded(): Promise<void> {
 }
 
 const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+const loadError = (e: unknown): WorkerResponse => {
+  const message = errText(e);
+  return {
+    type: 'error',
+    code: message.includes('not vendored') ? 'model_missing' : 'load_failed',
+    message,
+  };
+};
 
 self.addEventListener('message', (ev: MessageEvent<WorkerRequest>) => {
   const msg = ev.data;
@@ -76,18 +84,21 @@ self.addEventListener('message', (ev: MessageEvent<WorkerRequest>) => {
         await ensureLoaded();
         post({ type: 'ready' });
       } catch (e) {
-        const text = errText(e);
-        post({
-          type: 'error',
-          code: text.includes('not vendored') ? 'model_missing' : 'load_failed',
-          message: text,
-        });
+        post(loadError(e));
       }
       return;
     }
     if (msg.type === 'transcribe') {
       try {
         await ensureLoaded();
+      } catch (e) {
+        // Loading and inference are distinct failure phases. A transcription
+        // request racing the warm-up must retain model_missing/load_failed;
+        // collapsing it to transcribe_failed hides the actionable remedy.
+        post(loadError(e));
+        return;
+      }
+      try {
         const pipe = asr;
         if (pipe === null) throw new Error('pipeline unavailable after load');
         const out = await pipe(msg.audio, {

@@ -35,16 +35,20 @@ const MAX_PAGES = 60;
 const MAX_ITEMS_PER_PAGE = 4_000;
 
 let pdfjsReady: Promise<typeof import('pdfjs-dist')> | null = null;
+const NODE_PDFJS_ENTRY = 'pdfjs-dist/legacy/build/pdf.mjs';
 async function loadPdfjs(): Promise<typeof import('pdfjs-dist')> {
   pdfjsReady ??= (async (): Promise<typeof import('pdfjs-dist')> => {
     // Node (vitest/CLI): the legacy build is DOM-free; no worker → pdfjs runs
-    // on the calling thread. Browser: the standard build + Vite-served worker.
+    // on the calling thread. This fixed internal specifier is intentionally
+    // runtime-resolved: statically discovering the unreachable Node branch made
+    // Vite ship a second 535KB pdfjs runtime to every browser. Browser: the
+    // standard build + Vite-served worker.
     const isNode = typeof process !== 'undefined' && process.versions?.node !== undefined;
     if (isNode) {
-      const legacy = await import('pdfjs-dist/legacy/build/pdf.mjs');
+      const legacy = await import(/* @vite-ignore */ NODE_PDFJS_ENTRY) as typeof import('pdfjs-dist');
       // The legacy build's module type diverges from the main entry type only in
       // worker plumbing; the pdf API used here is the same — single documented cast.
-      return legacy as typeof import('pdfjs-dist');
+      return legacy;
     }
     const pdfjs = await import('pdfjs-dist');
     pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).href;

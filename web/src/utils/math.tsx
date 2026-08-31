@@ -1,6 +1,9 @@
-import { useMemo } from 'react';
-import { InlineMath } from 'react-katex';
-import 'katex/dist/katex.min.css';
+import { lazy, Suspense, useMemo } from 'react';
+
+// Hypothesis cards are on a deep research surface, and most statements contain
+// no TeX at all. Keep KaTeX (runtime + fonts + CSS) out of the cold shell and
+// request it only after the deterministic splitter finds a real math segment.
+const InlineMathFragment = lazy(() => import('./InlineMathFragment'));
 
 /**
  * R3 (PLAN-reuse-adoption §2「LaTeX 公式」): render `$...$` inline-math fragments
@@ -25,13 +28,12 @@ export function WithMath({ text }: { text: string }): JSX.Element {
     <>
       {parts.map((part, i) =>
         part.math ? (
-          <InlineMath
+          <Suspense
             key={i}
-            math={part.value}
-            renderError={(error) => (
-              <span className="math-fallback mono" title={error.message}>{`$${part.value}$`}</span>
-            )}
-          />
+            fallback={<span className="math-fallback mono">{`$${part.value}$`}</span>}
+          >
+            <InlineMathFragment math={part.value} />
+          </Suspense>
         ) : (
           <span key={i}>{part.value}</span>
         ),

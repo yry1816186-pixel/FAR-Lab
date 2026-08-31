@@ -117,14 +117,23 @@ test('perf: loaded home first paint and layout stability within "good" budgets',
   // first /runs response. Before the boot-state fix that late 43px insertion
   // moved the entire app body and produced CLS ~= 0.115 on every run.
   const activeRunId = await startStudy(request);
+  const coldAssetRequests = new Set<string>();
+  page.on('request', (req) => {
+    const pathname = new URL(req.url()).pathname;
+    if (pathname.startsWith('/assets/')) coldAssetRequests.add(pathname);
+  });
   const v = await measureVitals(page, () => page.goto('/#/', { waitUntil: 'networkidle' }));
   console.log(`PERF home: FCP=${v.fcp.toFixed(0)}ms LCP=${v.lcp.toFixed(0)}ms CLS=${v.cls.toFixed(4)} longTasks=${v.longTasks}`);
+  console.log(`PERF home cold assets: ${JSON.stringify([...coldAssetRequests].sort())}`);
   if (v.shifts.length > 0) console.log(`PERF home shifts: ${JSON.stringify(v.shifts)}`);
   await expect(page.locator('.awareness-bar')).toBeVisible();
   // Google "good": LCP <= 2500ms, CLS <= 0.1. Generous CI ceilings (runner
   // variance) — the committed baseline carries the measured local numbers.
   expect(v.lcp, 'home LCP within good budget').toBeLessThan(4_000);
   expect(v.cls, 'home layout stable').toBeLessThan(0.1);
+  const unexpectedOptional = [...coldAssetRequests].filter((pathname) =>
+    /\/(?:InlineMathFragment|RadarCompare|pdf(?:\.worker\.min)?-|xlsx-|transformers\.web-|asr-worker-)/.test(pathname));
+  expect(unexpectedOptional, 'optional research tools stay off the cold shell').toEqual([]);
   const cancel = await request.post(`/api/v1/runs/${activeRunId}/cancel`, { data: {} });
   expect(cancel.ok()).toBeTruthy();
   // Test isolation is part of the performance contract: a cancel request is

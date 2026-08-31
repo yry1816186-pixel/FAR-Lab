@@ -128,8 +128,9 @@ const QueueSkeleton = ({ rows = 2 }: { rows?: number }): JSX.Element => (
     onJudgmentCount?.(live.length + attentionAll.length + drafts.length + counterStudies.length);
   }, [live.length, attentionAll.length, drafts.length, counterStudies.length, onJudgmentCount]);
 
-  // One compose zone, one truth: the same component instance in both branches
-  // (fresh workspace = autofocus so typing can begin with zero navigation).
+  // One compose zone, one truth. FirstUse stays mounted across the initial
+  // runs request so a fresh-workspace transition cannot discard a question,
+  // selected file, dictation result, or an in-flight parse.
   // It is never a second destination — the rail's 工作台 entry is the only
   // navigation item that leads here.
   const composeZone = (autoFocus: boolean): JSX.Element => (
@@ -151,18 +152,16 @@ const QueueSkeleton = ({ rows = 2 }: { rows?: number }): JSX.Element => (
       <main className="queue-canvas">
         {runsError !== null && <ErrorBox error={runsError} onRetry={onRetryRuns} />}
 
-        {fresh ? (
-          <FirstUse
-            health={health}
-            healthError={healthError !== null}
-            checking={checking}
-            onOpenSettings={onOpenSettings}
-          >
-            {composeZone(true)}
-          </FirstUse>
-        ) : (
+        <FirstUse
+          active={fresh}
+          health={health}
+          healthError={healthError !== null}
+          checking={checking}
+          onOpenSettings={onOpenSettings}
+          compose={composeZone(fresh)}
+        >
+          {!fresh && (
           <>
-            {composeZone(false)}
             <section className="queue-section" aria-labelledby="labq-judgment">
               <h2 className="queue-section-title" id="labq-judgment">{t('labhome.judgmentTitle')}</h2>
               <p className="queue-section-sub">{t('labhome.judgmentSub')}</p>
@@ -311,7 +310,8 @@ const QueueSkeleton = ({ rows = 2 }: { rows?: number }): JSX.Element => (
               </section>
             )}
           </>
-        )}
+          )}
+        </FirstUse>
       </main>
     </div>
   );
@@ -320,11 +320,13 @@ const QueueSkeleton = ({ rows = 2 }: { rows?: number }): JSX.Element => (
 /** First-use zone (G1): what this is, is the engine ready, and the compose
  *  zone itself — the first-run researcher types their question HERE, not after
  *  a navigation hop. */
-function FirstUse({ health, healthError, checking, onOpenSettings, children }: {
+function FirstUse({ active, health, healthError, checking, onOpenSettings, compose, children }: {
+  active: boolean;
   health: { status: string; db: string; providers: { name: string; kind: string; liveReady: boolean }[] } | null;
   healthError: boolean;
   checking: boolean;
   onOpenSettings: () => void;
+  compose: React.ReactNode;
   children: React.ReactNode;
 }): JSX.Element {
   const { t } = useI18n();
@@ -334,64 +336,67 @@ function FirstUse({ health, healthError, checking, onOpenSettings, children }: {
   const routesOk = ready.length > 0;
 
   return (
-    <section className="firstuse" aria-labelledby="fu-title">
-      <h1 className="fu-title" id="fu-title">{t('labhome.fuTitle')}</h1>
-      <p className="fu-lede">{t('labhome.fuLede')}</p>
+    <section className={active ? 'firstuse' : undefined} aria-labelledby={active ? 'fu-title' : undefined}>
+      <div hidden={!active}>
+        <h1 className="fu-title" id="fu-title">{t('labhome.fuTitle')}</h1>
+        <p className="fu-lede">{t('labhome.fuLede')}</p>
 
-      <div className="fu-checks" role="list" aria-label={t('labhome.fuChecks')}>
-        <div className="fu-check" role="listitem">
-          <span className={`fu-dot ${engineOk ? 'ok' : healthError || !checking ? 'err' : 'wait'}`} aria-hidden="true" />
-          <span className="fu-check-main">
-            <span className="fu-check-name">{t('labhome.fuEngine')}</span>
-            <span className="fu-check-why">
-              {checking && health === null && !healthError ? t('labhome.fuChecking') : engineOk ? t('labhome.fuEngineOk') : t('labhome.fuEngineBad')}
-            </span>
-          </span>
-        </div>
-        <div className="fu-check" role="listitem">
-          <span className={`fu-dot ${routesOk ? 'ok' : healthError || (!checking && health !== null) ? 'warn' : 'wait'}`} aria-hidden="true" />
-          <span className="fu-check-main">
-            <span className="fu-check-name">{t('labhome.fuRoutes')}</span>
-            <span className="fu-check-why">
-              {checking && health === null && !healthError
-                ? t('labhome.fuChecking')
-                : healthError
-                  ? t('labhome.fuRoutesUnknown')
-                  : routesOk
-                    ? t('labhome.fuRoutesOk', { ready: ready.length, total: liveProviders.length })
-                    : t('labhome.fuRoutesZero')}
-            </span>
-            {/* Route detail (P2 fix): WHICH routes are ready — one CHIP per
-                route, the mark inside the chip so it cannot read as a
-                separator ("✓ zai – dashscope" was misread as "dashscope
-                not ready"). Unready chips say WHY via title. */}
-            {!checking && !healthError && liveProviders.length > 0 && (
-              <span className="fu-routes-detail">
-                {liveProviders.map((p) => (
-                  <span key={p.name} className={`fu-route${p.liveReady ? ' is-ready' : ''}`} title={p.liveReady ? t('labhome.fuRouteReady') : t('labhome.fuRouteNotReady')}>
-                    {p.name}{p.liveReady ? ' ✓' : ` · ${t('labhome.fuRouteNotReadyShort')}`}
-                  </span>
-                ))}
+        <div className="fu-checks" role="list" aria-label={t('labhome.fuChecks')}>
+          <div className="fu-check" role="listitem">
+            <span className={`fu-dot ${engineOk ? 'ok' : healthError || !checking ? 'err' : 'wait'}`} aria-hidden="true" />
+            <span className="fu-check-main">
+              <span className="fu-check-name">{t('labhome.fuEngine')}</span>
+              <span className="fu-check-why">
+                {checking && health === null && !healthError ? t('labhome.fuChecking') : engineOk ? t('labhome.fuEngineOk') : t('labhome.fuEngineBad')}
               </span>
-            )}
-            {/* Repair path whenever ANY route is unready (not only at zero):
-                the chip names the gap; this link owns the next action. */}
-            {!checking && !healthError && ready.length < liveProviders.length && (
-              <button type="button" className="fu-check-act" onClick={onOpenSettings}>{t('labhome.fuConfigure')}</button>
-            )}
-          </span>
+            </span>
+          </div>
+          <div className="fu-check" role="listitem">
+            <span className={`fu-dot ${routesOk ? 'ok' : healthError || (!checking && health !== null) ? 'warn' : 'wait'}`} aria-hidden="true" />
+            <span className="fu-check-main">
+              <span className="fu-check-name">{t('labhome.fuRoutes')}</span>
+              <span className="fu-check-why">
+                {checking && health === null && !healthError
+                  ? t('labhome.fuChecking')
+                  : healthError
+                    ? t('labhome.fuRoutesUnknown')
+                    : routesOk
+                      ? t('labhome.fuRoutesOk', { ready: ready.length, total: liveProviders.length })
+                      : t('labhome.fuRoutesZero')}
+              </span>
+              {/* Route detail (P2 fix): WHICH routes are ready — one CHIP per
+                  route, the mark inside the chip so it cannot read as a
+                  separator ("✓ zai – dashscope" was misread as "dashscope
+                  not ready"). Unready chips say WHY via title. */}
+              {!checking && !healthError && liveProviders.length > 0 && (
+                <span className="fu-routes-detail">
+                  {liveProviders.map((p) => (
+                    <span key={p.name} className={`fu-route${p.liveReady ? ' is-ready' : ''}`} title={p.liveReady ? t('labhome.fuRouteReady') : t('labhome.fuRouteNotReady')}>
+                      {p.name}{p.liveReady ? ' ✓' : ` · ${t('labhome.fuRouteNotReadyShort')}`}
+                    </span>
+                  ))}
+                </span>
+              )}
+              {/* Repair path whenever ANY route is unready (not only at zero):
+                  the chip names the gap; this link owns the next action. */}
+              {!checking && !healthError && ready.length < liveProviders.length && (
+                <button type="button" className="fu-check-act" onClick={onOpenSettings}>{t('labhome.fuConfigure')}</button>
+              )}
+            </span>
+          </div>
         </div>
-      </div>
 
-      {!routesOk && !checking && (
-        <p className="fu-hint">{t('labhome.fuRoutesHint')}</p>
-      )}
+        {!routesOk && !checking && (
+          <p className="fu-hint">{t('labhome.fuRoutesHint')}</p>
+        )}
+      </div>
 
       {/* The compose zone IS the first step — the researcher types here, in
           the same surface that will later hold the queue and the studies. */}
-      {children}
+      {compose}
 
-      <p className="fu-note">{t('labhome.fuNote')}</p>
+      {active && <p className="fu-note">{t('labhome.fuNote')}</p>}
+      {children}
     </section>
   );
 }
