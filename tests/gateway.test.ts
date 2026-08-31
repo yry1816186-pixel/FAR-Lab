@@ -14,13 +14,17 @@ import { SSHGateway, generateTargetKey } from '../src/experiment/gateway.js';
  * its host key, then executes a REAL remote training (sklearn logistic on CSV shipped
  * via scp) and a REAL remote bootstrap, comparing against local computation within
  * tolerance (cross-device bit-identity is explicitly not claimed, D-086-3).
- * Skipped honestly when the Docker daemon is not running (user-side condition).
+ * Skipped honestly when the Docker engine cannot run linux containers (user-side
+ * condition: daemon down or a Windows-container engine).
  */
 
+// The target image is linux-only (node:24-slim), so a Windows-container engine
+// (e.g. the stock Docker on GitHub windows runners) cannot run this suite at all —
+// gate on OSType, not merely on "a daemon answers".
 const dockerReady = (): boolean => {
   try {
-    execFileSync('docker', ['info', '--format', '{{.ServerVersion}}'], { stdio: ['ignore', 'pipe', 'ignore'] });
-    return true;
+    const ostype = execFileSync('docker', ['info', '--format', '{{.OSType}}'], { encoding: 'utf8' });
+    return ostype.trim() === 'linux';
   } catch {
     return false;
   }
@@ -149,7 +153,7 @@ describe('P3 ssh2-gateway on a real Docker/WSL2 Linux target (D-084)', { timeout
     expect(rejected.stderr).toMatch(/REMOTE HOST IDENTIFICATION HAS CHANGED|No ED25519 host key is known/);
   });
 
-  it.skipIf(ready)('docker daemon not running — remote-path verification stays honestly skipped (user-side condition, D-084)', () => {
+  it.skipIf(ready)('docker engine cannot run linux containers — remote-path verification stays honestly skipped (user-side condition, D-084)', () => {
     expect(true).toBe(true);
   });
 });

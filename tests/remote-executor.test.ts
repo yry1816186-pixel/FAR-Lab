@@ -20,10 +20,12 @@ import { uvAvailable } from './helpers/uv-gate.js';
  * Skipped honestly when the daemon is down.
  */
 
+// The target image is linux-only (node:24-slim): a Windows-container engine
+// (stock Docker on GitHub windows runners) cannot run this chain — gate on OSType.
 const dockerReady = (): boolean => {
   try {
-    execFileSync('docker', ['info', '--format', 'x'], { stdio: ['ignore', 'pipe', 'ignore'] });
-    return true;
+    const ostype = execFileSync('docker', ['info', '--format', '{{.OSType}}'], { encoding: 'utf8' });
+    return ostype.trim() === 'linux';
   } catch {
     return false;
   }
@@ -192,7 +194,7 @@ describe('P3 remote executor: device-bound queue -> remote training -> local ver
     }
   });
 
-  it.skipIf(ready)('docker daemon not running — remote executor chain honestly skipped', () => {
+  it.skipIf(ready)('docker engine cannot run linux containers — remote executor chain honestly skipped', () => {
     expect(true).toBe(true);
   });
 });

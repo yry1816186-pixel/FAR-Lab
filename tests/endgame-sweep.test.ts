@@ -38,7 +38,9 @@ const fixtureRepo = (): { root: string; log: string } => {
   fs.writeFileSync(path.join(root, 'src', 'value.ts'), 'export const value = 1;\n');
   fs.writeFileSync(path.join(root, 'tests', 'value.test.ts'), 'expect(value).toBeTruthy();\n');
   fs.writeFileSync(path.join(root, 'FINAL_ACCEPTANCE.json'), JSON.stringify({ items: [{ id: 'FA-T-01' }] }));
-  execFileSync('git', ['init', '-q'], { cwd: root });
+  // --template= keeps the fixture a bare repo: a host-global init.templateDir
+  // (e.g. a personal pre-commit guard) must not leak into fixture commits.
+  execFileSync('git', ['init', '-q', '--template='], { cwd: root });
   execFileSync('git', ['add', '.'], { cwd: root });
   execFileSync('git', ['-c', 'user.name=FAR Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'fixture'], { cwd: root });
   return { root, log: path.join(root, '.control', 'SWEEP-LOG.json') };

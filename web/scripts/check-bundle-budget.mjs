@@ -139,7 +139,18 @@ export function inspectBundle(distDir, { shellBudgetBytes = DEFAULT_SHELL_BUDGET
 
 function main() {
   const distDir = path.resolve(process.cwd(), process.argv[2] ?? 'dist');
-  const report = inspectBundle(distDir);
+  const budgetArg = process.argv[3];
+  let options = undefined;
+  if (budgetArg !== undefined) {
+    const shellBudgetBytes = Number(budgetArg);
+    if (!Number.isFinite(shellBudgetBytes)) {
+      process.stderr.write(`invalid budget (expected a number, got: ${budgetArg})\n`);
+      process.exitCode = 2;
+      return;
+    }
+    options = { shellBudgetBytes };
+  }
+  const report = inspectBundle(distDir, options);
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   if (report.status !== 'PASS') process.exitCode = 1;
 }
