@@ -73,6 +73,29 @@ node dist/cli/main.js verify <bundle-id>
 
 > Shorthand below: `far` means `node dist/cli/main.js` (or `npm run far --`).
 
+### Verify a published source release
+
+Published releases contain a `.tar.gz` source archive, content manifest,
+CycloneDX SBOM, `SHA256SUMS`, and two Sigstore verification bundles. Verify
+the signed checksum list, its covered files, and archive provenance before
+extracting or running it:
+
+```bash
+cd /path/to/downloaded-release
+gh attestation verify SHA256SUMS --repo yry1816186-pixel/FAR-Lab
+sha256sum --check SHA256SUMS
+gh attestation verify /path/to/farlab-public-<version>+<commit>.tar.gz \
+  --repo yry1816186-pixel/FAR-Lab
+# From a trusted FAR-Lab checkout, additionally match every archive payload
+# byte to the release content manifest:
+node scripts/verify-release-artifacts.mjs /path/to/downloaded-release
+```
+
+The Node verifier safely inspects and extracts the archive into a temporary
+directory, then matches every payload byte against the content manifest.
+Branch/manual-dispatch artifacts are release candidates only; only an
+annotated, version-matched Git tag may create a GitHub Release.
+
 ### Web Workbench
 
 ```bash

@@ -33,10 +33,10 @@
     "d3-force": "^3.0.0",
     "diff": "9.0.0",
     "echarts": "^6.1.0",
-    "jszip": "^3.10.1",
+    "jszip": "3.10.1",
     "katex": "0.16.47",
     "lucide-react": "^1.33.0",
-    "mammoth": "^1.12.1",
+    "mammoth": "1.12.1",
     "pdfjs-dist": "6.2.108",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -61,7 +61,10 @@
     "vite": "^6.0.3"
   },
   "overrides": {
-    "sharp": "^0.35.4",
-    "adm-zip": "^0.6.0"
+    "sharp": "0.35.4",
+    "adm-zip": "0.6.0",
+    "jszip": "3.10.1",
+    "mammoth": "1.12.1",
+    "pdfjs-dist": "6.2.108"
   }
 }

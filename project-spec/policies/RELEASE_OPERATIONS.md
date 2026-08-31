@@ -65,3 +65,28 @@
 - 如果正式施工开始时尚未初始化 Git，则建立仓库后再决定 pre-commit/CI 接线；`secret-scan.mjs` + `path-hygiene.mjs` 可作为提交/发布前检查，CI 有真实价值时加入 build/typecheck/相关测试/门禁。
 - 未接 CI 前，发布动作由本文件流程 + 脚本人工执行，如实标注验证等级。
 - 竞赛发布路径必须满足当前官方规则要求的模型调用方式，属于正式 release 合规要求；提交材料组装本身不是产品 runtime。
+
+## 11. FAR-Lab 当前源码发布闭环
+
+- 权威版本：根 `package.json`；Web、TUI、Python runtime、desktop npm/Tauri/Cargo
+  必须同版，规则见 `VERSIONING.md`。发布标签必须是与之完全一致的 annotated
+  `vMAJOR.MINOR.PATCH`，且 `CHANGELOG.md` 同版本节必须已有 ISO 日期；
+  `UNRELEASED` fail closed。
+- `node scripts/export-public.mjs` 只接受 clean Git tree。允许清单必须包含产品声明的
+  root/Web/TUI/Python/desktop 腿；自检在复制后的目录内分别执行，原工作区预装依赖不能
+  充当副本可用证据。
+- 托管 `release-pack` 先等待 verify、浏览器矩阵、dependency audit 和多语言 CodeQL，
+  再生成 CycloneDX SBOM、规范化 `.tar.gz`、逐文件 manifest 与 `SHA256SUMS`。
+- 源码归档的路径顺序、mtime、uid/gid 与 pax 时间字段固定；同一提交应产生相同归档。
+  SBOM 会记录扫描器版本/生成时间，是已声明的非确定性文件，但其精确字节受
+  `SHA256SUMS` 与 SBOM attestation 约束。
+- GitHub Actions OIDC 生成 build provenance 与 SBOM 两份签名 attestation；工作流随后
+  用 `gh attestation verify` 真验 archive 与 `SHA256SUMS`。验证 bundle 作为自签名文件
+  随发布物附带；不得再改写已被 attestation 绑定的 `SHA256SUMS`，从而避免签名循环。
+- manual dispatch 只产生 attested release candidate artifact。只有通过上述门的 tag build
+  才执行 `gh release create`；desktop 安装包在签名/updater/卸载闭环关闭前不进入该发布物。
+- 消费者先对 `SHA256SUMS` 运行 `gh attestation verify`，再执行 `sha256sum --check`，
+  并对 archive 单独验 attestation；可信源码树中的
+  `node scripts/verify-release-artifacts.mjs <下载目录>` 进一步逐字节对照内容 manifest。
+  回滚到上一已签名标签；
+  若有数据迁移，必须先执行该版本 changelog 中另列的回滚演练，不能只替换二进制。

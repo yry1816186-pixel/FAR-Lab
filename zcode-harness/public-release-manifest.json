@@ -2,6 +2,11 @@
   "$schema": "public-release allowlist (Wave-G WP1 proposal §3, adjudicated D-069/D-070)",
   "license": "Apache-2.0",
   "include": [
+    ".github/**",
+    "docs/**",
+    "experiment-runtime/**",
+    "packages/**",
+    "skills/**",
     "src/**",
     "tests/**",
     "web/**",
@@ -11,11 +16,15 @@
     "zcode-harness/**",
     "project-spec/**",
     "README.md",
+    ".env.example",
+    "CHANGELOG.md",
+    "VERSIONING.md",
     "package.json",
     "package-lock.json",
     "tsconfig.json",
     "vitest.config.ts",
     "eslint.config.js",
+    "rust-toolchain.toml",
     ".gitignore",
     "LICENSE",
     "NOTICE",
@@ -43,7 +52,10 @@
     "dist",
     "target",
     ".cache",
-    "coverage"
+    "coverage",
+    ".venv",
+    "__pycache__",
+    ".pytest_cache"
   ],
   "notes": "exclude wins over include; copyFilters prune directories at ANY depth. research/evidence/.control/spikes are the workspace fact system (constitution §2) — never published."
 }

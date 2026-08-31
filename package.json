@@ -23,6 +23,9 @@
     "endgame:sweep:status": "node zcode-harness/scripts/endgame-sweep.mjs status",
     "endgame:sweep:check": "node zcode-harness/scripts/endgame-sweep.mjs check",
     "endgame:sweep:complete": "node zcode-harness/scripts/endgame-sweep.mjs check --require-complete",
+    "release:build": "node scripts/build-release-artifacts.mjs",
+    "release:verify": "node scripts/verify-release-artifacts.mjs",
+    "release:check-tag": "node scripts/check-release-tag.mjs",
     "lint": "eslint ."
   },
   "dependencies": {
