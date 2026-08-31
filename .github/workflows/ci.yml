@@ -28,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-15]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -69,7 +69,7 @@ jobs:
       - name: Build backend dist
         run: npm run build
       # Experiment sidecar bootstrap scripts run `python -c "import numpy..."`;
-      # use the same explicit interpreter on Linux and Windows.
+      # use the same explicit interpreter on Linux, Windows and macOS.
       - name: Install python deps for the experiment sidecar
         run: python -m pip install "numpy>=2.4,<3" --quiet  # pinned to the uv.lock family (experiment-runtime/uv.lock resolves 2.4.x/2.5.x)
       - name: Typecheck (backend + CLI)
@@ -94,6 +94,33 @@ jobs:
       - name: Web production build
         working-directory: web
         run: npm run build
+
+  # The experiment runtime declares Python >=3.11 and ships one uv lock. Verify
+  # both release-targeted minor versions against that lock instead of inferring
+  # compatibility from the main 3.12 job.
+  python-runtime:
+    name: Python runtime (${{ matrix.python }})
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.11', '3.12']
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: '0.12.1'
+          enable-cache: true
+      - name: Sync the locked runtime
+        run: uv sync --locked --project experiment-runtime --python "${{ matrix.python }}"
+      - name: Import the complete scientific runtime from the frozen environment
+        run: uv run --project experiment-runtime --frozen --python "${{ matrix.python }}" python -c "import sys, farlab_experiment_runtime, cleanlab, numpy, scipy, sklearn, sympy, xarray, netCDF4; expected=tuple(map(int, '${{ matrix.python }}'.split('.'))); assert sys.version_info[:2] == expected, (sys.version, expected); print(sys.version); print('numpy', numpy.__version__, 'scipy', scipy.__version__)"
 
   # Network-backed advisory queries run once on Ubuntu against every shipped
   # npm lock. A registry outage is a visible gate failure, not a false green.
@@ -157,9 +184,11 @@ jobs:
 
   # HX §19: browser E2E over the Research Map core journey (home -> formation
   # -> launch -> study map -> inspector -> home) on the deterministic offline
-  # route. Chromium owns the complete suite; Firefox independently exercises
-  # the core journey plus optional PDF/ASR boundaries. A retry-recovered test
-  # still fails the job so CI cannot launder a product race as green.
+  # route. Chromium owns the complete suite; Firefox and Playwright WebKit on
+  # Ubuntu independently exercise the core journey plus optional PDF/ASR
+  # boundaries. This WebKit lane is cross-engine web evidence, not a Safari or
+  # macOS WKWebView claim. A retry-recovered test still fails the job so CI
+  # cannot launder a product race as green.
   web-e2e:
     name: Web E2E (${{ matrix.browser }} / ${{ matrix.scope }})
     needs: verify
@@ -171,6 +200,8 @@ jobs:
           - browser: chromium
             scope: full
           - browser: firefox
+            scope: smoke
+          - browser: webkit
             scope: smoke
     runs-on: ubuntu-latest
     steps:
@@ -203,12 +234,12 @@ jobs:
         env:
           PLAYWRIGHT_CHANNEL: ''
         run: npx playwright test --browser=chromium --workers=1 --fail-on-flaky-tests
-      - name: Run Firefox core + optional-capability smoke
+      - name: Run cross-engine core + optional-capability smoke
         if: matrix.scope == 'smoke'
         working-directory: web
         env:
           PLAYWRIGHT_CHANNEL: ''
-        run: npx playwright test e2e/core-journey.spec.ts e2e/optional-assets.spec.ts --browser=firefox --workers=1 --retries=0
+        run: npx playwright test e2e/core-journey.spec.ts e2e/optional-assets.spec.ts --browser=${{ matrix.browser }} --workers=1 --retries=0
       - name: Upload browser failure evidence
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -218,12 +249,86 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+  # Native compilation evidence on every claimed desktop platform. These
+  # bundles are deliberately labelled compile-only: the current shell locates
+  # the source tree at compile time and launches a system Node process, so it is
+  # not yet a standalone distributable application (desktop/BUILD_SCOPE.md).
+  desktop-build:
+    name: Desktop compile-only (${{ matrix.platform }})
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            platform: linux-x64
+            bundles: deb,appimage
+            required_suffixes: '.deb,.AppImage'
+            apple_signing_identity: ''
+          - os: windows-latest
+            platform: windows-x64
+            bundles: nsis
+            required_suffixes: '-setup.exe'
+            apple_signing_identity: ''
+          - os: macos-15
+            platform: macos-arm64
+            bundles: dmg
+            required_suffixes: '.dmg'
+            apple_signing_identity: '-'
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Linux WebKit and bundle prerequisites
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf xdg-utils
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '24.18.0'
+          cache: npm
+          cache-dependency-path: |
+            web/package-lock.json
+            desktop/package-lock.json
+      - name: Install exact Rust toolchain
+        run: rustup toolchain install 1.98.0 --profile minimal --no-self-update
+      - name: Install and build the web frontend
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+      - name: Install desktop CLI
+        working-directory: desktop
+        run: npm ci
+      - name: Run native Rust tests
+        working-directory: desktop/src-tauri
+        run: cargo +1.98.0 test --locked
+      - name: Compile native desktop bundles
+        working-directory: desktop
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ matrix.apple_signing_identity }}
+        run: npm run tauri -- build --ci --bundles ${{ matrix.bundles }} -- --locked
+      - name: Assert requested bundle formats exist
+        working-directory: desktop
+        run: node scripts/assert-bundle-formats.mjs src-tauri/target/release/bundle "${{ matrix.required_suffixes }}"
+      - name: Upload compile-only desktop evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: desktop-compile-only-${{ matrix.platform }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            desktop/BUILD_SCOPE.md
+            desktop/src-tauri/target/release/bundle/
+          if-no-files-found: error
+          retention-days: 14
+
   # Release artifact: the public-release pack is built only on explicit demand
   # (tag push or manual dispatch) because export-public.mjs re-verifies the
   # copy with a fresh install + typecheck + lint + test + build inside it.
   release-pack:
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-    needs: [verify, web-e2e, dependency-audit, codeql]
+    needs: [verify, python-runtime, web-e2e, desktop-build, dependency-audit, codeql]
     timeout-minutes: 120
     runs-on: ubuntu-latest
     permissions:
