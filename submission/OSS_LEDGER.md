@@ -53,10 +53,10 @@ Authoritative policy: `DEPENDENCY_POLICY.md` (runtime dependency set is exactly 
 | d3-force | ^3.0.0 | 3.0.0 | ISC | runtime |
 | diff | 9.0.0 | 9.0.0 | BSD-3-Clause | runtime |
 | echarts | ^6.1.0 | 6.1.0 | Apache-2.0 | runtime |
-| jszip | ^3.10.1 | 3.10.1 | (MIT OR GPL-3.0-or-later) | runtime |
+| jszip | 3.10.1 | 3.10.1 | (MIT OR GPL-3.0-or-later) | runtime |
 | katex | 0.16.47 | 0.16.47 | MIT | runtime |
 | lucide-react | ^1.33.0 | 1.33.0 | ISC | runtime |
-| mammoth | ^1.12.1 | 1.12.1 | BSD-2-Clause | runtime |
+| mammoth | 1.12.1 | 1.12.1 | BSD-2-Clause | runtime |
 | pdfjs-dist | 6.2.108 | 6.2.108 | Apache-2.0 | runtime |
 | react | ^18.3.1 | 18.3.1 | MIT | runtime |
 | react-dom | ^18.3.1 | 18.3.1 | MIT | runtime |
