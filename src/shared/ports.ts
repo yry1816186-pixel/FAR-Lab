@@ -12,6 +12,7 @@ export type StructuredOutputEvent =
   | { type: 'attempt_started'; attempt: number }
   | { type: 'delta'; text: string }
   | { type: 'attempt_discarded'; reason: 'invalid_output' | 'transport_retry' }
+  | { type: 'attempt_interrupted'; reason: 'caller_abort' }
   | { type: 'attempt_completed' };
 
 /** Structured model call request — the narrow semantic boundary (INTERFACES.md §5). */

@@ -338,6 +338,11 @@ const runAndLandTurn = async (
   // restarting from scratch (fresh sessions get the same id and start clean).
   const resumePlan = planConversationResume(conversationRolloutDir(app), conversationId, researcherMsgId);
   let draft = researcherMsg.replyDraft ?? '';
+  // A retry/resumed provider attempt replaces an older interrupted prefix once
+  // its first schema-projected byte arrives. Until then, retain the old prefix
+  // durably so a failure-before-output does not erase useful researcher-visible
+  // evidence from the prior attempt.
+  let replaceDraftOnNextDelta = draft.length > 0;
   let lastDraftWrite = 0;
   const flushDraft = (force = false): void => {
     const now = Date.now();
@@ -348,8 +353,14 @@ const runAndLandTurn = async (
   const onProgress = (event: ConversationTurnProgress): void => {
     if (event.type === 'reply_reset') {
       draft = '';
+      replaceDraftOnNextDelta = false;
       flushDraft(true);
     } else if (event.type === 'reply_delta') {
+      if (replaceDraftOnNextDelta) {
+        draft = '';
+        replaceDraftOnNextDelta = false;
+        runtime.onProgress?.({ type: 'reply_reset' });
+      }
       draft = `${draft}${event.text}`.slice(0, 40_000);
       flushDraft();
     }
@@ -417,6 +428,9 @@ const runAndLandTurn = async (
         ...(generation.toolTrace.length > 0 ? { toolTrace: generation.toolTrace } : {}),
         ...(generation.proposals.length > 0 ? { proposals: generation.proposals } : {}),
         ...(generation.usage !== undefined ? { usage: generation.usage } : {}),
+        ...(generation.thinking !== undefined && generation.thinking.length > 0
+          ? { thinking: generation.thinking }
+          : {}),
         createdAt: new Date().toISOString(),
       }),
       ...fresh.messages.slice(at + 1),

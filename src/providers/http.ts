@@ -1565,7 +1565,11 @@ export async function runOpenAICompatStructuredCall<T>(
     const retryableKind = f.kind === 'rate_limited' || f.kind === 'timeout' || (f.kind === 'provider_error' && f.retryable);
     if (!retryableKind || transportRetries >= MAX_TRANSPORT_RETRIES) {
       const exhausted = retryableKind && transportRetries >= MAX_TRANSPORT_RETRIES;
-      emitOutput(req, { type: 'attempt_discarded', reason: 'transport_retry' });
+      // An explicit caller abort is terminal, not a retry. Keep any already
+      // schema-projected answer prefix available to the cancellation surface;
+      // only a replacement attempt invalidates those bytes.
+      if (req.signal?.aborted === true) emitOutput(req, { type: 'attempt_interrupted', reason: 'caller_abort' });
+      else emitOutput(req, { type: 'attempt_discarded', reason: 'transport_retry' });
       return fail(
         exhausted
           ? { ...f, message: `${f.message} (retry budget of ${MAX_TRANSPORT_RETRIES} exhausted)` }

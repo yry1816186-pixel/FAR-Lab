@@ -181,6 +181,8 @@ export interface ConversationTurnGeneration {
   toolTrace: ToolTrace[];
   usage?: ConversationTurnUsage;
   proposals: ConversationProposal[];
+  /** Bounded provider reasoning retained for the completed message accordion. */
+  thinking?: string;
   error?: string;
 }
 
@@ -595,6 +597,7 @@ export async function generateConversationTurn(
 ): Promise<ConversationTurnGeneration> {
   const proposals: ConversationProposal[] = [];
   const toolTrace: ToolTrace[] = [];
+  const thinkingParts: string[] = [];
   const progress = (event: ConversationTurnProgress): void => {
     try { input.onProgress?.(event); } catch { /* progress observers are isolated */ }
   };
@@ -667,6 +670,11 @@ export async function generateConversationTurn(
         ...(ev.summary !== undefined ? { summary: ev.summary.slice(0, 300) } : {}),
       });
       progress({ type: 'phase', phase: 'using_tools', turn: ev.turn });
+    }
+    if (ev.type === 'model_call_done' && ev.thinking !== undefined) {
+      // Reasoning is retained only for the final message; it is never forwarded
+      // through the incremental progress projector with raw structured output.
+      thinkingParts.push(ev.thinking);
     }
   };
 
@@ -821,5 +829,8 @@ export async function generateConversationTurn(
     toolTrace,
     ...(usage !== undefined ? { usage } : {}),
     proposals,
+    ...(thinkingParts.length > 0
+      ? { thinking: thinkingParts.join('\n\n—\n\n').slice(0, 12_000) }
+      : {}),
   };
 }
