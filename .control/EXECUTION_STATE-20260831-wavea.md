@@ -130,3 +130,23 @@ transcription promise exists, leaving the later hard-coded classification as
 the user-visible result. This is part of FA-PLT-07's honest optional-capability
 contract and must be fixed at the worker boundary; weakening the browser
 expectation to accept the generic error is forbidden.
+
+## FA-PLT-08 — Static frontend cache identity (finding before repair)
+
+Pre-repair live `HEAD` probes against the production static server on isolated
+port 3320 found that both `/` (`index.html`, 1,932 bytes) and the content-hashed
+`/assets/index-CSzSy9GS.js` (1,042,096 bytes) return `Content-Type` and
+`Content-Length` only. Neither response supplies `Cache-Control`, `ETag`, nor
+`Last-Modified`. This matches the older durable-state observation that a shell
+deployment required a hard reload because `index.html` cached.
+
+Predeclared repair contract:
+
+- unversioned `index.html`, model assets, and other non-Vite static files must
+  revalidate rather than become indefinitely stale;
+- Vite-owned `/assets/` files are content-hashed and may advertise
+  `public, max-age=31536000, immutable`;
+- every 200 static representation carries an identity validator, and a matching
+  `If-None-Match` returns an empty 304 with the same cache contract for both GET
+  and HEAD;
+- MIME truth, missing-model 404s, and path-traversal refusal must not regress.
