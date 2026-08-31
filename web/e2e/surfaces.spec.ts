@@ -191,7 +191,7 @@ test('§8.2 pre-launch: draft -> scope proposal -> edit -> server truth -> launc
   // draft-journey.test.ts; the PATCH contract is asserted there too.)
   await page.getByRole('button', { name: /生成范围提议|Generate scope proposal/ }).click();
   await expect(page.locator('.errorbox').first()).toBeVisible({ timeout: 30_000 });
-  await expect(page.locator('#scope-domain')).toHaveCount(0); // never fabricated
+  await expect(page.locator('.scope-editor')).toHaveCount(0); // never fabricated
 
   // Launch: the remainder runs; the map lands on the scientific state band.
   await page.getByRole('button', { name: /直接启动研究|^启动研究$|^Launch|^Launch study$/ }).click();
@@ -200,7 +200,7 @@ test('§8.2 pre-launch: draft -> scope proposal -> edit -> server truth -> launc
   expect(done.status).toBe('completed');
 
   // Post-launch: the scope-review surface is gone (edits belong to the revision chain now).
-  await expect(page.locator('#scope-domain')).toHaveCount(0);
+  await expect(page.locator('.scope-editor')).toHaveCount(0);
 });
 
 

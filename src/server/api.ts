@@ -1388,10 +1388,16 @@ function parseSeedSources(raw: unknown): string | {
           if (typeof s.domain !== 'string' || s.domain.trim().length === 0) throw validation('scope.domain must be a non-empty string');
           scopeNext.domain = s.domain;
         } else {
-          if (!Array.isArray(s[key]) || s[key].length === 0 || (s[key] as unknown[]).some((x) => typeof x !== 'string' || x.trim().length === 0)) {
-            throw validation(`scope.${key} must be a non-empty array of non-empty strings`);
+          const values = s[key];
+          const requiresItem = key === 'phenomena';
+          if (!Array.isArray(values) || (requiresItem && values.length === 0) || values.some((x) => typeof x !== 'string' || x.trim().length === 0)) {
+            throw validation(
+              requiresItem
+                ? `scope.${key} must be a non-empty array of non-empty strings`
+                : `scope.${key} must be an array of non-empty strings (empty array allowed)`,
+            );
           }
-          scopeNext[key] = s[key];
+          scopeNext[key] = values;
         }
         if (JSON.stringify(scopeNext[key]) !== JSON.stringify((question.scope as Record<string, unknown>)[key])) {
           const label = `scope.${key}`;

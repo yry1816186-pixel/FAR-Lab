@@ -169,6 +169,19 @@ describe('§8.2 draft journey', () => {
     // 400: bad goalType
     const badGoal = await postJson(`${base}/api/v1/runs/${draftId}/question`, { goalType: 'revolutionary' }, 'PATCH');
     expect(badGoal.status).toBe(400);
+    // Canonical ResearchScope semantics: the core phenomena list is required,
+    // while inclusion/exclusion boundaries may be explicitly cleared.
+    const clearBoundaries = await postJson(`${base}/api/v1/runs/${draftId}/question`, {
+      scope: { inScope: [], outOfScope: [] },
+    }, 'PATCH');
+    expect(clearBoundaries.status).toBe(200);
+    const cleared = app.store.getObject('question', app.store.getRun(draftId)!.questionId)!;
+    expect(cleared.scope.inScope).toEqual([]);
+    expect(cleared.scope.outOfScope).toEqual([]);
+    const emptyPhenomena = await postJson(`${base}/api/v1/runs/${draftId}/question`, {
+      scope: { phenomena: [] },
+    }, 'PATCH');
+    expect(emptyPhenomena.status).toBe(400);
   });
 
   it('resume launches the remainder of the draft (execution starts, run leaves paused)', async () => {
@@ -266,4 +279,3 @@ describe('§8.2 draft journey', () => {
     expect(() => ResearchQuestion.parse({ ...q, id: newId('q'), createdAt: new Date().toISOString() })).not.toThrow();
   });
 });
-

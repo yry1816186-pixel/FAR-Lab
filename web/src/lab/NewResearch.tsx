@@ -7,8 +7,10 @@ import { useI18n } from '../i18n/LanguageContext';
 import { useCreateRun } from '../hooks/useCreateRun';
 import { deleteRun, editRunQuestion, listModelConfigs, proposeScope, resumeRun, type EditQuestionInput } from '../api/endpoints';
 import { ApiError } from '../api/client';
-import type { ModelConfigsResponse, ResearchQuestion, ScientificGoalType } from '../api/types';
+import type { ModelConfigsResponse, ResearchQuestion } from '../api/types';
 import { TRAY_MAX_SEEDS, SeedCardRow, useSeedTray } from './SeedTray';
+import { ScopeEditor, useScopeEditorDraft } from './ScopeEditor';
+import { scopeEditorPatch, type ScopeEditorIssue } from './scopeEditorModel';
 import type { DictKey } from '../i18n/dict';
 import './lab.css';
 
@@ -28,12 +30,6 @@ import './lab.css';
  * researcher EDIT the refined scope before committing — 启动 continues the
  * draft via /resume. Direct launch stays one click for the quick path.
  */
-
-const GOAL_TYPES: readonly ScientificGoalType[] = ['explanatory', 'predictive', 'interventional', 'methodological', 'exploratory'];
-
-const linesOf = (items: readonly string[]): string => items.join('\n');
-const fromLines = (text: string): string[] =>
-  text.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
 
 export function NewResearch({
   onLaunched, onOpenConversation, initialQuestion = null,
@@ -74,11 +70,8 @@ export function NewResearch({
   const [reviewBusy, setReviewBusy] = useState<null | 'proposing' | 'saving' | 'launching'>(null);
   const [reviewError, setReviewError] = useState<ApiError | null>(null);
   const [savedNote, setSavedNote] = useState(false);
-  const [domainText, setDomainText] = useState('');
-  const [goalChoice, setGoalChoice] = useState<ScientificGoalType>('explanatory');
-  const [phenomenaText, setPhenomenaText] = useState('');
-  const [inScopeText, setInScopeText] = useState('');
-  const [outOfScopeText, setOutOfScopeText] = useState('');
+  const [scopeIssues, setScopeIssues] = useState<ScopeEditorIssue[]>([]);
+  const scopeEditor = useScopeEditorDraft(proposal);
 
   useEffect(() => {
     const c = new AbortController();
@@ -105,11 +98,8 @@ export function NewResearch({
 
   const enterReview = (q: ResearchQuestion): void => {
     setProposal(q);
-    setDomainText(q.scope.domain);
-    setGoalChoice(q.goalType);
-    setPhenomenaText(linesOf(q.scope.phenomena));
-    setInScopeText(linesOf(q.scope.inScope));
-    setOutOfScopeText(linesOf(q.scope.outOfScope));
+    scopeEditor.reset(q);
+    setScopeIssues([]);
   };
 
   const startPreview = async (ev?: React.MouseEvent): Promise<void> => {
@@ -136,18 +126,11 @@ export function NewResearch({
     if (proposal === null || draftId === null) return false;
     setReviewError(null);
     setSavedNote(false);
-    const scopePatch: NonNullable<EditQuestionInput['scope']> = {};
-    const patch: EditQuestionInput = {};
+    const scoped = scopeEditorPatch(proposal, scopeEditor.draft);
+    setScopeIssues(scoped.issues);
+    if (scoped.issues.length > 0) return false;
+    const patch: EditQuestionInput = { ...scoped.patch };
     if (run.text.trim() !== proposal.text && run.text.trim().length > 0) patch.text = run.text.trim();
-    if (goalChoice !== proposal.goalType) patch.goalType = goalChoice;
-    if (domainText.trim() !== proposal.scope.domain && domainText.trim().length > 0) scopePatch.domain = domainText.trim();
-    const phenomena = fromLines(phenomenaText);
-    const inScope = fromLines(inScopeText);
-    const outOfScope = fromLines(outOfScopeText);
-    if (phenomena.length > 0 && JSON.stringify(phenomena) !== JSON.stringify(proposal.scope.phenomena)) scopePatch.phenomena = phenomena;
-    if (JSON.stringify(inScope) !== JSON.stringify(proposal.scope.inScope)) scopePatch.inScope = inScope;
-    if (JSON.stringify(outOfScope) !== JSON.stringify(proposal.scope.outOfScope)) scopePatch.outOfScope = outOfScope;
-    if (Object.keys(scopePatch).length > 0) patch.scope = scopePatch;
     if (patch.text === undefined && patch.goalType === undefined && patch.scope === undefined) {
       setSavedNote(true); // nothing changed — the "saved" state is truthful (no-op)
       return true;
@@ -155,7 +138,6 @@ export function NewResearch({
     if (manageBusy) setReviewBusy('saving');
     try {
       const res = await editRunQuestion(draftId, patch);
-      setProposal(res.question);
       enterReview(res.question);
       setSavedNote(true);
       return true;
@@ -198,6 +180,8 @@ export function NewResearch({
     }
     setDraftId(null);
     setProposal(null);
+    scopeEditor.reset(null);
+    setScopeIssues([]);
     setSavedNote(false);
   };
 
@@ -206,6 +190,8 @@ export function NewResearch({
     // local journey resets. Resuming later = the studies index entry.
     setDraftId(null);
     setProposal(null);
+    scopeEditor.reset(null);
+    setScopeIssues([]);
     setSavedNote(false);
     setReviewError(null);
   };
@@ -332,39 +318,15 @@ export function NewResearch({
 
   const reviewPanel = reviewing && (
     <section className="nr-review" aria-label={t('newresearch.reviewTitle')}>
-      <h3 className="nr-review-title">{t('newresearch.reviewTitle')}</h3>
-      <p className="nr-review-hint">{t('newresearch.reviewHint')}</p>
-      <div className="nr-review-grid">
-        <label className="nr-field">
-          <span className="nr-field-label">{t('newresearch.fieldDomain')}</span>
-          <input className="nr-input" value={domainText} onChange={(e) => setDomainText(e.target.value)} />
-        </label>
-        <label className="nr-field">
-          <span className="nr-field-label">{t('newresearch.fieldGoalType')}</span>
-          <select className="nr-input" value={goalChoice} onChange={(e) => setGoalChoice(e.target.value as ScientificGoalType)}>
-            {GOAL_TYPES.map((g) => <option key={g} value={g}>{t(`goalType.${g}`)}</option>)}
-          </select>
-        </label>
-        <label className="nr-field nr-field--wide">
-          <span className="nr-field-label">{t('newresearch.fieldPhenomena')}</span>
-          <textarea className="nr-input" rows={2} value={phenomenaText} onChange={(e) => setPhenomenaText(e.target.value)} />
-        </label>
-        <label className="nr-field">
-          <span className="nr-field-label">{t('newresearch.fieldInScope')}</span>
-          <textarea className="nr-input" rows={2} value={inScopeText} onChange={(e) => setInScopeText(e.target.value)} />
-        </label>
-        <label className="nr-field">
-          <span className="nr-field-label">{t('newresearch.fieldOutOfScope')}</span>
-          <textarea className="nr-input" rows={2} value={outOfScopeText} onChange={(e) => setOutOfScopeText(e.target.value)} />
-        </label>
-      </div>
-      {proposal.constraints && (
-        <p className="nr-review-constraints">
-          {t('newresearch.fieldConstraints')}
-          {': '}
-          {[...proposal.constraints.assumptions, ...proposal.constraints.dataConstraints, ...proposal.constraints.methodologicalConstraints].filter((s) => s.length > 0).join('；') || t('newresearch.noConstraints')}
-        </p>
-      )}
+      <ScopeEditor
+        idPrefix="new-research-scope"
+        title={t('newresearch.reviewTitle')}
+        hint={t('newresearch.reviewHint')}
+        draft={scopeEditor.draft}
+        onChange={(field, value) => { scopeEditor.change(field, value); setScopeIssues([]); setSavedNote(false); }}
+        issues={scopeIssues}
+        constraints={proposal.constraints}
+      />
       {savedNote && <p className="nr-review-saved" role="status">{t('newresearch.saved')}</p>}
     </section>
   );
