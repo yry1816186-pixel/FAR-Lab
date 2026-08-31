@@ -78,7 +78,7 @@ import { toProvJsonLd } from '../domain/prov-o.js';
 import { consolidateConversationProfile } from '../app/memory.js';
 import { EvidenceRelation, EvidenceRelationType } from '../domain/evidence.js';
 import { diagnosticityScores, removalSensitivity } from '../domain/ach.js';
-import { canonicalSha256 } from '../shared/crypto.js';
+import { canonicalSha256, sha256Hex } from '../shared/crypto.js';
 import { deriveNextActions, projectScientificState } from '../domain/index.js';
 import { projectStateDeltas } from '../domain/state-delta.js';
 import { experimentLegStatus } from '../app/iteration.js';
@@ -1646,7 +1646,13 @@ function parseSeedSources(raw: unknown): string | {
 
   // ---- static frontend (only when web/dist exists; never pretend otherwise) ----
 
-  const serveStatic = (res: http.ServerResponse, method: string, pathname: string, headOnly: boolean): void => {
+  const serveStatic = (
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    method: string,
+    pathname: string,
+    headOnly: boolean,
+  ): void => {
     if (!fs.existsSync(staticRoot)) {
       if (pathname === '/' && (method === 'GET' || method === 'HEAD')) {
         sendJson(res, 200, {
@@ -1674,7 +1680,30 @@ function parseSeedSources(raw: unknown): string | {
     }
     if (target === null) throw notFound(`no route: ${method} ${pathname}`);
     const body = fs.readFileSync(target);
-    const headers = { 'Content-Type': mimeFor(target), 'Content-Length': body.length };
+    const etag = `"sha256-${sha256Hex(body)}"`;
+    // Vite owns /assets and content-hashes every emitted filename. Those bytes
+    // are immutable across deployments; the HTML and optional /models tree are
+    // stable paths whose contents can change and therefore revalidate every
+    // reuse. A strong content validator makes both policies deterministic.
+    const cacheControl = pathname.startsWith('/assets/')
+      ? 'public, max-age=31536000, immutable'
+      : 'no-cache';
+    const representationHeaders = {
+      'Content-Type': mimeFor(target),
+      'Cache-Control': cacheControl,
+      ETag: etag,
+      'X-Content-Type-Options': 'nosniff',
+    };
+    const ifNoneMatch = req.headers['if-none-match'];
+    const validators = (Array.isArray(ifNoneMatch) ? ifNoneMatch.join(',') : ifNoneMatch ?? '')
+      .split(',')
+      .map((value) => value.trim());
+    if (validators.includes('*') || validators.includes(etag)) {
+      res.writeHead(304, representationHeaders);
+      res.end();
+      return;
+    }
+    const headers = { ...representationHeaders, 'Content-Length': body.length };
     if (headOnly) {
       res.writeHead(200, headers);
       res.end();
@@ -2187,7 +2216,7 @@ function parseSeedSources(raw: unknown): string | {
     // static / hint surface (non-/api paths)
     if (segments[0] !== 'api') {
       if (method === 'GET' || method === 'HEAD') {
-        serveStatic(res, method, url.pathname, method === 'HEAD');
+        serveStatic(req, res, method, url.pathname, method === 'HEAD');
         return;
       }
       throw notFound(`no route: ${method} ${url.pathname}`);

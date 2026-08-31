@@ -477,8 +477,10 @@ beforeAll(async () => {
   // second server with a real static root for the file-serving tests
   const staticRoot = path.join(tmp, 'web-dist');
   fs.mkdirSync(path.join(staticRoot, 'assets'), { recursive: true });
+  fs.mkdirSync(path.join(staticRoot, 'models', 'whisper-base'), { recursive: true });
   fs.writeFileSync(path.join(staticRoot, 'index.html'), '<!doctype html><title>far workbench</title>');
   fs.writeFileSync(path.join(staticRoot, 'assets', 'style.css'), 'body{margin:0}');
+  fs.writeFileSync(path.join(staticRoot, 'models', 'whisper-base', 'config.json'), '{"model":"fixture"}');
   staticApi = createApiServer(app, { port: 0, executor, staticRoot });
   staticPort = await staticApi.start();
   staticBase = `http://127.0.0.1:${staticPort}`;
@@ -1383,11 +1385,41 @@ describe('static serving', () => {
     const index = await fetch(`${staticBase}/`);
     expect(index.status).toBe(200);
     expect(index.headers.get('content-type')).toContain('text/html');
+    expect(index.headers.get('cache-control')).toBe('no-cache');
+    expect(index.headers.get('etag')).toMatch(/^"sha256-[0-9a-f]{64}"$/);
+    expect(index.headers.get('x-content-type-options')).toBe('nosniff');
     expect(await index.text()).toContain('far workbench');
 
     const css = await fetch(`${staticBase}/assets/style.css`);
     expect(css.status).toBe(200);
     expect(css.headers.get('content-type')).toContain('text/css');
+    expect(css.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
+    expect(css.headers.get('etag')).toMatch(/^"sha256-[0-9a-f]{64}"$/);
+
+    const model = await fetch(`${staticBase}/models/whisper-base/config.json`);
+    expect(model.status).toBe(200);
+    expect(model.headers.get('content-type')).toContain('application/json');
+    expect(model.headers.get('cache-control')).toBe('no-cache');
+
+    // Validator parity is part of the deployment contract: both GET and HEAD
+    // answer a matching representation identity with a bodyless 304 while
+    // retaining the same cache policy.
+    for (const [url, cacheControl] of [
+      [`${staticBase}/`, 'no-cache'],
+      [`${staticBase}/assets/style.css`, 'public, max-age=31536000, immutable'],
+      [`${staticBase}/models/whisper-base/config.json`, 'no-cache'],
+    ] as const) {
+      const first = await fetch(url);
+      const etag = first.headers.get('etag');
+      expect(etag).not.toBeNull();
+      for (const method of ['GET', 'HEAD'] as const) {
+        const cached = await fetch(url, { method, headers: { 'If-None-Match': etag! } });
+        expect(cached.status).toBe(304);
+        expect(cached.headers.get('cache-control')).toBe(cacheControl);
+        expect(cached.headers.get('etag')).toBe(etag);
+        expect(await cached.text()).toBe('');
+      }
+    }
 
     // Hash routing (useHashRoute) means extension-less paths are NOT client
     // routes. They must 404 honestly — a 200 index.html here once made the ASR
