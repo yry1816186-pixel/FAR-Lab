@@ -1,8 +1,8 @@
 {
   "schema": "final-acceptance/1",
-  "asOf": "2026-08-31 (Wave 0 integrated implementation lane in flight)",
-  "head": "b8afe4b+c926aa9 on lane/endgame-wave0-root (conversation streaming preserved; Wave 0 rebased; full gate pending)",
-  "provenance": "First full endgame audit: 8 parallel read-only domain audits, reports in FINAL_EVIDENCE/audit-2026-08-30/. Load-bearing claims spot-checked by main agent. Wave 0 additions are tracked below from direct repository inspection and executable tests. The preserved conversation-stream lane is now integrated; its pre-integration thinking-persistence regression is registered FA-first below. Incomplete sweep and verification states remain PARTIAL/FAIL.",
+  "asOf": "2026-08-31 (Wave 0 integrated implementation and verification complete; exhaustive sweep remains open)",
+  "head": "d39b427 implementation head on lane/endgame-wave0-root (scope convergence + durable conversation streaming + Wave 0 hardening)",
+  "provenance": "First full endgame audit: 8 parallel read-only domain audits, reports in FINAL_EVIDENCE/audit-2026-08-30/. Load-bearing claims were spot-checked by the main agent. Wave 0 findings were registered before repair, the preserved conversation-stream lane was integrated without dropping its work, and the resulting clean lane passed targeted, browser, build, hygiene, and full-suite gates recorded in .control/EXECUTION_STATE-20260831-wave0.md. Five-table and shallow-assertion coverage remain explicitly incomplete rather than inferred from the passing mechanisms.",
   "statusVocabulary": [
     "PASS",
     "PARTIAL",
@@ -815,12 +815,12 @@
       "id": "FA-W0-02",
       "domain": "agent",
       "title": "Agent handoff, action-deduplication, child-budget, and MCP-reconnect hardening",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P0",
       "owner": "self",
-      "gap": "Implemented and targeted-tested on the Wave 0 lane: closed handoff schema + quality gate + fact-only degradation, durable successful-effect deduplication, deterministic child budget split, bounded retryable-only MCP reconnect. Conversation-stream AbortSignal/onOutput changes were rebased into the same lane and the merged tree typechecks. Remaining before PASS: fix the separately registered thinking-persistence regression and run the full clean-lane gate.",
+      "gap": "CLOSED on the integrated Wave 0 lane: closed handoff schema + quality/reference gate + fact-only degradation, durable successful-effect deduplication, deterministic child budget split, bounded retryable-only MCP reconnect, and AbortSignal/model-output streaming coexist. Targeted agent/MCP tests and the final 232-file/2346-test clean-lane gate passed with only 12 explicitly skipped tests.",
       "target": "all five hardenings coexist with streaming/resume behavior and pass full verification",
-      "verify": "targeted agent/MCP suites, then npm run verify after sibling-lane integration",
+      "verify": "npm test -- --maxWorkers=4 --minWorkers=4 after clean-lane integration",
       "evidence": [
         "tests/agent-compaction.test.ts",
         "tests/agent-loop.test.ts",
@@ -834,31 +834,36 @@
       "id": "FA-W0-03",
       "domain": "product",
       "title": "Research-scope three-form semantic convergence",
-      "status": "FAIL",
+      "status": "PASS",
       "priority": "P0",
       "owner": "self",
-      "gap": "Registered before convergence work: NewResearch owns five local text fields and its own patch builder; ScopeReview owns a second five-field state machine and different patch rules; StudyMap embeds that second form as a separate run-state surface. Direct schema/API inspection also proves semantic drift: canonical ResearchScope requires non-empty phenomena but permits empty inScope/outOfScope, while PATCH /runs/:id/question currently rejects an empty array for all three and the two UI builders handle empties differently. No single editor, canonical draft-to-patch function, or migration proof exists yet.",
+      "gap": "CLOSED after the pre-fix duplicate-state/API-boundary finding was registered: NewResearch, ScopeReview, and the StudyMap-embedded review now share one ResearchScope-derived draft model, patch builder, validator, accessible accordion editor, and polling-safe edit fingerprint. PATCH semantics now require phenomena while permitting canonical empty inScope/outOfScope arrays. Pure-model/API regressions, production builds, and a real Chromium journey on isolated port 3298 all passed.",
       "target": "one ResearchScope-derived draft/patch model and one accessible accordion editor shared by create/review/study-map flows; API validation matches canonical empty-boundary semantics",
       "verify": "pure draft/patch tests + shared-component caller inventory + API empty-boundary regression + production build/browser smoke",
       "evidence": [
         "web/src/lab/NewResearch.tsx",
         "web/src/lab/ScopeReview.tsx",
-        "web/src/lab/StudyMap.tsx"
+        "web/src/lab/StudyMap.tsx",
+        "web/src/lab/ScopeEditor.tsx",
+        "web/src/lab/scopeEditorModel.ts",
+        "tests/scope-editor-model.test.ts",
+        "tests/draft-journey.test.ts"
       ]
     },
     {
       "id": "FA-W0-04",
       "domain": "security",
       "title": "Repository hygiene and plaintext-secret sweep",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P0",
       "owner": "self",
-      "gap": "Existing secret/path hygiene checks exist, but the Wave 0 full tracked-file hygiene pass and resulting finding disposition have not completed.",
+      "gap": "CLOSED for the deterministic repository-hygiene scope: secret scan passed across 899 files with no HIGH finding. Its 68 MEDIUM heuristic matches were adjudicated as 67 visible test/dummy credential assignments plus one lexical false positive (`const token = jsonStringPrefixAt(...)`), not hidden plaintext secrets. Path hygiene reported zero errors; its only warnings were ignored, auxiliary-worktree dist/node_modules artifacts and therefore not tracked repository content. Exhaustive semantic file review remains separately open under FA-W0-05/06.",
       "target": "tracked repository passes deterministic secret/path hygiene with every finding fixed or explicitly recorded",
       "verify": "node zcode-harness/scripts/secret-scan.mjs && node zcode-harness/scripts/path-hygiene.mjs",
       "evidence": [
         "zcode-harness/scripts/secret-scan.mjs",
-        "zcode-harness/scripts/path-hygiene.mjs"
+        "zcode-harness/scripts/path-hygiene.mjs",
+        ".control/EXECUTION_STATE-20260831-wave0.md"
       ]
     },
     {
@@ -868,7 +873,7 @@
       "status": "PARTIAL",
       "priority": "P0",
       "owner": "self",
-      "gap": "Deterministic five-table inventory, disjoint/full coverage validation, FA backfill, atomic updates, and honest red completion gate are implemented and tested. The actual file review ledger remains incomplete, so completion is intentionally red.",
+      "gap": "Deterministic five-table inventory, disjoint/full coverage validation, FA backfill, atomic updates, and honest red completion gate are implemented and tested. The synchronized 901-file ledger remains incomplete: runtime 2/378, tests/evaluation/evidence 2/321, delivery/operations 1/114, product/specs/docs 0/38, governance/assets 0/50. Completion is intentionally red.",
       "target": "100% tracked-file adjudication with no open finding and every finding linked to FINAL_ACCEPTANCE before repair",
       "verify": "npm run endgame:sweep:sync && npm run endgame:sweep:complete",
       "evidence": [
@@ -884,7 +889,7 @@
       "status": "PARTIAL",
       "priority": "P1",
       "owner": "self",
-      "gap": "The staged-tree inventory currently identifies 165 shallow-assertion candidates. One scanner-fixture string is explicitly justified; 164/165 remain pending and no candidate is silently treated as fixed.",
+      "gap": "The synchronized staged-tree inventory identifies 167 shallow-assertion candidates. One scanner-fixture string is explicitly justified; 166/167 remain pending and no candidate is silently treated as fixed.",
       "target": "every live candidate strengthened or justified with rationale/evidence; removed assertions retained as retired history",
       "verify": "npm run endgame:sweep:status && npm run endgame:sweep:complete",
       "evidence": [
@@ -896,14 +901,16 @@
       "id": "FA-W0-07",
       "domain": "product",
       "title": "Conversation model reasoning remains durably attached to the agent message after streaming integration",
-      "status": "FAIL",
+      "status": "PASS",
       "priority": "P0",
       "owner": "self",
-      "gap": "Registered before repair from the preserved sibling-lane baseline: tests/thinking-display.test.ts fails because the streaming projection change removed thinking collection from model_call_done, removed thinking from ConversationTurnGeneration, and omitted it when persisting the final agent message. Follow-up protocol inspection before related repairs found two more bounded failures in the same slice: the live HTTP provider emits attempt_discarded on explicit user abort, which resets the schema-projected prefix instead of preserving it; and a retry initializes its durable draft from the prior failed prefix but appends new-attempt deltas without first resetting that draft. The new HTTP/SSE endpoints also have no dedicated production-path regression yet. Tool trace and the final reply path still land, so these are bounded stream/durability regressions rather than a whole-turn failure.",
+      "gap": "CLOSED after the failures were registered before repair: bounded provider reasoning is collected through model_call_done and persisted on the completed agent message without entering the public reply stream; caller abort preserves the last valid projected prefix; retry keeps the prior durable draft until the first valid replacement delta and then resets exactly once. Production HTTP/SSE regressions cover completion, tool/thinking privacy, raw-JSON nonleak, disconnect/replay, concurrent-turn rejection, cancel, and retry replacement across real provider dialect parsers.",
       "target": "private reasoning never enters the public stream, but bounded provider reasoning is retained on the completed agent message exactly as before streaming",
-      "verify": "npm test -- --run tests/thinking-display.test.ts tests/conversation-stream.test.ts tests/providers.test.ts plus full gate",
+      "verify": "npm test -- --run tests/thinking-display.test.ts tests/conversation-stream.test.ts tests/provider-streaming.test.ts tests/providers.test.ts plus the final full gate",
       "evidence": [
         "tests/thinking-display.test.ts",
+        "tests/conversation-stream.test.ts",
+        "tests/provider-streaming.test.ts",
         "src/server/conversation-agent.ts",
         "src/server/conversations.ts"
       ]
@@ -939,6 +946,6 @@
   ],
   "stopConditions": {
     "note": "Mission stop requires ALL of: no internal FAIL/PARTIAL; canonical clean-clone CI green; science north-star met or externally justified; real evidence across all planes; 24h→72h soak+chaos; win/mac/linux matrix; sandbox attack suite; production-path-only flows; clean-machine bundle verify; honest BLOCKED_EXTERNAL only; docs==commit; final red-team audit no new P0/P1.",
-    "currentVerdict": "NOT READY — 16 FAIL, 34 PARTIAL, 12 PASS, 2 BLOCKED_EXTERNAL (64 tracked). Wave 0 truth is explicit: CJK alignment and immediate sidecar spawn-failure handling are tested; Agent hardening and conversation streaming are integrated but the thinking-persistence regression is red until repaired and the full gate reruns; scope convergence, full hygiene, sweep coverage, and 164 shallow-assertion adjudications remain open. Earlier frontier remains unchanged."
+    "currentVerdict": "NOT READY — 14 FAIL, 32 PARTIAL, 16 PASS, 2 BLOCKED_EXTERNAL (64 tracked). Wave 0 implementation, scope convergence, streaming durability, and deterministic hygiene gates are closed on the integrated lane. The exhaustive five-table review is still only 5/901 files and shallow-assertion adjudication is 1/167, so those two Wave 0 criteria remain PARTIAL; the earlier frontier remains open."
   }
 }

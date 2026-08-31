@@ -48,3 +48,43 @@ Verification at this checkpoint:
 
 Next action: commit this isolated Wave 0 slice, take over the existing streaming
 lane without losing its changes, rebase/integrate, then implement scope convergence.
+
+## Integrated Wave 0 closure checkpoint
+
+The preserved conversation lane was committed byte-for-byte as `b8afe4b`, then
+the Wave 0 hardening commit was rebased on top as `c926aa9`. No primary-worktree
+file was reset or overwritten. Subsequent FA-first repair commits restored the
+conversation thinking/durability contract (`d17d6eb`, `bbc4418`, `7d54404`) and
+converged research-scope editing (`8d32da1`, `d39b427`).
+
+Direct verification on the integrated auxiliary worktree:
+
+- Conversation/provider targeted gate: 83 tests passed; adjacent API,
+  conversation and reasoning gate: 106 tests passed.
+- Scope/API/i18n focused gate: 17 tests passed; compiled CLI scope/draft and
+  freshness gate: 28 tests passed.
+- Scope browser journey: 3/3 Playwright Chromium tests passed against an
+  isolated production route on port 3298. User-owned port 3196 was untouched.
+- Root and web typechecks passed; root and web production builds passed; lint
+  had zero errors and three pre-existing unused-disable warnings.
+- Final controlled full Vitest gate (`--maxWorkers=4 --minWorkers=4`): 231 files
+  passed, one file explicitly skipped; 2334 tests passed, 12 explicitly skipped,
+  zero failed (232 files / 2346 tests total).
+- Deterministic secret scan: PASS across 899 files, no HIGH findings. The 68
+  MEDIUM heuristic matches are 67 visible test/dummy credential assignments and
+  one production lexical false positive (`const token = jsonStringPrefixAt`),
+  not a plaintext credential.
+- Path hygiene: zero errors; only ignored auxiliary `dist` and `node_modules`
+  artifacts were warned. `git diff --check` and tracked status were clean before
+  this evidence update.
+- Five-table sync/check: structural PASS over 901 tracked files, but actual
+  reviews remain runtime 2/378, tests/evaluation/evidence 2/321,
+  delivery/operations 1/114, product/specs/docs 0/38, governance/assets 0/50.
+  Shallow assertions remain 1/167 adjudicated. FA-W0-05/06 therefore stay
+  PARTIAL by design.
+
+Wave 0 implementation criteria FA-W0-01/02/03/04/07 are now evidenced PASS.
+This is not a release-completion claim: the exhaustive sweep and the pre-existing
+frontier in `FINAL_ACCEPTANCE.json` remain open. Next action is Wave A, starting
+with the highest-leverage hosted-CI/platform root cause that can be verified
+without mutating the user-owned primary worktree or port 3196.
