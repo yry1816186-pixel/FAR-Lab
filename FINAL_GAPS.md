@@ -3,20 +3,23 @@
 > 机器可读版：`FINAL_ACCEPTANCE.json`。逐域审计报告：`FINAL_EVIDENCE/audit-2026-08-30/`（8 域并行只读审计 + 主代理抽验）。
 > 状态词汇：PASS / PARTIAL / FAIL / BLOCKED_EXTERNAL。**任何 FAIL/PARTIAL 不得宣布完成。** 本文件随修复持续更新。
 
-## 总判（2026-08-31，Wave 0 进行中）
+## 总判（2026-08-31，Wave A 本地 CLS 修复已闭，托管核验待集成）
 
-工程底座（可靠性/持久化/审计链/outbox/DLQ/租约）真实且被测——这是强项。当前阻断完成的不是"缺功能"，而是四类真相缺口：
+当前 64 项终局标准为 16 PASS / 32 PARTIAL / 14 FAIL / 2
+BLOCKED_EXTERNAL。Wave 0 的五项实现标准已经集成并通过全门禁；Wave A 已在
+独立车道关闭 loaded-shell CLS 的本地根因，但 canonical hosted 绿仍未发生，
+不能提前翻 PASS。当前阻断完成的是四类真相缺口：
 
-1. **事实性声明破裂**：hosted CI 自 08-29 连红（根因=netcdf fixture 越界守卫）；提交文档三处引用已被推翻的 judge-variance 0.061 旧数；ACC-25 "real Linux target" 实为本机 Docker。
-2. **安全实边界**：CodeAct 静态门存在已知绕过（别名/拆链/getattr）且 sidecar 全量继承密钥；egress 无闸；api_key 走 URL query 可入错误持久化；netcdf 围栏可被 symlink 穿越。
+1. **平台事实链未闭合**：canonical `main@cc4009c` 的 hosted verify 已绿，但 web-e2e 因 loaded-home CLS 0.123795 连红；本地根因已在 `87a1f3f` 修复并通过 23/23 浏览器门，仍待集成后的 hosted 绿证。Windows/浏览器矩阵与 release 真跑仍开放；ACC-25 "real Linux target" 实为本机 Docker。
+2. **安全实边界**：CodeAct 别名/拆链/getattr、sidecar env、sources egress、OpenAlex key 与 netcdf symlink 已在静态/运行时层修复；真正的 OS 级隔离、provider/MCP 进程边界 egress、SBOM/SAST 与发布签名仍开放。
 3. **科学指标未达标**：rediscovery 0.226/0.7、judge variance 0.267/0.15、relation agreement 0.61/0.8、structured-output 0.011/0.005；评估集 100% 生物医学，无跨领域 held-out。
-4. **规模与长程证据空档**：数据面全内存（100/200MB 顶）；容量测试最大 ~21 claims；无 6h+ soak；无 windows CI/浏览器矩阵；release 链 0 次真实执行。
+4. **规模与长程证据空档**：后端 1000+ claim 门仅是明确标注的 SYNTHETIC 容量证据，浏览器真实路径当前只有 7 claims/0 admissible hypotheses；数据面仍受内存上限约束，无 6h+ soak、Windows CI/浏览器矩阵，release 链 0 次真实执行。
 
 ## P0 队列（correctness/safety/scientific-truth/core-flow）
 
 | ID | 缺口 | owner | 状态 |
 |---|---|---|---|
-| FA-PLT-02 | CI 红：netcdf 两用例移入 skipIf 守卫（根因已定位） | self | **已修（本地双向验证；hosted 绿待推送后核验）** |
+| FA-PLT-02 | canonical CI：verify 绿、web-e2e loaded-home CLS 红 | self | **本地根因已修于 87a1f3f（home CLS 0.0001、map 0.0184–0.0185、完整 Chromium 23/23）；待集成后 hosted 绿核验，PARTIAL** |
 | FA-EVAL-14 | 提交文档 0.061 旧数三处 + north-star 引用错位 | self | **已修（含两份 PDF 重生成+抽取核验）** |
 | FA-SEC-02/01 | CodeAct 门绕过封堵 + malicious 回归语料 + sidecar env 白名单 | self | **静态+运行时层已落地（别名/拆链/getattr 全拒、危险模块运行时擦除、env 最小化）；OS 级隔离仍开放（FA-SEC-01 残余）** |
 | FA-SEC-04 | sources 层 egress destination guard（私网段/重定向/协议） | self | **sources 层已落地；进程边界 allowlist（providers/MCP）开放** |
@@ -26,15 +29,15 @@
 | FA-SCI-01..04 | rediscovery/judge-variance/relation 治理 + 跨领域 gold suite | self | 分批（评估波次） |
 | FA-X-01 | B-QWEN 凭证（09-05 用户裁定） | user | BLOCKED_EXTERNAL |
 | FA-W0-01 | CJK/Unicode 证据对齐分词 | self | **已修（目标测试 34/34 通过，含同字符逆序负例）** |
-| FA-W0-02 | Agent 五硬化与流式会话车道集成 | self | **实现+目标测试通过；待合并流式车道与全门禁，PARTIAL** |
-| FA-W0-03 | scope 三表单归一为单一语义模型/手风琴界面 | self | **待办，FAIL** |
-| FA-W0-04 | 全仓卫生/明文秘密检查 | self | **机制已有，完整执行与处置待办，PARTIAL** |
+| FA-W0-02 | Agent 五硬化与流式会话车道集成 | self | **已集成并通过最终 232 文件/2346 测试门，PASS** |
+| FA-W0-03 | scope 三表单归一为单一语义模型/手风琴界面 | self | **统一模型、共享编辑器、API 边界与 Chromium 旅程均验证，PASS** |
+| FA-W0-04 | 全仓卫生/明文秘密检查 | self | **901 文件扫描无 HIGH，路径 0 error；全文件语义审阅另由 W0-05/06 保持开放，PASS** |
 
 ## P1 队列（acceptance/reliability/reproducibility 摘要）
 
 **批 2 已闭（2026-08-30）**：FA-DAT-02 far restore+三库备份+损坏 drill（PASS）· FA-DAT-05 verify vacuous 机器可读降级（PASS）· FA-PRF-01 后端容量门 1000+ claims（PASS，明示 SYNTHETIC）· FA-PRF-04 cancel 0.6ms 计时钉死（PASS）· FA-PRF-05 sweep 三测试+FARLAB_DATA_DIR（PASS）· FA-PLT-06 numpy pin（PARTIAL→numpy 已 pin，rust-toolchain 随桌面车道）· FA-REM-03 probe 全指纹入 provenance+fingerprint（PASS）· FA-SCI-05 注释诚实化（PARTIAL，真 ODE 腿=独立车道）· FA-SCI-04 跨领域 6 题+真实 salted seal 封存（PARTIAL，执行待评估波）。
 
-仍开放：FA-W0-05 五表 SWEEP 已建但仅裁决 5/901（runtime 2/378、tests/evaluation/evidence 2/321、delivery/operations 1/114、product/specs/docs 0/38、governance/assets 0/50）· FA-W0-06 浅断言 1/167 已裁决（扫描器夹具字符串 justified），166 项待逐项裁决 · FA-HAR-07 已闭（启动/管道终止单次结算，缺失 launcher <1s 失败且真实 sidecar 冒烟通过）· FA-HAR-01 per-tool 超时缝（兄弟车道）· FA-HAR-02 预算/pacing 默认化 · FA-HAR-03 failover live 实证 · FA-HAR-04 72h soak · FA-DAT-01 数据面流式化 · FA-SCI-05 ODE 腿实现 · FA-SCI-06 结构化输出复测 · FA-SCI-07 AstaBench/MLR 接入 · FA-SCI-04 执行 · FA-REM-02 远程 cell 级去重 · FA-PRF-02 后端 perf gate · FA-PRF-03 混沌矩阵补 4 项 · FA-SEC-08 fence crypto-random（兄弟车道）· FA-SEC-09 SBOM/SAST/audit 门 · FA-SEC-11 威胁登记（R-19/20/21 已登，条目闭待能力闭）· FA-PLT-01 windows CI + firefox · FA-PLT-03 release-pack 真跑 · FA-HCI-01..03（兄弟车道）· FA-EVAL-02 user-study 协议开发 · FA-EVAL-04 控制面鲜活度。
+仍开放：FA-W0-05 五表 SWEEP 已建但仅裁决 5/902（runtime 2/378、tests/evaluation/evidence 2/321、delivery/operations 1/114、product/specs/docs 0/38、governance/assets 0/51）· FA-W0-06 浅断言 1/168 已裁决（扫描器夹具字符串 justified），167 项待逐项裁决 · FA-HAR-07 已闭（启动/管道终止单次结算，缺失 launcher <1s 失败且真实 sidecar 冒烟通过）· FA-HAR-01 per-tool 超时缝（兄弟车道）· FA-HAR-02 预算/pacing 默认化 · FA-HAR-03 failover live 实证 · FA-HAR-04 72h soak · FA-DAT-01 数据面流式化 · FA-SCI-05 ODE 腿实现 · FA-SCI-06 结构化输出复测 · FA-SCI-07 AstaBench/MLR 接入 · FA-SCI-04 执行 · FA-REM-02 远程 cell 级去重 · FA-PRF-02 后端 perf gate · FA-PRF-03 混沌矩阵补 4 项 · FA-SEC-08 fence crypto-random（兄弟车道）· FA-SEC-09 SBOM/SAST/audit 门 · FA-SEC-11 威胁登记（R-19/20/21 已登，条目闭待能力闭）· FA-PLT-01 windows CI + firefox · FA-PLT-03 release-pack 真跑 · FA-HCI-01..03（兄弟车道）· FA-EVAL-02 user-study 协议开发 · FA-EVAL-04 控制面鲜活度。
 
 ## P2 队列（architecture/product/performance/frontier 摘要）
 
@@ -48,8 +51,8 @@ outbox/lease/DLQ/原子落地/错误分类（faults.json 10 案全绿）；事�
 
 | # | 条件 | 现状 |
 |---|---|---|
-| 1 | 无内部 FAIL/PARTIAL | ✗（12 FAIL / 30 PARTIAL） |
-| 2 | clean-clone CI 全绿无隐藏依赖 | ✗（连红，netcdf fixture） |
+| 1 | 无内部 FAIL/PARTIAL | ✗（14 FAIL / 32 PARTIAL） |
+| 2 | clean-clone CI 全绿无隐藏依赖 | ✗（canonical main web-e2e CLS 红；本地修复尚未集成/hosted 核验） |
 | 3 | science north-star 达标 | ✗（4 项指标均未达） |
 | 4 | 六面真实证据 | 部分（工程强/科学-外部薄） |
 | 5 | 24h+ soak & chaos | ✗（无 6h+ soak；混沌 10/14） |
@@ -58,11 +61,11 @@ outbox/lease/DLQ/原子落地/错误分类（faults.json 10 案全绿）；事�
 | 8 | 全流程 production path | 大体 ✓（gold 场景 A/B live） |
 | 9 | clean machine bundle verify | ✓（far verify 16 checks，四 bundle 11/11） |
 | 10 | BLOCKED_EXTERNAL 诚实 | ✓（B-QWEN/S-1 如实登记） |
-| 11 | 文档与 commit 一致 | ✗（提交文档 0.061；ACC-25 措辞） |
+| 11 | 文档与 commit 一致 | ✗（0.061 旧数已修；ACC-25 "real Linux" 措辞仍开放） |
 | 12 | 终局红队无新 P0/P1 | ✗（本轮审计即产出新 P0） |
 
 ## 修复纪律
 
 - 每修一项：FINAL_ACCEPTANCE.json 状态翻转 + 验证命令 + 证据指针；FINAL_GAPS.md 同步。
-- 兄弟车道文件（conversation-stream 面、loop.ts、providers/http.ts、web 十文件、AGENTS/DESIGN/PRODUCT/ACCEPTANCE 规范、演示视频脚本）本轮不改，缺口照记 owner=sibling-lane。
+- 用户主工作树中的真实 WIP 与用户自有 3196 服务不改不清；实现经独立 worktree/分支提交。已保存的 conversation-stream 车道已无损集成，不能继续把它写成“待合并”。
 - 评估类修复必须走预声明协议 + 原始 artifact（seed/route/prompt/receipts），禁止 benchmark hard-code。
