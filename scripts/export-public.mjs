@@ -164,8 +164,9 @@ try {
   run(rustDir, 'cargo', ['metadata', '--locked', '--format-version', '1', '--no-deps']);
 
   console.log(`\nEXPORT VERIFIED: ${shipped.length} files; root, Web, TUI, Python and desktop source contracts green in-copy`);
-} catch {
+} catch (error) {
   console.error('\nEXPORT VERIFICATION FAILED — the public tree is NOT self-sufficient; fix before publishing.');
+  console.error(error instanceof Error ? error.message : String(error));
   process.exitCode = 1;
 } finally {
   // The release is a source snapshot. Verification products must never leak
