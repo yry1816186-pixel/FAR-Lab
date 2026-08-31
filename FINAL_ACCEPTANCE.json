@@ -837,9 +837,9 @@
       "status": "FAIL",
       "priority": "P0",
       "owner": "self",
-      "gap": "Repository inspection still finds three independent scope editing surfaces/state shapes. No convergence implementation or migration proof exists yet.",
-      "target": "one canonical scope model and accordion editing surface shared by create/review/study-map flows",
-      "verify": "component/state inventory + focused UI tests + production-path browser smoke",
+      "gap": "Registered before convergence work: NewResearch owns five local text fields and its own patch builder; ScopeReview owns a second five-field state machine and different patch rules; StudyMap embeds that second form as a separate run-state surface. Direct schema/API inspection also proves semantic drift: canonical ResearchScope requires non-empty phenomena but permits empty inScope/outOfScope, while PATCH /runs/:id/question currently rejects an empty array for all three and the two UI builders handle empties differently. No single editor, canonical draft-to-patch function, or migration proof exists yet.",
+      "target": "one ResearchScope-derived draft/patch model and one accessible accordion editor shared by create/review/study-map flows; API validation matches canonical empty-boundary semantics",
+      "verify": "pure draft/patch tests + shared-component caller inventory + API empty-boundary regression + production build/browser smoke",
       "evidence": [
         "web/src/lab/NewResearch.tsx",
         "web/src/lab/ScopeReview.tsx",
