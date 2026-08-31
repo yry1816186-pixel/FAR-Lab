@@ -80,6 +80,8 @@
   `ONNXRUNTIME_NODE_INSTALL=skip`，避免安装阶段下载不被产品调用的 GPU NuGet 二进制。
 - 托管 `release-pack` 先等待 verify、浏览器矩阵、dependency audit 和多语言 CodeQL，
   再生成 CycloneDX SBOM、规范化 `.tar.gz`、逐文件 manifest 与 `SHA256SUMS`。
+- 发布工作流引用的 GitHub Actions 必须钉到完整 commit SHA（旁注可读版本标签）；
+  浮动 major/tag 不能进入签名信任链。
 - 源码归档的路径顺序、mtime、uid/gid 与 pax 时间字段固定；同一提交应产生相同归档。
   SBOM 会记录扫描器版本/生成时间，是已声明的非确定性文件，但其精确字节受
   `SHA256SUMS` 与 SBOM attestation 约束。

@@ -16,6 +16,7 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 const GENERATED_SEGMENTS = new Set([
+  '.git',
   'node_modules',
   'dist',
   'target',

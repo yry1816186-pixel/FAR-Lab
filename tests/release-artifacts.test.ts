@@ -97,6 +97,14 @@ describe.skipIf(process.platform !== 'linux')('release artifact integrity', () =
     expect(result.stderr).toContain('missing lock ecosystems: cargo, pypi');
   });
 
+  it('refuses repository metadata even if exporter cleanup regresses', () => {
+    const { root, exportRoot, sbom } = fixture();
+    write(exportRoot, 'farlab-public-abcdef0/.git/config', '[core]\nrepositoryformatversion = 0\n');
+    const result = build(exportRoot, sbom, join(root, 'release'));
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('release tree contains generated content: .git');
+  });
+
   it('adds self-authenticating bundles without changing the already-attested checksum subject', () => {
     const { root, exportRoot, sbom } = fixture();
     const out = join(root, 'release');
