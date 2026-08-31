@@ -1,8 +1,8 @@
 {
   "schema": "final-acceptance/1",
-  "asOf": "2026-08-31 (Wave 0 implementation lane in flight)",
-  "head": "cc4009c+lane/endgame-wave0-root(dirty; sibling conversation-stream lane pending integration)",
-  "provenance": "First full endgame audit: 8 parallel read-only domain audits, reports in FINAL_EVIDENCE/audit-2026-08-30/. Load-bearing claims spot-checked by main agent. Wave 0 additions are tracked below from direct repository inspection and targeted executable tests; incomplete sweep and integration states remain PARTIAL/FAIL.",
+  "asOf": "2026-08-31 (Wave 0 integrated implementation lane in flight)",
+  "head": "b8afe4b+c926aa9 on lane/endgame-wave0-root (conversation streaming preserved; Wave 0 rebased; full gate pending)",
+  "provenance": "First full endgame audit: 8 parallel read-only domain audits, reports in FINAL_EVIDENCE/audit-2026-08-30/. Load-bearing claims spot-checked by main agent. Wave 0 additions are tracked below from direct repository inspection and executable tests. The preserved conversation-stream lane is now integrated; its pre-integration thinking-persistence regression is registered FA-first below. Incomplete sweep and verification states remain PARTIAL/FAIL.",
   "statusVocabulary": [
     "PASS",
     "PARTIAL",
@@ -818,7 +818,7 @@
       "status": "PARTIAL",
       "priority": "P0",
       "owner": "self",
-      "gap": "Implemented and targeted-tested on the Wave 0 lane: closed handoff schema + quality gate + fact-only degradation, durable successful-effect deduplication, deterministic child budget split, bounded retryable-only MCP reconnect. Remaining before PASS: integrate the sibling conversation-stream AbortSignal/onOutput changes and run the full clean-lane gate.",
+      "gap": "Implemented and targeted-tested on the Wave 0 lane: closed handoff schema + quality gate + fact-only degradation, durable successful-effect deduplication, deterministic child budget split, bounded retryable-only MCP reconnect. Conversation-stream AbortSignal/onOutput changes were rebased into the same lane and the merged tree typechecks. Remaining before PASS: fix the separately registered thinking-persistence regression and run the full clean-lane gate.",
       "target": "all five hardenings coexist with streaming/resume behavior and pass full verification",
       "verify": "targeted agent/MCP suites, then npm run verify after sibling-lane integration",
       "evidence": [
@@ -893,6 +893,22 @@
       ]
     },
     {
+      "id": "FA-W0-07",
+      "domain": "product",
+      "title": "Conversation model reasoning remains durably attached to the agent message after streaming integration",
+      "status": "FAIL",
+      "priority": "P0",
+      "owner": "self",
+      "gap": "Registered before repair from the preserved sibling-lane baseline: tests/thinking-display.test.ts fails because the streaming projection change removed thinking collection from model_call_done, removed thinking from ConversationTurnGeneration, and omitted it when persisting the final agent message. Tool trace still lands, so this is a bounded data-loss regression rather than a whole-turn failure.",
+      "target": "private reasoning never enters the public stream, but bounded provider reasoning is retained on the completed agent message exactly as before streaming",
+      "verify": "npm test -- --run tests/thinking-display.test.ts plus conversation streaming/cancellation regressions and full gate",
+      "evidence": [
+        "tests/thinking-display.test.ts",
+        "src/server/conversation-agent.ts",
+        "src/server/conversations.ts"
+      ]
+    },
+    {
       "id": "FA-X-01",
       "domain": "external",
       "title": "B-QWEN live route credential (ACC-02)",
@@ -923,6 +939,6 @@
   ],
   "stopConditions": {
     "note": "Mission stop requires ALL of: no internal FAIL/PARTIAL; canonical clean-clone CI green; science north-star met or externally justified; real evidence across all planes; 24h→72h soak+chaos; win/mac/linux matrix; sandbox attack suite; production-path-only flows; clean-machine bundle verify; honest BLOCKED_EXTERNAL only; docs==commit; final red-team audit no new P0/P1.",
-    "currentVerdict": "NOT READY — 15 FAIL, 34 PARTIAL, 12 PASS, 2 BLOCKED_EXTERNAL (63 tracked). Wave 0 truth is explicit: CJK alignment and immediate sidecar spawn-failure handling are tested; Agent hardening awaits sibling streaming integration/full gate; scope convergence, full hygiene, sweep coverage, and 164 shallow-assertion adjudications remain open. Earlier frontier remains unchanged."
+    "currentVerdict": "NOT READY — 16 FAIL, 34 PARTIAL, 12 PASS, 2 BLOCKED_EXTERNAL (64 tracked). Wave 0 truth is explicit: CJK alignment and immediate sidecar spawn-failure handling are tested; Agent hardening and conversation streaming are integrated but the thinking-persistence regression is red until repaired and the full gate reruns; scope convergence, full hygiene, sweep coverage, and 164 shallow-assertion adjudications remain open. Earlier frontier remains unchanged."
   }
 }
