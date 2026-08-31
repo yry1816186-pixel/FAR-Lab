@@ -1,0 +1,5 @@
+# Committed artifacts that CI regenerates and diffs byte-for-byte must stay LF
+# on every platform: a Windows autocrlf checkout would otherwise render CRLF,
+# and the license-ledger --check gate (drift = exit 1) would be red on
+# windows-latest while green on ubuntu/macos — not a dependency drift at all.
+submission/OSS_LEDGER.md text eol=lf
