@@ -1,7 +1,7 @@
 {
   "schema": "final-acceptance/1",
-  "asOf": "2026-08-31 (Wave A loaded-shell CLS locally closed; web artifact and static-cache findings registered before repair; canonical hosted CI remains open)",
-  "head": "6f7e0f4 evidence head on lane/endgame-wave0-root (loaded-shell stability plus pre-repair web delivery findings)",
+  "asOf": "2026-08-31 (Wave A loaded-shell CLS locally closed; web artifact and static-cache contracts verified; canonical hosted CI remains open)",
+  "head": "62917fd implementation head on lane/endgame-wave0-root (web production artifact boundaries and deployment-safe static caching)",
   "provenance": "First full endgame audit: 8 parallel read-only domain audits, reports in FINAL_EVIDENCE/audit-2026-08-30/. Load-bearing claims were spot-checked by the main agent. Wave 0 findings were registered before repair, the preserved conversation-stream lane was integrated without dropping its work, and the resulting clean lane passed targeted, browser, build, hygiene, and full-suite gates recorded in .control/EXECUTION_STATE-20260831-wave0.md. Wave A reproduced the hosted loaded-home CLS failure locally, attributed the exact shifting nodes before repair, and closed independent shell/science-projection races at 87a1f3f; local gates are recorded in .control/EXECUTION_STATE-20260831-wavea.md, while canonical hosted green remains deliberately unclaimed. Five-table and shallow-assertion coverage remain explicitly incomplete rather than inferred from passing mechanisms.",
   "statusVocabulary": [
     "PASS",
@@ -749,10 +749,10 @@
       "id": "FA-PLT-07",
       "domain": "platform",
       "title": "Web production artifact budget and optional-capability loading",
-      "status": "FAIL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "self",
-      "gap": "PRE-REPAIR 2026-08-31 production build is 47,856,580 bytes: 16,395,647 bytes of shipped source maps plus a 23,567,050-byte ORT wasm copied into the default artifact even though the offline ASR model is absent and dictation must fail visibly. Browser output also contains both modern and legacy pdfjs runtimes (479,385 + 535,249 bytes), while KaTeX is statically retained in the 1,313,137-byte main entry. There is no deterministic bundle inventory/budget gate, so optional tools can silently become cold-shell payload or release bloat. The required real browser probe then exposed a coupled truth defect twice: the missing-model 404/diagnostic was collapsed to generic transcribe_failed because the worker's transcribe catch discarded the model_missing classification.",
+      "gap": "CLOSED 2026-08-31 after pre-repair registration. Production build now reports a 7,346,964-byte application artifact (down from 47,856,580), zero source maps, zero wasm outside /models, and a 1,203,645-byte initial closure (336,506 gzip). The browser manifest contains exactly one modern pdfjs runtime and no legacy runtime; KaTeX/CSS, ASR, ingest parsers, XLSX and Radar remain dynamic. The build-integrated deterministic gate rejects exact-budget equality, maps, misplaced wasm, static optional sources and legacy pdfjs. A real cold-shell trace requested only main JS/CSS plus four fonts. Real-browser ASR-unavailable, initial-workspace state retention and PDF ingestion passed 15/15 across five no-retry repetitions, then the combined perf/optional gate passed 5/5 with home CLS 0.0001 and map CLS 0.0002. Missing ASR now retains model_missing instead of generic transcribe_failed, and the composer no longer loses a selected file when the initial runs response reveals a fresh workspace.",
       "target": "application-shell artifact (excluding explicitly vendored /models optional assets) <10,000,000 bytes with zero .map and zero ORT wasm outside /models; optional ASR continues to use separately vendored version-matched assets and fails visibly when absent; exactly one browser pdfjs runtime; KaTeX, ASR, ingest and comparison visualization remain lazy; a deterministic gate records shell/initial/optional assets and fails budget regressions",
       "verify": "production build + deterministic bundle-budget gate + cold-shell network inventory + real PDF/ASR-unavailable/browser regressions",
       "evidence": [
@@ -760,17 +760,21 @@
         "web/vite.config.ts",
         "web/src/dictation/asr-worker.ts",
         "web/src/utils/ingest.ts",
-        "web/src/utils/pdfCollect.ts"
+        "web/src/utils/pdfCollect.ts",
+        "web/scripts/check-bundle-budget.mjs",
+        "tests/web-bundle-budget.test.ts",
+        "web/e2e/optional-assets.spec.ts",
+        "web/e2e/perf.spec.ts"
       ]
     },
     {
       "id": "FA-PLT-08",
       "domain": "platform",
       "title": "Static frontend cache identity and deployment revalidation",
-      "status": "FAIL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "self",
-      "gap": "PRE-REPAIR 2026-08-31 live HEAD probes on isolated port 3320 show both / (unversioned index.html) and /assets/index-CSzSy9GS.js (content-hashed 1,042,096-byte entry) return only Content-Type and Content-Length: no Cache-Control, ETag, or Last-Modified. Consequently immutable assets cannot use an explicit long-lived cache contract, while index.html has no deterministic deployment revalidation contract; the durable execution state already records that a prior shell deployment required a hard reload because index.html cached.",
+      "gap": "CLOSED 2026-08-31 after pre-repair live evidence was registered. The production static server now emits a strong sha256 ETag and nosniff on every successful representation, no-cache on index/model/stable paths, and public max-age=31536000 immutable on Vite /assets. Matching If-None-Match returns a bodyless 304 with the same cache policy for GET and HEAD. The complete 78-test API integration file passes, including index/assets/models, conditional requests, MIME, missing-model 404s and traversal refusal. Post-build live probes on isolated port 3321 observed index 200 no-cache and hashed JS 200 immutable, then 304/0 bytes for both validators.",
       "target": "unversioned/index/model files revalidate on every reuse; Vite /assets content-hashed files advertise one-year immutable caching; every successful static representation has an identity validator; matching If-None-Match returns bodyless 304 for GET and HEAD without weakening honest 404/path-traversal behavior",
       "verify": "static server integration tests assert Cache-Control + ETag on index/assets/models, conditional 304, GET/HEAD parity, MIME and existing 404/traversal invariants; isolated live curl probes confirm production headers",
       "evidence": [
@@ -986,6 +990,6 @@
   ],
   "stopConditions": {
     "note": "Mission stop requires ALL of: no internal FAIL/PARTIAL; canonical clean-clone CI green; science north-star met or externally justified; real evidence across all planes; 24h→72h soak+chaos; win/mac/linux matrix; sandbox attack suite; production-path-only flows; clean-machine bundle verify; honest BLOCKED_EXTERNAL only; docs==commit; final red-team audit no new P0/P1.",
-    "currentVerdict": "NOT READY — 16 FAIL, 32 PARTIAL, 16 PASS, 2 BLOCKED_EXTERNAL (66 tracked). Wave 0 implementation, scope convergence, streaming durability, and deterministic hygiene gates are closed on the integrated lane. Web artifact weight and static-cache findings are registered before repair. The exhaustive five-table review is still only 5/902 files and shallow-assertion adjudication is 1/168, so those two Wave 0 criteria remain PARTIAL; the earlier frontier remains open."
+    "currentVerdict": "NOT READY — 14 FAIL, 32 PARTIAL, 18 PASS, 2 BLOCKED_EXTERNAL (66 tracked). Wave 0 implementation, scope convergence, streaming durability, deterministic hygiene, web artifact weight, and static-cache contracts are closed on the integrated lane. The exhaustive five-table review is still only 5/902 files and shallow-assertion adjudication is 1/168, so those two Wave 0 criteria remain PARTIAL; the earlier frontier remains open."
   }
 }

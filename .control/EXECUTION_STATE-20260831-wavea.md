@@ -131,6 +131,22 @@ the user-visible result. This is part of FA-PLT-07's honest optional-capability
 contract and must be fixed at the worker boundary; weakening the browser
 expectation to accept the generic error is forbidden.
 
+### Closure evidence (commits cbcfba7 + 62917fd)
+
+- Production build and the build-integrated bundle gate PASS: application
+  artifact 7,346,964 bytes (pre-repair 47,856,580), initial closure 1,203,645
+  bytes / 336,506 gzip, zero `.map`, zero wasm outside `/models`, one modern
+  pdfjs runtime, no legacy pdfjs runtime. KaTeX/CSS, PDF, XLSX, Radar and ASR
+  remain outside the initial manifest closure.
+- Deterministic gate regressions pass 3/3; the real Node PDF collection → SDM
+  integration passes 4/4.
+- Chromium optional-capability and transition suite passed 15/15 across five
+  repetitions with retries disabled: actionable missing-model ASR, state held
+  across the initial empty-workspace transition, and real selected-PDF parsing.
+- Combined optional/performance gate passed 5/5 with retries disabled. Cold
+  home requested main JS/CSS and four fonts only; home FCP/LCP/CLS was
+  148ms/196ms/0.0001, map 112ms/160ms/0.0002, with zero long tasks.
+
 ## FA-PLT-08 — Static frontend cache identity (finding before repair)
 
 Pre-repair live `HEAD` probes against the production static server on isolated
@@ -150,3 +166,12 @@ Predeclared repair contract:
   `If-None-Match` returns an empty 304 with the same cache contract for both GET
   and HEAD;
 - MIME truth, missing-model 404s, and path-traversal refusal must not regress.
+
+### Closure evidence (commit 62917fd)
+
+- Root typecheck/build pass; `tests/api.test.ts` passes 78/78, including
+  index/assets/models cache policy, strong sha256 ETag, GET+HEAD conditional
+  304, MIME, missing-model 404 and traversal refusal.
+- Post-build production probes on isolated port 3321 observed `/` as
+  `no-cache` and hashed JS as `public, max-age=31536000, immutable`; both exact
+  validators returned 304 with zero response bytes and retained `nosniff`.
