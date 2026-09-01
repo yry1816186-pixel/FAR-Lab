@@ -86,3 +86,20 @@ full red on resilience:41 — root-caused and fixed as (4) above.
 - run_cancelled double-write cleanup (registered TODO above).
 - Wave A remaining depth items: off-source-tree installed-app e2e, updater,
   uninstall cleanup, deb/AppImage/macOS notarization disclosures.
+
+## Update — 2026-09-01 late morning (head 20c94ee)
+
+- `decec46` run_cancelled single-source (`via` parameter; api/cli double-write
+  removed; conversations path was already single).
+- **Desktop installed-app journey VERIFIED locally (Windows/NSIS slice)**:
+  `FAR-Lab_0.1.0_x64-setup.exe` 126.1 MB (sidecar 173 MB staged) — silent
+  install, launch from the install tree healthy in 1 s (db/audit chain/
+  watchdog ok), web served from packaged resources, exit leaves no orphan
+  listener, uninstall removes all files (empty dirs linger — NSIS rmdir
+  timing, warning-grade). BUILD_SCOPE.md updated.
+- `783abb1` desktop three-platform green (staging precondition fix worked);
+  its only red was task-metrics:86 — the cancel-checkpoint fix made offline
+  batches land cancellation within the confirm tick, so the pending-line
+  assertion never sees its window on slow CI. Spec widened to the honest
+  state space (pending OR final; 15 s fast-feedback gate + 120 s terminal
+  gate preserved). `20c94ee` is the all-green candidate.
