@@ -25,6 +25,12 @@ function textPdf(text: string): Buffer {
 test('optional dictation: missing local model is visible before ASR runtime loads', async ({ page }) => {
   const requests: string[] = [];
   page.on('request', (req) => { requests.push(new URL(req.url()).pathname); });
+  // Hermetic "model missing" precondition: a developer machine can have real
+  // ASR artifacts under dist/models (fetch:asr-model), which would send the
+  // worker into a full multi-MB wasm load and blow the 30 s assertion for a
+  // reason unrelated to what this case verifies. Fulfilling every model probe
+  // with 404 pins the missing-model path on every machine.
+  await page.route('**/models/**', (route) => route.fulfill({ status: 404, body: 'missing' }));
   await page.addInitScript(() => {
     class FakeMediaRecorder {
       static isTypeSupported(): boolean { return true; }
