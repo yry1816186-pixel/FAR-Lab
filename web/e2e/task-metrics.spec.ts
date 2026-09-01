@@ -94,9 +94,12 @@ test('T6 从失败中恢复: cancel (armed) -> resume -> completed', async ({ pa
   await expect(cancelBtn).toBeVisible({ timeout: 15_000 });
   await cancelBtn.click(); clicks += 1;
   await page.getByRole('button', { name: /确认取消|Confirm cancel/ }).click(); clicks += 1;
-  // Honest intermediate state: the request is acknowledged immediately...
-  await expect(page.getByText(/取消请求已记录|Cancellation recorded/).first()).toBeVisible({ timeout: 15_000 });
-  // ...then takes effect at the next batch boundary (measured 16s+ on offline retrieve).
+  // Honest intermediate-or-final state: on a fast batch (the offline double
+  // checks cancellation at every runSearch now) the request can land within
+  // the same tick the confirm click resolves — the researcher sees the final
+  // cancelled band directly, never the pending line. Both are honest renders;
+  // a slow batch still shows the pending line first.
+  await expect(page.getByText(/取消请求已记录|已取消——可从断点继续|Cancellation recorded|Cancelled/).first()).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText(/已取消——可从断点继续|Cancelled/).first()).toBeVisible({ timeout: 120_000 });
   const resume = page.getByRole('button', { name: /从此处恢复|Resume/ }).first();
   await expect(resume).toBeVisible({ timeout: 20_000 });
