@@ -16,12 +16,16 @@ Current hard boundary:
   experiment runtime is NOT packaged — experiments need the host
   interpreter (same boundary as the source-tree mode);
 - the staged server is smoke-verified per staging (health probe on a random
-  port), but the **installed-app journey** (real installer, launch outside
-  the build tree, upgrade, uninstall cleanup) remains `UNVERIFIED`;
+  port), and the **installed-app journey is now locally VERIFIED for the
+  Windows/NSIS slice** (2026-09-01): silent install (`/S /D=…`) → launch from
+  the install tree → server healthy in 1 s (db ok, audit chain ok, watchdog
+  ok) → web workbench served from packaged resources (200, zh-CN html) →
+  process exit leaves no orphan listener; uninstall removes every file
+  (only empty directories linger briefly — NSIS rmdir timing, warning-grade).
 - Windows bundles are unsigned, Linux bundles are unsigned, and the macOS CI
   bundle uses Tauri's ad-hoc signing identity (`-`), not Developer ID signing
   or Apple notarization.
 
-A public desktop release requires an off-source-tree end-to-end test on each
-platform, updater and uninstall behavior, and the platform signing/notarization
-disclosures and evidence appropriate to the published build.
+A public desktop release requires the same installed-app evidence on macOS and
+Linux, updater behavior, and the platform signing/notarization disclosures
+appropriate to the published build.
