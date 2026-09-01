@@ -113,7 +113,11 @@ test('optional PDF: browser loads one modern runtime only when a real file is se
   const requests: string[] = [];
   page.on('request', (req) => { requests.push(new URL(req.url()).pathname); });
   await page.goto('/#lab/new');
-  await expect(page.getByRole('heading', { name: '从一个问题开始' })).toBeVisible();
+  // This spec also runs after core-journey in the Firefox/WebKit smoke job,
+  // so the shared real server already has a study and the fresh-workspace-only
+  // heading is intentionally hidden. The composer is the stable product
+  // surface whose optional PDF loading contract is under test.
+  await expect(page.locator('#nr-question')).toBeVisible();
   expect(requests.filter((pathname) => /\/assets\/(?:pdf|pdf\.worker\.min)-/.test(pathname))).toEqual([]);
 
   await page.locator('input[type="file"]').setInputFiles({
