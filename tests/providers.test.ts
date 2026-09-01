@@ -678,6 +678,31 @@ describe('transport failure classification and retry budget', () => {
     }
   });
 
+  it('pacing is ON by default (no env): back-to-back same-provider calls space at the product default', async () => {
+    // The suite env pins FARLAB_MIN_CALL_INTERVAL_MS=0 (vitest.config.ts) so
+    // unrelated provider tests stay fast — this case must strip it to prove
+    // the product default (600 ms) actually guards a fresh process.
+    const prev = process.env.FARLAB_MIN_CALL_INTERVAL_MS;
+    delete process.env.FARLAB_MIN_CALL_INTERVAL_MS;
+    const { __resetPacerForTests } = await import('../src/providers/http.js');
+    __resetPacerForTests();
+    try {
+      const { sleep, sleeps } = sleepRecorder();
+      const first = recorderFetch([() => Promise.resolve(anthropicOk(RAW_OK))]);
+      const second = recorderFetch([() => Promise.resolve(anthropicOk(RAW_OK))]);
+      const provider = createZaiProvider({ apiKey: 'test-fixture-key-zai', fetchImpl: first.fetchImpl, sleep, random: () => 0.5 });
+      const p2 = createZaiProvider({ apiKey: 'test-fixture-key-zai', fetchImpl: second.fetchImpl, sleep, random: () => 0.5 });
+      await provider.structuredCall(REQ, parseHypothesis);
+      await p2.structuredCall(REQ, parseHypothesis);
+      expect(sleeps.length).toBe(1); // second call paced
+      expect(sleeps[0]).toBeGreaterThan(0);
+      expect(sleeps[0]).toBeLessThanOrEqual(600);
+    } finally {
+      if (prev !== undefined) process.env.FARLAB_MIN_CALL_INTERVAL_MS = prev;
+      __resetPacerForTests();
+    }
+  });
+
   it('does NOT retry permanent 4xx (400 invalid model)', async () => {
     const { fetchImpl, calls } = recorderFetch([
       () =>

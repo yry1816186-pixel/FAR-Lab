@@ -107,15 +107,21 @@ const OVERLOAD_INITIAL_DELAY_MS = 15_000;
 const RATE_LIMIT_INITIAL_DELAY_MS = 20_000;
 
 /**
- * Optional per-provider call pacing (env FARLAB_MIN_CALL_INTERVAL_MS, default 0 =
- * off). Batch stages (claim extraction over N sources) otherwise fire back-to-back
- * structured calls and hit the account RPM wall repeatedly; pacing prevents the
- * wall instead of only recovering from it. Per-provider so a mixed chain never
- * inherits one slow route's interval.
+ * Per-provider call pacing, ON by default (600 ms; env FARLAB_MIN_CALL_INTERVAL_MS
+ * overrides, explicit 0 disables). Batch stages (claim extraction over N sources)
+ * otherwise fire back-to-back structured calls and hit the account RPM wall
+ * repeatedly — the live 2026-08-28 incident had three runs racing one key into
+ * HTTP 1302 self-excitation; pacing prevents the wall instead of only
+ * recovering from it (the 20s/40s spacing above). Per-provider so a mixed chain
+ * never inherits one slow route's interval. 600 ms keeps a full research run's
+ * added wall time well under a minute while staying far below common RPM walls.
  */
+const DEFAULT_MIN_CALL_INTERVAL_MS = 600;
 const minCallIntervalMs = (): number => {
-  const raw = Number(process.env.FARLAB_MIN_CALL_INTERVAL_MS ?? '0');
-  return Number.isFinite(raw) && raw > 0 ? Math.min(raw, 60_000) : 0;
+  const raw = process.env.FARLAB_MIN_CALL_INTERVAL_MS;
+  if (raw === undefined) return DEFAULT_MIN_CALL_INTERVAL_MS;
+  const v = Number(raw);
+  return Number.isFinite(v) && v >= 0 ? Math.min(v, 60_000) : DEFAULT_MIN_CALL_INTERVAL_MS;
 };
 const lastCallAtByProvider = new Map<string, number>();
 /** Pacing wait for the next call to `providerName` (0 = fire now). Pure, testable. */

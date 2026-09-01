@@ -8,6 +8,11 @@ export default defineConfig({
     hookTimeout: 60_000,
     pool: 'forks',
     env: {
+      // Product default is 600 ms per-provider pacing (http.ts); the suite
+      // exercises pacing through its own dedicated tests with injected clocks,
+      // so the default here is an explicit off to keep unrelated provider
+      // tests from inheriting real 600 ms waits between back-to-back calls.
+      FARLAB_MIN_CALL_INTERVAL_MS: '0',
       // CLI renderer tests assert plain-text output; the vendored picocolors
       // honors NO_COLOR above every other switch, so pinning it here keeps
       // the suite hermetic against CI environments that set CI=true (which
