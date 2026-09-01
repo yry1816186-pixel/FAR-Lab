@@ -11,7 +11,7 @@ import { isSourceAdapterError } from '../../sources/error.js';
 import { snapshotHash, excludeVolatile } from '../../sources/snapshot.js';
 import { callStructured } from '../llm.js';
 import type { StageContext, StageHandler, StageOutcome } from '../types.js';
-import { mapBounded, STAGE_CONCURRENCY } from './shared.js';
+import { assertNotCancelled, mapBounded, STAGE_CONCURRENCY } from './shared.js';
 import { contentTokens } from './evidence.js';
 import { isCancellationError, throwIfCancelled } from './guard.js';
 import {
@@ -532,6 +532,10 @@ export const retrieveStage: StageHandler = {
       queryText: string,
       isVariant: boolean,
     ): Promise<SearchYield> => {
+      // Structured cancellation checkpoint: a user cancel (or lease loss) must
+      // stop the search loop here, not after the remaining planned queries,
+      // variants, and the citation chase have all spent their round trips.
+      assertNotCancelled(ctx, 'retrieve');
       const redactionNote = isVariant
         ? 'arxiv recovery variant search; query text and per-record content hashes retained; payloads archived content-addressed'
         : 'query text and per-record content hashes retained; payloads archived content-addressed';
@@ -872,6 +876,9 @@ export const retrieveStage: StageHandler = {
         let chaseListIdx = targets.length; // chase lists get their own RRF list indices
         chaseLoop: for (const seed of seeds) {
           if (outcome.added >= CHASE_MAX_NEW) break;
+          // Same cancellation discipline as the planned searches: the chase
+          // iterates one network round trip per seed and must honor a cancel.
+          assertNotCancelled(ctx, 'retrieve');
           // Backward: seed's referenced works, first N in citation order, one batch resolve.
           // Every executed chase search is receipted (0 results included — attempts are
           // provenance facts, same P3-1 discipline as planned searches).
