@@ -3,6 +3,7 @@ import { newId, ExperimentSpec } from '../domain/index.js';
 import { MetaAnalysisSpec } from '../domain/meta.js';
 import { FemSpec } from '../domain/fem.js';
 import { TheorySpec, THEORY_GRID_POINTS, THEORY_DEFAULT_TOLERANCE } from '../domain/theory.js';
+import { OdeSpec, ODE_DEFAULT_RTL, ODE_DEFAULT_ATOL, ODE_DEFAULT_TOLERANCE } from '../domain/ode.js';
 import type { ResearchPlan } from '../domain/plan.js';
 import { invokeStructured, type ModelPlaneDeps } from '../pipeline/llm.js';
 import { RunBudgetExhaustedError } from '../app/run-budget.js';
@@ -438,6 +439,122 @@ export const draftTheorySpecFromPlan = async (
     createdAt: new Date().toISOString(),
   });
   return { kind: 'theory', spec, executionMode };
+};
+
+// ---- Wave B: ODE (numerical integration against a closed-form solution) drafting ----
+
+export type OdeSpecDraftOutcome =
+  | { kind: 'ode'; spec: OdeSpec; executionMode: 'live' | 'test' }
+  | { kind: 'skip'; reason: string };
+
+const OdeDraftOut = z.object({
+  /** false = the plan is not testable by integrating a stated ODE against its claimed closed-form solution. */
+  feasible: z.boolean(),
+  skipReason: z.string().min(10).optional(),
+  stateVariables: z.array(z.object({
+    name: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_]{0,30}$/),
+    /** dy/dt as one closed expression in t and the state names. */
+    rhs: z.string().min(1).max(300),
+    y0: z.number().finite(),
+  })).min(1).max(6).optional(),
+  tSpan: z.tuple([z.number().finite(), z.number().finite()]).optional(),
+  /** The plan's claimed closed-form solution y_i(t); when absent the run is honestly unfalsifiable. */
+  analyticalSolution: z.array(z.object({
+    name: z.string().min(1).max(31),
+    expr: z.string().min(1).max(300),
+  })).min(1).max(6).optional(),
+  claims: z.array(z.object({
+    label: z.string().min(3).max(200),
+  })).min(1).max(8).optional(),
+}).superRefine((d, ctx) => {
+  if (d.feasible && (d.stateVariables === undefined || d.tSpan === undefined || d.claims === undefined)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'feasible=true requires stateVariables, tSpan and claims' });
+  }
+  if (d.feasible && d.stateVariables !== undefined && d.analyticalSolution !== undefined
+    && d.analyticalSolution.length !== d.stateVariables.length) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'analyticalSolution entries must match stateVariables' });
+  }
+});
+
+const ODE_SYSTEM_PROMPT =
+  'You convert a research plan into ONE ODE-verification spec draft, or declare it infeasible. ' +
+  'Feasible ONLY when the plan\'s falsifiable content is an initial-value problem the plan itself states ' +
+  '(dy/dt expressions) TOGETHER WITH a claimed closed-form solution to integrate against — e.g. a kinetics ' +
+  'or decay model with its analytic solution. ' +
+  'Expressions are Python-syntax numeric expressions, using ONLY: + - * / % ** ( ), numbers, the functions ' +
+  'exp log log2 log10 sqrt sin cos tan sinh cosh tanh arcsin arccos arctan arctan2 abs floor ceil min max, ' +
+  'and the constants pi e. No imports, no attribute access, no other names. ' +
+  'stateVariables: 1-6 entries; rhs may use the independent variable t and the state names; names must not be t. ' +
+  'analyticalSolution: y_i(t) expressions in t ONLY, one per state variable, or omit entirely when the plan ' +
+  'claims no closed form (the run then records an honest unfalsifiable outcome). ' +
+  'If the plan needs datasets, literature pooling, PDEs, or physical experiments rather than a stated IVP, ' +
+  'set feasible=false with a skipReason naming what is missing. Output JSON only.';
+
+export const draftOdeSpecFromPlan = async (
+  plan: ResearchPlan,
+  questionText: string,
+  plane: ModelPlaneDeps,
+): Promise<OdeSpecDraftOutcome> => {
+  let draft: z.infer<typeof OdeDraftOut>;
+  let executionMode: 'live' | 'test';
+  try {
+    const res = await invokeStructured<z.infer<typeof OdeDraftOut>>(plane, {
+      stage: 'execute',
+      purpose: 'ode-spec-draft',
+      systemPrompt: ODE_SYSTEM_PROMPT,
+      payload: {
+        researchQuestion: questionText,
+        objective: plan.objective,
+        variables: plan.variables,
+        decisionRules: { success: plan.decisionRules.successCriterion, falsification: plan.decisionRules.falsificationCriterion },
+        hypothesisIds: plan.hypothesisIds,
+      },
+      schema: OdeDraftOut,
+      temperature: 0.1,
+      maxTokens: 2048,
+    });
+    draft = res.data;
+    executionMode = res.executionMode;
+  } catch (e) {
+    if (e instanceof RunBudgetExhaustedError) throw e;
+    return { kind: 'skip', reason: `ode spec drafting failed: ${(e instanceof Error ? e.message : String(e)).slice(0, 180)}` };
+  }
+  if (!draft.feasible || draft.stateVariables === undefined || draft.tSpan === undefined || draft.claims === undefined) {
+    return { kind: 'skip', reason: draft.skipReason ?? 'plan is not testable by ODE integration against a closed-form solution' };
+  }
+  // Deterministic discipline: preregistered method/tolerances/grid, first claim
+  // primary, exploratory until an operator binds.
+  const spec = OdeSpec.parse({
+    id: newId('xsp'),
+    runId: plan.runId,
+    planId: plan.id,
+    planStepId: plan.steps[0]?.id ?? newId('task'),
+    question: questionText.slice(0, 500),
+    experimentType: 'ode_integration',
+    stateVariables: draft.stateVariables,
+    tSpan: draft.tSpan,
+    method: 'DOP853',
+    rtol: ODE_DEFAULT_RTL,
+    atol: ODE_DEFAULT_ATOL,
+    samplePoints: 101,
+    ...(draft.analyticalSolution !== undefined ? { analyticalSolution: draft.analyticalSolution } : {}),
+    claims: draft.claims.map((c, i) => ({
+      id: `claim_${i + 1}`,
+      label: c.label,
+      tolerance: ODE_DEFAULT_TOLERANCE,
+      thresholdProvenance: 'model-stipulated',
+      primary: i === 0,
+    })),
+    compute: { device: 'local', maxParallel: 1, timeoutMs: 300_000 },
+    approvals: [],
+    ...(draft.analyticalSolution === undefined
+      ? { noAnalyticalNote: `Plan-drafted run without a claimed closed-form solution for ${plan.id}: recorded as an honest unfalsifiable integration.` }
+      : {}),
+    exploratoryNote: `Plan-drafted exploratory ODE integration for ${plan.id}: tolerance is model-stipulated; hypothesis-bound ode specs require operator approval.`,
+    validation: { passed: false, missing: ['pending deterministic validation at execution'] },
+    createdAt: new Date().toISOString(),
+  });
+  return { kind: 'ode', spec, executionMode };
 };
 
 // ---------------------------------------------------------------------------

@@ -19,6 +19,7 @@ import {
   ProtocolSpec, ProtocolExecution,
   ScientificProblemModel, MethodSelection,
   TheorySpec,
+  OdeSpec,
   FemSpec,
 } from '../domain/index.js';
 import { z } from 'zod';
@@ -44,6 +45,7 @@ const KIND_SCHEMAS = {
   problem_model: ScientificProblemModel,
   method_selection: MethodSelection,
   theory_spec: TheorySpec,
+  ode_spec: OdeSpec,
   fem_spec: FemSpec,
   feedback: FeedbackSignal,
   revision: Revision,

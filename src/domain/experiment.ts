@@ -130,7 +130,7 @@ export const CLASSIFICATION_COMPARISON_METRICS: readonly MetricKey[] = ['accurac
 export const REGRESSION_COMPARISON_METRICS: readonly MetricKey[] = ['mean_squared_error'];
 
 export const Hyperparams = z.record(z.string(), z.union([z.string(), z.number(), z.boolean()]));
-export type Hyperparams = z.infer<typeof Hyperparams>;
+export type Hyperparams = z.infer<typeof Hyperparams>;
 /**
  * P2 ablation matrix: factors are NAMED hyperparameter-override LEVELS over one base
  * model — declarative and LLM-safe (no free-form code/values). Full factorial expansion;
@@ -143,7 +143,7 @@ export const AblationFactor = z.object({
     hyperparams: Hyperparams.default({}),
   })).min(1),
 });
-export type AblationFactor = z.infer<typeof AblationFactor>;
+export type AblationFactor = z.infer<typeof AblationFactor>;
 
 /** Hyperparameters are primitives only — deterministic serialization, no code injection surface. */
 
@@ -173,6 +173,8 @@ export const MetricKey = z.enum([
   'sim_mean', 'sim_variance', 'sim_threshold_prob',
   // Slice-5 theory identity reports: max |lhs-rhs| over the preregistered grid.
   'identity_max_abs_residual',
+  // Wave B ODE integration: max |y_num - y_analytic| on the preregistered grid.
+  'ode_max_abs_residual',
   // Slice-6 FEM verification: L2 error at the finest preregistered level.
   'fem_l2_error_final_level',
   // Slice-6b adaptive FEM: H1 error at the final AFEM round.
@@ -445,7 +447,7 @@ export const StatReport = z.object({
   pointEstimate: z.number(),
   ci: z.object({ level: z.number(), low: z.number(), high: z.number() }),
   test: z.object({
-    kind: z.union([StatisticsPlan.shape.test, z.enum(['meta_iv_fixed', 'meta_iv_random_dl']), z.literal('identity_grid'), z.literal('fem_convergence_order')]),
+    kind: z.union([StatisticsPlan.shape.test, z.enum(['meta_iv_fixed', 'meta_iv_random_dl']), z.literal('identity_grid'), z.literal('fem_convergence_order'), z.literal('ode_analytical_grid')]),
     alpha: z.number(),
     pValue: z.number().optional(),
     nBoot: z.number().int().optional(),

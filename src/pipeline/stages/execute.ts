@@ -2,11 +2,12 @@ import type { StageContext, StageHandler, StageOutcome } from '../types.js';
 import { ExperimentSpec, newId, newProtocolExecution, ProtocolSpec, type MethodFamily } from '../../domain/index.js';
 import type { ResearchPlan } from '../../domain/plan.js';
 import { draftSpecFromPlan, draftMetaSpecFromPlan, type RegisteredDatasetRef } from '../../experiment/spec-from-plan.js';
-import { draftTheorySpecFromPlan, draftFemSpecFromPlan } from '../../experiment/spec-from-plan.js';
+import { draftTheorySpecFromPlan, draftFemSpecFromPlan, draftOdeSpecFromPlan } from '../../experiment/spec-from-plan.js';
 import { draftProtocolFromPlan, planHashOf, protocolForPlan } from '../../experiment/protocol-from-plan.js';
 import { executeExperiment } from '../../experiment/executor.js';
 import { executeMetaAnalysis } from '../../experiment/executor-meta.js';
 import { executeTheoryAnalysis } from '../../experiment/executor-theory.js';
+import { executeOdeAnalysis } from '../../experiment/executor-ode.js';
 import { executeFemAnalysis } from '../../experiment/executor-fem.js';
 import { RunBudgetExhaustedError } from '../../app/run-budget.js';
 import { experimentLegStatus } from '../../app/iteration.js';
@@ -191,6 +192,36 @@ export const executeStage: StageHandler = {
           if (e instanceof TemplateModeRefusal) return { kind: 'skipped', reason: e.message };
           const msg = e instanceof Error ? e.message : String(e);
           return { kind: 'skipped', reason: `theory identity execution failed (run continues): ${msg.slice(0, 240)}` };
+        }
+      }
+
+      }
+      // Wave B ODE leg: plans whose falsifiable content is a stated IVP plus a
+      // claimed closed-form solution get a NUMERICAL integration experiment
+      // (preregistered method/tolerances -> sidecar ode_integrate against the
+      // analytic solution -> mechanical max-residual verdict). Without a
+      // claimed closed form the run is honestly unfalsifiable, not faked.
+      if (!routeSkip('ode_integration', ['numerical_simulation', 'analytic_symbolic'])) {
+      const odeDraft = await draftOdeSpecFromPlan(plan, question.text, plane);
+      if (odeDraft.kind === 'ode') {
+        try {
+          refuseTemplateMode(ctx, odeDraft.executionMode, 'ode draft');
+          const executed = await executeOdeAnalysis(ctx.store, ctx.artifacts, odeDraft.spec, {
+            shouldCancel: () => ctx.cancelled() || ctx.disowned(),
+          });
+          const rep = executed.statReports[0];
+          return {
+            kind: 'done',
+            summary:
+              `ODE integration experiment ${executed.run.id}: ${executed.statReports.length} claim(s) ` +
+              `(method ${odeDraft.spec.method}, verdict=${rep?.verdict ?? 'exploratory'}) — numerical integration against the preregistered analytical solution, not a symbolic proof — ` +
+              'plan-drafted, exploratory (tolerance model-stipulated; binding needs operator approval)',
+          };
+        } catch (e) {
+          if (e instanceof RunBudgetExhaustedError) throw e;
+          if (e instanceof TemplateModeRefusal) return { kind: 'skipped', reason: e.message };
+          const msg = e instanceof Error ? e.message : String(e);
+          return { kind: 'skipped', reason: `ode integration execution failed (run continues): ${msg.slice(0, 240)}` };
         }
       }
 
