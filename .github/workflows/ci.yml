@@ -286,6 +286,7 @@ jobs:
           node-version: '24.18.0'
           cache: npm
           cache-dependency-path: |
+            package-lock.json
             web/package-lock.json
             desktop/package-lock.json
       - name: Install exact Rust toolchain
@@ -295,6 +296,11 @@ jobs:
         run: |
           npm ci
           npm run build
+      - name: Build the backend and stage the desktop sidecar
+        run: |
+          npm ci
+          npm run build
+          node desktop/scripts/stage-sidecar.mjs
       - name: Install desktop CLI
         working-directory: desktop
         run: npm ci
