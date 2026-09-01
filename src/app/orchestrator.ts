@@ -743,7 +743,7 @@ export class Orchestrator {
     return run;
   }
 
-  cancel(runId: string): boolean {
+  cancel(runId: string, via: string = 'persisted-request'): boolean {
     // Wire-level: kill the in-flight provider call of an executing run (this
     // process) within ms — the persisted flag below still carries cross-process
     // cancels to the next stage/subtask boundary.
@@ -752,7 +752,9 @@ export class Orchestrator {
     // race the owning executor's stage transitions.
     const ok = this.deps.store.requestCancel(runId);
     if (!ok) return false;
-    this.deps.store.appendEvent(runId, { type: 'run_cancelled', detail: { via: 'persisted-request' } });
+    // Single event source: entry points pass their own `via` (http/cli) instead of
+    // appending a second run_cancelled on top of this one.
+    this.deps.store.appendEvent(runId, { type: 'run_cancelled', detail: { via } });
     return ok;
   }
 

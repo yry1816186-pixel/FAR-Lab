@@ -1230,9 +1230,8 @@ function parseSeedSources(raw: unknown): string | {
 
   const cancelRun = (res: http.ServerResponse, runId: string): void => {
     const run = mustGetRun(runId);
-    const ok = app.orchestrator.cancel(runId);
+    const ok = app.orchestrator.cancel(runId, 'http');
     if (ok) {
-      app.store.appendEvent(runId, { type: 'run_cancelled', detail: { via: 'http' } });
       sendJson(res, 202, { requested: true });
     } else {
       // orchestrator.cancel refuses completed/cancelled runs — report that truthfully.

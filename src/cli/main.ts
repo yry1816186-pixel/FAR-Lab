@@ -1185,9 +1185,8 @@ const main = async (): Promise<void> => {
   if (sub === 'cancel') {
     const app = await createApp();
     try {
-      const ok = app.orchestrator.cancel(rid);
+      const ok = app.orchestrator.cancel(rid, 'cli');
       if (!ok) die(`no active run to cancel: ${runId}`);
-      app.store.appendEvent(rid, { type: 'run_cancelled', detail: { via: 'cli' } });
       out(`${marker()} ${ink.warn('cancellation requested')} for ${runId} (takes effect between stage operations)`);
     } finally { app.close(); }
     return;
