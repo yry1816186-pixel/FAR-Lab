@@ -12,6 +12,15 @@ import { join, relative, resolve } from 'node:path';
 export const staleDistFiles = (root = process.cwd()): string[] => {
   const srcRoot = join(root, 'src');
   const distRoot = join(root, 'dist');
+  // Distributed trees (packaged desktop sidecar, clean-clone release packs)
+  // ship dist without src: with no source to compare against there is no
+  // staleness to guard — the D-031 risk ("src edited, dist not rebuilt")
+  // cannot exist without src.
+  try {
+    readdirSync(srcRoot);
+  } catch {
+    return [];
+  }
   const stale: string[] = [];
   const walk = (dir: string): void => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {

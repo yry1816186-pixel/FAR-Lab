@@ -53,4 +53,15 @@ describe('staleDistFiles (D-031 dist-freshness guard)', () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it('treats a dist-only tree (packaged sidecar) as fresh — no src means no staleness', () => {
+    const root = makeRoot();
+    try {
+      mkdirSync(join(root, 'dist'), { recursive: true });
+      writeFileSync(join(root, 'dist', 'a.js'), 'export const a = 1;');
+      expect(staleDistFiles(root)).toEqual([]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });

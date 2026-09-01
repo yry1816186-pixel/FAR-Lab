@@ -103,6 +103,27 @@ fn shell_en() -> bool {
     lang_is_en(std::env::var("FARLANG").ok().as_deref())
 }
 
+/// Packaged backend root: desktop/sidecar staged by scripts/stage-sidecar.mjs
+/// and shipped as Tauri resources. Resolved from the binary's location across
+/// the three platform layouts (Windows/Linux: next to the exe or under
+/// resources/; macOS .app: Contents/Resources). None = development checkout —
+/// the caller falls back to repo_root(). Leaked once like repo_root().
+fn sidecar_root() -> Option<&'static Path> {
+    let exe = std::env::current_exe().ok()?;
+    let exe_dir = exe.parent()?;
+    let mut candidates = vec![
+        exe_dir.join("sidecar"),                       // flat bundle layout
+        exe_dir.join("resources").join("sidecar"),     // resources/ subfolder
+    ];
+    if let Some(outer) = exe_dir.parent() {
+        candidates.push(outer.join("Resources").join("sidecar")); // macOS .app bundle
+    }
+    let found = candidates
+        .into_iter()
+        .find(|p| p.join("scripts").join("serve.mjs").is_file())?;
+    Some(Box::leak(found.into_boxed_path()))
+}
+
 fn repo_root() -> &'static str {
     // CARGO_MANIFEST_DIR (set by cargo at compile time in both `tauri dev` and
     // `tauri build`) points at desktop/src-tauri — the repo root is 2 levels up.
@@ -474,7 +495,8 @@ fn main() {
         eprintln!("far-lab-desktop: server already healthy on {port}, reusing");
         None
     } else {
-        let root = repo_root();
+        // Packaged sidecar resources when present; the dev checkout otherwise.
+        let root: &Path = sidecar_root().unwrap_or_else(|| Path::new(repo_root()));
         let mut cmd = Command::new("node");
         cmd.arg("scripts/serve.mjs")
             .current_dir(root)
