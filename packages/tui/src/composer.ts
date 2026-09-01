@@ -17,6 +17,7 @@ import {
   backspace, composerReady, composerText, emptyComposer, extractPaste, insertText, newline, sanitizeText,
 } from './composerCore.ts';
 import { decide, VOCAB_FOOTER } from './approveCore.ts';
+import type { Lang } from './i18n.ts';
 
 const h = React.createElement;
 type El = React.ReactElement;
@@ -56,6 +57,34 @@ export const LAUNCH_LABELS: ComposerLabels = {
   confirmTitle: '启动研究',
   confirmKeys: 'y 确认就绪 · n 返回编辑 · q 放弃',
   confirmFooter: '（就绪即止：真实启动被 FAR_ALLOW_LIVE 门控禁用 — no-live-API 纪律）',
+};
+
+const QUESTION_LABELS_EN: ComposerLabels = {
+  header: 'Research question (multiline / paste-safe / IME-safe)',
+  confirmTitle: 'Submit research question',
+  confirmKeys: 'y confirm-ready · n back to edit · q discard',
+  confirmFooter: '(stops at READY: the real submit is gated behind FAR_ALLOW_LIVE — no-live-API discipline)',
+};
+
+const CHAT_LABELS_EN: ComposerLabels = {
+  header: 'Chat (multiline / paste-safe / IME-safe)',
+  confirmTitle: 'Send message',
+  confirmKeys: 'y send · n back to edit · q discard',
+  confirmFooter: '(sending uses the real conversation channel, same as the web; the model route is server-resolved)',
+};
+
+const LAUNCH_LABELS_EN: ComposerLabels = {
+  header: 'Distill a research question (starts a study from this conversation)',
+  confirmTitle: 'Launch study',
+  confirmKeys: 'y confirm-ready · n back to edit · q discard',
+  confirmFooter: '(stops at READY: the real launch is gated behind FAR_ALLOW_LIVE — no-live-API discipline)',
+};
+
+export const composerLabels = (kind: 'question' | 'chat' | 'launch', lang: Lang): ComposerLabels => {
+  if (lang === 'en') {
+    return kind === 'question' ? QUESTION_LABELS_EN : kind === 'chat' ? CHAT_LABELS_EN : LAUNCH_LABELS_EN;
+  }
+  return kind === 'question' ? QUESTION_LABELS : kind === 'chat' ? CHAT_LABELS : LAUNCH_LABELS;
 };
 
 export function Composer({ onDone, labels = QUESTION_LABELS }: { onDone: (r: ComposerResult) => void; labels?: ComposerLabels }): El {

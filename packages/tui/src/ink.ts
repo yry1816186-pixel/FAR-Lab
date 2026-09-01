@@ -19,8 +19,9 @@ import type { Conversation, RunDetail, RunSummary } from './api.ts';
 import { subscribeRunEvents, type LiveState, type LiveSubscription, type SubscribeOptions } from './sse.ts';
 import { applyEventToStages, stageRows, stagesFromEvents } from './liveCore.ts';
 import type { StageRow } from './narrative.ts';
-import { relTime, STAGE_ICON, STAGE_ZH } from './narrative.ts';
-import { Composer, CHAT_LABELS, LAUNCH_LABELS, type ComposerResult } from './composer.ts';
+import { relTime, STAGE_ICON, stageLabel } from './narrative.ts';
+import { CONN_LABELS, resolveLang, STATUS_LABELS, type Lang } from './i18n.ts';
+import { Composer, composerLabels, type ComposerResult } from './composer.ts';
 import * as chatCore from './chatCore.ts';
 import { renderRows, renderSubView } from './chatViews.ts';
 import * as commands from './commands.ts';
@@ -30,11 +31,10 @@ import { readSeedFile, type SeedDraft } from './seedAttach.ts';
 const h = React.createElement;
 type El = React.ReactElement;
 
-const STATUS_ZH: Record<string, string> = {
-  completed: '已完成', running: '运行中', queued: '排队中', failed: '失败',
-  partial: '部分完成', paused: '已暂停', cancelled: '已取消', created: '已创建',
-};
-const CONN_ZH: Record<LiveState, string> = { connecting: '连接中', live: '实时', reconnecting: '重连中' };
+// One resolution per process: the TUI surface language (FARLANG; zh default).
+const LANG: Lang = resolveLang();
+const STATUS = STATUS_LABELS[LANG];
+const CONN = CONN_LABELS[LANG];
 
 // ---------------------------------------------------------------------------
 // deps bundles (defaults bind the real api; tests/e2e inject fakes)
@@ -226,14 +226,14 @@ export function RunDetailView(props: {
   });
 
   const rows = stageRows(rowsMap);
-  const statusText = STATUS_ZH[run.status] ?? run.status;
+  const statusText = STATUS[run.status] ?? run.status;
   const frozen = run.status === 'running' && run.lease?.live === false;
 
   return h(Box, { flexDirection: 'column' },
     h(Text, { bold: true, color: 'cyan' }, (props.run.questionText ?? props.run.id).slice(0, 100)),
     h(Text, { dimColor: true },
       `${statusText}${frozen ? ' · [已冻结 — r 恢复]' : ''} · ${props.run.id}`
-      + `${conn !== null ? ` · ${CONN_ZH[conn]}` : ''} · q 返回`),
+      + `${conn !== null ? ` · ${CONN[conn]}` : ''} · q 返回`),
     subError !== null ? h(Text, { color: 'red' }, `读取失败: ${subError}`) : null,
     sub !== null
       ? renderSubView(sub)
@@ -241,7 +241,7 @@ export function RunDetailView(props: {
         rows.length === 0 ? h(Text, { dimColor: true }, '（暂无阶段事件）') : null,
         rows.map((s) => h(Box, { key: s.stage, paddingLeft: 1 },
           h(Text, { color: s.status === 'done' ? 'green' : s.status === 'failed' ? 'red' : s.status === 'started' ? 'blue' : 'gray' }, STAGE_ICON[s.status]),
-          h(Text, null, ` ${STAGE_ZH[s.stage] ?? s.stage} `),
+          h(Text, null, ` ${stageLabel(s.stage, LANG)} `),
           s.summary !== undefined ? h(Text, { dimColor: true, wrap: 'truncate' }, s.summary.slice(0, 60)) : null,
         )),
       ),
@@ -352,7 +352,7 @@ export function ChatView(props: {
   return h(Box, { flexDirection: 'column' },
     h(Box, { borderStyle: 'round', flexDirection: 'column', paddingX: 1 },
       h(Text, { bold: true }, `对话 · ${conv.title.slice(0, 60)}`),
-      h(Text, { dimColor: true }, `${chatCore.conversationMeta(conv)} · ${relTime(conv.updatedAt)} · q 返回`),
+      h(Text, { dimColor: true }, `${chatCore.conversationMeta(conv)} · ${relTime(conv.updatedAt, LANG)} · q 返回`),
     ),
     h(Box, { flexDirection: 'column', paddingX: 1 }, renderRows(chatCore.conversationRows(conv, 40))),
     pending.length > 0
@@ -376,12 +376,12 @@ export function ChatView(props: {
         : null,
     composing
       ? h(Box, { flexDirection: 'column' },
-        h(Text, { dimColor: true }, CHAT_LABELS.header),
-        h(Composer, { onDone: onComposed, labels: CHAT_LABELS }))
+        h(Text, { dimColor: true }, composerLabels('chat', LANG).header),
+        h(Composer, { onDone: onComposed, labels: composerLabels('chat', LANG) }))
       : launching
         ? h(Box, { flexDirection: 'column' },
-          h(Text, { dimColor: true }, LAUNCH_LABELS.header),
-          h(Composer, { onDone: onLaunchComposed, labels: LAUNCH_LABELS }))
+          h(Text, { dimColor: true }, composerLabels('launch', LANG).header),
+          h(Composer, { onDone: onLaunchComposed, labels: composerLabels('launch', LANG) }))
         : h(Text, { dimColor: true },
           `${pending.length > 0 ? 'y/a/n 处理最上面的提案 · m 写消息 · ' : 'n 写消息 · '}s 附文件 · l 凝结问题并启动研究 · q 返回`),
   );
@@ -536,7 +536,7 @@ export function App(props: {
       rows.push(h(Box, { key: r.id },
         h(Text, { color: i === cursor ? 'cyan' : undefined }, `${i === cursor ? '❯ ' : '  '}${i + 1}. `),
         h(Text, { color: i === cursor ? 'cyan' : undefined, wrap: 'truncate' }, (r.questionText ?? r.id).slice(0, 72)),
-        h(Text, { dimColor: true }, ` — ${STATUS_ZH[r.status] ?? r.status} · ${relTime(r.createdAt)}`),
+        h(Text, { dimColor: true }, ` — ${STATUS[r.status] ?? r.status} · ${relTime(r.createdAt, LANG)}`),
       ));
     });
   }
@@ -547,7 +547,7 @@ export function App(props: {
       rows.push(h(Box, { key: c.id },
         h(Text, { color: i === convCursor ? 'cyan' : undefined }, `${i === convCursor ? '❯ ' : '  '}${i + 1}. `),
         h(Text, { color: i === convCursor ? 'cyan' : undefined, wrap: 'truncate' }, c.title.slice(0, 72)),
-        h(Text, { dimColor: true }, ` — ${chatCore.conversationMeta(c)} · ${relTime(c.updatedAt)}`),
+        h(Text, { dimColor: true }, ` — ${chatCore.conversationMeta(c)} · ${relTime(c.updatedAt, LANG)}`),
       ));
     });
   }

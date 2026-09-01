@@ -91,6 +91,18 @@ struct ServerState(Mutex<ServerGuard>);
 
 use std::path::Path;
 
+/// Desktop-shell language: the few OS-level strings this binary shows itself
+/// (fatal dialogs, native notifications) mirror the web/TUI default (zh);
+/// FARLANG=en switches them, matching `resolveLang()` in the TUI.
+fn lang_is_en(raw: Option<&str>) -> bool {
+    raw.map(|v| v.to_ascii_lowercase().starts_with("en"))
+        .unwrap_or(false)
+}
+
+fn shell_en() -> bool {
+    lang_is_en(std::env::var("FARLANG").ok().as_deref())
+}
+
 fn repo_root() -> &'static str {
     // CARGO_MANIFEST_DIR (set by cargo at compile time in both `tauri dev` and
     // `tauri build`) points at desktop/src-tauri — the repo root is 2 levels up.
@@ -221,8 +233,17 @@ fn final_transitions(
 
 #[cfg(test)]
 mod tests {
-    use super::{deep_link_hash, final_transitions, hash_assign_script};
+    use super::{deep_link_hash, final_transitions, hash_assign_script, lang_is_en};
     use std::collections::HashMap;
+
+    #[test]
+    fn shell_language_matches_tui_resolvelang_semantics() {
+        assert!(lang_is_en(Some("en")));
+        assert!(lang_is_en(Some("en-US")));
+        assert!(!lang_is_en(Some("zh")));
+        assert!(!lang_is_en(Some("fr"))); // unmapped locale keeps the zh default
+        assert!(!lang_is_en(None)); // unset FARLANG: historical default
+    }
 
     #[test]
     fn deep_link_hash_maps_the_documented_shapes() {
@@ -465,7 +486,11 @@ fn main() {
                 Some(child)
             }
             Err(e) => {
-                let msg = format!("FAR-Lab 启动失败：无法启动本地服务（{e}）。\n请确认已安装 Node.js 并在仓库目录运行过 npm install && npm run build。");
+                let msg = if shell_en() {
+                    format!("FAR-Lab failed to start: cannot spawn the local server ({e}).\nCheck that Node.js is installed and npm install && npm run build has run in the repo directory.")
+                } else {
+                    format!("FAR-Lab 启动失败：无法启动本地服务（{e}）。\n请确认已安装 Node.js 并在仓库目录运行过 npm install && npm run build。")
+                };
                 fatal_dialog(&msg);
                 eprintln!("far-lab-desktop: failed to spawn node server: {e}");
                 std::process::exit(1);
@@ -475,7 +500,11 @@ fn main() {
 
     // Honest wait: bounded (~20s), then fail visibly instead of a blank window.
     if !http_health_ok_wait(port, Duration::from_secs(20)) {
-        let msg = format!("FAR-Lab 启动失败：本地服务在 20 秒内未就绪（端口 {port}）。\n请手动运行 node scripts/serve.mjs 查看错误输出。");
+        let msg = if shell_en() {
+            format!("FAR-Lab failed to start: the local server did not become healthy within 20 s (port {port}).\nRun node scripts/serve.mjs manually to see the error output.")
+        } else {
+            format!("FAR-Lab 启动失败：本地服务在 20 秒内未就绪（端口 {port}）。\n请手动运行 node scripts/serve.mjs 查看错误输出。")
+        };
         fatal_dialog(&msg);
         eprintln!("far-lab-desktop: server did not become healthy on {port} within 20s — aborting");
         std::process::exit(2);
@@ -531,17 +560,32 @@ fn main() {
                         };
                         let next = parse_runs_snapshot(&body);
                         for (run_id, status) in final_transitions(&prev, &next) {
-                            let zh = match status.as_str() {
-                                "completed" => "研究已完成",
-                                "failed" => "研究失败",
-                                "partial" => "研究部分完成",
-                                _ => "研究已取消",
+                            let (title, body): (&str, String) = if shell_en() {
+                                (
+                                    match status.as_str() {
+                                        "completed" => "Study completed",
+                                        "failed" => "Study failed",
+                                        "partial" => "Study partially completed",
+                                        _ => "Study cancelled",
+                                    },
+                                    format!("{run_id} — click the tray to open the workbench"),
+                                )
+                            } else {
+                                (
+                                    match status.as_str() {
+                                        "completed" => "研究已完成",
+                                        "failed" => "研究失败",
+                                        "partial" => "研究部分完成",
+                                        _ => "研究已取消",
+                                    },
+                                    format!("{run_id} — 点击托盘打开工作台"),
+                                )
                             };
                             let ok = handle
                                 .notification()
                                 .builder()
-                                .title(zh)
-                                .body(format!("{run_id} — 点击托盘打开工作台"))
+                                .title(title)
+                                .body(body)
                                 .show();
                             if let Err(e) = ok {
                                 eprintln!("far-lab-desktop: notification for {run_id} failed: {e}");

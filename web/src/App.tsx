@@ -771,7 +771,14 @@ export function App(): JSX.Element {
                dock slot. One rendering location, visible in every dock state. */
             <ErrorBox error={convCreateError.error} onRetry={() => discussRun(convCreateError.runId)} />
           )}
-          {newResearchView ? (
+          {/* homeSurface must occupy exactly ONE slot: rendering it in two
+              alternative branches (newResearchView vs. the fallback) remounts
+              the whole surface when the branch flips — the initial hash
+              routing lands newResearchView=true after the first commit, and
+              that remount silently discards a question typed into the still-
+              pristine first frame (caught on Firefox's looser commit timing;
+              spec optional-assets "survives the transition"). */}
+          {newResearchView || (!libraryView && selectedConvId === null && selectedRunId === null) ? (
             homeSurface
           ) : libraryView ? (
             <Library runs={runs} onOpenStudy={selectStudy} />
@@ -781,8 +788,6 @@ export function App(): JSX.Element {
               onOpenedRun={selectStudy}
               onMutated={refreshConversations}
             />
-          ) : selectedRunId === null ? (
-            homeSurface
           ) : runDetail === null ? (
             detailLoading ? (
               <div className="select-hint" role="status">
@@ -832,9 +837,9 @@ export function App(): JSX.Element {
                     focusClaimId={focusClaimId}
                     onClaimFocused={() => setFocusClaimId(null)}
                     stream={stream}
-                    sourceConversation={sourceByRunId.get(selectedRunId) ?? null}
+                    sourceConversation={sourceByRunId.get(runDetail.id) ?? null}
                     dockedConversation={dockOpen ? selectedConvId : null}
-                    onDiscuss={() => discussRun(selectedRunId)}
+                    onDiscuss={() => discussRun(runDetail.id)}
                     embedded
                   />
                 </aside>

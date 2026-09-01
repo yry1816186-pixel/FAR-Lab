@@ -12,7 +12,8 @@ import {
   type Conversation, type RunEvent,
 } from './api.ts';
 import { ask, closeAsk } from './ask.ts';
-import { relTime, STAGE_ZH } from './narrative.ts';
+import { relTime, stageLabel } from './narrative.ts';
+import { resolveLang, type Lang } from './i18n.ts';
 import { decide, VOCAB_FOOTER } from './approveCore.ts';
 import * as chatCore from './chatCore.ts';
 import type { ChatRow } from './chatCore.ts';
@@ -21,6 +22,7 @@ import { readSeedFile } from './seedAttach.ts';
 const ACTIVE = new Set(['created', 'queued', 'running', 'paused']);
 const WATCH_TICK_MS = 2_000;
 const WATCH_MAX_MS = 10 * 60_000;
+const LANG: Lang = resolveLang();
 
 const rowText = (row: ChatRow): string => {
   switch (row.kind) {
@@ -79,7 +81,7 @@ const watchRun = async (runId: string): Promise<void> => {
     for (const e of events) {
       if (e.seq <= cursor || e.stage === undefined) continue;
       cursor = e.seq;
-      const line = `${STAGE_ICON_FOR(e.type)} ${STAGE_ZH[e.stage] ?? e.stage}${typeof e.detail?.summary === 'string' ? ` — ${String(e.detail.summary).slice(0, 60)}` : ''}`;
+      const line = `${STAGE_ICON_FOR(e.type)} ${stageLabel(String(e.stage), LANG)}${typeof e.detail?.summary === 'string' ? ` — ${String(e.detail.summary).slice(0, 60)}` : ''}`;
       if (seen.get(e.stage) !== line) { console.log(`  ${line}`); seen.set(e.stage, line); }
     }
     let status = '';
@@ -180,7 +182,7 @@ export async function runReadline(): Promise<void> {
         const idx = Number.parseInt(answer, 10);
         if (Number.isNaN(idx) || idx < 1 || idx > Math.min(runs.length, 30)) continue;
         const run = runs[idx - 1]!;
-        say(`\n${(run.questionText ?? run.id).slice(0, 100)} · ${run.status} · ${relTime(run.createdAt)}`);
+        say(`\n${(run.questionText ?? run.id).slice(0, 100)} · ${run.status} · ${relTime(run.createdAt, LANG)}`);
         await watchRun(run.id);
         await runActions(run.id);
         continue;
@@ -198,7 +200,7 @@ export async function runReadline(): Promise<void> {
           continue;
         }
         convs.slice(0, 30).forEach((c, i) => {
-          say(`${String(i + 1).padStart(2)}. ${c.title.slice(0, 70)} — ${chatCore.conversationMeta(c)} · ${relTime(c.updatedAt)}`);
+          say(`${String(i + 1).padStart(2)}. ${c.title.slice(0, 70)} — ${chatCore.conversationMeta(c)} · ${relTime(c.updatedAt, LANG)}`);
         });
         const answer = (await ask('输入编号打开对话（n 新建 · q 返回）: ')).trim().toLowerCase();
         if (answer === 'q') continue;

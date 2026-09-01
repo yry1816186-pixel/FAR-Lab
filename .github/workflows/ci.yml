@@ -231,15 +231,11 @@ jobs:
       - name: Run full Chromium E2E (offline deterministic route)
         if: matrix.scope == 'full'
         working-directory: web
-        env:
-          PLAYWRIGHT_CHANNEL: ''
-        run: npx playwright test --browser=chromium --workers=1 --fail-on-flaky-tests
+        run: npx playwright test --project=chromium --workers=1 --fail-on-flaky-tests
       - name: Run cross-engine core + optional-capability smoke
         if: matrix.scope == 'smoke'
         working-directory: web
-        env:
-          PLAYWRIGHT_CHANNEL: ''
-        run: npx playwright test e2e/core-journey.spec.ts e2e/optional-assets.spec.ts --browser=${{ matrix.browser }} --workers=1 --retries=0
+        run: npx playwright test e2e/core-journey.spec.ts e2e/optional-assets.spec.ts --project=${{ matrix.browser }} --workers=1 --retries=0
       - name: Upload browser failure evidence
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
