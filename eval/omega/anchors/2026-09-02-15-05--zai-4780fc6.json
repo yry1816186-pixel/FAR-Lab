@@ -1,0 +1,507 @@
+{
+  "schemaVersion": 1,
+  "harnessVersion": 1,
+  "leg": "CURRENT",
+  "pinnedAt": "2026-09-02T16:45:15.110Z",
+  "gitCommit": "4780fc63ba0817109cd340a5516bf8197ef66ce0",
+  "gitTag": "omega-baseline-w0",
+  "route": "zai",
+  "problemsFile": "eval/problems-ev1.json",
+  "cli": {
+    "path": "work/omega-baseline-w0/dist/cli/main.js",
+    "argv": [
+      "research",
+      "start",
+      "<q>",
+      "--domain",
+      "<d>",
+      "--goal",
+      "<g>",
+      "--route",
+      "zai",
+      "--json"
+    ]
+  },
+  "results": [
+    {
+      "problemId": "P1",
+      "ok": true,
+      "snapshot": {
+        "runId": "run_3egvfhjwgh4bzksvfxnf18gvdm",
+        "status": "completed",
+        "stages": [
+          {
+            "stage": "scope",
+            "state": "done"
+          },
+          {
+            "stage": "retrieve",
+            "state": "done"
+          },
+          {
+            "stage": "verify_sources",
+            "state": "done"
+          },
+          {
+            "stage": "build_evidence",
+            "state": "done"
+          },
+          {
+            "stage": "generate_hypotheses",
+            "state": "done"
+          },
+          {
+            "stage": "critique_falsify",
+            "state": "done"
+          },
+          {
+            "stage": "rank",
+            "state": "done"
+          },
+          {
+            "stage": "plan",
+            "state": "done"
+          },
+          {
+            "stage": "execute",
+            "state": "skipped",
+            "reason": "tabular: routed out by method selection; literature-pool: routed out by method selection; theory: The plan requires structured retrieval and synthesis of a 12-source literature evidence base (bootstrap CIs over attributed claims, phage-cluster evidence counts per source). No closed-form mathematical identity or bound is claimed that can be checked numerically on a grid; it needs literature evidence, not symbolic verification.; protocol: Every step in the plan is executed on the existing verified claim corpus: literature coding, bootstrap synthesis of published claim counts, decision-rule adjudication, and a negative-control recoding sensitivity check. All data requirements are either public (the claim corpus), uncertain (full texts), or explicitly unavailable, and no step requires wet-lab procedures, field sampling, human participants, physical experiments, or archive retrieval. The entire protocol is pure synthesis/pooling of published evidence and can be executed by the software layer without real-world work."
+          },
+          {
+            "stage": "feedback",
+            "state": "skipped"
+          },
+          {
+            "stage": "revise",
+            "state": "skipped"
+          },
+          {
+            "stage": "export",
+            "state": "done"
+          }
+        ],
+        "metrics": {
+          "source_total": 12,
+          "source_verification_rate": 1,
+          "claim_total": 29,
+          "claim_binding_rate": 1,
+          "counter_evidence_relations": 13,
+          "hypothesis_candidates": 12,
+          "hypothesis_representatives": 12,
+          "falsification_completeness_rate": 1,
+          "plan_present": true,
+          "receipts": 133,
+          "model_calls": 81,
+          "receipt_modes": {
+            "live": 133
+          },
+          "agent_reports": 0,
+          "debate_counter_findings": 0,
+          "debate_verdict_counts": {}
+        },
+        "modelVersions": []
+      },
+      "wallMs": 1322794
+    },
+    {
+      "problemId": "P2",
+      "ok": true,
+      "snapshot": {
+        "runId": "run_2twmn9312ad84knj5xg9x8b7ys",
+        "status": "completed",
+        "stages": [
+          {
+            "stage": "scope",
+            "state": "done"
+          },
+          {
+            "stage": "retrieve",
+            "state": "done"
+          },
+          {
+            "stage": "verify_sources",
+            "state": "done"
+          },
+          {
+            "stage": "build_evidence",
+            "state": "done"
+          },
+          {
+            "stage": "generate_hypotheses",
+            "state": "done"
+          },
+          {
+            "stage": "critique_falsify",
+            "state": "done"
+          },
+          {
+            "stage": "rank",
+            "state": "done"
+          },
+          {
+            "stage": "plan",
+            "state": "done"
+          },
+          {
+            "stage": "execute",
+            "state": "done"
+          },
+          {
+            "stage": "feedback",
+            "state": "skipped"
+          },
+          {
+            "stage": "revise",
+            "state": "skipped"
+          },
+          {
+            "stage": "export",
+            "state": "done"
+          }
+        ],
+        "metrics": {
+          "source_total": 12,
+          "source_verification_rate": 1,
+          "claim_total": 18,
+          "claim_binding_rate": 1,
+          "counter_evidence_relations": 7,
+          "hypothesis_candidates": 10,
+          "hypothesis_representatives": 10,
+          "falsification_completeness_rate": 1,
+          "plan_present": true,
+          "receipts": 113,
+          "model_calls": 71,
+          "receipt_modes": {
+            "live": 113
+          },
+          "agent_reports": 0,
+          "debate_counter_findings": 0,
+          "debate_verdict_counts": {}
+        },
+        "modelVersions": []
+      },
+      "wallMs": 1280776
+    },
+    {
+      "problemId": "P3",
+      "ok": true,
+      "snapshot": {
+        "runId": "run_y1jkyez1fh584ja6e386zak2xx",
+        "status": "completed",
+        "stages": [
+          {
+            "stage": "scope",
+            "state": "done"
+          },
+          {
+            "stage": "retrieve",
+            "state": "done"
+          },
+          {
+            "stage": "verify_sources",
+            "state": "done"
+          },
+          {
+            "stage": "build_evidence",
+            "state": "done"
+          },
+          {
+            "stage": "generate_hypotheses",
+            "state": "skipped",
+            "reason": "evidence flagged insufficient for the question's subject (run tag evidence-insufficient) — the verified claims do not measure or observe the question's central subject; refusing to generate hypotheses about an uncovered subject"
+          },
+          {
+            "stage": "critique_falsify",
+            "state": "skipped"
+          },
+          {
+            "stage": "rank",
+            "state": "skipped"
+          },
+          {
+            "stage": "plan",
+            "state": "skipped",
+            "reason": "no defensible hypotheses were produced from the verified evidence — an honest plan is impossible; inspect the evidence tab for what was (in)sufficient"
+          },
+          {
+            "stage": "execute",
+            "state": "skipped"
+          },
+          {
+            "stage": "feedback",
+            "state": "skipped"
+          },
+          {
+            "stage": "revise",
+            "state": "skipped"
+          },
+          {
+            "stage": "export",
+            "state": "done"
+          }
+        ],
+        "metrics": {
+          "source_total": 12,
+          "source_verification_rate": 1,
+          "claim_total": 22,
+          "claim_binding_rate": 1,
+          "counter_evidence_relations": 1,
+          "hypothesis_candidates": 0,
+          "hypothesis_representatives": 0,
+          "falsification_completeness_rate": null,
+          "plan_present": false,
+          "receipts": 53,
+          "model_calls": 16,
+          "receipt_modes": {
+            "live": 53
+          },
+          "agent_reports": 0,
+          "debate_counter_findings": 0,
+          "debate_verdict_counts": {}
+        },
+        "modelVersions": []
+      },
+      "wallMs": 184512
+    },
+    {
+      "problemId": "P4",
+      "ok": true,
+      "snapshot": {
+        "runId": "run_7c2a1sdhp028ddeqwzdknr5my1",
+        "status": "completed",
+        "stages": [
+          {
+            "stage": "scope",
+            "state": "done"
+          },
+          {
+            "stage": "retrieve",
+            "state": "done"
+          },
+          {
+            "stage": "verify_sources",
+            "state": "done"
+          },
+          {
+            "stage": "build_evidence",
+            "state": "done"
+          },
+          {
+            "stage": "generate_hypotheses",
+            "state": "done"
+          },
+          {
+            "stage": "critique_falsify",
+            "state": "done"
+          },
+          {
+            "stage": "rank",
+            "state": "done"
+          },
+          {
+            "stage": "plan",
+            "state": "done"
+          },
+          {
+            "stage": "execute",
+            "state": "skipped",
+            "reason": "tabular: routed out by method selection; literature-pool: The plan requires collecting new data: rodent fear-conditioning experiments with CA1 SPW-R recording and tissue collection, human intracranial/MEG recordings via data requests, and an unvalidated non-invasive ripple proxy. Discriminating between a molecular-gating and an SPW-R reactivation mechanism requires these primary datasets (e.g., molecular_blunt_ratio_R, hippocampal reactivation measures) rather than pooling published odds ratios, risk ratios, or standardized mean differences contrasting exposure and outcome; no literature-based effect-estimate pooling can adjudicate these two mechanisms.; theory: routed out by method selection; protocol: protocol drafting failed: model call failed (invalid_output) in execute/protocol-draft: zai: structured output rejected even after 3 corrective re-asks: schema validation failed: sampling.unitLabel:String m"
+          },
+          {
+            "stage": "feedback",
+            "state": "skipped"
+          },
+          {
+            "stage": "revise",
+            "state": "skipped"
+          },
+          {
+            "stage": "export",
+            "state": "done"
+          }
+        ],
+        "metrics": {
+          "source_total": 12,
+          "source_verification_rate": 1,
+          "claim_total": 35,
+          "claim_binding_rate": 1,
+          "counter_evidence_relations": 19,
+          "hypothesis_candidates": 12,
+          "hypothesis_representatives": 12,
+          "falsification_completeness_rate": 1,
+          "plan_present": true,
+          "receipts": 131,
+          "model_calls": 83,
+          "receipt_modes": {
+            "live": 131
+          },
+          "agent_reports": 0,
+          "debate_counter_findings": 0,
+          "debate_verdict_counts": {}
+        },
+        "modelVersions": []
+      },
+      "wallMs": 1812938
+    },
+    {
+      "problemId": "P5",
+      "ok": true,
+      "snapshot": {
+        "runId": "run_d1pktw06685z3vjt79v32v1jty",
+        "status": "completed",
+        "stages": [
+          {
+            "stage": "scope",
+            "state": "done"
+          },
+          {
+            "stage": "retrieve",
+            "state": "done"
+          },
+          {
+            "stage": "verify_sources",
+            "state": "done"
+          },
+          {
+            "stage": "build_evidence",
+            "state": "done"
+          },
+          {
+            "stage": "generate_hypotheses",
+            "state": "skipped",
+            "reason": "evidence flagged insufficient for the question's subject (run tag evidence-insufficient) — the verified claims do not measure or observe the question's central subject; refusing to generate hypotheses about an uncovered subject"
+          },
+          {
+            "stage": "critique_falsify",
+            "state": "skipped"
+          },
+          {
+            "stage": "rank",
+            "state": "skipped"
+          },
+          {
+            "stage": "plan",
+            "state": "skipped",
+            "reason": "no defensible hypotheses were produced from the verified evidence — an honest plan is impossible; inspect the evidence tab for what was (in)sufficient"
+          },
+          {
+            "stage": "execute",
+            "state": "skipped"
+          },
+          {
+            "stage": "feedback",
+            "state": "skipped"
+          },
+          {
+            "stage": "revise",
+            "state": "skipped"
+          },
+          {
+            "stage": "export",
+            "state": "done"
+          }
+        ],
+        "metrics": {
+          "source_total": 18,
+          "source_verification_rate": 0.6666666666666666,
+          "claim_total": 5,
+          "claim_binding_rate": 1,
+          "counter_evidence_relations": 0,
+          "hypothesis_candidates": 0,
+          "hypothesis_representatives": 0,
+          "falsification_completeness_rate": null,
+          "plan_present": false,
+          "receipts": 66,
+          "model_calls": 27,
+          "receipt_modes": {
+            "live": 66
+          },
+          "agent_reports": 0,
+          "debate_counter_findings": 0,
+          "debate_verdict_counts": {}
+        },
+        "modelVersions": []
+      },
+      "wallMs": 213334
+    },
+    {
+      "problemId": "P6",
+      "ok": true,
+      "snapshot": {
+        "runId": "run_zfwtcst297avzq1bx559xspzqj",
+        "status": "completed",
+        "stages": [
+          {
+            "stage": "scope",
+            "state": "done"
+          },
+          {
+            "stage": "retrieve",
+            "state": "done"
+          },
+          {
+            "stage": "verify_sources",
+            "state": "done"
+          },
+          {
+            "stage": "build_evidence",
+            "state": "done"
+          },
+          {
+            "stage": "generate_hypotheses",
+            "state": "done"
+          },
+          {
+            "stage": "critique_falsify",
+            "state": "done"
+          },
+          {
+            "stage": "rank",
+            "state": "done"
+          },
+          {
+            "stage": "plan",
+            "state": "done"
+          },
+          {
+            "stage": "execute",
+            "state": "done"
+          },
+          {
+            "stage": "feedback",
+            "state": "skipped"
+          },
+          {
+            "stage": "revise",
+            "state": "skipped"
+          },
+          {
+            "stage": "export",
+            "state": "done"
+          }
+        ],
+        "metrics": {
+          "source_total": 12,
+          "source_verification_rate": 1,
+          "claim_total": 27,
+          "claim_binding_rate": 1,
+          "counter_evidence_relations": 23,
+          "hypothesis_candidates": 12,
+          "hypothesis_representatives": 12,
+          "falsification_completeness_rate": 1,
+          "plan_present": true,
+          "receipts": 123,
+          "model_calls": 78,
+          "receipt_modes": {
+            "live": 123
+          },
+          "agent_reports": 0,
+          "debate_counter_findings": 0,
+          "debate_verdict_counts": {}
+        },
+        "modelVersions": []
+      },
+      "wallMs": 1165715
+    }
+  ]
+}
