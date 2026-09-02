@@ -22,7 +22,7 @@ This tool reads model-provider credentials from environment variables (or a loca
 | Threat | Mitigation |
 |---|---|
 | Committed `.env` leak | `.gitignore` patterns + secret-scan gate (exact-match synthetic allowlist, documented) |
-| Supply chain via dependencies | Zero runtime dependencies (see DEPENDENCY_POLICY.md); all tooling in devDependencies |
+| Supply chain via dependencies | Single runtime dependency (`zod`, schema validation only — see DEPENDENCY_POLICY.md); all tooling in devDependencies |
 | Path traversal / SSRF via identifiers | Source adapters encode URL path segments; artifact store validates sha256 refs; API validates request paths |
 | Prompt injection via retrieved literature | Per-request random-delimiter untrusted-data fence at the transport layer; structured-output zod contracts |
 | Local server exposure | Loopback bind by default; Host/Origin/Content-Type guards; 1MB body cap |

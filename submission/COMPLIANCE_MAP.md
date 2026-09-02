@@ -50,7 +50,7 @@ Scope: XH-202619 Track 1 → Direction 1 → A (科学假设生成与研究计�
 
 ## E. Acceptance coverage
 
-All 41 acceptance criteria (project-spec/ACCEPTANCE.md) map onto the above surfaces; current
+All 46 acceptance criteria (project-spec/ACCEPTANCE.md) map onto the above surfaces; current
 level-of-evidence gaps are listed ONLY in `submission/RELEASE_BLOCKERS.md` (single published
 gap list; dynamic detail in `.control/`). As of 2026-08-25: ACC-02 below target
 (BLOCKED-live, user credential), ACC-40 below target (evidence level, sibling lane owns the

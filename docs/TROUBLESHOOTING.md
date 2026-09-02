@@ -19,9 +19,10 @@ different (fresh) directory. Always use forward slashes in env-provided paths:
 
 **Provider API keys are not picked up.**
 Keys are read from `process.env` at call time and are never written to any file.
-`scripts/dev.mjs` injects a `.env` for the API subprocess; running the server
-another way requires exporting the vars yourself (`ZAI_API_KEY`,
-`DASHSCOPE_API_KEY`, ...). `far` reports missing var *names* only.
+The API server hydrates `.env` itself at boot (src/platform/dotenv.ts; disable
+with `FAR_DOTENV=off`); running the server another way requires exporting the
+vars yourself (`ZAI_API_KEY`, `DASHSCOPE_API_KEY`, ...). `far` reports missing
+var *names* only.
 
 **Model provider 529 / HTTP 1302 capacity windows stall a run.**
 These are external overload windows. The built-in mitigations are pacing envs
@@ -101,6 +102,6 @@ swap must land while locked, it is recorded in `submission/RELEASE_BLOCKERS.md`
 
 **Desktop build cannot find the sidecar / bundled assets.**
 Desktop bundles run from `desktop/`; the CI gate builds with `--locked` and
-asserts bundle formats via `scripts/assert-bundle-formats.mjs`. If assets are
+asserts bundle formats via `desktop/scripts/assert-bundle-formats.mjs`. If assets are
 missing at runtime, verify you are running the packaged app (not the dev tree)
 and that the release-pack manifest includes them.

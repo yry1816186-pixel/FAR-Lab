@@ -256,7 +256,7 @@ far-lab/
 │       └── i18n/             # Internationalization (zh/en dictionaries)
 ├── experiment-runtime/       # Python sidecar for experiment execution (uv-managed)
 ├── packages/tui/             # Optional interactive terminal UI (isolated Ink package; never a Node-core dependency)
-├── tests/                    # 120 test files (Vitest, forks pool)
+├── tests/                    # 240 test files (Vitest, forks pool)
 ├── eval/                     # Evaluation protocols & benchmark scripts
 ├── scripts/                  # Operational scripts (serve, health checks, export)
 ├── project-spec/             # Formal specification documents & policies
@@ -345,7 +345,7 @@ Test configuration:
 - **Runner:** Vitest 3+ with `forks` pool
 - **Timeouts:** 120s per test, 60s per hook
 - **Coverage:** `tests/**/*.test.ts`, `src/**/*.test.ts`
-- **Count:** 120 test files covering domain schemas, pipeline stages, providers, sources, agent kernel, memory, lineage, experiments, API endpoints, CLI commands, and regression guards
+- **Count:** 240 test files covering domain schemas, pipeline stages, providers, sources, agent kernel, memory, lineage, experiments, API endpoints, CLI commands, and regression guards
 
 ## License
 

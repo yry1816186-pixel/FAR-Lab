@@ -241,7 +241,7 @@ content = {
     "kicker": "XH-202619 · 基于国产开源大模型的 AI Scientist · Track 1 / Direction 1 / A",
     "hero": "FAR-Lab 研究工作台",
     "summary": "证据约束、可证伪、可修订的科学假设生成与研究计划设计系统：从研究问题出发，经真实文献检索、来源核验、主张-证据绑定、多假设对抗排序，到可执行研究计划、确定性实验判决与可复现导出的完整闭环。",
-    "meta": "技术方案文档 v2 · 2026 年 8 月 · 袁荣岳",
+    "meta": "技术方案文档 v4 · 2026 年 8 月 · 袁荣岳",
     "footer": "FAR-LAB · TECHNICAL PROPOSAL · S-1",
     "footer_left": "XH-202619 Track 1-A", "footer_right": "2026 年 8 月",
     "year": "2026", "word": "PROPOSAL",
