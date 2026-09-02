@@ -18,14 +18,20 @@ export function AwarenessBar({
   loading,
   selectedRunId,
   onSelect,
+  idleVisible = true,
 }: {
   activeRuns: RunSummary[];
   loading: boolean;
   selectedRunId: string | null;
   onSelect: (runId: string) => void;
+  /** Render the idle "no active research" line at all. Off the home surface
+   *  that sentence reads as a contradiction (SC4: a completed study page is
+   *  not "no research") — there the strip appears only when runs exist. */
+  idleVisible?: boolean;
 }): ReactNode {
   const { t } = useI18n();
   const others = activeRuns.filter((r) => r.id !== selectedRunId);
+  if (!loading && activeRuns.length === 0 && !idleVisible) return null;
   return (
     <div
       className="awareness-bar"

@@ -7,6 +7,7 @@ import { useI18n } from '../i18n/LanguageContext';
 import type { DictKey } from '../i18n/dict';
 import type { Conversation } from '../api/types';
 import { runLabel } from '../studies';
+import { ellipsize } from './text';
 import type { RunSummary } from '../api/types';
 import './lab.css';
 
@@ -120,7 +121,6 @@ export function AppRail({
         )}
         {!runsLoading && recentStudies.map((r) => {
             const label = runLabel(r);
-            const short = label.length > 38 ? `${label.slice(0, 38)}…` : label;
             return (
               <button
                 type="button"
@@ -130,7 +130,7 @@ export function AppRail({
                 title={label}
               >
                 <span className="rail-link-icon" aria-hidden="true"><FlaskConical size={13} /></span>
-                {!collapsed && <span className="rail-link-label">{short}</span>}
+                {!collapsed && <span className="rail-link-label">{ellipsize(label, 38)}</span>}
               </button>
             );
           })}
@@ -184,7 +184,7 @@ export function AppRail({
                   <span className="rail-link-icon" aria-hidden="true"><MessageSquare size={13} /></span>
                   {!collapsed && (
                     <span className="rail-link-label">
-                      {c.title.length > 30 ? `${c.title.slice(0, 30)}…` : c.title}
+                      {ellipsize(c.title, 30)}
                     </span>
                   )}
                 </button>

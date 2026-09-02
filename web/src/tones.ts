@@ -5,7 +5,10 @@ import type { CitationBindingStatus, LiteratureNoveltyVerdict, NoveltyLabel, Run
 
 export function runStatusTone(status: RunStatus): BadgeTone {
   switch (status) {
-    case 'completed': return 'ok';
+    // 'completed' is a SETTLED state, not a success signal (design-baseline
+    // study-W5/home-W10): an index of finished studies must not read as a
+    // wall of green — the scientific outcome lives on the verdict band.
+    case 'completed': return 'muted';
     case 'running': case 'queued': return 'info';
     case 'paused': case 'partial': return 'warn';
     case 'failed': return 'err';

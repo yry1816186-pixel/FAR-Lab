@@ -556,6 +556,24 @@ a:hover { text-decoration: underline; }
 .status-conn.is-offline { color: var(--v2-refuted-on-tint); font-weight: 600; }
 .status-conn.is-offline .status-dot { background: var(--v2-refuted); }
 .status-item { white-space: nowrap; color: var(--v2-text-2); }
+/* SC5: judgment count is an entry point, not telemetry — reads as a chip
+   action (same voice as the terminal buttons on the right). */
+.status-item--action {
+  border: none;
+  background: color-mix(in oklab, var(--v2-info) 10%, transparent);
+  color: var(--v2-info);
+  font-weight: 600;
+  padding: 1px 8px;
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+}
+.status-item--action:hover { background: color-mix(in oklab, var(--v2-info) 20%, transparent); }
+.status-item--action:focus-visible { outline: 2px solid var(--v2-info); outline-offset: 1px; }
 .status-btn {
   display: inline-flex;
   align-items: center;
@@ -2689,3 +2707,17 @@ select option { color: var(--text); background: var(--surface); }
 
 /* Dataset raw drilldown preview */
 .exp-dp-raw { max-height: 260px; overflow: auto; background: var(--v2-surface); border: 1px solid var(--v2-border); border-radius: 8px; padding: 10px 12px; margin: 6px 0 0; white-space: pre; }
+
+/* Touch-target floor (design-baseline new-W1/W2), deliberately at file end:
+   .btn--small's min-height:24 sits mid-file — an earlier media block lost the
+   equal-specificity cascade to it (caught in after2 review). 40px hit height,
+   same visual density (padding grows into whitespace, icons stay 12px). */
+@media (max-width: 560px) {
+  .app-header { row-gap: 4px; }
+  .app-header-right { gap: 6px; }
+  .palette-toggle { min-height: 40px; min-width: 40px; justify-content: center; }
+  .theme-toggle--icon { min-height: 40px; min-width: 40px; }
+  .lang-toggle { flex: 1 1 100%; display: flex; }
+  .lang-btn { flex: 1; min-height: 40px; }
+  .status-bar { font-size: 12px; height: 30px; }
+}
