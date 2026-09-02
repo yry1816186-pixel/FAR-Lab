@@ -842,10 +842,10 @@
       "id": "FA-EVAL-02",
       "domain": "evaluation",
       "title": "User-study protocol + instrumentation developed (execution BLOCKED_EXTERNAL)",
-      "status": "FAIL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "self",
-      "gap": "zero SUS/task-success/time-to-insight instrumentation, zero recruitment materials; real-participant execution stays external",
+      "gap": "CLOSED at the designed scope 2026-09-02: eval/user-study/PROTOCOL.md (preregistered: RQs, n>=3 within-subject fixed-order A→C journeys, objective per-journey completion criteria, primary endpoints SUS>=68 + >=2/3 journeys, analysis plan with negative-result parity, preregistered limitations, deviation discipline), MATERIALS.md (zh/en recruitment script, consent form, task cards mapped verbatim to the completion criteria, standard 10-item SUS zh/en + raw NASA-TLX + per-journey Likert, frozen orientation script, session checklist skeleton), INSTRUMENTATION.md (every measure mapped to existing durable artifacts — no telemetry theater). EXECUTION remains BLOCKED_EXTERNAL by design: participants are user-owned (co-schedulable with the FA-X-02 acceptance drive).",
       "target": "protocol+materials+instrumentation in repo; n>=3 execution marked BLOCKED_EXTERNAL",
       "verify": "docs + instrumented flows",
       "evidence": [
@@ -1031,6 +1031,6 @@
   ],
   "stopConditions": {
     "note": "Mission stop requires ALL of: no internal FAIL/PARTIAL; canonical clean-clone CI green; science north-star met or externally justified; real evidence across all planes; 24h→72h soak+chaos; win/mac/linux matrix; sandbox attack suite; production-path-only flows; clean-machine bundle verify; honest BLOCKED_EXTERNAL only; docs==commit; final red-team audit no new P0/P1.",
-    "currentVerdict": "NOT READY — 9 FAIL, 24 PARTIAL, 31 PASS, 2 BLOCKED_EXTERNAL (66 tracked). Closed this wave: FA-SEC-01 (hosted ubuntu OCI evidence on canonical main 0da4c68, run 33583828122), FA-PLT-01/02 (canonical main CI fully green incl. chromium-full e2e and the windows/firefox/webkit matrix), FA-REM-01, FA-SEC-04, FA-SEC-08, FA-HAR-01, FA-HCI-04, FA-DAT-03 (decision record), FA-EVAL-04 (live CI/science tracking), FA-SEC-12 (web jszip bomb budget). Still open: hosted OIDC/release evidence, scientific targets (4 metrics), 6h+ soak (running), streaming data plane, evaluation-wave items, five-table sweep (in progress via parallel review), and B-QWEN (user-owned 09-05). The exhaustive five-table review and shallow-assertion adjudication remain the large PARTIAL blocks."
+    "currentVerdict": "NOT READY — 8 FAIL, 23 PARTIAL, 32 PASS, 2 BLOCKED_EXTERNAL (66 tracked). Closed this wave: FA-SEC-01 (hosted ubuntu OCI evidence on canonical main 0da4c68, run 33583828122), FA-PLT-01/02 (canonical main CI fully green incl. chromium-full e2e and the windows/firefox/webkit matrix), FA-REM-01, FA-SEC-04, FA-SEC-08, FA-HAR-01, FA-HCI-04, FA-DAT-03 (decision record), FA-EVAL-02 (preregistered user-study protocol+materials+instrumentation; execution BLOCKED_EXTERNAL by design), FA-EVAL-04 (live CI/science tracking), FA-SEC-12 (web jszip bomb budget). Still open: hosted OIDC/release evidence, scientific targets (4 metrics), 6h+ soak (running), streaming data plane, evaluation-wave re-measurement, five-table sweep (in progress via parallel review), and B-QWEN (user-owned 09-05). The exhaustive five-table review and shallow-assertion adjudication remain the large PARTIAL blocks."
   }
 }

@@ -5,7 +5,7 @@
 
 ## 总判（2026-09-02 晚：canonical main 0da4c68 全绿，SEC-01/PLT-01/02 等八项闭账）
 
-当前 66 项终局标准为 29 PASS / 26 PARTIAL / 9 FAIL / 2
+当前 66 项终局标准为 32 PASS / 23 PARTIAL / 8 FAIL / 2
 BLOCKED_EXTERNAL。Wave 0 的五项实现标准已经集成并通过全门禁；Wave A 已在
 独立车道关闭 loaded-shell CLS 的本地根因，并完成多运行时公开源码包、三生态
 SBOM 与确定性归档的本地真跑，但 canonical hosted 绿、OIDC attestation 和
@@ -66,6 +66,7 @@ outbox/lease/DLQ/原子落地/错误分类（faults.json 10 案全绿）；事�
 | 9 | clean machine bundle verify | ✓（far verify 16 checks，四 bundle 11/11） |
 | 10 | BLOCKED_EXTERNAL 诚实 | ✓（B-QWEN/S-1 如实登记） |
 | 11 | 文档与 commit 一致 | ✓（0.061 旧数已修；ACC-25 措辞已闭 2026-09-02） |
+
 | 12 | 终局红队无新 P0/P1 | ✗（本轮审计即产出新 P0） |
 
 ## 修复纪律
