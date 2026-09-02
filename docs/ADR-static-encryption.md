@@ -9,14 +9,14 @@ FAR-Lab's on-disk static surface consists of:
 
 | surface | content | sensitivity |
 | --- | --- | --- |
-| `far.db` (SQLite, better-sqlite3 stock build) | runs, events, objects, memory, lineage, receipts | scientific record — the product |
+| `far.db` (SQLite via the stdlib `node:sqlite` engine, D-011) | runs, events, objects, memory, lineage, receipts | scientific record — the product |
 | `far-scheduler.db` | experiment job queue | operational |
 | `source-cache.db` | retrieval response cache | QoS only |
 | artifact store | content-addressed files (sources, reports, bundles, datasets) | scientific record |
 | backup sets (`far backup`) | `VACUUM INTO` snapshots + manifest, same plaintext as the originals | scientific record |
 | provider credentials | **never written to disk** — resolved from `process.env` at call time (see `src/platform/dotenv.ts`, `src/providers/*`); `far` prints only which env var names are missing, never values | highest |
 
-Deployment model: a single-researcher local workstation (Windows/macOS/Linux), occasionally a shared lab machine. The database engine is stock `better-sqlite3`; enabling SQLCipher would require a custom compiled build on all three platforms, diverging from the npm lockfile everyone installs.
+Deployment model: a single-researcher local workstation (Windows/macOS/Linux), occasionally a shared lab machine. The database engine is the Node stdlib `node:sqlite` (better-sqlite3 is only a documented drop-in fallback, not the engine); enabling SQLCipher would mean leaving the stdlib engine for a custom compiled dependency on all three platforms, diverging from `npm ci` for everyone.
 
 ## Decision
 
@@ -25,7 +25,7 @@ Deployment model: a single-researcher local workstation (Windows/macOS/Linux), o
 Rationale:
 
 1. **Key management would be theater.** A local app that encrypts its own database must store the key on the same machine (or behind a password prompt per launch). On a single-user workstation the OS already gates disk access with the same authentication boundary; an app-layer key adds no adversary it can actually stop.
-2. **Engine-level encryption breaks the deterministic supply chain.** better-sqlite3 with SQLCipher means a custom build matrix on three OSes for every CI job and every contributor, replacing `npm ci` reproducibility — the exact property the license/SBOM and clean-clone gates exist to protect.
+2. **Engine-level encryption breaks the deterministic supply chain.** The stdlib `node:sqlite` engine with SQLCipher means a custom build matrix on three OSes for every CI job and every contributor, replacing `npm ci` reproducibility — the exact property the license/SBOM and clean-clone gates exist to protect.
 3. **Field-level encryption destroys queryability.** Encrypting columns would break FTS, `EXPLAIN`-audited indexes, and the verbatim-binding guarantees the verify chain depends on.
 
 What we keep doing instead:

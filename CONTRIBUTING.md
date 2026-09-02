@@ -53,8 +53,10 @@ docs/TROUBLESHOOTING.md for the Windows-specific traps (docker OSType, stale
 
 ## Workflow
 
-1. Branch per lane from `main` (`lane/<topic>`), rebase onto `main` before
-   merge, fast-forward merge — one squash-topic per lane, no merge commits.
+1. Branch per lane from `main` (`lane/<topic>`); integrate via pull request
+   (direct commits to `main` are hook-rejected; the repo ruleset gates merges on
+   CI). Keep one squash-topic per lane; merge commits happen only at the PR
+   boundary, never on the lane itself.
 2. One commit does one thing; subject ≤ 72 chars, `type(scope): subject`
    (`feat` / `fix` / `refactor` / `docs` / `test` / `chore` / `perf` / `ci`).
 3. Shared worktree discipline: if another session is active on the same tree,
