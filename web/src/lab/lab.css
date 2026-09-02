@@ -193,6 +193,8 @@
   font-size: 11px; color: var(--v2-text-3); line-height: 1.4;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+/* Retraction/correction flag (prepended so it survives the ellipsis). */
+.map-src-flag { color: var(--v2-caution-on-tint); font-weight: 600; }
 .map-claim-text {
   font-size: 13px;
   line-height: 1.5;
@@ -255,6 +257,13 @@
   padding: 20px 22px;
   overflow-y: auto;
 }
+/* The inspector PUSHES the map instead of covering it (review 2026-09-02):
+   overlay mode cut claim text mid-word at the drawer's edge. Narrow viewports
+   stay overlay — 460px leaves no map to push. */
+.lab-root.is-inspector-open { padding-right: min(462px, 46vw); }
+@media (max-width: 900px) {
+  .lab-root.is-inspector-open { padding-right: 0; }
+}
 .lab-inspector h3 { margin: 0 0 4px; font-size: 12px; color: var(--v2-text-3); letter-spacing: 0.08em; font-weight: 600; }
 .lab-inspector .insp-body { font-size: 13.5px; line-height: 1.6; margin: 10px 0 14px; white-space: pre-wrap; }
 .lab-inspector .insp-quote {
@@ -283,7 +292,7 @@
 
 /* ---------- shared queue rows (workspace layer + judgment items) ---------- */
 .queue-canvas { max-width: 880px; margin: 0 auto; padding: 26px 28px 120px; }
-.queue-section { margin-bottom: 34px; min-height: 168px; } /* reserved footprint: late data must not shift the page (perf CLS) */
+.queue-section { margin-bottom: 34px; min-height: 132px; } /* reserved footprint: late data must not shift the page (perf CLS); fits header + 2 rows */
 .queue-section-title { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
 .queue-section-sub { font-size: 12px; color: var(--v2-text-3); margin-bottom: 12px; }
 .queue-item {
@@ -317,6 +326,45 @@
   text-decoration: none;
 }
 .queue-item .q-act:hover { background: var(--v2-info-tint); }
+/* Home-W4: judgment rows carry a severity bar on the card's left edge — the
+   8px dot was too weak to separate "needs me" from the neutral index below. */
+.queue-item { position: relative; }
+.queue-item.sev-live::before,
+.queue-item.sev-attention::before,
+.queue-item.sev-review::before {
+  content: ''; position: absolute; left: 0; top: 9px; bottom: 9px;
+  width: 3px; border-radius: 2px;
+}
+.queue-item.sev-live::before { background: var(--v2-info); }
+.queue-item.sev-attention::before { background: var(--v2-caution); }
+.queue-item.sev-review::before { background: color-mix(in oklab, var(--v2-caution) 45%, var(--v2-border)); }
+/* One severity, one encoder: judgment rows carry the left bar, so their dot
+   column collapses (the index below keeps its dot — it has no bar). */
+.queue-item.sev-live,
+.queue-item.sev-attention,
+.queue-item.sev-review { grid-template-columns: 1fr auto; }
+.queue-item.sev-live .q-dot,
+.queue-item.sev-attention .q-dot,
+.queue-item.sev-review .q-dot { display: none; }
+/* Index rows: clamp the question at three lines so one long title cannot
+   dwarf its neighbors (review 2026-09-02 defect 11). */
+.queue-item--study .q-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+/* Home-W4: the action chip carries its queue severity — a judgment row's
+   next step reads differently from the index's neutral 打开地图. */
+.queue-item.sev-attention .q-act {
+  color: var(--v2-caution-on-tint);
+  border-color: color-mix(in oklab, var(--v2-caution) 45%, transparent);
+}
+.queue-item.sev-attention .q-act:hover { background: var(--v2-caution-tint); }
+.queue-item.sev-review .q-act {
+  color: var(--v2-info-on-tint);
+  border-color: color-mix(in oklab, var(--v2-info) 45%, transparent);
+}
 
 /* ================= production architecture (2026-08-27) ================= */
 /* Header / toline extensions */
@@ -414,6 +462,17 @@
 }
 .fu-start:hover { filter: brightness(1.08); }
 .fu-note { font-size: 12px; color: var(--v2-text-3); margin-top: 12px; line-height: 1.6; }
+
+/* HC1: returning researcher sees the judgment queue FIRST (their open
+   decisions outrank starting something new). Visual order only — the DOM
+   keeps compose in place so NewResearch never remounts (a JSX reorder would
+   drop the typed question, attached materials and any in-flight parse). */
+.firstuse-body { display: flex; flex-direction: column; }
+.fu-slot--compose { order: 1; }
+.fu-slot--queue { order: 2; }
+.fu-slot--rest { order: 3; }
+.firstuse-body.is-queue-first .fu-slot--queue { order: 0; }
+.firstuse-body.is-queue-first .fu-slot--compose .nr-embed { margin-top: 4px; }
 
 /* Live / partial / failed narrative bands */
 .map-band {
@@ -712,7 +771,7 @@
 .nr-embed { margin-bottom: 30px; }
 .nr-embed-head { margin-bottom: 10px; }
 .nr-embed-title { margin: 0 0 4px; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; color: var(--v2-text-1); }
-.nr-embed-sub { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--v2-text-2); max-width: 68ch; }
+.nr-embed-sub { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--v2-text-2); max-width: 68ch; text-wrap: balance; }
 .nr-card--embed { padding: 16px 18px; gap: 10px; }
 .nr-quick { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
 .nr-embed-acts { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -735,6 +794,18 @@
   .scope-editor-grid { grid-template-columns: 1fr; }
   .scope-editor-field--wide { grid-column: auto; }
   .scope-editor-summary { align-items: flex-start; flex-direction: column; gap: 2px; }
+  /* The launch decision owns the row on phones (design-baseline new-W5):
+     route select stacks above, the primary CTA runs full width. */
+  .nr-launch-row { flex-direction: column; align-items: stretch; }
+  .nr-launch-row .nr-submit,
+  .nr-launch-row .nr-secondary { width: 100%; padding: 12px 24px; }
+  .nr-route { min-width: 0; }
+  .nr-embed-acts .nr-submit { flex: 1 1 100%; padding: 12px 24px; }
+  .nr-embed-acts .nr-secondary { flex: 1 1 auto; }
+  /* Tool row reaches touch height (new-W4); body text keeps a 12px floor
+     (new-W3) — the desktop 11.5px aux voice is unreadable on phones. */
+  .nr-tool { min-height: 40px; padding: 10px 14px; }
+  .nr-tools-hint, .nr-side-note, .nr-side-steps { font-size: 12px; }
 }
 
 /* First-use route readiness detail (P2): which routes, per-route mark */
@@ -803,6 +874,8 @@
 .insp-source .insp-quote { margin: 0; }
 .insp-source-meta { margin: 4px 0 0; font-size: 11.5px; color: var(--v2-text-3); line-height: 1.5; }
 .insp-source-meta a { color: var(--v2-info); }
+/* A DOI is one identifier — never break it mid-token (review 2026-09-02). */
+.insp-source-meta a { white-space: nowrap; word-break: keep-all; }
 .insp-source-title { color: var(--v2-text-2); }
 .ss-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px 18px; }
 .ss-k { font-size: 11px; letter-spacing: 0.07em; color: var(--v2-text-3); margin-bottom: 3px; }
@@ -893,8 +966,9 @@
 
 /* ---- Study map: embedded evidence–hypothesis structure (B7 landscape on the spine) ---- */
 .map-graph-frame {
-  max-height: min(70vh, 640px);
-  overflow-y: auto;
+  /* SC3 root fix: no nested scroll. A max-height clip here silently hid the
+     bottom rows behind an 8px scrollbar with no affordance; the page owns
+     scrolling and the 40-node cap bounds the worst case. */
   border: 1px solid var(--v2-border);
   border-radius: var(--radius-m);
   background: var(--v2-surface);
@@ -1014,8 +1088,8 @@
 .qw-chip {
   display: inline-flex; align-items: center; gap: 5px;
   padding: 5px 12px; font-size: 12px; font-family: inherit;
-  color: var(--v2-text-2); background: var(--v2-surface-2);
-  border: 1px solid var(--v2-border); border-radius: 999px; cursor: pointer;
+  color: var(--v2-text-1); background: var(--v2-surface);
+  border: 1px solid var(--v2-form-border, var(--v2-border)); border-radius: 999px; cursor: pointer;
 }
 .qw-chip:hover { color: var(--v2-info-on-tint); border-color: color-mix(in oklab, var(--v2-info) 40%, var(--v2-border)); background: var(--v2-info-tint); }
 .qw-chip:focus-visible { outline: 2px solid var(--v2-info); outline-offset: 1px; }

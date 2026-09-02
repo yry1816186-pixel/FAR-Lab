@@ -744,6 +744,7 @@ export function App(): JSX.Element {
         loading={runsLoading}
         selectedRunId={selectedRunId}
         onSelect={selectStudy}
+        idleVisible={railSurface === 'home'}
       />
 
       <div className="app-body app-body--noshell">
@@ -901,7 +902,22 @@ export function App(): JSX.Element {
             {online ? t('conn.online') : t('conn.offline')}
           </span>
           {activeRuns.length > 0 && <span className="status-item">{t('statusbar.running', { n: activeRuns.length })}</span>}
-          {judgmentCount > 0 && <span className="status-item">{t('statusbar.judgment', { n: judgmentCount })}</span>}
+          {judgmentCount > 0 && (
+            /* SC5: the pending-judgment count is an ACTION, not telemetry —
+               the chip jumps to the workspace queue instead of sitting inert
+               in the bottom bar. */
+            <button
+              type="button"
+              className="status-item status-item--action"
+              onClick={() => {
+                openHome();
+                window.setTimeout(() => document.getElementById('labq-judgment')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
+              }}
+              title={t('statusbar.judgmentHint')}
+            >
+              {t('statusbar.judgment', { n: judgmentCount })}
+            </button>
+          )}
         </div>
         <div className="status-group status-group--right">
           <button
@@ -912,7 +928,9 @@ export function App(): JSX.Element {
             title={t('panel.toggleHint')}
           >
             <TerminalSquare size={11} aria-hidden="true" />
-            {t('statusbar.terminal', { n: terminalAlive })}
+            {/* Zero-session noise guard (design-baseline home-W10): "(0)" next
+                to a terminal nobody opened reads as a broken counter. */}
+            {terminalAlive > 0 ? t('statusbar.terminal', { n: terminalAlive }) : t('statusbar.terminalIdle')}
           </button>
           <button
             type="button"

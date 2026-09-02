@@ -21,6 +21,7 @@ export * from './ach.js';
 export * from './prediction.js';
 export * from './meta.js';
 export * from './theory.js';
+export * from './ode.js';
 export * from './fem.js';
 export * from './paper-outline.js';
 export * from './conversation.js';

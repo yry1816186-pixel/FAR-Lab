@@ -20,6 +20,7 @@ import { ClaimInspector } from './ClaimInspector';
 import { ProtocolPanel } from './ProtocolPanel';
 import { getProtocolState, type ProtocolStateView } from '../api/protocol';
 import { zhFirst, markerZh, dimensionLabel, decodeEntities } from './bilingual';
+import { ellipsize } from './text';
 import { useRunTruth } from '../components/detail/ResearchStatePanel';
 import { ScopeReview } from './ScopeReview';
 import { runLabel, type StudyGroup } from '../studies';
@@ -45,14 +46,6 @@ type Insp =
   | { kind: 'hyp'; hypId: string; rank: number };
 
 const LIVE_REFETCH_MS = 4_000;
-
-/** Word-boundary ellipsis — a study title cut mid-word ("…increas") reads as broken, not shortened. */
-const ellipsize = (text: string, max: number): string => {
-  if (text.length <= max) return text;
-  const cut = text.slice(0, max);
-  const lastSpace = cut.lastIndexOf(' ');
-  return `${(lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`;
-};
 
 /** Audit strings embed "(archived full object: sha256:…)"; the hash belongs in a tooltip, not the visible line. */
 const stripArchiveHash = (s: string): string => s.replace(/\s*\(archived full object: sha256:[0-9a-f]+…?\)/g, '');
@@ -351,7 +344,7 @@ export function StudyMap({
   const elapsedMin = Math.max(0, Math.round((Date.now() - Date.parse(run.createdAt)) / 60_000));
 
   return (
-    <div className="lab-root">
+    <div className={`lab-root${insp !== null ? ' is-inspector-open' : ''}`}>
       <header className="lab-topline">
         <a className="lab-crumb" href="#/">{t('map.backHome')}</a>
         <span className="lab-title">{t('map.title')}</span>
@@ -379,14 +372,20 @@ export function StudyMap({
             <optgroup label={t('map.thisStudy')}>
               {siblingStudies.own.runs.slice(0, 12).map((r) => (
                 <option key={r.id} value={r.id}>
-                  {`${t(runStatusKey(r.status))} · ${ellipsize(runLabel(r), 48)}${r.id === run.id ? t('map.currentMark') : ''}`}
+                  {r.id === run.id
+                    /* The closed control shows question + (当前) only — the
+                       topline badge already states this run's status, and the
+                       prefixed form truncated the date in the compact width
+                       (review 2026-09-02). */
+                    ? `${ellipsize(runLabel(r), 40)}${t('map.currentMark')}`
+                    : `${t(runStatusKey(r.status))} · ${ellipsize(runLabel(r), 40)} · ${r.createdAt.slice(5, 10)}`}
                 </option>
               ))}
             </optgroup>
           )}
           <optgroup label={t('map.otherStudies')}>
             {siblingStudies.others.slice(0, 24).map((g) => (
-              <option key={g.key} value={g.latest.id}>{ellipsize(runLabel(g.latest), 60)}</option>
+              <option key={g.key} value={g.latest.id}>{`${ellipsize(runLabel(g.latest), 56)} · ${g.latest.createdAt.slice(5, 10)}`}</option>
             ))}
           </optgroup>
         </select>
@@ -454,7 +453,8 @@ export function StudyMap({
           <div className="map-scope-row" style={{ marginTop: 10 }}>
             <span className="map-chip">{question?.scope.domain ?? run.domain ?? t('map.domainPending')}</span>
             {(question?.scope.phenomena ?? []).slice(0, 3).map((p) => <span key={p} className="map-chip">{p}</span>)}
-            <span className="map-chip">{t('map.chipCounts', { claims: claims.length, hyps: activeHyps.length })}</span>
+            {/* W9: claim/hypothesis counts live where the objects are (the
+                graph legend and the bands below) — one truth, not three. */}
           </div>
         </section>
 
@@ -543,9 +543,15 @@ export function StudyMap({
                         {excluded ? '⊘' : pinned ? '◆' : bal.counters > 0 ? '✗' : bal.supports > 0 ? '✓' : '–'}
                       </span>
                       <span className="map-claim-main">
-                        <span className="map-claim-text">{c.text}</span>
+                        <span className="map-claim-text" title={c.text}>{c.text}</span>
                         {src !== undefined && (
                           <span className="map-claim-src">
+                            {/* Retraction outranks the title (review 2026-09-02):
+                                a retracted source changes the claim's weight —
+                                the mark must survive truncation. */}
+                            {src.verification?.retractionStatus !== undefined && (
+                              <span className="map-src-flag">⚠ {t(`library.retraction.${src.verification.retractionStatus}` as DictKey)} · </span>
+                            )}
                             {decodeEntities(src.title)}
                             {c.locators.length > 1 && ` +${c.locators.length - 1}`}
                             {src.publicationYear !== undefined && ` · ${src.publicationYear}`}

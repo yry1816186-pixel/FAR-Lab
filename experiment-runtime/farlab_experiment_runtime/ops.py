@@ -13,6 +13,7 @@ from . import builders
 from .exploration import op_run_exploration
 from .netcdf import op_netcdf_profile, op_netcdf_extract_features
 from .fem import op_fem_poisson_2d, op_fem_poisson_2d_adaptive
+from .ode import op_ode_integrate
 
 CLASSIFICATION_METRICS = ("accuracy", "balanced_accuracy", "f1_macro", "roc_auc", "log_loss")
 REGRESSION_METRICS = ("mean_squared_error", "r2")
@@ -489,6 +490,8 @@ OPS = {
     # AOSSA scientific data plane: NetCDF profiling + record-time QC.
     "netcdf_profile": op_netcdf_profile,
     "netcdf_extract_features": op_netcdf_extract_features,
+    # Wave B: preregistered ODE integration against a closed-form solution.
+    "ode_integrate": op_ode_integrate,
 }
 
 

@@ -1,4 +1,7 @@
 import { SourceAdapterError } from './error.js';
+import { assertFetchDestination } from '../shared/destination-guard.js';
+
+export { assertFetchDestination };
 
 /**
  * Structural fetch contract — the real global fetch satisfies it, tests inject fakes.
@@ -42,39 +45,12 @@ export interface HttpGetResult {
 
 export const DEFAULT_TIMEOUT_MS = 30_000;
 
-const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
-
 /**
- * Egress destination guard (endgame audit, security W: no network-layer
- * allowlist existed — an injected tool or redirect pivot could probe internal
- * ranges through the scholarly-fetch chokepoint). Static layer, applied to
- * every hop including manual redirect follows:
- * - https only (loopback exempt, for local dev/test surfaces);
- * - no public IP-literal hosts (cloud metadata / RFC1918 probes must not be
- *   fetchable by address).
- * Honest limit: a DNS NAME that privately resolves cannot be seen statically;
- * the deny-by-default egress allowlist for the process boundary is tracked as
- * a separate work item (see FINAL_ACCEPTANCE FA-SEC-04).
+ * Egress destination guard for the scholarly-fetch chokepoint: the shared
+ * policy owner is src/shared/destination-guard.ts (one invariant, one owner —
+ * the providers and MCP boundaries apply the identical rule). Every hop
+ * including manual redirect follows passes through it.
  */
-export const assertFetchDestination = (url: string): void => {
-  let u: URL;
-  try {
-    u = new URL(url);
-  } catch {
-    throw new Error(`destination guard: not a valid absolute URL: ${url}`);
-  }
-  const host = u.hostname.toLowerCase();
-  if (LOOPBACK_HOSTS.has(host)) return;
-  if (u.protocol !== 'https:') {
-    throw new Error(`destination guard: non-https scheme to a public host is not allowed (${u.protocol}//${host})`);
-  }
-  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
-    throw new Error(`destination guard: IPv4-literal hosts are not allowed (${host})`);
-  }
-  if (host.includes(':')) {
-    throw new Error(`destination guard: IPv6-literal hosts are not allowed (${host})`);
-  }
-};
 
 /**
  * Single GET with abort timeout. No built-in retry — retry budgets are owned by the

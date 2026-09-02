@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import type { Store } from '../persistence/store.js';
 import type { ArtifactStore } from '../shared/ports.js';
+import { assertFetchDestination } from '../shared/destination-guard.js';
 import type { DatasetRecord, DatasetSource, DatasetUse, RunId } from '../domain/index.js';
 import { parseCsv, type ParsedCsv } from './csv.js';
 
@@ -48,6 +49,9 @@ const fetchOpenmlMeta = async (openmlId: number): Promise<OpenmlMeta> => {
 
 /** Download the official ARFF file and convert to canonical CSV (TS owns data identity, sidecar eats CSV). */
 const fetchOpenmlArff = async (meta: OpenmlMeta): Promise<string> => {
+  // Egress guard (FA-SEC-04): the download URL is UPSTREAM-CONTROLLED (returned by
+  // the OpenML API response) — the same destination-pivot class as a redirect.
+  assertFetchDestination(meta.url);
   const res = await fetch(meta.url, { signal: AbortSignal.timeout(120_000) });
   if (!res.ok) throw new Error(`openml arff fetch failed: ${res.status} ${res.statusText} (${meta.url})`);
   const text = await res.text();

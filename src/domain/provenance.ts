@@ -83,6 +83,28 @@ export const ProvenanceReceipt = z.object({
   toolExec: z.object({
     tool: z.string(), inputHash: z.string().length(64), outputHash: z.string().length(64),
     exitCode: z.number().int().optional(), durationMs: z.number().int().nonnegative().optional(),
+    /** OS-enforced sandbox facts captured before untrusted tool execution. */
+    sandbox: z.object({
+      backend: z.literal('docker-linux'),
+      imageRef: z.string().min(1),
+      imageId: z.string().regex(/^sha256:[0-9a-f]{64}$/),
+      policyHash: z.string().length(64),
+      attestationHash: z.string().length(64),
+      policyVersion: z.number().int().positive(),
+      uid: z.number().int().positive(),
+      gid: z.number().int().positive(),
+      noNewPrivs: z.literal(true),
+      seccompMode: z.number().int().min(1),
+      capEff: z.literal('0000000000000000'),
+      rootfsReadOnly: z.literal(true),
+      tmpWritable: z.literal(true),
+      networkDisabled: z.literal(true),
+      cgroup: z.object({
+        memoryMaxBytes: z.number().int().positive(),
+        pidsMax: z.number().int().positive(),
+        cpuMax: z.string().min(1),
+      }),
+    }).optional(),
   }).optional(),
   stage: z.string().optional(),
   codeRevision: z.string().optional(),   // git commit at execution time

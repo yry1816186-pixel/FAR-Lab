@@ -294,6 +294,27 @@ describe('dashscope transport shell (mock fetch) — the OpenAI-compat core suit
     expect(body.tool_choice).toEqual({ type: 'function', function: { name: 'respond' } });
   });
 
+  it('untrusted-data fence delimiter is crypto-random: hex shape, unique per request (FA-SEC-08)', async () => {
+    const fences: string[] = [];
+    for (let i = 0; i < 2; i += 1) {
+      const { fetchImpl, calls } = recorderFetch([() => Promise.resolve(httpError(401, { error: { message: 'fixture' } }))]);
+      await runOpenAICompatStructuredCall(
+        { providerName: 'fence-entropy-test', baseUrl: 'https://unit.test/v1', apiKey: 'test-fixture-key-fence', modelId: 'm', executionMode: 'test' },
+        REQ,
+        parseHypothesis,
+        { fetchImpl, sleep: () => Promise.resolve() },
+      );
+      const content = lastUserContent(calls[0]!);
+      const matches = [...content.matchAll(/<<FARLAB-UNTRUSTED-DATA-[0-9a-f]+>>/g)].map((m) => m[0]);
+      // instruction mention + open + close markers, all identical within one request
+      expect(matches).toHaveLength(3);
+      expect(new Set(matches).size).toBe(1);
+      expect(matches[0]).toMatch(/^<<FARLAB-UNTRUSTED-DATA-[0-9a-f]{12}>>$/);
+      fences.push(matches[0]!);
+    }
+    expect(fences[0]).not.toBe(fences[1]);
+  });
+
   it('wire-level cancel: a PRE-aborted signal fails immediately, non-retryably, without dispatching', async () => {
     const controller = new AbortController();
     controller.abort();
@@ -674,6 +695,31 @@ describe('transport failure classification and retry budget', () => {
     } finally {
       if (prev === undefined) delete process.env.FARLAB_MIN_CALL_INTERVAL_MS;
       else process.env.FARLAB_MIN_CALL_INTERVAL_MS = prev;
+      __resetPacerForTests();
+    }
+  });
+
+  it('pacing is ON by default (no env): back-to-back same-provider calls space at the product default', async () => {
+    // The suite env pins FARLAB_MIN_CALL_INTERVAL_MS=0 (vitest.config.ts) so
+    // unrelated provider tests stay fast — this case must strip it to prove
+    // the product default (600 ms) actually guards a fresh process.
+    const prev = process.env.FARLAB_MIN_CALL_INTERVAL_MS;
+    delete process.env.FARLAB_MIN_CALL_INTERVAL_MS;
+    const { __resetPacerForTests } = await import('../src/providers/http.js');
+    __resetPacerForTests();
+    try {
+      const { sleep, sleeps } = sleepRecorder();
+      const first = recorderFetch([() => Promise.resolve(anthropicOk(RAW_OK))]);
+      const second = recorderFetch([() => Promise.resolve(anthropicOk(RAW_OK))]);
+      const provider = createZaiProvider({ apiKey: 'test-fixture-key-zai', fetchImpl: first.fetchImpl, sleep, random: () => 0.5 });
+      const p2 = createZaiProvider({ apiKey: 'test-fixture-key-zai', fetchImpl: second.fetchImpl, sleep, random: () => 0.5 });
+      await provider.structuredCall(REQ, parseHypothesis);
+      await p2.structuredCall(REQ, parseHypothesis);
+      expect(sleeps.length).toBe(1); // second call paced
+      expect(sleeps[0]).toBeGreaterThan(0);
+      expect(sleeps[0]).toBeLessThanOrEqual(600);
+    } finally {
+      if (prev !== undefined) process.env.FARLAB_MIN_CALL_INTERVAL_MS = prev;
       __resetPacerForTests();
     }
   });

@@ -8,6 +8,7 @@ import {
   type ClaimClassification,
 } from '../api/endpoints';
 import type { HypothesisCandidate, ResearchRun, ScientificClaim, SourceDocument } from '../api/types';
+import { bindingKey } from '../tones';
 import { zhFirst, decodeEntities } from './bilingual';
 
 /**
@@ -60,6 +61,10 @@ export function ClaimInspector({ claim, run, hyps, balances, sourceById, busy, o
             {src !== undefined && (
               <p className="insp-source-meta">
                 {t('map.inspSourcePrefix')}
+                {src.verification?.retractionStatus !== undefined && (
+                  /* Retraction outranks the title (review 2026-09-02). */
+                  <span className="map-src-flag">⚠ {t(`library.retraction.${src.verification.retractionStatus}` as DictKey)} · </span>
+                )}
                 <span className="insp-source-title" title={decodeEntities(src.title)}>{decodeEntities(src.title)}</span>
                 {src.publicationYear !== undefined && ` · ${src.publicationYear}`}
                 {doi !== undefined && (
@@ -74,7 +79,7 @@ export function ClaimInspector({ claim, run, hyps, balances, sourceById, busy, o
         );
       })}
       <p className="insp-meta">
-        {t('map.inspBinding', { status: claim.bindingStatus })}
+        {t('map.inspBinding', { status: lang === 'zh' ? t(`binding.${claim.bindingStatus}.zh` as DictKey) : t(bindingKey(claim.bindingStatus)) })}
         {claim.gradeCertainty !== undefined && t('map.inspCertainty', { n: claim.gradeCertainty })}
         {balances.get(claim.id) !== undefined && t('map.inspImpact', {
           s: balances.get(claim.id)!.supports, c: balances.get(claim.id)!.counters,

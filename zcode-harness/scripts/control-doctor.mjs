@@ -44,6 +44,24 @@ if (blockers) {
     for (const b of blockers.items) {
       if (!b.id || !b.status || !b.reason) errors.push(`invalid blocker:${JSON.stringify(b).slice(0,180)}`);
       if (ids.has(b.id)) errors.push(`duplicate blocker id:${b.id}`); else ids.add(b.id);
+      if (b.requiredEvidence !== undefined) {
+        const required = b.requiredEvidence;
+        if (required === null || typeof required !== 'object' || Array.isArray(required)) {
+          errors.push(`invalid blocker requiredEvidence:${b.id}`);
+        } else if (b.status !== 'OPEN') {
+          const resolved = b.resolutionEvidence;
+          if (resolved === null || typeof resolved !== 'object' || Array.isArray(resolved)) {
+            errors.push(`resolved blocker missing resolutionEvidence:${b.id}`);
+          } else {
+            if (typeof required.workflow === 'string' && resolved.workflow !== required.workflow) errors.push(`resolved blocker workflow mismatch:${b.id}`);
+            if (typeof required.runner === 'string' && resolved.runner !== required.runner) errors.push(`resolved blocker runner mismatch:${b.id}`);
+            if ('runUrl' in required && (typeof resolved.runUrl !== 'string' || !/^https?:\/\/\S+$/.test(resolved.runUrl))) errors.push(`resolved blocker runUrl missing:${b.id}`);
+            if ('sourceSha' in required && (typeof resolved.sourceSha !== 'string' || !/^[0-9a-f]{40}$/i.test(resolved.sourceSha))) errors.push(`resolved blocker sourceSha missing:${b.id}`);
+            if ('imageId' in required && (typeof resolved.imageId !== 'string' || !/^sha256:[0-9a-f]{64}$/i.test(resolved.imageId))) errors.push(`resolved blocker imageId missing:${b.id}`);
+            if ('linuxProcAttachCleanup' in required && resolved.linuxProcAttachCleanup !== true) errors.push(`resolved blocker /proc cleanup unproven:${b.id}`);
+          }
+        }
+      }
     }
     if (state?.blockerIds) for (const id of state.blockerIds) if (!ids.has(id)) errors.push(`state references missing blocker:${id}`);
   }

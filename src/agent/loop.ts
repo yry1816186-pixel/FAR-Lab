@@ -162,6 +162,9 @@ export interface AgentLoopDeps {
 
 export type AgentLoopStatus = 'completed' | 'max_turns' | 'aborted' | 'failed' | 'step_timeout' | 'total_timeout' | 'stop_condition';
 
+/** FA-HAR-01 sentinel: the tool raced its remaining step budget and lost without settling. */
+class ToolStepDeadlineExceeded extends Error {}
+
 export interface AgentLoopResult {
   status: AgentLoopStatus;
   turns: AgentTurnRecord[];
@@ -597,10 +600,35 @@ export async function runAgentLoop(cfg: AgentLoopConfig, deps: AgentLoopDeps): P
     // Rollout write order is the crash-classification contract (rollout.ts):
     // started marker BEFORE execution; tool_result BEFORE the finished marker.
     rl().append({ type: 'tool_lifecycle', at: at(), turn, tool: action.tool, phase: 'started' });
+    // Per-tool deadline (FA-HAR-01): a tool that never settles and ignores its
+    // abort signal must not park the turn forever. When a step budget exists,
+    // execution races the REMAINING step time; expiry finishes the run as
+    // step_timeout with the hung tool named. The abandoned promise keeps a
+    // no-op catch so its eventual rejection never becomes unhandled.
+    let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
+    const execution = Promise.resolve().then(() => tool.execute(validated.value, toolCtx));
+    const stepRemainingMs = stepDeadline !== null ? stepDeadline - Date.now() : null;
     try {
-      result = await tool.execute(validated.value, toolCtx);
+      if (stepRemainingMs === null) {
+        result = await execution;
+      } else {
+        const deadline = new Promise<never>((_, reject) => {
+          deadlineTimer = setTimeout(() => {
+            reject(new ToolStepDeadlineExceeded(`tool ${action.tool} did not settle within the remaining step budget (stepTimeoutMs ${cfg.stepTimeoutMs}ms)`));
+          }, Math.max(stepRemainingMs, 0));
+        });
+        result = await Promise.race([execution, deadline]);
+      }
     } catch (e) {
+      if (e instanceof ToolStepDeadlineExceeded) {
+        pushEntry({ kind: 'tool_result', turn, tool: action.tool, ok: false, payload: { skipped: true, reason: 'step timeout (tool hung)' } });
+        pushTurn({ turn, action: 'tool_error', tool: action.tool, ok: false, reason: `step timeout ${cfg.stepTimeoutMs}ms (tool hung)` });
+        return finish('step_timeout', { error: `turn ${turn}: ${e.message}` });
+      }
       result = { ok: false, error: { kind: 'execution', message: e instanceof Error ? e.message : String(e) } };
+    } finally {
+      if (deadlineTimer !== undefined) clearTimeout(deadlineTimer);
+      execution.catch(() => { /* raced-away late failure stays handled */ });
     }
     const durationMs = Date.now() - startedMs;
 

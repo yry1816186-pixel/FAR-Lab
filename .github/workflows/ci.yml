@@ -121,6 +121,130 @@ jobs:
         run: uv sync --locked --project experiment-runtime --python "${{ matrix.python }}"
       - name: Import the complete scientific runtime from the frozen environment
         run: uv run --project experiment-runtime --frozen --python "${{ matrix.python }}" python -c "import sys, farlab_experiment_runtime, cleanlab, numpy, scipy, sklearn, sympy, xarray, netCDF4; expected=tuple(map(int, '${{ matrix.python }}'.split('.'))); assert sys.version_info[:2] == expected, (sys.version, expected); print(sys.version); print('numpy', numpy.__version__, 'scipy', scipy.__version__)"
+      - name: Run experiment runtime unit tests
+        run: uv run --project experiment-runtime --frozen --python "${{ matrix.python }}" python -m unittest discover -s experiment-runtime/tests -p 'test_*.py' -v
+
+  # FA-SEC-01: CodeAct is a real OCI capability. Missing Docker/image/runtime
+  # facts fail this job; no host-side fallback and no skip can become evidence.
+  exploration-sandbox:
+    name: Exploration OCI sandbox
+    timeout-minutes: 25
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '24.18.0'
+          cache: npm
+      - name: Install root dependencies
+        run: npm ci
+      - name: Build immutable exploration runtime image
+        run: npm run sandbox:build
+      - name: Record hosted source and immutable image identity
+        id: sandbox_identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          image_ref='farlab-experiment-runtime:sec01'
+          source_sha="$(git rev-parse HEAD)"
+          if [ "$source_sha" != "$GITHUB_SHA" ]; then
+            printf 'checked-out SHA %s does not match GITHUB_SHA %s\n' "$source_sha" "$GITHUB_SHA" >&2
+            exit 1
+          fi
+          image_id="$(docker image inspect "$image_ref" --format '{{.Id}}')"
+          if [[ ! "$image_id" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            printf 'Docker image ID is not a full sha256 digest: %s\n' "$image_id" >&2
+            exit 1
+          fi
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          printf 'FA-SEC-01 hosted workflow run: %s\n' "$run_url"
+          printf 'FA-SEC-01 hosted source SHA: %s\n' "$source_sha"
+          printf 'FA-SEC-01 hosted image ID: %s\n' "$image_id"
+          {
+            printf 'source_sha=%s\n' "$source_sha"
+            printf 'image_id=%s\n' "$image_id"
+            printf 'run_url=%s\n' "$run_url"
+          } > "$RUNNER_TEMP/fa-sec-01-identity.txt"
+          printf 'FARLAB_EXPLORATION_SANDBOX_IMAGE=%s\n' "$image_id" >> "$GITHUB_ENV"
+          {
+            printf '### FA-SEC-01 hosted OCI identity\n\n'
+            printf -- '- Workflow run: `%s`\n' "$run_url"
+            printf -- '- Source SHA: `%s`\n' "$source_sha"
+            printf -- '- Image ID: `%s`\n' "$image_id"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Verify Docker policy and in-container attestation
+        run: |
+          set -euo pipefail
+          npm run sandbox:verify 2>&1 | tee "$RUNNER_TEMP/fa-sec-01-verifier.log"
+      - name: Execute the production explore_code path
+        env:
+          FARLAB_VERIFY_EXPLORATION_SANDBOX: '1'
+        run: npx vitest run tests/exploration-feasibility.test.ts tests/research-tools.test.ts tests/exploration-sandbox-contract.test.ts tests/exploration-sandbox-verifier.test.ts
+      - name: Attack the live OCI boundaries and timeout cleanup
+        env:
+          FARLAB_VERIFY_EXPLORATION_SANDBOX: '1'
+          FARLAB_SEC01_EVIDENCE_FILE: ${{ runner.temp }}/fa-sec-01-adversarial-evidence.txt
+        run: |
+          set -euo pipefail
+          npx vitest run tests/exploration-sandbox-adversarial.test.ts 2>&1 | tee "$RUNNER_TEMP/fa-sec-01-adversarial.log"
+      - name: Assert cleanup and publish hosted FA-SEC-01 evidence
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          failed=0
+          docker_query_failed=0
+          if ! exploration_leftovers="$(docker ps -aq --filter name=^farlab-exploration-)"; then
+            exploration_leftovers='docker query failed'
+            docker_query_failed=1
+          fi
+          if ! verifier_leftovers="$(docker ps -aq --filter name=^farlab-sec01-)"; then
+            verifier_leftovers='docker query failed'
+            docker_query_failed=1
+          fi
+          if [ "$docker_query_failed" -ne 0 ]; then
+            printf 'Unable to inspect sandbox containers after the job\n' >&2
+            failed=1
+          elif [ -n "$exploration_leftovers" ] || [ -n "$verifier_leftovers" ]; then
+            printf 'Sandbox containers survived cleanup:\n%s\n%s\n' "$exploration_leftovers" "$verifier_leftovers"
+            failed=1
+          else
+            printf 'FA-SEC-01 container cleanup: exploration=0 verifier=0\n'
+          fi
+          proc_evidence=''
+          if [ -f "$RUNNER_TEMP/fa-sec-01-adversarial-evidence.txt" ]; then
+            proc_evidence="$(grep -F 'FA-SEC-01 Linux /proc attach-client cleanup:' "$RUNNER_TEMP/fa-sec-01-adversarial-evidence.txt" | tail -n 1 || true)"
+          fi
+          if [ -z "$proc_evidence" ]; then
+            printf 'Missing Linux /proc attach-client cleanup evidence from the adversarial test\n' >&2
+            failed=1
+          else
+            printf '%s\n' "$proc_evidence"
+          fi
+          {
+            printf '### FA-SEC-01 hosted cleanup evidence\n\n'
+            printf -- '- Containers: exploration=%s verifier=%s\n' "${exploration_leftovers:-0}" "${verifier_leftovers:-0}"
+            if [ -n "$proc_evidence" ]; then
+              printf -- '- Linux `/proc` attach-client: `%s`\n' "$proc_evidence"
+            else
+              printf -- '- Linux `/proc` attach-client: **MISSING**\n'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$failed"
+      - name: Upload hosted FA-SEC-01 evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fa-sec-01-oci-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/fa-sec-01-identity.txt
+            ${{ runner.temp }}/fa-sec-01-verifier.log
+            ${{ runner.temp }}/fa-sec-01-adversarial.log
+            ${{ runner.temp }}/fa-sec-01-adversarial-evidence.txt
+          if-no-files-found: ignore
+          retention-days: 14
 
   # Network-backed advisory queries run once on Ubuntu against every shipped
   # npm lock. A registry outage is a visible gate failure, not a false green.
@@ -330,7 +454,7 @@ jobs:
   # copy with a fresh install + typecheck + lint + test + build inside it.
   release-pack:
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-    needs: [verify, python-runtime, web-e2e, desktop-build, dependency-audit, codeql]
+    needs: [verify, python-runtime, exploration-sandbox, web-e2e, desktop-build, dependency-audit, codeql]
     timeout-minutes: 120
     runs-on: ubuntu-latest
     permissions:

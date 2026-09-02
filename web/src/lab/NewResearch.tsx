@@ -199,6 +199,18 @@ export function NewResearch({
   const canSubmit = !run.submitting && run.text.trim().length > 0;
   const reviewing = proposal !== null;
   const activeLabel = configs?.configs.find((c) => c.id === (run.providerConfigId === '' ? configs.activeModelConfigId : run.providerConfigId))?.label;
+  // Long placeholder copy wraps to 4 lines inside a 2-row box on phones
+  // (design-baseline new-W6) — the narrow viewport gets the short form.
+  const [narrowViewport, setNarrowViewport] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 600px)').matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 600px)');
+    const onChange = (e: MediaQueryListEvent): void => setNarrowViewport(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  const placeholderKey: DictKey = narrowViewport ? 'newresearch.placeholderShort' : 'newresearch.placeholder';
 
   // Collapsing would strand real state (attached materials, an in-progress
   // scope review) — the panel stays open until that state is resolved.
@@ -219,7 +231,7 @@ export function NewResearch({
         className="nr-question"
         value={run.text}
         rows={open ? 3 : 2}
-        placeholder={t('newresearch.placeholder')}
+        placeholder={t(placeholderKey)}
         aria-invalid={run.showValidationError && run.text.trim().length === 0}
         onChange={(e) => run.setText(e.target.value)}
         onPaste={(e) => tray.onPaste(e)}

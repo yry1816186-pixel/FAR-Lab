@@ -7,6 +7,7 @@ import { getHypotheses } from '../api/endpoints';
 import type { Conversation, HypothesisCandidate, RunSummary } from '../api/types';
 import { runStatusKey, runStatusTone } from '../tones';
 import { groupStudies, runLabel } from '../studies';
+import { ellipsize } from './text';
 import { useHealth } from '../hooks/useHealth';
 import { NewResearch } from './NewResearch';
 import './lab.css';
@@ -159,9 +160,7 @@ const QueueSkeleton = ({ rows = 2 }: { rows?: number }): JSX.Element => (
           checking={checking}
           onOpenSettings={onOpenSettings}
           compose={composeZone(fresh)}
-        >
-          {!fresh && (
-          <>
+          queue={!fresh ? (
             <section className="queue-section" aria-labelledby="labq-judgment">
               <h2 className="queue-section-title" id="labq-judgment">{t('labhome.judgmentTitle')}</h2>
               <p className="queue-section-sub">{t('labhome.judgmentSub')}</p>
@@ -174,7 +173,7 @@ const QueueSkeleton = ({ rows = 2 }: { rows?: number }): JSX.Element => (
                     {live.map((r) => (
                       <QueueRow
                         key={r.id} sev="live"
-                        title={runLabel(r).slice(0, 90)}
+                        title={runLabel(r)}
                         why={r.progress !== undefined
                           ? t('labhome.liveWhyProgress', { stage: t(`stage.${r.currentStage}`), done: r.progress.done, total: r.progress.total })
                           : t('labhome.liveWhy', { stage: t(`stage.${r.currentStage}`) })}
@@ -185,7 +184,7 @@ const QueueSkeleton = ({ rows = 2 }: { rows?: number }): JSX.Element => (
                     {drafts.map((r) => (
                       <QueueRow
                         key={`draft-${r.id}`} sev="review"
-                        title={runLabel(r).slice(0, 90)}
+                        title={runLabel(r)}
                         why={r.status === 'paused'
                           ? t('labhome.draftWhyProposed')
                           : t('labhome.draftWhyNew')}
@@ -196,7 +195,7 @@ const QueueSkeleton = ({ rows = 2 }: { rows?: number }): JSX.Element => (
                     {attention.map((r) => (
                       <QueueRow
                         key={r.id} sev="attention"
-                        title={runLabel(r).slice(0, 90)}
+                        title={runLabel(r)}
                         why={t('labhome.attentionWhy', {
                           status: t(runStatusKey(r.status)),
                           reason: failureCause(r.lastError ?? t('labhome.seeStudyMap'), t),
@@ -211,7 +210,7 @@ const QueueSkeleton = ({ rows = 2 }: { rows?: number }): JSX.Element => (
                     {counterStudies.map((r) => (
                       <QueueRow
                         key={`ctr-${r.id}`} sev="review"
-                        title={runLabel(r).slice(0, 90)}
+                        title={runLabel(r)}
                         why={t('labhome.counterWhy')}
                         action={t('labhome.review')}
                         onClick={() => onOpenStudy(r.id)}
@@ -220,7 +219,9 @@ const QueueSkeleton = ({ rows = 2 }: { rows?: number }): JSX.Element => (
                   </>
                 )}
             </section>
-
+          ) : null}
+          rest={!fresh ? (
+            <>
             <section className="queue-section" aria-labelledby="labq-studies">
               <div className="queue-section-head">
                 <h2 className="queue-section-title" id="labq-studies">{t('labhome.studiesTitle')}</h2>
@@ -289,10 +290,18 @@ const QueueSkeleton = ({ rows = 2 }: { rows?: number }): JSX.Element => (
               )}
             </section>
 
-            {conversations.length > 0 && (
-              <section className="queue-section" aria-labelledby="labq-convs">
-                <h2 className="queue-section-title" id="labq-convs">{t('labhome.convsTitle')}</h2>
-                <p className="queue-section-sub">{t('labhome.convsSub')}</p>
+            <section className="queue-section" aria-labelledby="labq-convs">
+              <h2 className="queue-section-title" id="labq-convs">{t('labhome.convsTitle')}</h2>
+              <p className="queue-section-sub">{t('labhome.convsSub')}</p>
+              {conversations.length === 0 ? (
+                /* Home-W3: absence is a state, not a missing section — the
+                   empty row names the entry points instead of vanishing. */
+                <p className="queue-empty">
+                  {t('labhome.convsEmptyPre')}
+                  <button type="button" className="nr-linklike" onClick={onStartConversation}>{t('labhome.convsEmptyCta')}</button>
+                  {t('labhome.convsEmptyPost')}
+                </p>
+              ) : (
                 <div className="lab-conv-row">
                   {conversations.slice(0, 6).map((c) => (
                     <button
@@ -307,11 +316,11 @@ const QueueSkeleton = ({ rows = 2 }: { rows?: number }): JSX.Element => (
                     </button>
                   ))}
                 </div>
-              </section>
-            )}
-          </>
-          )}
-        </FirstUse>
+              )}
+            </section>
+            </>
+          ) : null}
+        />
       </main>
     </div>
   );
@@ -320,14 +329,15 @@ const QueueSkeleton = ({ rows = 2 }: { rows?: number }): JSX.Element => (
 /** First-use zone (G1): what this is, is the engine ready, and the compose
  *  zone itself — the first-run researcher types their question HERE, not after
  *  a navigation hop. */
-function FirstUse({ active, health, healthError, checking, onOpenSettings, compose, children }: {
+function FirstUse({ active, health, healthError, checking, onOpenSettings, compose, queue, rest }: {
   active: boolean;
   health: { status: string; db: string; providers: { name: string; kind: string; liveReady: boolean }[] } | null;
   healthError: boolean;
   checking: boolean;
   onOpenSettings: () => void;
   compose: React.ReactNode;
-  children: React.ReactNode;
+  queue: React.ReactNode;
+  rest: React.ReactNode;
 }): JSX.Element {
   const { t } = useI18n();
   const liveProviders = health?.providers.filter((p) => p.kind === 'live') ?? [];
@@ -391,12 +401,19 @@ function FirstUse({ active, health, healthError, checking, onOpenSettings, compo
         )}
       </div>
 
-      {/* The compose zone IS the first step — the researcher types here, in
-          the same surface that will later hold the queue and the studies. */}
-      {compose}
+      {/* Slot order is a CSS decision (HC1): a returning researcher's OPEN
+          DECISIONS outrank starting something new, so the judgment queue
+          renders above the compose zone — but the DOM order stays fixed so
+          NewResearch never remounts (a JSX reorder would drop the typed
+          question, materials and any in-flight parse). On a fresh workspace
+          compose leads: typing the first question IS the only task. */}
+      <div className={`firstuse-body${active ? '' : ' is-queue-first'}`}>
+        <div className="fu-slot fu-slot--compose">{compose}</div>
+        <div className="fu-slot fu-slot--queue">{queue}</div>
+        <div className="fu-slot fu-slot--rest">{rest}</div>
+      </div>
 
       {active && <p className="fu-note">{t('labhome.fuNote')}</p>}
-      {children}
     </section>
   );
 }
@@ -413,16 +430,17 @@ function failureCause(raw: string, t: ReturnType<typeof useI18n>['t']): string {
 
 function QueueRow({ sev, title, why, action, onClick }: {
   sev: 'live' | 'attention' | 'review';
+  /** Full row title — displayed word-boundary truncated, full text on hover. */
   title: string;
   why: string;
   action: string;
   onClick: () => void;
 }): JSX.Element {
   return (
-    <div className={`queue-item sev-${sev}`}>
+    <div className={`queue-item sev-${sev}`} title={title}>
       <span className="q-dot" aria-hidden="true" />
       <span className="q-main">
-        <span className="q-title">{title}</span>
+        <span className="q-title">{ellipsize(title, 90)}</span>
         <span className="q-why">{why}</span>
       </span>
       <button type="button" className="q-act" onClick={onClick}>{action}</button>

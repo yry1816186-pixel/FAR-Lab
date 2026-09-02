@@ -12,9 +12,26 @@ import { zhFirst, decodeEntities } from '../../lab/bilingual';
  * graph (zero dependencies — hand-rolled, deterministic tri-column layout).
  * Every node and edge is a REAL store object (locator, relation, explicit
  * binding); nothing is invented for the picture. Interactions: hover to
- * trace a node's edges, click a claim to flash it in the list (or navigate),
- * click a hypothesis to jump to its tab; polarity filters; wheel zoom + drag
- * pan. Keyboard: nodes are focusable, Enter activates, Esc resets the view.
+ * trace a node's edges, click a claim to open the map inspector, click a
+ * hypothesis to jump to its band; polarity filters; wheel zoom + drag pan.
+ * Keyboard: nodes are focusable, Enter activates, Esc resets the view.
+ *
+ * 2026-09-02 Wave D rework (design-baseline SC1/SC2/W3/W6/W7/W9/W10): the
+ * plain three-independent-lists layout failed at real density (5×17×10) —
+ * edges crossed claim text and each other into an unreadable braid. Three
+ * structural changes:
+ *  1. Barycenter ordering: claims cluster by their primary source and their
+ *     bound hypotheses; hypotheses order by their claim mass — connected rows
+ *     sit near each other, so most edges are short and near-parallel instead
+ *     of long crossers. Deterministic two-pass median heuristic, stable
+ *     tie-breaks on id.
+ *  2. An edge-routing gutter: node labels stop ~120px before the next column
+ *     and bezier control points hug the target column, so curves travel a
+ *     corridor that text does not occupy; a background halo on every label is
+ *     the second line of defense.
+ *  3. Honest scale encoding: locator edges recede (context), support/counter
+ *     carry the polarity; the legend states every edge kind and the ✓/✗
+ *     column glyphs; hypothesis boxes show their rank.
  */
 
 type Filter = 'all' | 'counter' | 'supporting' | 'discriminating';
@@ -28,6 +45,9 @@ interface GraphNode {
   title: string;
   /** claim binding tone for glyph color */
   tone?: 'verified' | 'caution' | 'refuted' | 'unknown';
+  /** researcher-layer marks (disclosed in place, same glyphs as the band) */
+  researcherExcluded?: boolean;
+  researcherPinned?: boolean;
   rank?: number;
   supportingCount: number;
   counterCount: number;
@@ -43,10 +63,12 @@ interface GraphEdge {
   strength?: 'strong' | 'moderate' | 'weak' | 'unrated';
 }
 
-const COL_X = { source: 70, claim: 380, hypothesis: 700 };
+const COL_X = { source: 64, claim: 420, hypothesis: 768 };
 const VIEW_W = 1000;
 const ROW_H = 34;
 const MAX_NODES_PER_COL = 40;
+/** Corridor reserved for edge routing between columns (labels stop short). */
+const GUTTER_PX = 118;
 /** First content row sits below the in-SVG column headers. */
 const HEADER_Y = 16;
 const FIRST_ROW_Y = 46;
@@ -54,13 +76,12 @@ const FIRST_ROW_Y = 46;
 const STRENGTH_W: Record<NonNullable<GraphEdge['strength']>, number> = { strong: 2.2, moderate: 1.6, weak: 1.0, unrated: 1.2 };
 
 /**
- * Pixel-budget label fitting: a node label must never cross into the next
- * column (measured defect: 36-60 CJK chars at 11px ≈ 400-660px spilled from
- * the claim column over the hypothesis column). Advance width is estimated
- * without DOM measurement — CJK/fullwidth ≈ fontSize, Latin ≈ 0.56×fontSize.
+ * Pixel-budget label fitting: a node label must never cross into the edge
+ * corridor (see GUTTER_PX). Advance width is estimated without DOM
+ * measurement — CJK/fullwidth ≈ fontSize, Latin ≈ 0.56×fontSize.
  * Look-alike truncated labels stay distinguishable: identical fits get a tail
  * fragment appended (head…tail) within the same budget instead of growing
- * past the column edge.
+ * past the corridor.
  */
 const charWidth = (ch: string, fs: number): number =>
   ch.charCodeAt(0) > 0x2e7f ? fs : fs * 0.56;
@@ -100,6 +121,60 @@ function fitLabels(raw: string[], budgetPx: number, fs = 11): string[] {
   return out;
 }
 
+/** SVG text halo: edges may pass behind a label during pans/drags — the text
+ *  stays readable over its own background stroke (paint-order keeps the fill
+ *  crisp). */
+const HALO_STYLE = { paintOrder: 'stroke' as const, stroke: 'var(--v2-surface)', strokeWidth: 3, strokeLinejoin: 'round' as const };
+
+/**
+ * Barycenter ordering (deterministic median heuristic): position each node
+ * near the mean position of its neighbors on the other side, so most edges
+ * become short and near-parallel. `links` is [leftId, rightId][]; both sides
+ * are returned in row order. Id tie-breaks keep it stable across renders.
+ * Two type parameters — the two columns are different object kinds.
+ */
+function barycenterOrder<L, R>(
+  left: L[],
+  right: R[],
+  idOf: (n: L | R) => string,
+  links: [string, string][],
+): { leftOrder: L[]; rightOrder: R[]; rightIndex: Map<string, number>; leftIndex: Map<string, number> } {
+  const leftIndex = new Map(left.map((n, i) => [idOf(n), i] as const));
+  const rightNeighbor = new Map<string, string[]>();
+  const leftNeighbor = new Map<string, string[]>();
+  for (const [a, b] of links) {
+    const rn = rightNeighbor.get(a) ?? [];
+    rn.push(b); rightNeighbor.set(a, rn);
+    const ln = leftNeighbor.get(b) ?? [];
+    ln.push(a); leftNeighbor.set(b, ln);
+  }
+  // Pass 1: order the right side by the mean row of its left neighbors.
+  const rightPos = new Map<string, number>();
+  for (const [ri, n] of right.entries()) {
+    const ns = leftNeighbor.get(idOf(n)) ?? [];
+    const mean = ns.length === 0
+      ? ri
+      : ns.reduce((acc, id) => acc + (leftIndex.get(id) ?? 0), 0) / ns.length;
+    rightPos.set(idOf(n), mean);
+  }
+  const rightOrder = [...right].sort((a, b) =>
+    (rightPos.get(idOf(a)) ?? 0) - (rightPos.get(idOf(b)) ?? 0) || (idOf(a) < idOf(b) ? -1 : 1));
+  const rightIndex = new Map(rightOrder.map((n, i) => [idOf(n), i] as const));
+  // Pass 2: order the left side by the mean of its (now-ordered) right neighbors.
+  const leftPos = new Map<string, number>();
+  for (const [li, n] of left.entries()) {
+    const ns = rightNeighbor.get(idOf(n)) ?? [];
+    const mean = ns.length === 0
+      ? li
+      : ns.reduce((acc, id) => acc + (rightIndex.get(id) ?? 0), 0) / ns.length;
+    leftPos.set(idOf(n), mean);
+  }
+  const leftOrder = [...left].sort((a, b) =>
+    (leftPos.get(idOf(a)) ?? 0) - (leftPos.get(idOf(b)) ?? 0) || (idOf(a) < idOf(b) ? -1 : 1));
+  leftOrder.forEach((n, i) => leftIndex.set(idOf(n), i));
+  return { leftOrder, rightOrder, rightIndex, leftIndex };
+}
+
 export function EvidenceGraph({
   run,
   sources,
@@ -117,6 +192,9 @@ export function EvidenceGraph({
 }): ReactNode {
   const { t, lang } = useI18n();
   const [filter, setFilter] = useState<Filter>('all');
+  /** Claim-row clustering factor (review 2026-09-02): hypotheses (default —
+   *  the comparison structure) or sources (the provenance reading path). */
+  const [clusterBy, setClusterBy] = useState<'hypothesis' | 'source'>('hypothesis');
   const [hover, setHover] = useState<string | null>(null);
   const [view, setView] = useState({ k: 1, tx: 0, ty: 0 });
   /** VIZ V5: per-node drag offsets (reset with the view); honest full render is opt-in. */
@@ -128,8 +206,19 @@ export function EvidenceGraph({
   const hypFetcher = useCallback((signal: AbortSignal) => getHypotheses(run.id, signal), [run.id]);
   const hypRes = useResource(hypFetcher, [run.id], `${run.updatedAt}:${run.status}`);
   const hypotheses = hypRes.data?.hypotheses ?? [];
+  /** Rank from scorecards (authoritative), unranked tail appended in list
+   *  order — recomputes with the payload, not per render. */
+  const hypRanks = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const s of hypRes.data?.scorecards ?? []) m.set(s.hypothesisId, s.rank);
+    for (const h of hypRes.data?.hypotheses ?? []) {
+      if (!m.has(h.id)) m.set(h.id, m.size + 1);
+    }
+    return m;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the payload identity, not the wrapper object
+  }, [hypRes.data]);
 
-  const { nodes, edges, height, truncated, floating } = useMemo(() => {
+  const { nodes, edges, height, truncated, floating, counts } = useMemo(() => {
     // Discriminating filter needs hypothesis bindings; claim→hyp edges come
     // from BOTH the hypothesis id-arrays (authoritative) and relations.
     const supportingOf = new Map<string, Set<string>>();
@@ -159,57 +248,96 @@ export function EvidenceGraph({
     }
     const connectedSources = sources.filter((s) => locatedSourceIds.has(s.id));
     const floating = sources.length - connectedSources.length;
-    const visibleSources = connectedSources.slice(0, cap);
-    const visibleClaims = claims
-      .filter((c) => {
-        if (filter === 'counter') return (counterOf.get(c.id)?.size ?? 0) > 0;
-        if (filter === 'supporting') return (supportingOf.get(c.id)?.size ?? 0) > 0;
-        if (filter === 'discriminating') return discriminating(c.id);
-        return true;
-      })
-      .slice(0, cap);
-    const visibleHyps = hypotheses.slice(0, cap);
+    const filteredClaims = claims.filter((c) => {
+      if (filter === 'counter') return (counterOf.get(c.id)?.size ?? 0) > 0;
+      if (filter === 'supporting') return (supportingOf.get(c.id)?.size ?? 0) > 0;
+      if (filter === 'discriminating') return discriminating(c.id);
+      return true;
+    });
+
+    // ---- Barycenter clustering (SC2): order sources/claims by their locator
+    // mass, then claims/hypotheses by their binding mass. Connected rows end
+    // up adjacent; long crossing braids collapse into short near-parallel fans.
+    const locatorLinks: [string, string][] = [];
+    for (const c of filteredClaims) {
+      for (const loc of c.locators) locatorLinks.push([loc.sourceDocumentId, c.id]);
+    }
+    const sc = barycenterOrder(connectedSources, filteredClaims, (n) => n.id, locatorLinks);
+    const orderedSources = sc.leftOrder.slice(0, cap);
+    const bindingLinks: [string, string][] = [];
+    for (const h of hypotheses) {
+      for (const cid of h.supportingClaimIds ?? []) bindingLinks.push([cid, h.id]);
+      for (const cid of h.counterClaimIds ?? []) bindingLinks.push([cid, h.id]);
+    }
+    const preClaims = filteredClaims.slice(0, cap);
+    const ch = barycenterOrder(preClaims, hypotheses, (n) => n.id, bindingLinks);
+    const orderedHyps = ch.rightOrder.slice(0, cap);
+    const claimRow = ch.leftIndex; // claim row order honors hypothesis mass
+    const sourceRow = new Map(orderedSources.map((s, i) => [s.id, i] as const));
+    // claimRow came from pass 2 of the claim↔hyp ordering; merge the source
+    // clustering so both sides influence the final claim order (pass 3).
+    const sourceMeanOfClaim = new Map<string, number>();
+    for (const c of preClaims) {
+      const rows = c.locators
+        .map((l) => sourceRow.get(l.sourceDocumentId))
+        .filter((v): v is number => v !== undefined);
+      sourceMeanOfClaim.set(c.id, rows.length === 0
+        ? (sc.rightIndex.get(c.id) ?? 0)
+        : rows.reduce((a, b) => a + b, 0) / rows.length);
+    }
+    const orderedClaims = [...preClaims].sort((a, b) =>
+      (clusterBy === 'hypothesis'
+        ? (claimRow.get(a.id) ?? 0) - (claimRow.get(b.id) ?? 0)
+          || (sourceMeanOfClaim.get(a.id) ?? 0) - (sourceMeanOfClaim.get(b.id) ?? 0)
+        : (sourceMeanOfClaim.get(a.id) ?? 0) - (sourceMeanOfClaim.get(b.id) ?? 0)
+          || (claimRow.get(a.id) ?? 0) - (claimRow.get(b.id) ?? 0))
+      || (a.id < b.id ? -1 : 1));
 
     const nodeList: GraphNode[] = [];
-    // Label budgets: next column's x minus this node's glyph+label offset and
-    // a margin — a label physically cannot reach the neighboring column.
-    const sourceLabelPx = COL_X.claim - COL_X.source - 14 - 12;
-    const claimLabelPx = COL_X.hypothesis - COL_X.claim - 14 - 12;
+    // Label budgets stop short of the routing corridor (GUTTER_PX) — edges
+    // travel the corridor, text does not (SC1 root fix).
+    const sourceLabelPx = COL_X.claim - GUTTER_PX - COL_X.source - 14;
+    const claimLabelPx = COL_X.hypothesis - GUTTER_PX - COL_X.claim - 14;
     const hypLabelPx = VIEW_W - COL_X.hypothesis - 14 - 6;
-    const sourceLabels = fitLabels(visibleSources.map((s) => decodeEntities(s.title)), sourceLabelPx);
-    visibleSources.forEach((s, i) => nodeList.push({
+    const sourceLabels = fitLabels(orderedSources.map((s) => decodeEntities(s.title)), sourceLabelPx);
+    orderedSources.forEach((s, i) => nodeList.push({
       id: s.id, kind: 'source', x: COL_X.source, y: FIRST_ROW_Y + i * ROW_H,
       label: sourceLabels[i] ?? s.title, title: decodeEntities(s.title),
       supportingCount: 0, counterCount: 0,
     }));
-    const claimLabels = fitLabels(visibleClaims.map((c) => decodeEntities(c.text)), claimLabelPx);
-    visibleClaims.forEach((c, i) => nodeList.push({
+    const claimLabels = fitLabels(orderedClaims.map((c) => decodeEntities(c.text)), claimLabelPx);
+    orderedClaims.forEach((c, i) => nodeList.push({
       id: c.id, kind: 'claim', x: COL_X.claim, y: FIRST_ROW_Y + i * ROW_H,
       label: claimLabels[i] ?? c.text, title: decodeEntities(c.text),
       tone: c.bindingStatus === 'verified' ? 'verified' : c.bindingStatus === 'resolved_unaligned' ? 'caution' : c.bindingStatus === 'unresolved' ? 'refuted' : 'unknown',
+      /** Researcher layer rides the graph (excluded/pinned disclosed in place,
+       *  same marks as the evidence band — never erased from the picture). */
+      researcherExcluded: c.researcher?.excluded === true,
+      researcherPinned: c.researcher?.pinned === true,
       supportingCount: supportingOf.get(c.id)?.size ?? 0,
       counterCount: counterOf.get(c.id)?.size ?? 0,
     }));
-    // Hypothesis labels follow the reader's language when the W-C zh rendering exists.
-    const hypTexts = visibleHyps.map((h) => zhFirst(h.statement, h.statementZh, lang));
+    // Hypothesis labels follow the reader's language when the zh rendering exists.
+    const hypTexts = orderedHyps.map((h) => zhFirst(h.statement, h.statementZh, lang));
     const hypLabels = fitLabels(hypTexts, hypLabelPx);
-    visibleHyps.forEach((h, i) => nodeList.push({
+    orderedHyps.forEach((h, i) => nodeList.push({
       id: h.id, kind: 'hypothesis', x: COL_X.hypothesis, y: FIRST_ROW_Y + i * ROW_H,
       label: hypLabels[i] ?? h.statement, title: hypTexts[i] ?? h.statement,
+      rank: hypRanks.get(h.id),
       supportingCount: h.supportingClaimIds?.length ?? 0, counterCount: h.counterClaimIds?.length ?? 0,
     }));
 
     const nodeIds = new Set(nodeList.map((n) => n.id));
     const edgeList: GraphEdge[] = [];
-    const claimIds = new Set(visibleClaims.map((c) => c.id));
-    for (const c of visibleClaims) {
+    const claimIds = new Set(orderedClaims.map((c) => c.id));
+    for (const c of orderedClaims) {
       for (const loc of c.locators) {
         if (nodeIds.has(loc.sourceDocumentId)) {
           edgeList.push({ id: `loc-${c.id}-${loc.sourceDocumentId}`, from: loc.sourceDocumentId, to: c.id, kind: 'locator' });
         }
       }
     }
-    for (const h of visibleHyps) {
+    for (const h of orderedHyps) {
       for (const cid of h.supportingClaimIds ?? []) {
         if (claimIds.has(cid)) edgeList.push({ id: `sup-${cid}-${h.id}`, from: cid, to: h.id, kind: 'supports' });
       }
@@ -222,14 +350,22 @@ export function EvidenceGraph({
         edgeList.push({ id: `cc-${r.id}`, from: r.claimId!, to: r.targetClaimId, kind: 'claim_claim', dashed: true, ...(r.strength !== undefined ? { strength: r.strength } : {}) });
       }
     }
-    const maxRows = Math.max(visibleSources.length, visibleClaims.length, visibleHyps.length);
+    const maxRows = Math.max(orderedSources.length, orderedClaims.length, orderedHyps.length);
     const truncated = Math.max(
-      (connectedSources.length > visibleSources.length ? connectedSources.length - visibleSources.length : 0),
-      (claims.length > visibleClaims.length ? claims.length - visibleClaims.length : 0),
-      (hypotheses.length > visibleHyps.length ? hypotheses.length - visibleHyps.length : 0),
+      (connectedSources.length > orderedSources.length ? connectedSources.length - orderedSources.length : 0),
+      (filteredClaims.length > orderedClaims.length ? filteredClaims.length - orderedClaims.length : 0),
+      (hypotheses.length > orderedHyps.length ? hypotheses.length - orderedHyps.length : 0),
     );
-    return { nodes: nodeList, edges: edgeList, height: FIRST_ROW_Y + 18 + maxRows * ROW_H, truncated, floating };
-  }, [sources, claims, relations, hypotheses, filter, showAll]);
+    const counts = {
+      sources: orderedSources.length,
+      claims: orderedClaims.length,
+      hyps: orderedHyps.length,
+      supports: edgeList.filter((e) => e.kind === 'supports').length,
+      counters: edgeList.filter((e) => e.kind === 'counters').length,
+      locators: edgeList.filter((e) => e.kind === 'locator').length,
+    };
+    return { nodes: nodeList, edges: edgeList, height: FIRST_ROW_Y + 18 + maxRows * ROW_H, truncated, floating, counts };
+  }, [sources, claims, relations, hypotheses, hypRanks, filter, showAll, clusterBy, lang]);
 
   const byId = useMemo(() => new Map(nodes.map((n) => [n.id, n] as const)), [nodes]);
   const activeEdges = hover !== null
@@ -308,9 +444,18 @@ export function EvidenceGraph({
             {t(f.labelKey)}
           </button>
         ))}
-        <span className="muted small">{t('graph.counts', { s: nodes.filter((n) => n.kind === 'source').length, c: nodes.filter((n) => n.kind === 'claim').length, h: nodes.filter((n) => n.kind === 'hypothesis').length })}</span>
+        <span className="muted small">{t('graph.counts', { s: counts.sources, c: counts.claims, h: counts.hyps })}</span>
         <button type="button" className="btn btn--sm" onClick={() => { setView({ k: 1, tx: 0, ty: 0 }); setOffsets(new Map()); }}>
           {t('graph.reset')}
+        </button>
+        <button
+          type="button"
+          className="btn btn--sm"
+          aria-pressed={clusterBy === 'source'}
+          title={t('graph.clusterHint')}
+          onClick={() => setClusterBy((v) => (v === 'hypothesis' ? 'source' : 'hypothesis'))}
+        >
+          {clusterBy === 'hypothesis' ? t('graph.clusterBySource') : t('graph.clusterByHyp')}
         </button>
         {truncated > 0 && (
           <span className="graph-truncated" role="status">
@@ -337,11 +482,17 @@ export function EvidenceGraph({
           <text x={COL_X.source} y={HEADER_Y} fontSize={11} fontWeight={600} fill="var(--v2-text-1)">{t('graph.colSource')}</text>
           <text x={COL_X.claim} y={HEADER_Y} fontSize={11} fontWeight={600} fill="var(--v2-text-1)">{t('graph.colClaim')}</text>
           <text x={COL_X.hypothesis} y={HEADER_Y} fontSize={11} fontWeight={600} fill="var(--v2-text-1)">{t('graph.colHyp')}</text>
-          {/* Polarity legend swatches + live counts — support/counter must be legible at a glance. */}
-          <line x1={COL_X.claim + 140} y1={HEADER_Y - 4} x2={COL_X.claim + 176} y2={HEADER_Y - 4} stroke="var(--v2-verified)" strokeWidth={2.6} />
-          <text x={COL_X.claim + 182} y={HEADER_Y} fontSize={10} fill="var(--v2-text-1)">{`${t('graph.legendSupport')} ${edges.filter((e) => e.kind === 'supports').length}`}</text>
-          <line x1={COL_X.claim + 238} y1={HEADER_Y - 4} x2={COL_X.claim + 274} y2={HEADER_Y - 4} stroke="var(--v2-refuted)" strokeWidth={2.6} strokeDasharray="8 4" />
-          <text x={COL_X.claim + 280} y={HEADER_Y} fontSize={10} fill="var(--v2-text-1)">{`${t('graph.legendCounter')} ${edges.filter((e) => e.kind === 'counters').length}`}</text>
+        </g>
+        {/* Edge-kind legend with live counts (W7), one block over the claim
+            column: every stroke on the canvas is named — locator context
+            lines included — so nothing reads as unexplained decoration. */}
+        <g fontSize={10}>
+          <line x1={COL_X.claim + 8} y1={HEADER_Y + 18} x2={COL_X.claim + 34} y2={HEADER_Y + 18} stroke="var(--v2-text-3)" strokeWidth={1} opacity={0.5} />
+          <text x={COL_X.claim + 38} y={HEADER_Y + 21} fill="var(--v2-text-2)">{`${t('graph.legendLocator')} ${counts.locators}`}</text>
+          <line x1={COL_X.claim + 128} y1={HEADER_Y + 18} x2={COL_X.claim + 154} y2={HEADER_Y + 18} stroke="var(--v2-verified)" strokeWidth={2.4} />
+          <text x={COL_X.claim + 158} y={HEADER_Y + 21} fill="var(--v2-text-2)">{`${t('graph.legendSupport')} ${counts.supports}`}</text>
+          <line x1={COL_X.claim + 248} y1={HEADER_Y + 18} x2={COL_X.claim + 274} y2={HEADER_Y + 18} stroke="var(--v2-refuted)" strokeWidth={2.6} strokeDasharray="8 4" />
+          <text x={COL_X.claim + 278} y={HEADER_Y + 21} fill="var(--v2-text-2)">{`${t('graph.legendCounter')} ${counts.counters}`}</text>
         </g>
         <g transform={`translate(${view.tx} ${view.ty}) scale(${view.k})`}>
           {edges.map((e) => {
@@ -361,7 +512,18 @@ export function EvidenceGraph({
             // Redundant polarity encoding (color-blind safe): counters dashed + thicker on
             // top of the color pair — supports solid thin, counters dashed bold.
             const dash = e.dashed === true ? '4 3' : e.kind === 'counters' ? '8 4' : undefined;
-            const d = `M ${pa.x + (a.kind === 'source' ? 8 : 10)} ${pa.y} C ${pa.x + (pb.x - pa.x) * 0.45} ${pa.y}, ${pb.x - (pb.x - pa.x) * 0.45} ${pb.y}, ${pb.x - (b.kind === 'hypothesis' ? 10 : 8)} ${pb.y}`;
+            // Corridor routing (SC1): control points give the curve a vertical
+            // slope right out of the glyph (it crosses the label band
+            // diagonally, never rides along a row's text) and hug the target
+            // column, so the slow bend lives inside the reserved gutter. The
+            // label halo covers the residual diagonal crossings.
+            const gutter = pb.x - pa.x;
+            const dy = pb.y - pa.y;
+            // Claim↔claim edges connect the SAME column — a straight vertical
+            // would ride the glyph spine; bulge them into the right corridor.
+            const d = gutter === 0
+              ? `M ${pa.x + 10} ${pa.y} C ${pa.x + 64} ${pa.y}, ${pb.x + 64} ${pb.y}, ${pb.x + 10} ${pb.y}`
+              : `M ${pa.x + (a.kind === 'source' ? 8 : 10)} ${pa.y} C ${pa.x + gutter * 0.42} ${pa.y + dy * 0.28}, ${pb.x - gutter * 0.30} ${pb.y - dy * 0.28}, ${pb.x - (b.kind === 'hypothesis' ? 10 : 8)} ${pb.y}`;
             return (
               <path
                 key={e.id}
@@ -370,7 +532,7 @@ export function EvidenceGraph({
                 stroke={stroke}
                 strokeWidth={inFocus ? baseW + 0.8 : baseW}
                 strokeDasharray={dash}
-                opacity={dim ? 0.08 : e.kind === 'locator' ? 0.22 : inFocus ? 1 : 0.85}
+                opacity={dim ? 0.06 : e.kind === 'locator' ? 0.16 : inFocus ? 1 : e.kind === 'supports' ? 0.65 : 0.5}
               >
                 {e.strength !== undefined && <title>{`${t('graph.claimClaim')} — ${t(`graph.strength.${e.strength}`)}`}</title>}
               </path>
@@ -400,11 +562,63 @@ export function EvidenceGraph({
                 onKeyDown={(e) => { if (e.key === 'Enter') activate(n); }}
                 className="graph-node graph-node--draggable"
               >
-                {n.kind === 'source' && <rect x={-8} y={-5} width={16} height={10} rx={2} fill={fill} stroke="var(--v2-border)" />}
-                {n.kind === 'claim' && <circle r={6} fill={fill} stroke={`var(--v2-${n.tone ?? 'unknown'})`} strokeWidth={2} />}
-                {n.kind === 'hypothesis' && <rect x={-10} y={-9} width={20} height={18} rx={5} fill={fill} stroke="var(--v2-info)" strokeWidth={2} />}
+                {n.kind === 'source' && (
+                  /* Document glyph (W6): a titled source chip, not a checkbox —
+                     a checkbox invited "select me" affordance it never had. */
+                  <g>
+                    <rect x={-8} y={-5} width={16} height={10} rx={2.5} fill={fill} stroke="var(--v2-text-3)" strokeWidth={1.2} />
+                    <line x1={-3.5} y1={-1.5} x2={3.5} y2={-1.5} stroke="var(--v2-text-3)" strokeWidth={0.9} />
+                    <line x1={-3.5} y1={1.5} x2={1.5} y2={1.5} stroke="var(--v2-text-3)" strokeWidth={0.9} />
+                  </g>
+                )}
+                {n.kind === 'claim' && (
+                  /* Researcher glyph mirrors the band: ⊘ excluded (dashed ring,
+                     struck label), ◆ pinned — the judgement is readable in the
+                     graph itself, not only below it. */
+                  <circle
+                    r={6}
+                    fill={fill}
+                    stroke={`var(--v2-${n.tone ?? 'unknown'})`}
+                    strokeWidth={2}
+                    strokeDasharray={n.researcherExcluded === true ? '2.5 2' : undefined}
+                  />
+                )}
+                {n.kind === 'hypothesis' && (
+                  <g>
+                    <rect x={-10} y={-9} width={20} height={18} rx={5} fill={fill} stroke="var(--v2-info)" strokeWidth={2} />
+                    {n.rank !== undefined && (
+                      <text x={0} y={3.5} fontSize={9} fontWeight={700} textAnchor="middle" fill="var(--v2-info)">{n.rank}</text>
+                    )}
+                  </g>
+                )}
                 <title>{n.title}</title>
-                <text x={14} y={4} fontSize={11} fill="var(--v2-text-1)">{n.label}</text>
+                <text
+                  x={14}
+                  y={4}
+                  fontSize={11}
+                  fill={n.researcherExcluded === true ? 'var(--v2-text-3)' : 'var(--v2-text-1)'}
+                  textDecoration={n.researcherExcluded === true ? 'line-through' : undefined}
+                  opacity={n.researcherExcluded === true ? 0.75 : 1}
+                  style={HALO_STYLE}
+                >
+                  {n.researcherPinned === true ? '◆ ' : ''}{n.researcherExcluded === true ? '⊘ ' : ''}{n.label}
+                </text>
+                {n.kind === 'claim' && (n.supportingCount > 0 || n.counterCount > 0) && (
+                  /* Polarity count chips (W10): ride the routing corridor's right
+                   *  end — inside the gutter, clear of the label budget. 11px at
+                   *  text-2: the first cut at 10px/text-3 was below legibility
+                   *  (review 2026-09-02 saw them as "missing"). */
+                  <text
+                    x={COL_X.hypothesis - 10}
+                    y={4}
+                    fontSize={11}
+                    textAnchor="end"
+                    fill="var(--v2-text-2)"
+                    style={HALO_STYLE}
+                  >
+                    {n.supportingCount > 0 ? `✓${n.supportingCount}` : ''}{n.counterCount > 0 ? ` ✗${n.counterCount}` : ''}
+                  </text>
+                )}
               </g>
             );
           })}

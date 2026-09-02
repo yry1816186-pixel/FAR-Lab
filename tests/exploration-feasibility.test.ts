@@ -9,33 +9,19 @@ import { ResearchQuestion, newId } from '../src/domain/index.js';
 import type { ArtifactStore } from '../src/shared/ports.js';
 
 /**
- * S10a offline capability probe: does the exploratory CodeAct plane actually
- * run end-to-end in THIS environment? Spawns the REAL sidecar (uv family env)
+ * S10a capability probe: does the exploratory CodeAct plane actually
+ * run end-to-end in THIS environment? Spawns the REAL Docker sandbox
  * through runExploration — the same path an agent tool would take. This is the
  * environment-feasibility check for directive §10's "real workload" bar on the
  * deterministic parts (LLM-dependent comparisons stay blocked and documented).
  *
- * Skipped honestly when `uv` is unavailable (CI without the Python family):
- * skip reason states exactly what could not be verified.
+ * This is an opt-in real-environment gate because the main cross-platform unit
+ * suite does not guarantee a prebuilt OCI image. CI's dedicated Ubuntu job sets
+ * FARLAB_VERIFY_EXPLORATION_SANDBOX=1 after building the image.
  */
 
-const uvAvailable = async (): Promise<boolean> => {
-  try {
-    const { execFile } = await import('node:child_process');
-    const { promisify } = await import('node:util');
-    await promisify(execFile)('uv', ['--version'], { timeout: 10_000 });
-    return true;
-  } catch {
-    return false;
-  }
-};
-
 describe('exploratory CodeAct environment feasibility (real sidecar)', () => {
-  it('runs gated analysis code through the real sidecar and lands full audit chain', async () => {
-    if (!(await uvAvailable())) {
-      console.warn('SKIP-EVIDENCE: uv not available in this environment — live sidecar feasibility unverified');
-      return;
-    }
+  it.skipIf(process.env.FARLAB_VERIFY_EXPLORATION_SANDBOX !== '1')('runs gated analysis code through the real sidecar and lands full audit chain', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'far-cap-'));
     const db = openDb(path.join(dir, 'far.db'));
     const store = new Store(db);
@@ -49,7 +35,6 @@ describe('exploratory CodeAct environment feasibility (real sidecar)', () => {
 
       // Lazy import keeps module-load time off the non-uv path.
       const { runExploration } = await import('../src/agent/exploration-runner.js');
-      const { createSidecar } = await import('../src/experiment/python.js');
 
       const result = await runExploration({
         store,
@@ -64,7 +49,6 @@ describe('exploratory CodeAct environment feasibility (real sidecar)', () => {
           'print("stdev", round(statistics.stdev(xs), 3))',
         ].join('\n'),
         maxRuntimeMs: 120_000,
-        sidecarFactory: () => createSidecar(),
       });
 
       expect(result.gate.allowed).toBe(true);
@@ -74,7 +58,9 @@ describe('exploratory CodeAct environment feasibility (real sidecar)', () => {
 
       // Full audit chain landed: receipt + note event.
       const receipts = store.listObjects('receipt', run.id);
-      expect(receipts.some((r) => r.toolExec?.tool === 'run_exploration')).toBe(true);
+      const receipt = receipts.find((r) => r.toolExec?.tool === 'run_exploration');
+      expect(receipt?.toolExec?.sandbox?.backend).toBe('docker-linux');
+      expect(receipt?.toolExec?.sandbox?.imageId).toMatch(/^sha256:[0-9a-f]{64}$/);
       const notes = store.listEvents(run.id).filter(
         (e) => e.type === 'note' && (e.detail as Record<string, unknown>).reason === 'exploration_completed',
       );

@@ -394,6 +394,20 @@ describe('agent loop dual timeout + stop conditions', () => {
     expect(res.turns.every((t) => t.action !== 'use_tool' || t.ok === undefined)).toBe(true);
   });
 
+  it('a tool that never settles is cut by the remaining step deadline and the run ends step_timeout (FA-HAR-01)', async () => {
+    const hung: AgentTool = {
+      name: 'echo',
+      description: 'never settles',
+      inputSchema: z.object({ text: z.string() }),
+      execute: () => new Promise(() => { /* hangs forever, ignores its abort signal */ }),
+    };
+    const { deps } = depsFor([{ rawOutput: useTool('echo', { text: 'x' }) }, { rawOutput: finish({ answer: 'ok' }) }]);
+    const res = await runAgentLoop(baseCfg({ stepTimeoutMs: 120 }), { ...deps, tools: new ToolRegistry().register(hung) });
+    expect(res.status).toBe('step_timeout');
+    expect(res.error).toContain('echo');
+    expect(res.error).toContain('stepTimeoutMs');
+  });
+
   it('a custom stop condition fires with its name recorded; conditions run before work', async () => {
     const { deps } = depsFor([{ rawOutput: finish({ answer: 'ok' }) }]);
     const res = await runAgentLoop(baseCfg({

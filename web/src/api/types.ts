@@ -208,6 +208,10 @@ export interface SourceVerification {
   titleMatch?: boolean;
   detail?: string;
   checkedAt: string;
+  /** Mirrors the stored per-run source (src pipeline stages read this same
+   *  field): retraction state as verified at the registry. */
+  retractionStatus?: 'retracted' | 'corrected' | 'expression_of_concern' | 'reinstated';
+  retractionReasons?: string[];
 }
 
 export interface SourceDocument {

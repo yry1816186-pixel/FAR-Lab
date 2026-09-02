@@ -8,7 +8,7 @@ Evidence-constrained, falsifiable scientific hypothesis generation and research-
 - **In-run falsification cascade** — a deterministic iteration controller closes experiment → feedback → revise (re-freeze) → re-experiment under bounded rounds / token budget / no-material-delta; an adaptive quality gate reopens weak hypothesis generation for one bounded round; run-level token budget treats receipts as the only spend authority
 - **Research supervisor** — read-only trajectory analysis at stage boundaries (idempotent, one observation per boundary; signals persisted for audit, action stays with the orchestrator and the human)
 - **Cross-run memory substrate** — governed memory items in the same SQLite store (no second memory DB): lifecycle governance (zod + SQL CHECK), poisoning fences (own-trust requires resolvable provenance; external content never derives own-trust), deterministic zero-LLM retrieval (FTS5 + ACT-R activation), append-only supersession
-- **Experiment execution layer** — Python sidecar (`experiment-runtime/`) with durable scheduler, dataset acquisition (ARFF/CSV/OpenML), train/eval with mechanical statistical verdicts, exploratory CodeAct analysis op under dual static gates (TS policy gate + Python AST mirror, dunder-traversal escape banned) in a restricted sandbox namespace — outputs are candidate findings only, never verdicts; remote execution over stdio JSON protocol
+- **Experiment execution layer** — Python sidecar (`experiment-runtime/`) with durable scheduler, dataset acquisition (ARFF/CSV/OpenML), train/eval with mechanical statistical verdicts, and exploratory CodeAct under dual static gates plus a fail-closed Docker Linux OCI boundary (no network, read-only rootfs, non-root, no capabilities, seccomp/resource limits, exact environment allowlist) — outputs are candidate findings only, never verdicts; remote execution over stdio JSON protocol
 - **Research protocol layer (paradigm-honest execution)** — when a plan's real-world legs (bench / field / human-subjects / engineering / archive / theory) cannot run computationally, the execute stage registers a FROZEN protocol: preregistered materials, instruments, arms and sampling, a code-committed randomization sequence (seeded by the plan hash — regenerated, never re-randomized), steps with explicit human-confirmation requirements, measurement variables with declarative QC, fail-closed ethics gates and stop conditions. Execution is tracked in an append-only HUMAN-ATTESTED ledger — the software never claims execution, it awaits real-world records; completed (or explicitly published) outcomes re-enter the causal loop as experiment feedback. HTTP: `GET /api/v1/runs/:id/protocol`, `POST /api/v1/runs/:id/protocol/records`
 - **Claim-source word-by-word binding** — every evidential claim is bound to its source text span; alignment is machine-verifiable, not free-text assertion
 - **Hypothesis comparison with evidence discrimination** — structured comparison view with per-cell evidence support/contradiction states; falsification stage produces ACH-style contrastivity analysis
@@ -29,6 +29,7 @@ Evidence-constrained, falsifiable scientific hypothesis generation and research-
 | Node.js | >= 24 |
 | npm | >= 10 |
 | Python + uv | >= 3.11 (experiment sidecar only) |
+| Docker Engine | Linux-container mode (required for production `explore_code`) |
 | SQLite | bundled via `node:sqlite` |
 
 Runtime dependencies (production): **zod** ^3.24.0 (single runtime invariant — schema validation only).
@@ -43,6 +44,11 @@ git clone https://github.com/yry1816186-pixel/FAR-Lab.git
 cd FAR-Lab
 npm install
 npm run build
+
+# Required before using the agent's explore_code capability. This fails rather
+# than falling back to host execution when Linux Docker isolation is unavailable.
+npm run sandbox:build
+npm run sandbox:verify
 
 # Set model provider key (choose one)
 export ZAI_API_KEY=your_zhipu_api_key          # Zhipu GLM (default)

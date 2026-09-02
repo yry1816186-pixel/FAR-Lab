@@ -24,6 +24,24 @@
       "lastReviewed": "2026-08-29"
     },
     {
+      "id": "B-FA-SEC-01-HOSTED-OCI",
+      "status": "OPEN",
+      "critical": true,
+      "reason": "Final source SHA hosted Ubuntu exploration-sandbox evidence is missing: require the workflow run URL, exact source SHA, image ID/digest, and Linux /proc attach-client cleanup proof. Local Docker Desktop evidence must not close this boundary.",
+      "owner": "self/hosted CI",
+      "openedAt": "2026-09-02",
+      "lastReviewed": "2026-09-02",
+      "acceptanceId": "FA-SEC-01",
+      "requiredEvidence": {
+        "workflow": "exploration-sandbox",
+        "runner": "ubuntu-latest",
+        "runUrl": null,
+        "sourceSha": null,
+        "imageId": null,
+        "linuxProcAttachCleanup": false
+      }
+    },
+    {
       "id": "B-CONTROL-PLANE-REBUILT",
       "status": "RESOLVED",
       "critical": false,

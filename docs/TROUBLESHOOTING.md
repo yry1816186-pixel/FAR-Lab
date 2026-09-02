@@ -44,6 +44,12 @@ linux-only (`node:24-slim`). The suites gate on `docker info --format
 '{{.OSType}}'` and honestly skip unless it reports `linux` (Docker Desktop with
 the WSL2 backend reports `linux`).
 
+**`explore_code` reports that Docker/image isolation is unavailable.**
+The production capability deliberately has no host-process fallback. Start a
+Docker Engine in Linux-container mode, then run `npm run sandbox:build` and
+`npm run sandbox:verify`. On Windows the supported backend is Docker Desktop's
+Linux/WSL2 engine; a Windows-native AppContainer/Job backend is not shipped.
+
 **A test's git fixture commit dies with `Direct commits to main are not allowed`.**
 A host-global `init.templateDir` (e.g. `~/.git-template` with a personal
 pre-commit) leaks into `git init` fixtures. The fixture uses `git init

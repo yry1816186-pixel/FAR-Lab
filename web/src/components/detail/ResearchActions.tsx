@@ -42,7 +42,7 @@ export function ResearchActions({
   onOpenClaim: (claimId: string) => void;
   onToFeedback: (content: string) => void;
 }): ReactNode {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [open, setOpen] = useState(false);
   const [askText, setAskText] = useState('');
   const [loading, setLoading] = useState<ResearchActionName | null>(null);
@@ -84,9 +84,9 @@ export function ResearchActions({
     if (result === null) return;
     const points = result.analysis.points.map((p) => `[${p.kind}] ${p.text}${p.claimId !== undefined ? ` (${p.claimId})` : ''}`).join('\n');
     onToFeedback(
-      `AI 研究动作（${result.action} · ${result.model.provider}/${result.model.modelId}）对「${targetLabel}」的分析：\n${result.analysis.headline}\n${points}` +
-      `${result.analysis.uncertainties.length > 0 ? `\n不确定性：${result.analysis.uncertainties.join('；')}` : ''}` +
-      `${result.analysis.nextStep !== undefined ? `\n建议下一步：${result.analysis.nextStep}` : ''}`,
+      t('actions.promoteHead', { action: result.action, model: `${result.model.provider}/${result.model.modelId}`, label: targetLabel }) + `\n${result.analysis.headline}\n${points}` +
+      (result.analysis.uncertainties.length > 0 ? `\n${t('actions.promoteUncertainties', { items: result.analysis.uncertainties.join(lang === 'zh' ? '；' : '; ') })}` : '') +
+      (result.analysis.nextStep !== undefined ? `\n${t('actions.promoteNextStep', { step: result.analysis.nextStep })}` : ''),
     );
   };
 

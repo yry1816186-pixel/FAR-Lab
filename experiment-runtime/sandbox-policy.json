@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "backend": "docker-linux",
+  "user": "65532:65532",
+  "networkMode": "none",
+  "readOnlyRootfs": true,
+  "capDrop": ["ALL"],
+  "noNewPrivileges": true,
+  "pidsMax": 64,
+  "memoryMaxBytes": 536870912,
+  "nanoCpus": 500000000,
+  "nofileMax": 64,
+  "fsizeMaxBytes": 1048576,
+  "tmpfs": "/tmp:rw,noexec,nosuid,nodev,size=32m",
+  "ipcMode": "private",
+  "cgroupnsMode": "private",
+  "init": true
+}

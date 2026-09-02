@@ -4,7 +4,8 @@ import type { ArtifactStore } from '../shared/ports.js';
 import { newId } from '../domain/ids.js';
 import { ProvenanceReceipt } from '../domain/index.js';
 import { analyzeExplorationCode, type ExplorationVerdict } from './exploratory-codeact.js';
-import type { SidecarFactory } from '../experiment/python.js';
+import { createExplorationSandbox } from '../experiment/exploration-sandbox.js';
+import type { SandboxAttestation, Sidecar } from '../experiment/python.js';
 
 /**
  * Exploratory CodeAct execution wiring (AVO fusion G4, execution half).
@@ -44,15 +45,108 @@ export interface RunExplorationInput {
   code: string;
   /** Hard wall-clock bound passed to the sidecar call. */
   maxRuntimeMs: number;
-  /** Injectable for tests; production uses createSidecar(). */
-  sidecarFactory: SidecarFactory;
+  /** Cooperative cancellation polled while the sidecar is warming up or executing. */
+  signal?: { readonly aborted: boolean };
   /** Optional stage label on the receipt (defaults to the agent plane convention). */
   stage?: string;
 }
 
 const sha256 = (s: string): string => createHash('sha256').update(s).digest('hex');
 
+const makeAbortError = (): Error => {
+  const error = new Error('exploration aborted by caller');
+  error.name = 'AbortError';
+  return error;
+};
+
+const isAborted = (signal: { readonly aborted: boolean } | undefined): boolean => signal?.aborted === true;
+
+/** Poll the run-backed cancellation view and close the sidecar before rejecting. */
+const awaitWithCooperativeAbort = async <T>(
+  operation: () => Promise<T>,
+  signal: { readonly aborted: boolean } | undefined,
+  onAbort: () => void,
+): Promise<T> => {
+  if (signal === undefined) return operation();
+
+  const abort = (): Error => {
+    const cancellation = makeAbortError();
+    try {
+      onAbort();
+      return cancellation;
+    } catch (cleanupError) {
+      return new AggregateError(
+        [cancellation, cleanupError],
+        `${cancellation.message}; sidecar cleanup also failed`,
+        { cause: cleanupError },
+      );
+    }
+  };
+
+  if (signal.aborted) throw abort();
+
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const poll = setInterval(() => {
+      if (!signal.aborted || settled) return;
+      const error = abort();
+      settled = true;
+      clearInterval(poll);
+      reject(error);
+    }, 10);
+
+    const settle = (finish: () => void): void => {
+      if (settled) return;
+      settled = true;
+      clearInterval(poll);
+      finish();
+    };
+
+    let pending: Promise<T>;
+    try {
+      pending = operation();
+    } catch (error) {
+      settle(() => reject(error));
+      return;
+    }
+    // A later rejection after abort/close is consumed here rather than becoming
+    // an unhandled rejection from the underlying sidecar promise.
+    pending.then(
+      (value) => settle(() => resolve(value)),
+      (error) => settle(() => reject(error)),
+    );
+    if (signal.aborted && !settled) {
+      const error = abort();
+      settled = true;
+      clearInterval(poll);
+      reject(error);
+    }
+  });
+};
+
+const receiptSandbox = (attestation: SandboxAttestation) => {
+  const facts = {
+    backend: attestation.backend,
+    imageRef: attestation.imageRef,
+    imageId: attestation.imageId,
+    policyHash: attestation.policyHash,
+    policyVersion: attestation.policyVersion,
+    uid: attestation.uid,
+    gid: attestation.gid,
+    noNewPrivs: attestation.noNewPrivs,
+    seccompMode: attestation.seccompMode,
+    capEff: attestation.capEff,
+    rootfsReadOnly: attestation.rootfsReadOnly,
+    tmpWritable: attestation.tmpWritable,
+    networkDisabled: attestation.networkDisabled,
+    cgroup: attestation.cgroup,
+  };
+  return { ...facts, attestationHash: sha256(JSON.stringify(facts)) };
+};
+
 export const runExploration = async (input: RunExplorationInput): Promise<ExplorationRunResult> => {
+  if (isAborted(input.signal)) throw makeAbortError();
+
   // ---- 1. static gate (fail-closed: no sidecar is ever spawned on violation) ----
   const gate = analyzeExplorationCode({
     code: input.code,
@@ -64,20 +158,49 @@ export const runExploration = async (input: RunExplorationInput): Promise<Explor
     throw new Error(`exploration gate rejected code [${codes}]: ${gate.violations.map((v) => v.message).join('; ')}`);
   }
 
-  const sidecar = input.sidecarFactory();
+  if (isAborted(input.signal)) throw makeAbortError();
+  // The production runner owns the trust root. Test doubles can replace this
+  // module boundary in an isolated test worker, but a runtime caller cannot
+  // supply a host process that merely reports attestation-shaped data.
+  const sidecar: Sidecar = createExplorationSandbox();
+  let sidecarClosed = false;
+  const closeSidecar = (): void => {
+    if (sidecarClosed) return;
+    sidecar.close();
+    sidecarClosed = true;
+  };
   try {
-    // warmup is best-effort: it verifies the env and caches SidecarEnvInfo, but
-    // a family env that answers run_exploration does not need the extra ping.
-    await sidecar.warmup(input.maxRuntimeMs).catch(() => undefined);
+    // Attestation is mandatory and precedes the first byte of untrusted code.
+    await awaitWithCooperativeAbort(
+      () => sidecar.warmup(input.maxRuntimeMs),
+      input.signal,
+      closeSidecar,
+    );
+    if (isAborted(input.signal)) {
+      closeSidecar();
+      throw makeAbortError();
+    }
+    const attestation = sidecar.sandboxAttestation?.() ?? null;
+    if (attestation === null) throw new Error('exploration execution requires a verified OS sandbox; host sidecars are refused');
+    const sandbox = receiptSandbox(attestation);
 
     // ---- 2. sandboxed execution ----
     const startedAt = Date.now();
-    const r = await sidecar.call<{ exploration: { ok: boolean; stdout?: string; stdoutTruncated?: boolean; errorKind?: string; errorMessage?: string } }>(
-      'run_exploration',
-      { code: input.code },
-      input.maxRuntimeMs,
+    const r = await awaitWithCooperativeAbort(
+      () => sidecar.call<{ exploration: { ok: boolean; stdout?: string; stdoutTruncated?: boolean; errorKind?: string; errorMessage?: string } }>(
+        'run_exploration',
+        { code: input.code },
+        input.maxRuntimeMs,
+      ),
+      input.signal,
+      closeSidecar,
     );
     const durationMs = Date.now() - startedAt;
+
+    if (isAborted(input.signal)) {
+      closeSidecar();
+      throw makeAbortError();
+    }
 
     if (!r.ok || r.result === undefined) {
       // Protocol-level error (allowlist/parse escape that slipped the TS gate —
@@ -104,7 +227,9 @@ export const runExploration = async (input: RunExplorationInput): Promise<Explor
         inputHash,
         outputHash: outputFingerprint,
         durationMs,
+        sandbox,
       },
+      environmentFingerprint: `${attestation.backend} ${attestation.imageId} policy:${attestation.policyHash}`,
       stage: input.stage ?? 'agent:exploration',
     };
     // Persist via the store's receipt schema (same discipline as the
@@ -128,11 +253,17 @@ export const runExploration = async (input: RunExplorationInput): Promise<Explor
         ok: execution.ok,
         ...(execution.errorKind !== undefined ? { errorKind: execution.errorKind, errorMessage: execution.errorMessage } : {}),
         durationMs,
+        sandbox: {
+          backend: attestation.backend,
+          imageId: attestation.imageId,
+          policyHash: attestation.policyHash,
+          attestationHash: sandbox.attestationHash,
+        },
       },
     });
 
     return { gate, execution, artifactRef: artifact.ref, receiptId: full.id };
   } finally {
-    sidecar.close();
+    closeSidecar();
   }
 };

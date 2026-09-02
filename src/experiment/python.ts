@@ -20,15 +20,41 @@ export interface SidecarEnvInfo {
   hardware?: Record<string, string>;
 }
 
-export interface SidecarFactory {
-  (): {
-    call<T>(op: string, payload: unknown, timeoutMs: number): Promise<SidecarCallResult<T>>;
-    logs(): string[];
-    envInfo(): SidecarEnvInfo | null;
-    lockfileHash(): string | null;
-    close(): void;
-    warmup(timeoutMs: number): Promise<SidecarEnvInfo>;
+export interface SandboxAttestation {
+  backend: 'docker-linux';
+  imageRef: string;
+  imageId: string;
+  policyHash: string;
+  policyVersion: number;
+  uid: number;
+  gid: number;
+  noNewPrivs: true;
+  seccompEnabled: true;
+  seccompMode: number;
+  capEff: '0000000000000000';
+  rootfsReadOnly: true;
+  tmpWritable: true;
+  networkDisabled: true;
+  interfaces: string[];
+  cgroup: {
+    memoryMaxBytes: number;
+    pidsMax: number;
+    cpuMax: string;
   };
+}
+
+export interface Sidecar {
+  call<T>(op: string, payload: unknown, timeoutMs: number): Promise<SidecarCallResult<T>>;
+  logs(): string[];
+  envInfo(): SidecarEnvInfo | null;
+  lockfileHash(): string | null;
+  sandboxAttestation?: () => SandboxAttestation | null;
+  close(): void;
+  warmup(timeoutMs: number): Promise<SidecarEnvInfo>;
+}
+
+export interface SidecarFactory {
+  (): Sidecar;
 }
 
 const RUNTIME_DIR = path.resolve(import.meta.dirname, '..', '..', 'experiment-runtime');
@@ -180,6 +206,7 @@ export const createSidecar = (opts: SidecarOptions = {}) => {
     logs: () => logLines,
     envInfo: () => env,
     lockfileHash,
+    sandboxAttestation: () => null,
     async warmup(timeoutMs: number): Promise<SidecarEnvInfo> {
       const r = await call<SidecarEnvInfo>('env_info', {}, timeoutMs);
       if (!r.ok || r.result === undefined) throw new Error(`sidecar env_info failed: ${r.error?.message ?? 'no result'}`);
@@ -195,5 +222,3 @@ export const createSidecar = (opts: SidecarOptions = {}) => {
     },
   };
 };
-
-export type Sidecar = ReturnType<typeof createSidecar>;
