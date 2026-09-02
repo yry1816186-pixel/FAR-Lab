@@ -16,8 +16,10 @@ import { experimentSpecHash, executeExperiment } from './executor.js';
  *   - training logs stay content-addressed artifacts (never queue rows, never events)
  *
  * Crash window semantics: a worker may finish far.db but die before scheduler.complete.
- * The reclaiming worker re-executes; ResultCell fingerprint dedup (D-086-1) makes the
- * re-run replay from cache instead of recomputing — idempotent by construction.
+ * The reclaiming worker re-executes; ResultCell fingerprint dedup (D-086-1, shared
+ * owner src/experiment/cell-dedup.ts) makes the re-run replay cached cells instead of
+ * retraining — locally env-lock scoped, remotely device+env scoped, and v2 per-device
+ * dispatch keeps reclaims on the same device, so remote retries hit their cache.
  *
  * Fence tokens: every claim (fresh or reclaim) increments the token; terminal writes and
  * heartbeats must carry the CURRENT token+worker, so a disowned zombie can never

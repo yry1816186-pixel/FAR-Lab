@@ -14,6 +14,7 @@ import { expandAblationModels } from './matrix.js';
 import { acquireDataset } from './datasets.js';
 import { applySplit } from './split.js';
 import { createSidecar, type Sidecar } from './python.js';
+import { localCellFingerprint, previousRunCells, loadCachedPerRow } from './cell-dedup.js';
 import { elapsedMilliseconds, monotonicMilliseconds, type MonotonicClock } from '../shared/timing.js';
 
 /**
@@ -338,7 +339,7 @@ export const executeExperiment = async (
     }
 
     // 4. Train/eval per model, with fingerprint dedup against earlier cells (D-086-1).
-    const previousCells = (store.listObjects('result_set', spec.runId) as ResultSet[]).flatMap((rs) => rs.cells);
+    const previousCells = previousRunCells(store, spec.runId);
     // 14→10 wiring: full-factorial ablation expansion (matrix.ts is the single owner).
     // Expanded cells are APPENDED after all base models — spec comparison indices stay
     // valid, ablation cells are report-only by construction. Cells whose (builder,
@@ -354,14 +355,13 @@ export const executeExperiment = async (
     const perRowByModel = new Map<number, number[]>();
     for (const [modelIdx, model] of effectiveModels.entries()) {
       if (opts.shouldCancel?.()) throw new Error('canceled');
-      const fingerprint = createHash('sha256')
-        .update(JSON.stringify({ specHash, contentRef: record.contentRef, envLock: lock, modelIdx, seed: model.seed, builder: model.builderId, hyperparams: model.hyperparams }))
-        .digest('hex');
+      const fingerprint = localCellFingerprint({
+        specHash, contentRef: record.contentRef, envLock: lock,
+        modelIdx, seed: model.seed, builder: model.builderId, hyperparams: model.hyperparams,
+      });
       const cached = previousCells.find((c) => c.fingerprint === fingerprint);
       if (cached !== undefined) {
-        const raw = await artifacts.get(cached.perRowRef);
-        if (raw === null) fail(`cached cell ${cached.modelName} lost its per-row artifact ${cached.perRowRef}`);
-        perRowByModel.set(modelIdx, JSON.parse(raw) as number[]);
+        perRowByModel.set(modelIdx, await loadCachedPerRow(artifacts, cached, fail));
         cells.push(cached);
         continue;
       }

@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -14,6 +13,7 @@ import { applySplit } from './split.js';
 import { createSidecar, type Sidecar } from './python.js';
 import { SSHGateway, remoteTimeoutWrap, truncateOutput } from './gateway.js';
 import { experimentSpecHash, computeStatReports, buildFeedback } from './executor.js';
+import { remoteCellFingerprint, previousRunCells, loadCachedPerRow } from './cell-dedup.js';
 import { elapsedMilliseconds, monotonicMilliseconds, type MonotonicClock } from '../shared/timing.js';
 
 /**
@@ -30,7 +30,9 @@ import { elapsedMilliseconds, monotonicMilliseconds, type MonotonicClock } from 
 const REMOTE_TEMPLATE = path.resolve(import.meta.dirname, '..', '..', 'experiment-runtime', 'remote', 'train_eval.py');
 
 export interface RemoteExecuteOptions {
-  gateway: SSHGateway;
+  /** The executor uses only probe/exec/putFile — the narrow seam lets tests inject a
+   *  scripted gateway without a real SSH boundary (FA-REM-02 verify). */
+  gateway: Pick<SSHGateway, 'probe' | 'exec' | 'putFile'>;
   deviceId: string;
   allowLocalDatasets?: boolean;
   existingRunId?: ExperimentRun['id'];
@@ -99,6 +101,9 @@ export const executeRemoteExperiment = async (
   };
 
   const logLines: string[] = [];
+  // Device staging dir (cleaned on success, and on failure/cancel below — FA-REM-02).
+  const remoteDir = `/tmp/farlab/${expRun.id}`;
+  let remoteDirPrepared = false;
   try {
     // 1. Data identity locally; ship raw CSV + split assignment to the device.
     const { record, parsed } = await acquireDataset(store, artifacts, spec.runId, use);
@@ -131,16 +136,32 @@ export const executeRemoteExperiment = async (
       } } : {}),
     } }, 'experiment_started', { id: expRun.id, device: opts.deviceId, python: probe.pythonVersion });
 
-    const remoteDir = `/tmp/farlab/${expRun.id}`;
     await opts.gateway.exec(`mkdir -p ${remoteDir}`);
+    remoteDirPrepared = true;
     await opts.gateway.putFile(artifacts.path(record.contentRef), `${remoteDir}/data.csv`);
     await opts.gateway.putFile(REMOTE_TEMPLATE, `${remoteDir}/train_eval.py`);
 
-    // 2. Remote cell production per model (reviewed template only).
+    // 2. Remote cell production per model (reviewed template only), with fingerprint
+    // dedup against earlier cells (D-086-1 / FA-REM-02): a reclaimed/retried job on
+    // the same device replays cached cells instead of retraining. Fingerprints are
+    // device+env scoped, so a different device/python/pip honestly retrains.
+    const previousCells = previousRunCells(store, spec.runId);
     const cells: ResultCell[] = [];
     const perRowByModel = new Map<number, number[]>();
     for (const [modelIdx, model] of spec.models.entries()) {
       if (opts.shouldCancel?.()) throw new Error('canceled');
+      const fingerprint = remoteCellFingerprint({
+        specHash, contentRef: record.contentRef, device: opts.deviceId,
+        remotePython: probe.pythonVersion, remotePipFreeze: probe.pipFreezeSha256,
+        modelIdx, seed: model.seed, builder: model.builderId, hyperparams: model.hyperparams,
+      });
+      const cached = previousCells.find((c) => c.fingerprint === fingerprint);
+      if (cached !== undefined) {
+        perRowByModel.set(modelIdx, await loadCachedPerRow(artifacts, cached, fail));
+        cells.push(cached);
+        logLines.push(`model=${model.name} cache-hit fp=${fingerprint.slice(0, 12)}`);
+        continue;
+      }
       const payloadPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'farlab-payload-')), 'payload.json');
       fs.writeFileSync(payloadPath, JSON.stringify({
         csvPath: `${remoteDir}/data.csv`, targetColumn: use.targetColumn,
@@ -173,11 +194,7 @@ export const executeRemoteExperiment = async (
       perRowByModel.set(modelIdx, res.perRowCorrect);
       cells.push({
         modelIdx, modelName: model.name, metrics: res.metrics, perRowRef, tags: model.tags,
-        fingerprint: createHash('sha256').update(JSON.stringify({
-          specHash, contentRef: record.contentRef, device: opts.deviceId, remotePython: probe.pythonVersion,
-          remotePipFreeze: probe.pipFreezeSha256,
-          modelIdx, seed: model.seed, builder: model.builderId, hyperparams: model.hyperparams,
-        })).digest('hex'),
+        fingerprint,
         nTrain: res.nTrain, nTest: res.nTest, timingMs: elapsedMilliseconds(t0, monotonicClock),
       });
     }
@@ -231,6 +248,19 @@ export const executeRemoteExperiment = async (
     await opts.gateway.exec(`rm -rf ${remoteDir}`);
     return { run: completed, resultSet, statReports, feedback };
   } catch (e) {
+    // FA-REM-02 failure-path cleanup: a failed or canceled run must not leak its
+    // staging dir on the device. Best-effort — a cleanup failure is disclosed as a
+    // note event but never masks the original error.
+    if (remoteDirPrepared) {
+      try {
+        await opts.gateway.exec(`rm -rf ${remoteDir}`);
+      } catch (cleanupErr) {
+        store.appendEvent(spec.runId, {
+          type: 'note',
+          detail: { kind: 'remote_cleanup_failed', dir: remoteDir, error: cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr) },
+        });
+      }
+    }
     if (e instanceof Error && e.message.startsWith('canceled')) {
       persist({ ...expRun, status: 'canceled', cancelRequested: true, endedAt: now(), error: 'canceled by operator' }, 'experiment_canceled', { id: expRun.id });
       throw new Error(`remote experiment ${expRun.id} canceled`, { cause: e });
