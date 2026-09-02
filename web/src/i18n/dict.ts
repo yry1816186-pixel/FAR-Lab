@@ -447,6 +447,9 @@ export const zh = {
   'actions.meta': '{model} · {ms}ms · 接地 {n} 条库内证据',
   'actions.disclaimer': '模型分析，非事实断言',
   'actions.toFeedback': '转为反馈（进入因果修订链）',
+  'actions.promoteHead': 'AI 研究动作（{action} · {model}）对「{label}」的分析：',
+  'actions.promoteUncertainties': '不确定性：{items}',
+  'actions.promoteNextStep': '建议下一步：{step}',
   'actions.close': '关闭',
 
   'graph.title': '证据图谱',
@@ -2266,6 +2269,9 @@ export const en: Record<DictKey, string> = {
   'actions.meta': '{model} · {ms}ms · grounded on {n} corpus claims',
   'actions.disclaimer': 'model analysis, not a statement of fact',
   'actions.toFeedback': 'Promote to feedback (causal revision chain)',
+  'actions.promoteHead': 'AI research action ({action} · {model}) analysis of "{label}":',
+  'actions.promoteUncertainties': 'Uncertainties: {items}',
+  'actions.promoteNextStep': 'Suggested next step: {step}',
   'actions.close': 'Close',
 
   'graph.title': 'Evidence graph',
