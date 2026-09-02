@@ -19,7 +19,7 @@ const required = [
 ];
 for (const rel of required) exists(rel) ? ok.push(`exists:${rel}`) : errors.push(`missing:${rel}`);
 
-for (const obsolete of ['.control/ACCEPTANCE_MATRIX.json','research/LEGACY_DECOMPOSITION.md','eslint.config.js']) {
+for (const obsolete of ['.control/ACCEPTANCE_MATRIX.json','research/LEGACY_DECOMPOSITION.md']) {
   if (exists(obsolete)) warnings.push(`obsolete-or-redundant-present:${obsolete}`);
 }
 
