@@ -120,6 +120,10 @@ export const createRunKernelPlane = (deps: RunKernelPlaneDeps): KernelCapability
           resultSchema: req.resultSchema,
           maxTurns: req.maxTurns ?? 8,
           contextEntries: req.contextEntries,
+          // Substrate cancel bridge: wire-level abort (this process) AND the persisted
+          // cancelRequested flag (external/another-process cancels) both stop the
+          // session at turn boundaries — a long agent step must not outlive a user cancel.
+          shouldAbort: () => deps.store.getRun(deps.runId)?.cancelRequested === true,
           ...(req.signal !== undefined ? { signal: req.signal } : {}),
         },
         {

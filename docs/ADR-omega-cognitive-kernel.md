@@ -24,7 +24,7 @@ OpenHands 证据：事件日志=唯一事实源，LLM 上下文/状态=派生视
 ### D3 统一 durable 基底：自研收敛共享原语（否决三外部候选）
 
 dbos-ts 需 Postgres、langgraph-sqlite 需 better-sqlite3 原生、temporal 需独立 server+Rust NAPI——各撞硬约束（zod-only/node:sqlite/单机）。我们已手抄 dbos OAOO（checkpointed、scheduler fence token），本来就在此路上。
-**裁决**：以 dbos `system_db_schema`（workflow_status/operation_outputs/queues 语义）为蓝本 + SqliteSaver 写冲突语义（IGNORE/REPLACE+特殊通道）收敛一套 `src/kernel/substrate`：lease/fence、OAOO step outputs、预算视图、事件脊柱、cancel/steer——orchestrator 与 scheduler 迁移共用（**保留两者写域分离**：同一实现、不同库表，尊重 scheduler.ts:12-25 的既有裁决）。kernel loop 保留自有 turn 机制但共享预算/回执/事件词汇。
+**裁决**：以 dbos `system_db_schema`（workflow_status/operation_outputs/queues 语义）为蓝本 + SqliteSaver 写冲突语义（IGNORE/REPLACE+特殊通道）收敛共享原语。**范围修订（2026-09-02 切片实现对拍后，按反悔触发条款预防性行使）**：orchestrator 租约（单写者行级、TTL+watchdog 收养）与 scheduler fence（原子优先队列领取、token 递增）语义不同构——lease/checkpoint 保持各自实现（写域分离本就是既有裁决 scheduler.ts:12-25）；基底收敛到真共享件：事件脊柱词汇、OAOO step_outputs、预算视图、cancel/steer 桥（wire AbortSignal ↔ persisted cancelRequested）、deadline guard。新执行面（agent 步）一律经共享件，存量编排面不强行迁移。
 
 ### D4 Workflow-as-data：计划成为类型化域对象
 

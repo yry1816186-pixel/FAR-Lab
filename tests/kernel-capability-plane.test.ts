@@ -86,6 +86,31 @@ describe('kernel capability plane', () => {
     expect(receipts.length).toBeGreaterThanOrEqual(1);
     expect(receipts.every((r) => r.kind === 'model_call')).toBe(true);
   });
+
+  it('runCapability bridges the persisted cancelRequested flag into the loop (external cancels stop agent steps)', async () => {
+    const dir = tmp();
+    const store = openStore(dir);
+    const q = ResearchQuestion.parse({
+      id: newId('q'), text: 'q', background: '', goalType: 'explanatory',
+      scope: { domain: 'd', phenomena: ['p'] }, constraints: {}, createdAt: new Date().toISOString(),
+    });
+    const run = store.createRun(q);
+    const persisted = store.getRun(run.id)!;
+    persisted.cancelRequested = true; // an external (other-process) cancel
+    store.updateRun(persisted);
+    const deps: RunKernelPlaneDeps = {
+      provider: createTestStubProvider([{ rawOutput: finishDebate }]),
+      store, runId: run.id, integrations: [],
+      sourceFor: noSource,
+      recordReceipt: () => {},
+      rolloutDir: path.join(dir, 'agent-sessions'),
+    };
+    const out = await createRunKernelPlane(deps).runCapability('counter-evidence-debate');
+    expect(out.status).toBe('aborted');
+    expect(out.ok).toBe(false);
+    const session = store.listObjects('agent_session', run.id).find((s) => s.id === out.sessionId);
+    expect(session?.status).toBe('cancelled');
+  });
 });
 
 describe('orchestrator: agent-kind workflow steps', () => {
