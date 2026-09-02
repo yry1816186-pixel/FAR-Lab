@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FAR-Lab · 标识方向提案 V1</title>
+<style>
+  :root{
+    --paper:#f2ecdc; --ink:#0e2a22; --acid:#c8f547; --mint:#9be5b9; --brick:#f3c13a;
+    --forest:#1c3a13; --cream:#f6f6f4; --sage:#d2d8d0;
+    --black:#000000; --white:#ffffff; --grey:#e5e7eb;
+    --night:#060606; --burnt:#b95d13; --offwhite:#f2f4f5;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{
+    background:#111;color:#eee;
+    font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .serif{font-family:Georgia,"Times New Roman","Songti SC","SimSun",serif}
+  .mono{font-family:"SF Mono","Cascadia Mono",Consolas,"Courier New",monospace}
+
+  header.page{
+    padding:72px 6vw 56px;border-bottom:1px solid rgba(255,255,255,.14);
+    display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:24px;
+  }
+  header.page h1{font-size:clamp(28px,4vw,52px);font-weight:700;letter-spacing:-.02em;line-height:1.05}
+  header.page h1 span{color:#888;font-weight:400}
+  header.page .meta{font-size:12px;letter-spacing:.14em;color:#999;text-align:right;line-height:1.9}
+
+  section.scheme{border-bottom:1px solid rgba(255,255,255,.14)}
+  .inner{max-width:1240px;margin:0 auto;padding:88px 6vw}
+  .tag{display:inline-block;font-size:11px;letter-spacing:.22em;padding:7px 14px;border:1px solid currentColor;border-radius:999px;margin-bottom:28px}
+  .scheme h2{font-size:clamp(30px,3.6vw,46px);font-weight:700;letter-spacing:-.015em;line-height:1.1;margin-bottom:6px}
+  .scheme h2 small{font-size:.42em;font-weight:400;letter-spacing:.06em;opacity:.62;margin-left:14px;vertical-align:middle}
+  .grid{display:grid;grid-template-columns:minmax(300px,420px) 1fr;gap:72px;margin-top:56px;align-items:start}
+  @media (max-width:900px){.grid{grid-template-columns:1fr}}
+
+  .markstage{display:flex;align-items:center;justify-content:center;padding:56px;min-height:420px}
+  .markstage svg{width:min(320px,70vw);height:auto}
+
+  .rationale p{font-size:15.5px;line-height:1.85;max-width:56ch;opacity:.92}
+  .rationale p+p{margin-top:14px}
+  .kws{display:flex;gap:10px;flex-wrap:wrap;margin:26px 0 40px}
+  .kws span{font-size:12px;letter-spacing:.1em;padding:6px 13px;border:1px solid currentColor;border-radius:3px;opacity:.85}
+
+  h3.sub{font-size:11px;letter-spacing:.24em;opacity:.55;margin:34px 0 14px;font-weight:600}
+  .lockup{padding:30px 34px;border:1px solid currentColor;display:inline-block}
+  .sizes{display:flex;align-items:flex-end;gap:36px;padding:24px 0;border-top:1px solid currentColor;border-bottom:1px solid currentColor}
+  .sizes figure{text-align:center}
+  .sizes figcaption{font-size:10px;letter-spacing:.14em;opacity:.5;margin-top:10px}
+
+  .chips{display:flex;gap:0;border:1px solid currentColor}
+  .chip{flex:1;padding:14px 16px;font-size:11px;line-height:1.7}
+  .chip b{display:block;font-size:10px;letter-spacing:.14em;opacity:.6;font-weight:600}
+  .typesample{font-size:15px;line-height:2}
+  .apps{font-size:12.5px;letter-spacing:.06em;opacity:.7;line-height:2}
+
+  footer.page{padding:56px 6vw;color:#777;font-size:12px;letter-spacing:.1em;line-height:2}
+
+  /* per-scheme skins */
+  .sA{background:var(--paper);color:var(--ink)}
+  .sA .markstage{background:var(--ink)}
+  .sB{background:var(--white);color:var(--black)}
+  .sB .markstage{background:var(--white);border:1px solid var(--black)}
+  .sC{background:var(--forest);color:var(--cream)}
+  .sC .markstage{background:#142c0d;position:relative;overflow:hidden}
+  .sD{background:var(--night);color:var(--offwhite)}
+  .sD .markstage{background:#0c0c0c;border:1px solid #1d1d1d}
+  .sE{background:#b0c6b3;color:#000}
+  .sE .markstage{background:#9fb8a2}
+  .sF{background:#fff;color:#000}
+  .sF .markstage{background:#f4f4f2;border:1px solid #000}
+  .sG{background:#0d0d0d;color:#ece9e2}
+  .sG .markstage{background:#111;border:1px solid #262626}
+  .sH{background:#0d0f12;color:#e8e6df}
+  .sH .markstage{background:#090b0e;border:1px solid #1c2126}
+
+  nav.toc{display:flex;gap:10px;flex-wrap:wrap;padding:26px 6vw;border-bottom:1px solid rgba(255,255,255,.14)}
+  nav.toc a{font-family:"SF Mono","Cascadia Mono",Consolas,monospace;font-size:11px;letter-spacing:.16em;color:#bbb;text-decoration:none;border:1px solid #444;padding:8px 14px;border-radius:999px}
+  nav.toc a:hover{color:#fff;border-color:#888}
+</style>
+</head>
+<body>
+
+<header class="page">
+  <h1>FAR-Lab <span>/ AOSSA</span><br>标识方向提案</h1>
+  <div class="meta mono">
+    IDENTITY DIRECTIONS · V2<br>
+    2026-09 · 八个方向，选一深化<br>
+    科研操作环境 · 第二大脑 × 研究执行 × 可审计记录
+  </div>
+</header>
+
+<nav class="toc">
+  <a href="#sA">A · 验证环</a>
+  <a href="#sB">B · 档案签</a>
+  <a href="#sC">C · 远视线</a>
+  <a href="#sD">D · 校准仪</a>
+  <a href="#sE">E · 坐标纸</a>
+  <a href="#sF">F · 脚注星</a>
+  <a href="#sG">G · 穿孔卡</a>
+  <a href="#sH">H · 星图</a>
+</nav>
+
+<!-- ============ SCHEME A ============ -->
+<section class="scheme sA" id="sA">
+  <div class="inner">
+    <span class="tag mono">DIRECTION A</span>
+    <h2>验证环 <small>The Verify Loop —— 假设出发，带着证据回来</small></h2>
+    <div class="grid">
+      <div>
+        <div class="markstage">
+          <svg viewBox="0 0 240 240" aria-label="verify loop mark">
+            <path d="M 194.5 163.0 A 86 86 0 1 1 163.0 45.5" fill="none" stroke="#f2ecdc" stroke-width="22" stroke-linecap="round"/>
+            <polygon points="175.1,52.5 143.6,47.0 154.6,28.0" fill="#f2ecdc"/>
+            <rect x="184" y="152" width="26" height="26" fill="#c8f547"/>
+          </svg>
+        </div>
+        <h3 class="sub mono">LOCKUP / 字标组合</h3>
+        <div class="lockup">
+          <span style="font-weight:700;font-size:30px;letter-spacing:-.01em">FAR</span><span style="display:inline-block;width:.42em;height:.42em;background:#a9d63b;margin:0 .28em .06em"></span><span style="font-weight:700;font-size:30px;letter-spacing:-.01em">LAB</span>
+          <div class="mono" style="font-size:10px;letter-spacing:.3em;margin-top:8px;opacity:.65">AOSSA · RESEARCH OPERATING ENVIRONMENT</div>
+        </div>
+      </div>
+      <div class="rationale">
+        <p>环形箭头是项目的北极星回路：问题 → 证据 → 假说 → 实验 → 结论 → 再回到新问题。环故意不闭合——留出「验证口」，由一颗酸性绿的方形校验点把守，对应 <span class="mono">far verify</span>：任何结论必须先通过确定性校验，回路才允许继续转动。</p>
+        <p>配色是「档案纸 + 深林墨 + 色卡绿」：暖纸底承托墨绿正文，酸性绿只用于通过态与关键动作——像实验记录本上的高光标记，理性、克制、零渐变。</p>
+        <div class="kws mono"><span>可验证</span><span>循环实证</span><span>实验室感</span><span>编辑气质</span></div>
+        <h3 class="sub mono">SIZES / 缩尺检验</h3>
+        <div class="sizes">
+          <figure><svg viewBox="0 0 240 240" width="72"><rect width="240" height="240" fill="#0e2a22"/><path d="M 194.5 163.0 A 86 86 0 1 1 163.0 45.5" fill="none" stroke="#f2ecdc" stroke-width="22" stroke-linecap="round"/><polygon points="175.1,52.5 143.6,47.0 154.6,28.0" fill="#f2ecdc"/><rect x="184" y="152" width="26" height="26" fill="#c8f547"/></svg><figcaption class="mono">APP · 72</figcaption></figure>
+          <figure><svg viewBox="0 0 240 240" width="40"><rect width="240" height="240" fill="#0e2a22"/><path d="M 194.5 163.0 A 86 86 0 1 1 163.0 45.5" fill="none" stroke="#f2ecdc" stroke-width="22" stroke-linecap="round"/><polygon points="175.1,52.5 143.6,47.0 154.6,28.0" fill="#f2ecdc"/><rect x="184" y="152" width="26" height="26" fill="#c8f547"/></svg><figcaption class="mono">40</figcaption></figure>
+          <figure><svg viewBox="0 0 240 240" width="22"><rect width="240" height="240" fill="#0e2a22"/><path d="M 194.5 163.0 A 86 86 0 1 1 163.0 45.5" fill="none" stroke="#f2ecdc" stroke-width="22" stroke-linecap="round"/><polygon points="175.1,52.5 143.6,47.0 154.6,28.0" fill="#f2ecdc"/><rect x="184" y="152" width="26" height="26" fill="#c8f547"/></svg><figcaption class="mono">FAVICON · 22</figcaption></figure>
+        </div>
+        <h3 class="sub mono">PALETTE / 色板</h3>
+        <div class="chips mono">
+          <div class="chip" style="background:#f2ecdc;color:#0e2a22"><b>PAPER</b>#F2ECDC</div>
+          <div class="chip" style="background:#0e2a22;color:#f2ecdc"><b>INK</b>#0E2A22</div>
+          <div class="chip" style="background:#c8f547;color:#0e2a22"><b>ACID</b>#C8F547</div>
+          <div class="chip" style="background:#9be5b9;color:#0e2a22"><b>MINT</b>#9BE5B9</div>
+        </div>
+        <h3 class="sub mono">TYPE / 字体系统</h3>
+        <div class="typesample">Grotesque Bold 字标与标题 · <span class="serif">衬线斜体做编辑强调</span> · <span class="mono">等宽体承载数据、编号与 verdict</span></div>
+        <h3 class="sub mono">APPLICATION / 应用</h3>
+        <div class="apps">桌面图标 · CLI 启动画面 · 报告页眉 · 验证徽章（通过态即绿色方点） · 论文插图角标</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SCHEME B ============ -->
+<section class="scheme sB" id="sB">
+  <div class="inner">
+    <span class="tag mono">DIRECTION B</span>
+    <h2>档案签 <small>The Specimen Label —— 每一条结论，都有编号与出处</small></h2>
+    <div class="grid">
+      <div>
+        <div class="markstage">
+          <svg viewBox="0 0 240 240" aria-label="specimen label mark">
+            <rect x="18" y="18" width="204" height="204" fill="none" stroke="#000" stroke-width="3.5"/>
+            <rect x="27" y="27" width="186" height="186" fill="none" stroke="#000" stroke-width="1"/>
+            <text x="120" y="118" text-anchor="middle" font-family="Georgia,'Times New Roman','Songti SC',serif" font-size="72" letter-spacing="3" fill="#000">FAR</text>
+            <line x1="58" y1="138" x2="182" y2="138" stroke="#000" stroke-width="2"/>
+            <text x="120" y="164" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="15" letter-spacing="5" fill="#000">LAB·RECORD</text>
+            <text x="120" y="190" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="10" letter-spacing="3" fill="#000">No.001 — AUDITED · MMXXVI</text>
+          </svg>
+        </div>
+        <h3 class="sub mono">LOCKUP / 字标组合</h3>
+        <div class="lockup serif" style="letter-spacing:.02em">
+          <span style="font-size:30px">FAR-Lab</span>
+          <span class="mono" style="font-size:11px;letter-spacing:.24em;margin-left:14px">AOSSA</span>
+          <div class="mono" style="font-size:10px;letter-spacing:.3em;margin-top:8px;opacity:.6">EVERY CLAIM CARRIES ITS SOURCE</div>
+        </div>
+      </div>
+      <div class="rationale">
+        <p>把「可审计研究记录」直接画成一枚博物馆标本签 / 档案藏书票：双线框、衬线学名、等宽编号、注册线。它宣告这个系统的价值观——结论不是聊出来的，是登记入册、可追溯、可复核的。</p>
+        <p>严格单色：黑纸白墨，无彩色、无渐变、无圆角讨好。权威感来自排版纪律而不是装饰。副形态是一枚圆形档案章，用于报告封缄、版本封版与「已验证」戳记。</p>
+        <div class="kws mono"><span>可审计</span><span>档案权威</span><span>藏书票</span><span>单色纪律</span></div>
+        <h3 class="sub mono">SIZES / 缩尺检验（小尺寸启用简化章）</h3>
+        <div class="sizes">
+          <figure><svg viewBox="0 0 240 240" width="72"><rect width="240" height="240" fill="#fff"/><rect x="18" y="18" width="204" height="204" fill="none" stroke="#000" stroke-width="6"/><text x="120" y="152" text-anchor="middle" font-family="Georgia,serif" font-size="96" letter-spacing="3" fill="#000">FAR</text></svg><figcaption class="mono">APP · 72</figcaption></figure>
+          <figure><svg viewBox="0 0 240 240" width="40"><circle cx="120" cy="120" r="112" fill="#000"/><text x="120" y="158" text-anchor="middle" font-family="Georgia,serif" font-size="104" fill="#fff">F</text></svg><figcaption class="mono">STAMP · 40</figcaption></figure>
+          <figure><svg viewBox="0 0 240 240" width="22"><circle cx="120" cy="120" r="112" fill="#000"/><text x="120" y="162" text-anchor="middle" font-family="Georgia,serif" font-size="110" fill="#fff">F</text></svg><figcaption class="mono">FAVICON · 22</figcaption></figure>
+        </div>
+        <h3 class="sub mono">PALETTE / 色板</h3>
+        <div class="chips mono">
+          <div class="chip" style="background:#000;color:#fff"><b>INK</b>#000000</div>
+          <div class="chip" style="background:#fff;color:#000;border-left:1px solid #000"><b>PAPER</b>#FFFFFF</div>
+          <div class="chip" style="background:#e5e7eb;color:#000"><b>GREY</b>#E5E7EB</div>
+        </div>
+        <h3 class="sub mono">TYPE / 字体系统</h3>
+        <div class="typesample"><span class="serif">经典衬线承担学名与标题</span> · <span class="mono">等宽体承担编号、时间戳与元数据</span> · 全大写 + 宽字距做栏目眉</div>
+        <h3 class="sub mono">APPLICATION / 应用</h3>
+        <div class="apps">研究记录封签 · 报告封缄章 · 版本发布戳 · 信纸页眉 · 论文与 reproducible bundle 标识</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SCHEME C ============ -->
+<section class="scheme sC" id="sC">
+  <div class="inner">
+    <span class="tag mono">DIRECTION C</span>
+    <h2>远视线 <small>The Far Sightline —— FAR，就是看得更远</small></h2>
+    <div class="grid">
+      <div>
+        <div class="markstage">
+          <svg viewBox="0 0 240 240" aria-label="far sightline mark">
+            <rect x="56" y="42" width="26" height="156" fill="#f6f6f4"/>
+            <rect x="56" y="42" width="118" height="26" fill="#f6f6f4"/>
+            <rect x="56" y="99" width="142" height="18" fill="#f6f6f4"/>
+            <polygon points="198,108 232,96 232,120" fill="#c8f547"/>
+          </svg>
+        </div>
+        <h3 class="sub mono">LOCKUP / 字标组合</h3>
+        <div class="lockup" style="border-color:#f6f6f4">
+          <span style="font-weight:700;font-size:30px;letter-spacing:-.01em">FAR</span><span style="display:inline-block;width:1.7em;height:2px;background:#f6f6f4;vertical-align:middle;margin:0 .35em"></span><span style="font-weight:300;font-size:30px;letter-spacing:.02em">LAB</span>
+          <div class="mono" style="font-size:10px;letter-spacing:.3em;margin-top:8px;opacity:.6">SEE FURTHER · VERIFY EVERYTHING</div>
+        </div>
+      </div>
+      <div class="rationale">
+        <p>一语双关：FAR 的字母 F，中画被拉成一条「远视线」，尽头是一枚绿色三角标——经纬仪照准远处目标的那一瞬间。它把名字、视野与测量仪器的精度感压缩进一个字母。</p>
+        <p>深林绿单色系统：像老式测绘局与植物标本馆的公用墨色，配奶白纸面。整身只有一处彩色——那枚三角标，代表「被锁定的假说」。粗细字重对比的 FAR—LAB，长破折号即视线。</p>
+        <div class="kws mono"><span>望远</span><span>测量精度</span><span>单色机构感</span><span>一字双关</span></div>
+        <h3 class="sub mono">SIZES / 缩尺检验</h3>
+        <div class="sizes" style="border-color:#f6f6f4">
+          <figure><svg viewBox="0 0 240 240" width="72"><rect width="240" height="240" fill="#142c0d"/><rect x="56" y="42" width="26" height="156" fill="#f6f6f4"/><rect x="56" y="42" width="118" height="26" fill="#f6f6f4"/><rect x="56" y="99" width="142" height="18" fill="#f6f6f4"/><polygon points="198,108 232,96 232,120" fill="#c8f547"/></svg><figcaption class="mono">APP · 72</figcaption></figure>
+          <figure><svg viewBox="0 0 240 240" width="40"><rect width="240" height="240" fill="#142c0d"/><rect x="56" y="42" width="26" height="156" fill="#f6f6f4"/><rect x="56" y="42" width="118" height="26" fill="#f6f6f4"/><rect x="56" y="99" width="142" height="18" fill="#f6f6f4"/><polygon points="198,108 232,96 232,120" fill="#c8f547"/></svg><figcaption class="mono">40</figcaption></figure>
+          <figure><svg viewBox="0 0 240 240" width="22"><rect width="240" height="240" fill="#142c0d"/><rect x="56" y="42" width="26" height="156" fill="#f6f6f4"/><rect x="56" y="42" width="118" height="26" fill="#f6f6f4"/><rect x="56" y="99" width="142" height="18" fill="#f6f6f4"/></svg><figcaption class="mono">FAVICON · 22</figcaption></figure>
+        </div>
+        <h3 class="sub mono">PALETTE / 色板</h3>
+        <div class="chips mono" style="border-color:#f6f6f4">
+          <div class="chip" style="background:#1c3a13;color:#f6f6f4"><b>FOREST</b>#1C3A13</div>
+          <div class="chip" style="background:#f6f6f4;color:#1c3a13"><b>CREAM</b>#F6F6F4</div>
+          <div class="chip" style="background:#d2d8d0;color:#1c3a13"><b>SAGE</b>#D2D8D0</div>
+          <div class="chip" style="background:#c8f547;color:#1c3a13"><b>SIGNAL</b>#C8F547</div>
+        </div>
+        <h3 class="sub mono">TYPE / 字体系统</h3>
+        <div class="typesample">Light 字重做 48–64px 大标题 · Regular 正文 · <span class="mono">等宽体做编号</span> · 全大写宽字距栏目眉</div>
+        <h3 class="sub mono">APPLICATION / 应用</h3>
+        <div class="apps">产品主标识 · 官网首屏 · 启动页 · 演示文稿封面 · 与 C 方案色板共用一整套界面语言</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SCHEME D ============ -->
+<section class="scheme sD" id="sD">
+  <div class="inner">
+    <span class="tag mono">DIRECTION D</span>
+    <h2>校准仪 <small>The Calibration Dial —— 仪器级的确定性与执行力</small></h2>
+    <div class="grid">
+      <div>
+        <div class="markstage">
+          <svg viewBox="0 0 240 240" aria-label="calibration dial mark">
+            <circle cx="120" cy="120" r="106" fill="none" stroke="#f2f4f5" stroke-width="1.5" opacity=".45"/>
+            <circle cx="120" cy="120" r="92" fill="none" stroke="#f2f4f5" stroke-width="3"/>
+            <g class="dialticks" stroke="#f2f4f5"></g>
+            <line x1="120" y1="120" x2="173.1" y2="66.9" stroke="#b95d13" stroke-width="6"/>
+            <line x1="120" y1="52" x2="120" y2="26" stroke="#b95d13" stroke-width="7" transform="rotate(45 120 120)"/>
+            <circle cx="120" cy="120" r="11" fill="#b95d13"/>
+            <circle cx="120" cy="120" r="4.5" fill="#060606"/>
+          </svg>
+        </div>
+        <h3 class="sub mono">LOCKUP / 字标组合</h3>
+        <div class="lockup" style="border-color:#f2f4f5">
+          <span style="font-weight:700;font-size:30px;letter-spacing:.02em">FAR-LAB</span><span style="color:#b95d13;font-weight:700;font-size:30px">.</span>
+          <div class="mono" style="font-size:10px;letter-spacing:.3em;margin-top:8px;opacity:.6">EXECUTION · QC · VERDICT</div>
+        </div>
+      </div>
+      <div class="rationale">
+        <p>一台仪器的表盘：一圈刻度，一根指针，指向唯一一枚被加粗的校准刻线——「已校验」位。它对应项目的执行平面与 QC 层：协议被执行、数据被质控、结论被判定，全部落在确定性代码上。</p>
+        <p>纯黑底 + 烧橙信号色 + 灰白刻度，是示波器与航电仪表的语言。四个方案中气质最硬朗的一个，最适合强调「研究执行引擎」而非「笔记本」的品牌叙事。</p>
+        <div class="kws mono"><span>确定性</span><span>仪器仪表</span><span>执行引擎</span><span>硬朗</span></div>
+        <h3 class="sub mono">SIZES / 缩尺检验</h3>
+        <div class="sizes" style="border-color:#f2f4f5">
+          <figure><svg viewBox="0 0 240 240" width="72"><rect width="240" height="240" fill="#060606"/><circle cx="120" cy="120" r="92" fill="none" stroke="#f2f4f5" stroke-width="7"/><g class="dialticks" stroke="#f2f4f5" data-w="5"></g><line x1="120" y1="120" x2="173.1" y2="66.9" stroke="#b95d13" stroke-width="9"/><circle cx="120" cy="120" r="13" fill="#b95d13"/></svg><figcaption class="mono">APP · 72</figcaption></figure>
+          <figure><svg viewBox="0 0 240 240" width="40"><rect width="240" height="240" fill="#060606"/><circle cx="120" cy="120" r="92" fill="none" stroke="#f2f4f5" stroke-width="10"/><line x1="120" y1="120" x2="173.1" y2="66.9" stroke="#b95d13" stroke-width="13"/><circle cx="120" cy="120" r="15" fill="#b95d13"/></svg><figcaption class="mono">40</figcaption></figure>
+          <figure><svg viewBox="0 0 240 240" width="22"><rect width="240" height="240" fill="#060606"/><circle cx="120" cy="120" r="92" fill="none" stroke="#f2f4f5" stroke-width="16"/><line x1="120" y1="120" x2="173.1" y2="66.9" stroke="#b95d13" stroke-width="18"/><circle cx="120" cy="120" r="20" fill="#b95d13"/></svg><figcaption class="mono">FAVICON · 22</figcaption></figure>
+        </div>
+        <h3 class="sub mono">PALETTE / 色板</h3>
+        <div class="chips mono" style="border-color:#f2f4f5">
+          <div class="chip" style="background:#060606;color:#f2f4f5"><b>NIGHT</b>#060606</div>
+          <div class="chip" style="background:#b95d13;color:#060606"><b>SIGNAL</b>#B95D13</div>
+          <div class="chip" style="background:#f2f4f5;color:#060606"><b>SCALE</b>#F2F4F5</div>
+        </div>
+        <h3 class="sub mono">TYPE / 字体系统</h3>
+        <div class="typesample">几何无衬线全大写字标 · <span class="mono">等宽体承担读数、刻度与状态</span> · 字距收紧、行高压实</div>
+        <h3 class="sub mono">APPLICATION / 应用</h3>
+        <div class="apps">CLI 与终端启动画面 · 运行监控界面 · 执行引擎徽标 · 深色模式产品界面 · 贴纸与周边</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SCHEME E ============ -->
+<section class="scheme sE" id="sE">
+  <div class="inner">
+    <span class="tag mono">DIRECTION E</span>
+    <h2>坐标纸 <small>The Drafting Sheet —— 离群点不被删除，而是被红笔圈出</small></h2>
+    <div class="grid">
+      <div>
+        <div class="markstage">
+          <svg viewBox="0 0 240 240" aria-label="drafting sheet mark">
+            <defs>
+              <pattern id="gp" width="24" height="24" patternUnits="userSpaceOnUse">
+                <path d="M24 0H0V24" fill="none" stroke="#000" stroke-opacity=".2" stroke-width="1"/>
+              </pattern>
+              <pattern id="gpm" width="48" height="48" patternUnits="userSpaceOnUse">
+                <path d="M48 0H0V48" fill="none" stroke="#000" stroke-opacity=".4" stroke-width="1.2" stroke-dasharray="1,5"/>
+              </pattern>
+            </defs>
+            <rect x="16" y="16" width="208" height="208" fill="#b0c6b3"/>
+            <rect x="16" y="16" width="208" height="208" fill="url(#gp)"/>
+            <rect x="16" y="16" width="208" height="208" fill="url(#gpm)"/>
+            <rect x="16" y="16" width="208" height="208" fill="none" stroke="#000" stroke-width="3"/>
+            <g fill="#000">
+              <circle cx="64" cy="64" r="5.5"/><circle cx="64" cy="88" r="5.5"/><circle cx="64" cy="112" r="5.5"/><circle cx="64" cy="136" r="5.5"/><circle cx="64" cy="160" r="5.5"/><circle cx="64" cy="184" r="5.5"/>
+              <circle cx="88" cy="64" r="5.5"/><circle cx="112" cy="64" r="5.5"/><circle cx="136" cy="64" r="5.5"/>
+              <circle cx="88" cy="136" r="5.5"/><circle cx="112" cy="136" r="5.5"/>
+            </g>
+            <circle cx="172" cy="121" r="5.5" fill="#db3356"/>
+            <circle cx="172" cy="121" r="14" fill="none" stroke="#db3356" stroke-width="3"/>
+            <line x1="172" y1="101" x2="172" y2="95" stroke="#db3356" stroke-width="3"/>
+            <line x1="172" y1="147" x2="172" y2="141" stroke="#db3356" stroke-width="3"/>
+            <line x1="166" y1="121" x2="152" y2="121" stroke="#db3356" stroke-width="3"/>
+            <line x1="186" y1="121" x2="192" y2="121" stroke="#db3356" stroke-width="3"/>
+          </svg>
+        </div>
+        <h3 class="sub mono">LOCKUP / 字标组合</h3>
+        <div class="lockup">
+          <span style="font-weight:700;font-size:30px;letter-spacing:-.01em">FAR-LAB</span><span style="color:#db3356;font-weight:700;font-size:22px;vertical-align:super;margin-left:2px">*</span>
+          <div class="mono" style="font-size:10px;letter-spacing:.3em;margin-top:8px;opacity:.6">PLOTTED · NOT POLISHED</div>
+        </div>
+      </div>
+      <div class="rationale">
+        <p>整张标识就是一页实验坐标纸：实线细格 + 虚线主格，字母 F 由一颗颗钉在格点上的数据点连成——研究是被「标绘」出来的，不是被美化出来的。</p>
+        <p>题眼是那枚偏离格点的深红色离群点，被红笔圈出、打上十字丝。它把项目宪章里的铁律画了出来：负证据与异常值永不被抹除，反而被标成最重要的线索。鼠尾草绿是旧图纸与墨水的颜色，校勘红只用于修正与警示。</p>
+        <div class="kws mono"><span>负证据</span><span>标绘</span><span>草稿本</span><span>校勘红</span></div>
+        <h3 class="sub mono">SIZES / 缩尺检验</h3>
+        <div class="sizes">
+          <figure><svg viewBox="0 0 240 240" width="72"><rect width="240" height="240" fill="#b0c6b3"/><rect x="16" y="16" width="208" height="208" fill="none" stroke="#000" stroke-width="7"/><g fill="#000"><circle cx="64" cy="64" r="8"/><circle cx="64" cy="88" r="8"/><circle cx="64" cy="112" r="8"/><circle cx="64" cy="136" r="8"/><circle cx="64" cy="160" r="8"/><circle cx="64" cy="184" r="8"/><circle cx="88" cy="64" r="8"/><circle cx="112" cy="64" r="8"/><circle cx="136" cy="64" r="8"/><circle cx="88" cy="136" r="8"/><circle cx="112" cy="136" r="8"/></g><circle cx="172" cy="121" r="8" fill="#db3356"/><circle cx="172" cy="121" r="18" fill="none" stroke="#db3356" stroke-width="6"/></svg><figcaption class="mono">APP · 72</figcaption></figure>
+          <figure><svg viewBox="0 0 240 240" width="40"><rect width="240" height="240" fill="#b0c6b3"/><g fill="#000"><circle cx="64" cy="64" r="11"/><circle cx="64" cy="94" r="11"/><circle cx="64" cy="124" r="11"/><circle cx="64" cy="154" r="11"/><circle cx="64" cy="184" r="11"/><circle cx="94" cy="64" r="11"/><circle cx="124" cy="64" r="11"/><circle cx="154" cy="64" r="11"/><circle cx="94" cy="124" r="11"/><circle cx="124" cy="124" r="11"/></g><circle cx="188" cy="150" r="11" fill="#db3356"/></svg><figcaption class="mono">40</figcaption></figure>
+          <figure><svg viewBox="0 0 240 240" width="22"><rect width="240" height="240" fill="#b0c6b3"/><g fill="#000"><circle cx="64" cy="64" r="14"/><circle cx="64" cy="98" r="14"/><circle cx="64" cy="132" r="14"/><circle cx="64" cy="166" r="14"/><circle cx="98" cy="64" r="14"/><circle cx="132" cy="64" r="14"/><circle cx="98" cy="132" r="14"/></g><circle cx="176" cy="150" r="14" fill="#db3356"/></svg><figcaption class="mono">FAVICON · 22</figcaption></figure>
+        </div>
+        <h3 class="sub mono">PALETTE / 色板</h3>
+        <div class="chips mono">
+          <div class="chip" style="background:#b0c6b3;color:#000"><b>SAGE</b>#B0C6B3</div>
+          <div class="chip" style="background:#000;color:#b0c6b3"><b>INK</b>#000000</div>
+          <div class="chip" style="background:#db3356;color:#fff"><b>PROOF RED</b>#DB3356</div>
+        </div>
+        <h3 class="sub mono">TYPE / 字体系统</h3>
+        <div class="typesample">高对比衬线做展示标题 · 可变字重无衬线做标签 · <span class="mono">等宽体做坐标与编号</span> · 全部启用旧式数字</div>
+        <h3 class="sub mono">APPLICATION / 应用</h3>
+        <div class="apps">实验日志界面 · 数据平面标识 · 误差/异常状态语言 · 信纸与记录模板 · 周边（草稿本、方格贴纸）</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SCHEME F ============ -->
+<section class="scheme sF" id="sF">
+  <div class="inner">
+    <span class="tag mono">DIRECTION F</span>
+    <h2>脚注星 <small>The Footnote Star —— 每句话都带着出处，每颗星都在远方</small></h2>
+    <div class="grid">
+      <div>
+        <div class="markstage">
+          <svg viewBox="0 0 240 240" aria-label="footnote star mark">
+            <g stroke="#000" stroke-width="17">
+              <line x1="120" y1="120" x2="120" y2="28"/>
+              <line x1="120" y1="120" x2="120" y2="28" transform="rotate(60 120 120)"/>
+              <line x1="120" y1="120" x2="120" y2="28" transform="rotate(120 120 120)"/>
+              <line x1="120" y1="120" x2="120" y2="28" transform="rotate(180 120 120)"/>
+              <line x1="120" y1="120" x2="120" y2="28" transform="rotate(240 120 120)"/>
+              <line x1="120" y1="120" x2="120" y2="28" transform="rotate(300 120 120)"/>
+            </g>
+          </svg>
+        </div>
+        <h3 class="sub mono">LOCKUP / 字标组合</h3>
+        <div class="lockup">
+          <span style="font-weight:700;font-size:30px;letter-spacing:-.01em">FAR-LAB</span><span style="font-weight:700;font-size:30px">*</span>
+          <div class="mono" style="font-size:10px;letter-spacing:.22em;margin-top:8px;opacity:.6">* EVERY CLAIM CARRIES ITS SOURCE</div>
+        </div>
+      </div>
+      <div class="rationale">
+        <p>星号是最小的学术符号，却承担最大的诚实义务：它出现的地方，必有脚注、必有出处。把它放大成标识，等于把「claim-source 对齐」这条科学铁律顶在头上。</p>
+        <p>它同时是一颗星——FAR，远方的星。六角放射、平头切口的构造取自铅字时代的活字星标，配等宽体编号与上标数字（¹ ² ³），整套语言就是一篇排版严谨的论文。严格黑白，零装饰，识别力极强。</p>
+        <div class="kws mono"><span>出处</span><span>星标双关</span><span>论文排版</span><span>极简符号</span></div>
+        <h3 class="sub mono">SIZES / 缩尺检验</h3>
+        <div class="sizes">
+          <figure><svg viewBox="0 0 240 240" width="72"><g stroke="#000" stroke-width="17"><line x1="120" y1="120" x2="120" y2="28"/><line x1="120" y1="120" x2="120" y2="28" transform="rotate(60 120 120)"/><line x1="120" y1="120" x2="120" y2="28" transform="rotate(120 120 120)"/><line x1="120" y1="120" x2="120" y2="28" transform="rotate(180 120 120)"/><line x1="120" y1="120" x2="120" y2="28" transform="rotate(240 120 120)"/><line x1="120" y1="120" x2="120" y2="28" transform="rotate(300 120 120)"/></g></svg><figcaption class="mono">APP · 72</figcaption></figure>
+          <figure><svg viewBox="0 0 240 240" width="40"><g stroke="#000" stroke-width="22"><line x1="120" y1="120" x2="120" y2="28"/><line x1="120" y1="120" x2="120" y2="28" transform="rotate(60 120 120)"/><line x1="120" y1="120" x2="120" y2="28" transform="rotate(120 120 120)"/><line x1="120" y1="120" x2="120" y2="28" transform="rotate(180 120 120)"/><line x1="120" y1="120" x2="120" y2="28" transform="rotate(240 120 120)"/><line x1="120" y1="120" x2="120" y2="28" transform="rotate(300 120 120)"/></g></svg><figcaption class="mono">40</figcaption></figure>
+          <figure><svg viewBox="0 0 240 240" width="22"><g stroke="#000" stroke-width="30"><line x1="120" y1="120" x2="120" y2="28"/><line x1="120" y1="120" x2="120" y2="28" transform="rotate(60 120 120)"/><line x1="120" y1="120" x2="120" y2="28" transform="rotate(120 120 120)"/><line x1="120" y1="120" x2="120" y2="28" transform="rotate(180 120 120)"/><line x1="120" y1="120" x2="120" y2="28" transform="rotate(240 120 120)"/><line x1="120" y1="120" x2="120" y2="28" transform="rotate(300 120 120)"/></g></svg><figcaption class="mono">FAVICON · 22</figcaption></figure>
+        </div>
+        <h3 class="sub mono">PALETTE / 色板</h3>
+        <div class="chips mono">
+          <div class="chip" style="background:#000;color:#fff"><b>INK</b>#000000</div>
+          <div class="chip" style="background:#fff;color:#000;border-left:1px solid #000"><b>PAPER</b>#FFFFFF</div>
+          <div class="chip" style="background:#e5e7eb;color:#000"><b>GREY</b>#E5E7EB</div>
+        </div>
+        <h3 class="sub mono">TYPE / 字体系统</h3>
+        <div class="typesample">极窄 Bold 无衬线做展示 · <span class="mono">等宽体做全部 UI 与凭证编号</span> · 上标数字体系做引用层级</div>
+        <h3 class="sub mono">APPLICATION / 应用</h3>
+        <div class="apps">引用与溯源系统图标 · 文档角标 · favicon（星号在 16px 仍完美可读） · 论文模板 · 印章副形态</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SCHEME G ============ -->
+<section class="scheme sG" id="sG">
+  <div class="inner">
+    <span class="tag mono">DIRECTION G</span>
+    <h2>穿孔卡 <small>The Punch Card —— 第一份机器可读、可审计的记录</small></h2>
+    <div class="grid">
+      <div>
+        <div class="markstage">
+          <svg viewBox="0 0 240 240" aria-label="punch card mark">
+            <polygon points="14,62 34,42 226,42 226,198 14,198" fill="#ece9e2"/>
+            <g class="punch" fill="#0d0d0d"></g>
+            <line x1="34" y1="152" x2="226" y2="152" stroke="#0d0d0d" stroke-width="1" stroke-dasharray="3,4" opacity=".5"/>
+            <text x="120" y="176" text-anchor="middle" font-family="Consolas,'Courier New',monospace" font-size="10.5" letter-spacing="2.5" fill="#0d0d0d">FAR-LAB · MACHINE-READABLE · BIT■</text>
+          </svg>
+        </div>
+        <h3 class="sub mono">LOCKUP / 字标组合</h3>
+        <div class="lockup" style="border-color:#ece9e2">
+          <span class="mono" style="font-weight:700;font-size:26px;letter-spacing:.08em">FAR-LAB</span><span class="mono" style="color:#e83828;font-weight:700;font-size:26px">■</span>
+          <div class="mono" style="font-size:10px;letter-spacing:.3em;margin-top:8px;opacity:.6">RECORDED · READABLE · VERIFIABLE</div>
+        </div>
+      </div>
+      <div class="rationale">
+        <p>穿孔卡是计算史上第一种「机器可读、可重放、可审计」的记录介质——孔位即数据，切角即方向，错一列整卡作废。这恰好是 AOSSA 对研究记录的要求：确定性、可验证、不可悄悄修改。</p>
+        <p>FAR 三个字母由 5×7 孔阵击穿而成，右上角一孔以信号红击穿——那是校验位（verdict bit)，卡片命运的最后一击。灰白卡片 + 墨黑孔阵 + 单点红，整套语言延伸到终端即是等宽点阵字体。</p>
+        <div class="kws mono"><span>可重放</span><span>校验位</span><span>计算考古</span><span>点阵</span></div>
+        <h3 class="sub mono">SIZES / 缩尺检验</h3>
+        <div class="sizes" style="border-color:#ece9e2">
+          <figure><svg viewBox="0 0 240 240" width="72"><rect width="240" height="240" fill="#0d0d0d"/><polygon points="14,62 34,42 226,42 226,198 14,198" fill="#ece9e2"/><g class="punch" fill="#0d0d0d"></g></svg><figcaption class="mono">APP · 72</figcaption></figure>
+          <figure><svg viewBox="0 0 240 240" width="40"><rect width="240" height="240" fill="#0d0d0d"/><polygon points="14,62 34,42 226,42 226,198 14,198" fill="#ece9e2"/><g class="punch" fill="#0d0d0d" data-r="6"></g></svg><figcaption class="mono">40</figcaption></figure>
+          <figure><svg viewBox="0 0 240 240" width="22"><rect width="240" height="240" fill="#ece9e2"/><g class="punch" fill="#0d0d0d" data-r="8" data-letter="F" data-x0="84" data-y0="48"></g><circle cx="196" cy="52" r="10" fill="#e83828"/></svg><figcaption class="mono">FAVICON · 22</figcaption></figure>
+        </div>
+        <h3 class="sub mono">PALETTE / 色板</h3>
+        <div class="chips mono" style="border-color:#ece9e2">
+          <div class="chip" style="background:#ece9e2;color:#0d0d0d"><b>CARD</b>#ECE9E2</div>
+          <div class="chip" style="background:#0d0d0d;color:#ece9e2"><b>PUNCH</b>#0D0D0D</div>
+          <div class="chip" style="background:#e83828;color:#fff"><b>BIT RED</b>#E83828</div>
+        </div>
+        <h3 class="sub mono">TYPE / 字体系统</h3>
+        <div class="typesample"><span class="mono">点阵/等宽体为唯一主角</span> · 列号（01–80）做版式骨架 · 全大写、宽字距、零衬线</div>
+        <h3 class="sub mono">APPLICATION / 应用</h3>
+        <div class="apps">CLI 启动画面与日志语言 · 可复现 bundle 封签 · 版本发布卡 · 极客向周边（真·穿孔卡书签）</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SCHEME H ============ -->
+<section class="scheme sH" id="sH">
+  <div class="inner">
+    <span class="tag mono">DIRECTION H</span>
+    <h2>星图 <small>The Star Chart —— FAR：把名字写进远方</small></h2>
+    <div class="grid">
+      <div>
+        <div class="markstage">
+          <svg viewBox="0 0 240 240" aria-label="star chart mark">
+            <circle cx="120" cy="120" r="102" fill="none" stroke="#e8e6df" stroke-opacity=".35" stroke-width="1" stroke-dasharray="2,6"/>
+            <circle cx="120" cy="120" r="66" fill="none" stroke="#e8e6df" stroke-opacity=".22" stroke-width="1" stroke-dasharray="2,6"/>
+            <g stroke="#e8e6df" stroke-opacity=".5" stroke-width="1">
+              <line x1="120" y1="12" x2="120" y2="22"/><line x1="120" y1="218" x2="120" y2="228"/>
+              <line x1="12" y1="120" x2="22" y2="120"/><line x1="218" y1="120" x2="228" y2="120"/>
+            </g>
+            <g stroke="#e8e6df" stroke-opacity=".75" stroke-width="1">
+              <polyline points="70,60 64,100 76,140 70,180" fill="none"/>
+              <line x1="70" y1="60" x2="168" y2="60"/>
+              <line x1="76" y1="140" x2="146" y2="142"/>
+            </g>
+            <g fill="#e8e6df">
+              <circle cx="70" cy="60" r="3.5"/><circle cx="64" cy="100" r="2.5"/><circle cx="76" cy="140" r="2.5"/><circle cx="70" cy="180" r="3"/>
+              <circle cx="118" cy="60" r="2.5"/>
+              <circle cx="146" cy="142" r="2.5"/>
+              <circle cx="42" cy="42" r="1.4" opacity=".6"/><circle cx="200" cy="182" r="1.4" opacity=".6"/><circle cx="192" cy="96" r="1.1" opacity=".6"/><circle cx="48" cy="152" r="1.1" opacity=".6"/>
+            </g>
+            <circle cx="168" cy="60" r="4" fill="#e83828"/>
+            <circle cx="168" cy="60" r="11" fill="none" stroke="#e83828" stroke-width="2"/>
+            <line x1="168" y1="43" x2="168" y2="37" stroke="#e83828" stroke-width="2"/>
+            <line x1="168" y1="83" x2="168" y2="77" stroke="#e83828" stroke-width="2"/>
+            <line x1="151" y1="60" x2="157" y2="60" stroke="#e83828" stroke-width="2"/>
+            <line x1="179" y1="60" x2="185" y2="60" stroke="#e83828" stroke-width="2"/>
+            <text x="186" y="44" font-family="Consolas,'Courier New',monospace" font-size="9" letter-spacing="1" fill="#e83828">FAR-01</text>
+            <text x="20" y="220" font-family="Consolas,'Courier New',monospace" font-size="8" letter-spacing="1" fill="#e8e6df" opacity=".55">RA 05h35m · DEC −05°23′</text>
+          </svg>
+        </div>
+        <h3 class="sub mono">LOCKUP / 字标组合</h3>
+        <div class="lockup" style="border-color:#e8e6df">
+          <span style="font-weight:700;font-size:30px;letter-spacing:.06em">FAR-LAB</span><span class="mono" style="color:#e83828;font-size:12px;vertical-align:super;margin-left:6px">01</span>
+          <div class="mono" style="font-size:10px;letter-spacing:.3em;margin-top:8px;opacity:.6">CHARTED · NOT CLAIMED</div>
+        </div>
+      </div>
+      <div class="rationale">
+        <p>FAR 的本义是远方——那就把名字写进星图。F 形星座由七颗恒星连成，虚线赤纬圈与四向刻度是天文底图的语法；每颗已点亮的星是一个被验证的结论，未连线的散点是待连接的知识。</p>
+        <p>红色目标星 FAR-01 配十字丝与编号：那是当前被锁定的假说。星图的诚实在于——图上的每一点都必须有坐标，正如系统里的每个结论都必须有出处。夜空黑 + 星白 + 目标红，冷静且有野心。</p>
+        <div class="kws mono"><span>远方</span><span>坐标即出处</span><span>天文底图</span><span>野心</span></div>
+        <h3 class="sub mono">SIZES / 缩尺检验</h3>
+        <div class="sizes" style="border-color:#e8e6df">
+          <figure><svg viewBox="0 0 240 240" width="72"><rect width="240" height="240" fill="#0d0f12"/><circle cx="120" cy="120" r="102" fill="none" stroke="#e8e6df" stroke-opacity=".35" stroke-width="2" stroke-dasharray="3,8"/><g stroke="#e8e6df" stroke-opacity=".8" stroke-width="2"><polyline points="70,60 64,100 76,140 70,180" fill="none"/><line x1="70" y1="60" x2="168" y2="60"/><line x1="76" y1="140" x2="146" y2="142"/></g><g fill="#e8e6df"><circle cx="70" cy="60" r="5"/><circle cx="64" cy="100" r="4"/><circle cx="76" cy="140" r="4"/><circle cx="70" cy="180" r="4.5"/><circle cx="118" cy="60" r="4"/><circle cx="146" cy="142" r="4"/></g><circle cx="168" cy="60" r="6" fill="#e83828"/><circle cx="168" cy="60" r="14" fill="none" stroke="#e83828" stroke-width="3"/></svg><figcaption class="mono">APP · 72</figcaption></figure>
+          <figure><svg viewBox="0 0 240 240" width="40"><rect width="240" height="240" fill="#0d0f12"/><g stroke="#e8e6df" stroke-width="3"><polyline points="70,60 64,100 76,140 70,180" fill="none"/><line x1="70" y1="60" x2="168" y2="60"/><line x1="76" y1="140" x2="146" y2="142"/></g><g fill="#e8e6df"><circle cx="70" cy="60" r="7"/><circle cx="64" cy="100" r="6"/><circle cx="76" cy="140" r="6"/><circle cx="70" cy="180" r="7"/><circle cx="118" cy="60" r="6"/><circle cx="146" cy="142" r="6"/></g><circle cx="168" cy="60" r="8" fill="#e83828"/></svg><figcaption class="mono">40</figcaption></figure>
+          <figure><svg viewBox="0 0 240 240" width="22"><rect width="240" height="240" fill="#0d0f12"/><g fill="#e8e6df"><circle cx="70" cy="60" r="11"/><circle cx="64" cy="100" r="9"/><circle cx="76" cy="140" r="9"/><circle cx="70" cy="180" r="11"/><circle cx="118" cy="60" r="9"/><circle cx="146" cy="142" r="9"/></g><circle cx="172" cy="60" r="12" fill="#e83828"/></svg><figcaption class="mono">FAVICON · 22</figcaption></figure>
+        </div>
+        <h3 class="sub mono">PALETTE / 色板</h3>
+        <div class="chips mono" style="border-color:#e8e6df">
+          <div class="chip" style="background:#0d0f12;color:#e8e6df"><b>NIGHT</b>#0D0F12</div>
+          <div class="chip" style="background:#e8e6df;color:#0d0f12"><b>STAR</b>#E8E6DF</div>
+          <div class="chip" style="background:#e83828;color:#fff"><b>TARGET</b>#E83828</div>
+        </div>
+        <h3 class="sub mono">TYPE / 字体系统</h3>
+        <div class="typesample">宽字距全大写无衬线 · <span class="mono">等宽体做坐标、编号与图注</span> · 图版式版面：大量留白 + 细发线</div>
+        <h3 class="sub mono">APPLICATION / 应用</h3>
+        <div class="apps">产品主标识 · 知识图谱界面语言 · 假说追踪视图 · 演示与发布主视觉 · 徽章（每验证一个结论点亮一星）</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="page mono">
+  FAR-LAB / AOSSA — IDENTITY DIRECTIONS V2 · 八选一后进入完整视觉系统（字标定稿 / 制图栅格 / 应用规范 / 物料模板）<br>
+  所有图形均为矢量构造稿，非位图效果；缩尺列用于检验小尺寸识别度。
+</footer>
+
+<script>
+document.querySelectorAll('g.dialticks').forEach(function(g){
+  var w = parseFloat(g.dataset.w || 3);
+  for(var i=0;i<24;i++){
+    var a = i*15, major = (i%6===0);
+    if(a===45) continue;
+    var l = document.createElementNS('http://www.w3.org/2000/svg','line');
+    l.setAttribute('x1',120); l.setAttribute('y1',28);
+    l.setAttribute('x2',120); l.setAttribute('y2', major?48:40);
+    l.setAttribute('stroke-width', major? w+1 : w);
+    l.setAttribute('transform','rotate('+a+' 120 120)');
+    g.appendChild(l);
+  }
+});
+
+var PUNCH = {
+  F:["11111","10000","10000","11110","10000","10000","10000"],
+  A:["01110","10001","10001","11111","10001","10001","10001"],
+  R:["11110","10001","10001","11110","10100","10010","10001"]
+};
+document.querySelectorAll('g.punch').forEach(function(g){
+  var ns='http://www.w3.org/2000/svg';
+  var r = parseFloat(g.dataset.r || 4), cell = parseFloat(g.dataset.cell || 12);
+  var only = g.dataset.letter;
+  var letters = only ? [[only, parseFloat(g.dataset.x0||36), parseFloat(g.dataset.y0||64)]]
+                     : [["F",36,64],["A",100,64],["R",164,64]];
+  letters.forEach(function(L){
+    var map = PUNCH[L[0]], x0 = L[1], y0 = L[2];
+    map.forEach(function(row,ri){
+      row.split('').forEach(function(bit,ci){
+        if(bit!=='1') return;
+        var c = document.createElementNS(ns,'circle');
+        c.setAttribute('cx', x0 + ci*cell); c.setAttribute('cy', y0 + ri*cell);
+        c.setAttribute('r', r);
+        if(L[0]==='R' && ri===0 && ci===3 && !only) c.setAttribute('fill','#e83828');
+        g.appendChild(c);
+      });
+    });
+  });
+});
+</script>
+</body>
+</html>

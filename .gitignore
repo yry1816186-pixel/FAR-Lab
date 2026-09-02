@@ -95,3 +95,13 @@ work/
 
 # External AI tool local state (CodeBuddy)
 .codebuddy/
+
+# HX/design-lane iteration artifacts (impeccable outputs — never uploaded, per HX lane rule)
+/.impeccable/
+
+# Competition organizer materials (third-party docs, local reference only — never upload)
+/competition-inputs/
+
+# Submission final-package QA render iterations (process artifacts, ~77MB local only;
+# the deliverables docx/pdf/figs/generators ARE tracked under submission/final/)
+/submission/final/pdf-qa*/
