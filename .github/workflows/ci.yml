@@ -83,6 +83,13 @@ jobs:
         run: npm test
       - name: CLI smoke (offline help path)
         run: node dist/cli/main.js --help
+      # FA-PRF-02: backend percentile gate on the canonical Linux cell (real
+      # paths: cold start, createApp, API surface, 15k-event store ops, kernel
+      # turn machinery). Thresholds p95, provisional until tightened against
+      # hosted artifacts (evidence/reliability/perf-gate.json in the log).
+      - name: Backend perf gate (p50/p95/p99 thresholds)
+        if: matrix.os == 'ubuntu-latest'
+        run: node scripts/perf-gate.mjs --ci
       - name: License ledger gate (copyleft + committed-ledger drift)
         run: node zcode-harness/scripts/license-ledger.mjs --check
       - name: Secret scan

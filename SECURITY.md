@@ -33,6 +33,21 @@ This tool reads model-provider credentials from environment variables (or a loca
 | Proxy / custom CA (`FARLAB_HTTPS_PROXY`, `FARLAB_CA_CERT`) | These change the TLS trust root and the path of every outbound request — treated as credential-grade config from the researcher's environment/.env (same boundary as API keys). `FARLAB_CA_CERT` is refused when `NODE_EXTRA_CA_CERTS` is already set at boot (no silent double trust roots); `far probe net` verifies the resulting chain with a loopback self-test before a run depends on it. |
 | Thinking display (reasoning capture) | Model reasoning text is DISPLAY-ONLY: persisted on conversation messages, capped (8k/call, 12k/message), never fed back into prompts, never written into receipts (receipts carry hashes only). |
 
+## At-Rest Encryption — Explicit Non-Goal (decision FA-DAT-03, 2026-09-02)
+
+The local SQLite workspaces (`far.db`, scheduler/artifact stores) and the artifact directory are
+stored **unencrypted**, by decision, for the current single-user local deployment:
+
+- The threat model is a researcher's own machine with their own OS account. Against other OS
+  accounts / device theft / offline disk access, the correct control is full-disk encryption
+  (BitLocker/FileVault/LUKS) — an application-layer cipher adds no boundary the OS does not
+  already enforce for a local single-user process, while adding a key-management surface
+  (where does the app key live? same disk → no gain; OS keychain → new secret-sprawl).
+- API keys are NOT in the databases (env/local secrets file; receipts carry hashes only).
+- **Reopen trigger** (D-DAT-03): any multi-user, shared-workspace, or server deployment mode
+  makes per-workspace encryption (SQLCipher / AES-GCM artifact envelopes) REQUIRED before that
+  mode ships. Until such a mode exists, no at-rest-encryption claim is made anywhere.
+
 ## Scope
 
 Scientific content produced by the pipeline is model output over retrieved literature — it is

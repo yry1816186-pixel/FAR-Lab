@@ -69,7 +69,16 @@ find the zombie server (`netstat -ano | findstr <port>`) and kill it.
 
 **`git` warns `LF will be replaced by CRLF` on every checkout.**
 Harmless on this repo (no line-ending-sensitive artifacts are committed); the
-warnings come from a Windows-global `autocrlf=true`.
+warnings come from a Windows-global `autocrlf=true`. EXCEPTION below — `.mjs`
+files are line-ending sensitive.
+
+**A shebang'd `.mjs` import dies with `SyntaxError: Invalid or unexpected token`
+on `windows-latest` CI while the same tree is green locally and on ubuntu.**
+The runner's autocrlf checkout rendered the file with CRLF, and vite/vitest's
+transform fails on a shebang in a CRLF `.mjs` (reproduced and bisected
+2026-09-02: CRLF+shebang fails, CRLF without shebang passes). Root fix:
+`.gitattributes` pins `*.mjs text eol=lf` (commit b830955) — do not remove it,
+and do not add shebangs to `.ts` test-imported sources.
 
 ## Web & desktop
 

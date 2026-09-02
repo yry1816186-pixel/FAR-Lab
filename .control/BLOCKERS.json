@@ -25,7 +25,7 @@
     },
     {
       "id": "B-FA-SEC-01-HOSTED-OCI",
-      "status": "OPEN",
+      "status": "RESOLVED",
       "critical": true,
       "reason": "Final source SHA hosted Ubuntu exploration-sandbox evidence is missing: require the workflow run URL, exact source SHA, image ID/digest, and Linux /proc attach-client cleanup proof. Local Docker Desktop evidence must not close this boundary.",
       "owner": "self/hosted CI",
@@ -39,7 +39,17 @@
         "sourceSha": null,
         "imageId": null,
         "linuxProcAttachCleanup": false
-      }
+      },
+      "resolvedAt": "2026-09-02",
+      "resolutionEvidence": {
+        "workflow": "exploration-sandbox",
+        "runner": "ubuntu-latest",
+        "runUrl": "https://github.com/yry1816186-pixel/FAR-Lab/actions/runs/33583828122",
+        "sourceSha": "0da4c68adf0ac1496d67de59990e9755edced64d",
+        "imageId": "sha256:fedefb6ec129bfbaca3b19136bb0da5e313ba69d557e9fdd73b8a743657a2b10",
+        "linuxProcAttachCleanup": true
+      },
+      "resolutionNote": "Canonical main merge commit (PR #137) exploration-sandbox job: green verifier, green production-path suites, green adversarial suite with 'FA-SEC-01 Linux /proc attach-client cleanup: checked=4 remaining=0', always-run cleanup assertion 'FA-SEC-01 container cleanup: exploration=0 verifier=0'. Three hosted ubuntu green runs total (33579172412 lane, 33580883479 lane, 33583828122 main); the main run is the closing evidence."
     },
     {
       "id": "B-CONTROL-PLANE-REBUILT",

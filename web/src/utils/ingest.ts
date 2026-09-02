@@ -338,11 +338,56 @@ async function extractSheet(file: File): Promise<string | null> {
 const PPTX_TEXT_NS = 'http://schemas.openxmlformats.org/drawingml/2006/main';
 const PPTX_LOCAL = new Set(['t']);
 
+// Archive-bomb caps (FA-SEC-12), mirroring the server zip reader
+// (src/ingest/zip.ts: 512 entries / 64MB per entry / 256MB total): a hostile
+// archive must fail the client parse visibly, not OOM the browser tab. The
+// per-entry/total sizes are the DECLARED central-directory values — jszip
+// exposes them on the internal _data object; when absent (future jszip
+// internals change) the entry-count cap and the downstream text caps still
+// bound the damage. Residual, disclosed: docx goes through mammoth's own
+// reader (only the file-size cap applies there) and pdfjs streams are bounded
+// by the binary file-size cap — the zip budget below covers the jszip surface.
+const ZIP_MAX_ENTRIES = 512;
+const ZIP_MAX_ENTRY_UNCOMPRESSED = 64 * 1024 * 1024;
+const ZIP_MAX_TOTAL_UNCOMPRESSED = 256 * 1024 * 1024;
+
+interface ZipEntryLike {
+  dir: boolean;
+  _data?: { uncompressedSize?: unknown };
+}
+interface ZipLike {
+  files: Record<string, ZipEntryLike>;
+}
+
+/** Throws when the archive's declared shape busts the bomb budget. */
+export function assertZipEntryBudget(zip: unknown): void {
+  if (zip === null || typeof zip !== 'object') return; // nothing inspectable — downstream caps apply
+  const files = (zip as ZipLike).files;
+  if (files === null || typeof files !== 'object') return; // nothing inspectable — downstream caps apply
+  const entries = Object.values(files).filter((e) => !e.dir);
+  if (entries.length > ZIP_MAX_ENTRIES) {
+    throw new Error(`archive declares ${entries.length} entries (cap ${ZIP_MAX_ENTRIES})`);
+  }
+  let total = 0;
+  for (const entry of entries) {
+    const size = entry._data?.uncompressedSize;
+    if (typeof size !== 'number' || !Number.isFinite(size)) continue; // unknown declaration — count only
+    if (size > ZIP_MAX_ENTRY_UNCOMPRESSED) {
+      throw new Error(`archive entry declares ${(size / 1048576).toFixed(0)}MB uncompressed (cap 64MB)`);
+    }
+    total += size;
+  }
+  if (total > ZIP_MAX_TOTAL_UNCOMPRESSED) {
+    throw new Error(`archive declares ${(total / 1048576).toFixed(0)}MB total uncompressed (cap 256MB)`);
+  }
+}
+
 /** .pptx → per-slide text runs (`<a:t>` in ppt/slides/slideN.xml). */
 async function extractPptx(file: File): Promise<string | null> {
   try {
     const JSZip = (await import('jszip')).default;
     const zip = await JSZip.loadAsync(await file.arrayBuffer());
+    assertZipEntryBudget(zip);
     const slideRe = /^ppt\/slides\/slide(\d+)\.xml$/;
     const slides = Object.keys(zip.files)
       .map((p) => slideRe.exec(p))
@@ -369,6 +414,7 @@ async function extractOdf(file: File): Promise<string | null> {
   try {
     const JSZip = (await import('jszip')).default;
     const zip = await JSZip.loadAsync(await file.arrayBuffer());
+    assertZipEntryBudget(zip);
     const entry = zip.files['content.xml'];
     if (entry === undefined) return null;
     const doc = parseXmlDom(await entry.async('string'));
@@ -409,6 +455,7 @@ async function extractEpub(file: File): Promise<string | null> {
   try {
     const JSZip = (await import('jszip')).default;
     const zip = await JSZip.loadAsync(await file.arrayBuffer());
+    assertZipEntryBudget(zip);
     const parts = Object.keys(zip.files)
       .filter((p) => /\.(xhtml|html|htm)$/i.test(p) && !zip.files[p]!.dir)
       .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));

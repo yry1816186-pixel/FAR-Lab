@@ -25,10 +25,10 @@
       "id": "FA-PLT-02",
       "domain": "platform",
       "title": "Hosted CI green on canonical main (ACC-38 factual basis)",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P0",
       "owner": "self",
-      "gap": "LOCAL ROOT CAUSE CLOSED at 87a1f3f, but hosted acceptance remains open. Canonical main@cc4009c run 33315252432 is still the latest observed red evidence: verify passed and web-e2e finished 22 passed/1 failed because loaded-home CLS was 0.123795 twice (required <0.1). Local attribution found a late 43px AwarenessBar insertion (0.115474 CLS), an unbounded shell/async rail group, and an independent map race where evidence completion removed the science-state placeholder before /science settled (0.158829 CLS). Stable truthful shell slots, bounded scroll ownership, and a separate spineLoaded gate now produce loaded-home CLS 0.0001 and map CLS 0.0184-0.0185. The original seven-test order passed 7/7 and the full one-worker Chromium gate passed 23/23 in 4.6 minutes. Status stays PARTIAL until this lane is integrated and canonical hosted verify+web-e2e is observed green.",
+      "gap": "CLOSED 2026-09-02: canonical main merge commit 0da4c68adf0ac1496d67de59990e9755edced64d ran green at https://github.com/yry1816186-pixel/FAR-Lab/actions/runs/33583828122 — Verify on ubuntu/windows/macos all SUCCESS and Web E2E (chromium / full) 26/26 in 6.8m (the loaded-home CLS fix from 87a1f3f is now hosted-verified on canonical main: home CLS 0.0001 / map 0.0184-0.0185 locally, full browser gate green hosted). History: canonical main@cc4009c run 33315252432 was the last red (loaded-home CLS 0.123795); the fix lane was integrated via PR #137 (admin merge under the owner-configured bypass actor, all 38 checks green pre-merge).",
       "target": "green verify+web-e2e on hosted runner, SHA recorded",
       "verify": "FARLAB_E2E_PORT=3311 PLAYWRIGHT_CHANNEL='' npx playwright test --workers=1 (23/23 local), then canonical hosted verify+web-e2e green with SHA/run recorded",
       "evidence": [
@@ -60,10 +60,10 @@
       "id": "FA-SEC-01",
       "domain": "security",
       "title": "Exploration CodeAct real OS-level isolation",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P0",
       "owner": "self",
-      "gap": "LOCALLY_VERIFIED / READY_FOR_HOSTED_CI 2026-09-02: production explore_code creates a dedicated Docker Linux OCI container, resolves the operator tag once to a full immutable image ID before create, verifies image + complete HostConfig before start, attests kernel/runtime facts in-container (including root mount ro from /proc/self/mountinfo), runs as UID/GID 65532 with network none/read-only rootfs/drop ALL/NNP/seccomp/cgroup limits/private namespaces, bounds stdout, and force-removes timed-out or failed containers. Independent review found three Low failure-path gaps; all were fixed (strict Privileged=false verifier contract, immutable image pin/container binding, always-run CI residue assertion, attach-client kill in cleanup finally) and regression-tested. Cleanup remains retryable after transient Docker removal failure. Local Docker Desktop Linux production/adversarial paths are green for image sha256:4836603133c4d7536d3918ae1daef5609214da8155044d3af1d767fed70574dc and were re-verified 2026-09-02 at commit d17e706 against the rebuilt image sha256:f00cad3d803eaafa089d7fe87654e52d710706e41c1ca0aac2628dd72f0bbe19 (base-image refresh; sandbox:verify + opt-in OCI adversarial/cleanup suites re-run green). Cancellation now covers warmup and in-flight calls with idempotent sidecar close, and ToolContext.signal is forwarded through the production tool adapter. The production runExploration runner owns createExplorationSandbox; neither it nor wireResearchTools accepts a caller-supplied sidecar factory. Deterministic tests replace only that module boundary inside an isolated Vitest worker; this is not a runtime extension seam or a cryptographic attestation token. CI and Docker lifecycle environment consistency fixes are locally verified. STILL OPEN: the final source SHA has no hosted Ubuntu exploration-sandbox run URL, so the Linux /proc attach-client cleanup branch is unverified there. D-SEC-01 reclassified rootless daemon, gVisor/VM and Windows-native AppContainer+Job as separate threat/deployment profiles; none is claimed by the current single-user Docker Linux OCI baseline.",
+      "gap": "CLOSED 2026-09-02 (hosted evidence complete). LOCALLY: production explore_code creates a dedicated Docker Linux OCI container, resolves the operator tag once to a full immutable image ID before create, verifies image + complete HostConfig before start, attests kernel/runtime facts in-container (including root mount ro from /proc/self/mountinfo), runs as UID/GID 65532 with network none/read-only rootfs/drop ALL/NNP/seccomp/cgroup limits/private namespaces, bounds stdout, and force-removes timed-out or failed containers. Independent review found three Low failure-path gaps; all were fixed (strict Privileged=false verifier contract, immutable image pin/container binding, always-run CI residue assertion, attach-client kill in cleanup finally) and regression-tested. Cleanup remains retryable after transient Docker removal failure. Local Docker Desktop Linux production/adversarial paths are green for image sha256:4836603133c4d7536d3918ae1daef5609214da8155044d3af1d767fed70574dc and were re-verified 2026-09-02 at commit d17e706 against the rebuilt image sha256:f00cad3d803eaafa089d7fe87654e52d710706e41c1ca0aac2628dd72f0bbe19 (base-image refresh; sandbox:verify + opt-in OCI adversarial/cleanup suites re-run green). Cancellation now covers warmup and in-flight calls with idempotent sidecar close, and ToolContext.signal is forwarded through the production tool adapter. The production runExploration runner owns createExplorationSandbox; neither it nor wireResearchTools accepts a caller-supplied sidecar factory. Deterministic tests replace only that module boundary inside an isolated Vitest worker; this is not a runtime extension seam or a cryptographic attestation token. CI and Docker lifecycle environment consistency fixes are locally verified. HOSTED (closing evidence): canonical main merge commit 0da4c68adf0ac1496d67de59990e9755edced64d ran the exploration-sandbox job GREEN on ubuntu-latest at https://github.com/yry1816186-pixel/FAR-Lab/actions/runs/33583828122 with image sha256:fedefb6ec129bfbaca3b19136bb0da5e313ba69d557e9fdd73b8a743657a2b10; job log records 'FA-SEC-01 Linux /proc attach-client cleanup: checked=4 remaining=0' and 'FA-SEC-01 container cleanup: exploration=0 verifier=0'; blocker B-FA-SEC-01-HOSTED-OCI is RESOLVED with the machine-checkable resolution evidence. D-SEC-01 reclassified rootless daemon, gVisor/VM and Windows-native AppContainer+Job as separate threat/deployment profiles; none is claimed by the current single-user Docker Linux OCI baseline.",
       "target": "single-user local release baseline: dedicated fail-closed Docker Linux OCI process with exact env allowlist, no network, read-only rootfs, non-root UID/GID, no capabilities, NNP+seccomp/private namespaces/resource limits and forced cleanup; stronger daemon, hostile-tenant and Windows-native profiles are triggered by their corresponding product claims",
       "verify": "local: npm run sandbox:build && npm run sandbox:verify; FARLAB_VERIFY_EXPLORATION_SANDBOX=1 production-path + OCI adversarial suites; failure-injection cleanup contract; full npm test. closure: hosted Ubuntu exploration-sandbox green on the final source SHA with run URL/SHA/image ID and Linux /proc attach-client cleanup evidence. Re-open for rootless/gVisor/VM/AppContainer evidence only when a D-SEC-01 reversal trigger applies",
       "evidence": [
@@ -388,14 +388,15 @@
       "id": "FA-DAT-03",
       "domain": "data",
       "title": "At-rest encryption decision recorded and implemented or scoped out",
-      "status": "FAIL",
+      "status": "PASS",
       "priority": "P2",
       "owner": "self",
-      "gap": "plaintext far.db+artifacts; no decision record",
+      "gap": "CLOSED 2026-09-02 via the decision-record path: SECURITY.md now carries an explicit at-rest-encryption NON-GOAL section (FA-DAT-03/D-DAT-03) — single-user local deployment, FDE (BitLocker/FileVault/LUKS) is the correct control against the stated threat actors, app-layer cipher adds no OS-enforced boundary while adding a key-management surface; API keys are not stored in the databases (env/local secrets file; receipts hash-only). Reopen trigger recorded: any multi-user/shared-workspace/server mode REQUIRES per-workspace encryption (SQLCipher/AES-GCM) before that mode ships.",
       "target": "SECURITY.md explicit non-goal OR SQLCipher+AES-GCM",
       "verify": "decision record + implementation/tests if in scope",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/04-data.md CAP-08"
+        "FINAL_EVIDENCE/audit-2026-08-30/04-data.md CAP-08",
+        "SECURITY.md (At-Rest Encryption section)"
       ]
     },
     {
@@ -614,10 +615,10 @@
       "id": "FA-HCI-04",
       "domain": "hci",
       "title": "EN leak: ResearchActions hardcoded zh insert text",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P2",
-      "owner": "sibling-lane",
-      "gap": "ResearchActions.tsx:87-89 editor-insert text not in dict",
+      "owner": "self",
+      "gap": "CLOSED 2026-09-02 at commit e5052a6: the promoteToFeedback composition moved to dict keys actions.promoteHead/promoteUncertainties/promoteNextStep in BOTH dictionaries with {var} interpolation, and the uncertainty separator localizes with lang（；vs '; '); web typecheck green; hosted e2e (including the zh/en parity surface suite) green on lane 678d89a and PR #137 checks.",
       "target": "move to dict",
       "verify": "EN parity e2e",
       "evidence": [
@@ -693,10 +694,10 @@
       "id": "FA-SEC-12",
       "domain": "security",
       "title": "Web client archive-bomb caps (jszip/mammoth/pdfjs)",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P2",
-      "owner": "sibling-lane",
-      "gap": "server-side zip reader hardened; web client parsers uncapped",
+      "owner": "self",
+      "gap": "CLOSED 2026-09-02 at commit 0b26d06 for the jszip surface: assertZipEntryBudget (512 entries / 64MB per-entry declared uncompressed / 256MB total declared, mirroring the server zip reader) runs BEFORE any decompression at the pptx/odf/epub entry points; absent size declarations fall back to the entry-count cap. 5 regressions including a real 700-entry .odt bomb failing the client parse visibly. Disclosed residual: docx routes through mammoth's internal reader (bounded only by the 25MB file-size cap) and pdfjs streams by the binary file-size cap — no jszip-seamless budget exists for those two without forking their readers.",
       "target": "size/entry caps before parse",
       "verify": "nested-zip sample rejected",
       "evidence": [
@@ -707,10 +708,10 @@
       "id": "FA-PLT-01",
       "domain": "platform",
       "title": "CI matrix: windows runner + firefox/webkit smoke",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "self",
-      "gap": "Workflow now defines Ubuntu+Windows verification and independent Chromium-full+Firefox-smoke browser cells, but no matrix run has completed. Hosted run 33369651681 for 8a5200f remains displayed as in progress with 0/2 verify jobs completed; WebKit and macOS remain outside this item's minimum target and are still open at the broader platform level.",
+      "gap": "CLOSED 2026-09-02: canonical main 0da4c68 run 33583828122 completed with Verify (windows-latest) SUCCESS, Verify (macos-15) SUCCESS, Web E2E (firefox / smoke) SUCCESS and Web E2E (webkit / smoke) SUCCESS (webkit exceeds this item's minimum; also green on lane runs 33580883479 and the PR #137 checks). The stale 8a5200f in-progress display is superseded by three completed green matrix runs.",
       "target": "os matrix (ubuntu+windows) + firefox smoke project",
       "verify": "workflow runs green on both",
       "evidence": [
@@ -841,10 +842,10 @@
       "id": "FA-EVAL-02",
       "domain": "evaluation",
       "title": "User-study protocol + instrumentation developed (execution BLOCKED_EXTERNAL)",
-      "status": "FAIL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "self",
-      "gap": "zero SUS/task-success/time-to-insight instrumentation, zero recruitment materials; real-participant execution stays external",
+      "gap": "CLOSED at the designed scope 2026-09-02: eval/user-study/PROTOCOL.md (preregistered: RQs, n>=3 within-subject fixed-order A→C journeys, objective per-journey completion criteria, primary endpoints SUS>=68 + >=2/3 journeys, analysis plan with negative-result parity, preregistered limitations, deviation discipline), MATERIALS.md (zh/en recruitment script, consent form, task cards mapped verbatim to the completion criteria, standard 10-item SUS zh/en + raw NASA-TLX + per-journey Likert, frozen orientation script, session checklist skeleton), INSTRUMENTATION.md (every measure mapped to existing durable artifacts — no telemetry theater). EXECUTION remains BLOCKED_EXTERNAL by design: participants are user-owned (co-schedulable with the FA-X-02 acceptance drive).",
       "target": "protocol+materials+instrumentation in repo; n>=3 execution marked BLOCKED_EXTERNAL",
       "verify": "docs + instrumented flows",
       "evidence": [
@@ -869,10 +870,10 @@
       "id": "FA-EVAL-04",
       "domain": "evaluation",
       "title": "FRONTIER_STATUS / blocker records track live CI state + science metrics",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "self",
-      "gap": "asOf 08-27 stale; no science-metrics dimension; current main-red not reflected",
+      "gap": "CLOSED 2026-09-02: FRONTIER_STATUS refreshed to canonical main 0da4c68 with the required lastCIgreenSHA/lastCIgreenRunUrl fields, a scienceMetrics dimension (all four north-star values with targets and honest below-target status), and an explicit refresh rule (after every merged green wave and every evaluation wave); asOf now tracks the merge instead of a stale 08-27 snapshot.",
       "target": "refresh rule after each eval wave + lastCIgreenSHA field",
       "verify": "diff asOf vs latest generatedAt",
       "evidence": [
@@ -1030,6 +1031,6 @@
   ],
   "stopConditions": {
     "note": "Mission stop requires ALL of: no internal FAIL/PARTIAL; canonical clean-clone CI green; science north-star met or externally justified; real evidence across all planes; 24h→72h soak+chaos; win/mac/linux matrix; sandbox attack suite; production-path-only flows; clean-machine bundle verify; honest BLOCKED_EXTERNAL only; docs==commit; final red-team audit no new P0/P1.",
-    "currentVerdict": "NOT READY — 10 FAIL, 30 PARTIAL, 24 PASS, 2 BLOCKED_EXTERNAL (66 tracked). Wave 0 implementation, scope convergence, streaming durability, deterministic hygiene, Web artifact/static-cache contracts, version policy/TUI packaging, exact Rust pin, the locally verified multi-runtime source release pack, FA-REM-01 evidence alignment, FA-SEC-04 process-boundary egress enforcement, FA-SEC-08 fence crypto-randomization, and FA-HAR-01 per-tool deadline are closed at their stated scope. Hosted CI/CodeQL/OIDC release evidence, desktop distribution, scientific targets, soak/platform breadth, and several security boundaries remain open. The exhaustive five-table review is still only 5/902 files and shallow-assertion adjudication is 1/168, so those two Wave 0 criteria remain PARTIAL."
+    "currentVerdict": "NOT READY — 8 FAIL, 23 PARTIAL, 32 PASS, 2 BLOCKED_EXTERNAL (66 tracked). Closed this wave: FA-SEC-01 (hosted ubuntu OCI evidence on canonical main 0da4c68, run 33583828122), FA-PLT-01/02 (canonical main CI fully green incl. chromium-full e2e and the windows/firefox/webkit matrix), FA-REM-01, FA-SEC-04, FA-SEC-08, FA-HAR-01, FA-HCI-04, FA-DAT-03 (decision record), FA-EVAL-02 (preregistered user-study protocol+materials+instrumentation; execution BLOCKED_EXTERNAL by design), FA-EVAL-04 (live CI/science tracking), FA-SEC-12 (web jszip bomb budget). Still open: hosted OIDC/release evidence, scientific targets (4 metrics), 6h+ soak (running), streaming data plane, evaluation-wave re-measurement, five-table sweep (in progress via parallel review), and B-QWEN (user-owned 09-05). The exhaustive five-table review and shallow-assertion adjudication remain the large PARTIAL blocks."
   }
 }

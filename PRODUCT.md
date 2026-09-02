@@ -50,7 +50,7 @@ Name: FAR-Lab. Voice: precise, restrained, non-marketing, states limits and unce
 - Two gold studies (`work/gold`): full 12-stage live loops through sustained provider overload, 16-17 verbatim-bound claims, competing hypotheses with falsifiers, feedback→revision, all four bundles `far verify` PASS.
 - Baseline contrast on predeclared structural metrics (`work/baseline/comparison.md`): direct-LLM and in-process coding-agent conditions; honest reverse column (baseline broader via model memory and consistent with FAR-Lab measurements); external product baselines BLOCKED/external.
 - Independent four-dimension audit (scientific/engineering/product/security, 2026-08-30): all Critical and Warning findings fixed (`66c25ff`, `f7d0a25`, `c178f8a`, `cb7cfaa`, `6a0a52b`, `1015218`, `98d4cb8`); audit-confirmed sandbox containment.
-- Full suite 2275 passed | 4 skipped, e2e 22 passed, CI green on main (HEAD `98d4cb8`).
+- Full suite 2388 passed | 15 skipped (2026-09-02), e2e chromium-full 26 passed, CI green on canonical main `0da4c68` (run 33583828122: 3-OS verify, browser matrix, exploration-sandbox, CodeQL).
 - Absences that must not be fabricated: no persona/usability-interview data; no DASHSCOPE live receipt run yet (ACC-02, user credential); scenario C has no real human-attested execution yet.
 
 ## Product Principles
