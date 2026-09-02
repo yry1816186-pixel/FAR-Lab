@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  detectFileKind, extractFileText, EXTRACT_TEXT_MAX, MAX_BINARY_BYTES,
+  detectFileKind, extractFileText, assertZipEntryBudget, EXTRACT_TEXT_MAX, MAX_BINARY_BYTES,
   type FileKind,
 } from '../web/src/utils/ingest';
 
@@ -102,6 +102,43 @@ describe('extractFileText — per-format projection', () => {
   it('corrupt binary fails honestly (null, not garbage)', async () => {
     const out = await extract('corrupt.docx', 'docx');
     expect(out).toBeNull();
+  });
+});
+
+describe('archive-bomb budget (FA-SEC-12)', () => {
+  const zipLike = (entries: Array<{ dir?: boolean; size?: number }>): unknown => ({
+    files: Object.fromEntries(
+      entries.map((e, i) => [`e${i}.xml`, { dir: e.dir === true, ...(e.size !== undefined ? { _data: { uncompressedSize: e.size } } : {}) }]),
+    ),
+  });
+
+  it('entry-count cap: more than 512 entries is refused', () => {
+    expect(() => assertZipEntryBudget(zipLike(Array.from({ length: 513 }, () => ({}))))).toThrow(/entries/);
+    expect(() => assertZipEntryBudget(zipLike(Array.from({ length: 512 }, () => ({}))))).not.toThrow();
+  });
+
+  it('per-entry declared uncompressed size cap: a 4GB-in-1KB bomb is refused', () => {
+    expect(() => assertZipEntryBudget(zipLike([{ size: 70 * 1024 * 1024 }]))).toThrow(/64MB/);
+    expect(() => assertZipEntryBudget(zipLike([{ size: 64 * 1024 * 1024 }]))).not.toThrow();
+  });
+
+  it('total declared uncompressed cap: 5 x 60MB is refused even though each entry passes', () => {
+    expect(() => assertZipEntryBudget(zipLike(Array.from({ length: 5 }, () => ({ size: 60 * 1024 * 1024 }))))).toThrow(/256MB/);
+  });
+
+  it('absent size declarations (future jszip internals) fall back to the entry-count cap only', () => {
+    expect(() => assertZipEntryBudget(zipLike([{}, {}, {}]))).not.toThrow();
+    expect(() => assertZipEntryBudget(null)).not.toThrow();
+  });
+
+  it('end-to-end: a real 600-entry odt fails the client parse visibly (null)', async () => {
+    const JSZip = (await import('jszip')).default;
+    const zip = new JSZip();
+    zip.file('content.xml', '<document>ok</document>');
+    for (let i = 0; i < 700; i += 1) zip.file(`filler/f${i}.xml`, 'x');
+    const blob = await zip.generateAsync({ type: 'uint8array' });
+    const bomb = new File([blob], 'bomb.odt');
+    expect(await extractFileText(bomb, 'odf')).toBeNull();
   });
 });
 
