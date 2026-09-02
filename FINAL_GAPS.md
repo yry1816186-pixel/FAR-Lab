@@ -23,7 +23,7 @@ GitHub Release 仍未发生，不能提前翻 PASS。当前阻断完成的是四
 | FA-PLT-02 | canonical CI：verify 绿、web-e2e loaded-home CLS 红 | self | **本地根因已修于 87a1f3f（home CLS 0.0001、map 0.0184–0.0185、完整 Chromium 23/23）；待集成后 hosted 绿核验，PARTIAL** |
 | FA-EVAL-14 | 提交文档 0.061 旧数三处 + north-star 引用错位 | self | **已修（含两份 PDF 重生成+抽取核验）** |
 | FA-SEC-02 | CodeAct 门绕过封堵 + malicious 回归语料 + sidecar env 白名单 | self | **已闭：别名/拆链/getattr 全拒、危险模块运行时擦除、env 最小化** |
-| FA-SEC-01 | Exploration CodeAct OS 级隔离 | self | **PARTIAL：单用户本地 Docker Linux OCI 基线已在本机验证（生产真实路径、合同、故障注入、对抗、超时清理、取消传播均绿）；生产 `wireResearchTools` 已移除可替换 factory，低层 runner factory 仅保留为内部测试 seam 并由缺失 attestation 回归锁定，尚非不可伪造 token。最终 SHA 的 hosted Ubuntu job 与 Linux `/proc` attach-client 清理分支待证。rootless/gVisor/Windows-native 已按 D-SEC-01 重裁为条件档位，不作为四项同时满足的基线门** |
+| FA-SEC-01 | Exploration CodeAct OS 级隔离 | self | **已闭（2026-09-02）：canonical main 0da4c68 的 hosted ubuntu exploration-sandbox 绿证 run 33583828122（镜像 fedefb6e…+attach-client checked=4 remaining=0+容器残留 0）；B-FA-SEC-01-HOSTED-OCI RESOLVED 且过 control-doctor 机校；本地与托管双证齐；rootless/gVisor/Windows-native 保持 D-SEC-01 条件档位不声称** |
 | FA-SEC-04 | sources 层 egress destination guard（私网段/重定向/协议） | self | **已闭（2026-09-02，735c94b：进程边界五出口共用 src/shared/destination-guard.ts 单一属主——providers/MCP/zotero/datasets 全收口，9 回归锁定；DNS rebinding 静态不可见=披露限制）** |
 | FA-SEC-06 | OpenAlex api_key → header + 错误脱敏 | self | **已修（Bearer header + 构造器 chokepoint 脱敏）** |
 | FA-SEC-07 | netcdf realpath 围栏 + symlink 回归 | self | **已修** |
