@@ -16,7 +16,7 @@ This file records the KEEP/REDESIGN/MERGE/REPLACE/DELETE dispositions and the
 
 ## 1. What the system already is (verified 2026-08-30)
 
-A complete Direction-A loop exists and is tested (2173+ root tests, CI green):
+A complete Direction-A loop exists and is tested (2380+ root tests; live hosted-CI status is tracked in FINAL_ACCEPTANCE.json, never claimed here):
 12-stage orchestrator (scope→retrieve→verify→build_evidence→generate_hypotheses
 →critique/falsify→rank→plan→execute→feedback→revise→export) with bounded
 iteration controller, honest truth-plane (live/mixed/replay/synthetic), claim

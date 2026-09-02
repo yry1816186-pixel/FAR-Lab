@@ -1,4 +1,7 @@
 import { chromium } from '@playwright/test';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+const ART = path.join(fileURLToPath(new URL('../..', import.meta.url)), 'artifacts', 'hx', 'qa-2026-08-29');
 const BASE = 'http://127.0.0.1:3291';
 // Create + complete an offline run via API
 const jf = async (u, o) => { for (let i = 0; i < 4; i++) { try { return await fetch(u, o); } catch { await new Promise((r) => setTimeout(r, 1500)); } } throw new Error('fetch failed ' + u); };
@@ -37,5 +40,5 @@ console.log('all rows after Esc:', allRows);
 console.log('is-excluded rows after Esc:', exclRow);
 const adj = await page.locator('.map-band--adjusted').count();
 console.log('adjusted band:', adj);
-await page.screenshot({ path: 'C:/Users/RichardYuan/Desktop/new/artifacts/hx/qa-2026-08-29/probe-exclude.png', fullPage: true });
+await page.screenshot({ path: path.join(ART, 'probe-exclude.png'), fullPage: true });
 await browser.close();

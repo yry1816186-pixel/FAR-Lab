@@ -1,0 +1,32 @@
+{
+  "status": "IN_PROGRESS",
+  "updatedAt": "2026-09-02T12:40:00+08:00",
+  "lane": "lane/endgame-waveb @ 本地 5 提交待 PR #139；canonical main = 9983c30（PR #137+#138 已合并）",
+  "currentObjective": "①main CI 9983c30（含 perf-gate hosted 首跑）结果落地→FA-PRF-02 闭账；②soak ~15:59 四判→FA-PRF-06；③PR #139 合并车道余量；④sweep 续（delivery 127→docs 余 26→runtime/tests 分窗，工具链已备）；本窗口已闭账 12 项（SEC-01/PLT-01/02/REM-01/SEC-04/08/HAR-01/HCI-04/DAT-03/EVAL-02/04/SEC-12），计数 32/23/8/2",
+  "criticalProblemSet": [
+    {
+      "rank": 1,
+      "id": "CPS-N5",
+      "problem": "FA-SEC-01 本地 Docker Linux OCI 已通过独立 verifier、生产真实 caller、对抗/超时清理与全量回归；最终源码 SHA 尚无 hosted Ubuntu exploration-sandbox run URL，Linux /proc attach-client 清理分支未在该平台证明",
+      "why": "安全边界不得由本机 Docker Desktop 证据越级关闭"
+    },
+    {
+      "rank": 2,
+      "id": "CPS-N4",
+      "problem": "ACC-02/B-QWEN（09-05 用户窗口）BLOCKED_EXTERNAL 维持；completion-gate 唯一缺口",
+      "why": "用户侧外部条件"
+    }
+  ],
+  "missionFacts": [
+    "主线收口：main cc4009c→495e53c（+7838/-766，125 文件）——Wave 0 全量+Wave A 大部+夜间车道五族 CI 根因修复（windows verify 三红/license CRLF/e2e 三族/retrieve 取消检查点/cancel 事件单源化）",
+    "桌面发布链实证：NSIS 126.1MB 真包（sidecar 173MB 随包）静默安装→离源树 1s 健康→打包资源服务 web→退出无孤儿→卸载文件全清（BUILD_SCOPE 已更新）",
+    "TUI+桌面壳 i18n 机制（FARLANG）+设计基线走查 9C+26W 入 HCI 账本（修复落点 Wave D）",
+    "FA-SEC-01 本地镜像：farlab-experiment-runtime:sec01 = sha256:4836603133c4d7536d3918ae1daef5609214da8155044d3af1d767fed70574dc，linux/amd64，186095983B；Python 3.12.12，NumPy 2.5.2/SciPy 1.18.1/sklearn 1.9.0，最终层无 uv/uvx",
+    "FA-SEC-01 本地门禁：sandbox verifier PASS；合同/生产真实路径/OCI 对抗含容器内 root 的只读挂载写探针、1.5s 无限循环清理及 Docker 删除失败时 attach-client 必杀故障注入均 PASS；Python 有界输出+mountinfo 解析 9/9；2026-09-02 最新 npm test exit 0（236 files / 2370 passed / 15 skipped）；opt-in OCI 回归 6 files / 25 passed；typecheck、build、定向 lint、secret scan、diff-check PASS；path hygiene WARN 但 errors=[]（仅忽略的本地构建产物）；farlab 容器和相关进程零残留；cli-spawn 编译 CLI 合同 12/12 PASS",
+    "FA-SEC-01 独立复审无 Critical/High/Medium；3 个 Low（verifier Privileged 缺字段、CI 失败时残留断言、close 清理异常跳过 attach kill）均最小修复并验证，另补 immutable image pin/container binding、同步 spawn 失败清理和瞬时删除失败可重试回归。取消传播覆盖 warmup/in-flight call，ToolContext.signal 已转发，且 sidecar close 幂等；Docker inspect/create/verify/start/rm/attach 共用同一份 captured client env，CI cleanup 检查 farlab-exploration-* 与 farlab-sec01-* 并使用 pipefail。生产 runExploration 与 wireResearchTools 现在都固定拥有 createExplorationSandbox，不再暴露 caller-supplied sidecarFactory；runner 测试仅在隔离 Vitest worker 替换模块边界，缺失 attestation fail-closed 回归通过，未声称不可伪造 token。D-SEC-01 将 rootless daemon、gVisor/VM、Windows-native AppContainer+Job 重裁为声明触发的独立安全档位，D-SEC-03 记录移除 runner 的 runtime factory 参数，当前能力仅声明单用户 Docker Linux OCI 基线",
+    "全仓 lint 被用户/兄弟车道 submission/final/create_docx.js 的 process/console 两处 no-undef 阻断；本车道定向 ESLint 为 PASS，未触碰 submission",
+    "兄弟车道：wave0/wavea 账本+485d925（fresh 锚）已并入主线；当前活跃于 brand/competition-inputs/submission-final（未跟踪目录——发布物料，未触碰）",
+    "教训入账：add 后未即时 commit→rebase 吞改动+主题混杂（已在 d8a1416 消息纠正）；PowerShell here-string 触发 hook 误拦（源码写操作一律 Edit 工具）；本地 vite-node 对 web/ 下 .mjs 的 Windows 空产物（测试走子进程边界）"
+  ],
+  "nextAction": "推送 lane/endgame-waveb（d17e706）触发 ci.yml exploration-sandbox job；绿证后把 run URL/source SHA/image ID/Linux /proc 证据写入 BLOCKERS.json resolutionEvidence 并闭 B-FA-SEC-01-HOSTED-OCI，随后评估主线收口（车道含 87a1f3f，合并可同时推进 FA-PLT-02 hosted 绿）。若 hosted 失败：按 job 日志定位环境差异（本地 Docker Desktop vs ubuntu-latest），不得以本地证据替代。仅在 D-SEC-01 反转触发器出现时重开 rootless/gVisor/VM/AppContainer 后端工作"
+}

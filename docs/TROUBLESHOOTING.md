@@ -19,9 +19,10 @@ different (fresh) directory. Always use forward slashes in env-provided paths:
 
 **Provider API keys are not picked up.**
 Keys are read from `process.env` at call time and are never written to any file.
-`scripts/dev.mjs` injects a `.env` for the API subprocess; running the server
-another way requires exporting the vars yourself (`ZAI_API_KEY`,
-`DASHSCOPE_API_KEY`, ...). `far` reports missing var *names* only.
+The API server hydrates `.env` itself at boot (src/platform/dotenv.ts; disable
+with `FAR_DOTENV=off`); running the server another way requires exporting the
+vars yourself (`ZAI_API_KEY`, `DASHSCOPE_API_KEY`, ...). `far` reports missing
+var *names* only.
 
 **Model provider 529 / HTTP 1302 capacity windows stall a run.**
 These are external overload windows. The built-in mitigations are pacing envs
@@ -62,6 +63,15 @@ module on Windows. Drive the real process boundary instead (see
 `tests/web-bundle-budget.test.ts`, which shells out to the CLI). This is a
 transform-layer workaround, not a product change.
 
+**A root test importing a web-only dependency (`jszip`, `xlsx`, `mammoth`…)
+fails on CI with "Failed to resolve import" while passing locally.**
+Module resolution walks up from the IMPORTING file: `web/src/**` finds them in
+`web/node_modules`, but `tests/**` walks only root `node_modules` — a local
+root install may carry the package (masking the bug) where CI's clean root
+`npm ci` does not (canonical main went three-OS red this way on 2026-09-02).
+Resolve through web's package root: `createRequire(join(__dirname, '..', 'web',
+'package.json'))('jszip')`.
+
 **Web tests/e2e flake with a port race.**
 Dev-server port assignment races on loaded machines; re-run once before
 investigating. Persistent failures with a fixed port error are a real conflict —
@@ -92,6 +102,6 @@ swap must land while locked, it is recorded in `submission/RELEASE_BLOCKERS.md`
 
 **Desktop build cannot find the sidecar / bundled assets.**
 Desktop bundles run from `desktop/`; the CI gate builds with `--locked` and
-asserts bundle formats via `scripts/assert-bundle-formats.mjs`. If assets are
+asserts bundle formats via `desktop/scripts/assert-bundle-formats.mjs`. If assets are
 missing at runtime, verify you are running the packaged app (not the dev tree)
 and that the release-pack manifest includes them.

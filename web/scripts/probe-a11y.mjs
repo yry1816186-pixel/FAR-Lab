@@ -1,6 +1,8 @@
 // Keyboard-only journey + axe scan + verify-panel structure, real browser.
 import { chromium } from '@playwright/test';
-import { join } from 'node:path';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+const ART = path.join(fileURLToPath(new URL('../..', import.meta.url)), 'artifacts', 'hx', 'qa-2026-08-29');
 const BASE = 'http://127.0.0.1:3293';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const runId = await fetch(`${BASE}/api/v1/runs`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'Does resistance training improve insulin sensitivity in older adults?' }) }).then((r) => r.json()).then((d) => d.runId);
@@ -31,27 +33,17 @@ await page.keyboard.press('/');
 await sleep(400);
 const paletteOpen = await page.evaluate(() => document.querySelector('.palette') !== null || document.activeElement?.className.includes('palette-input'));
 await page.keyboard.press('Escape'); await sleep(200);
-// Tab through first 15 focusables from body — all must be interactive/visible
-const tabOk = await page.evaluate(async () => {
-  const els = [];
-  for (let i = 0; i < 15; i++) {
-    document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
-    // simulate tab via focus order instead: collect candidates
-    break;
-  }
-  return true;
-});
 console.log('kb: palette via /', paletteOpen);
 
 // ---- axe scan on map + verify panel
-await page.addScriptTag({ path: join(process.cwd(), 'node_modules/axe-core/axe.min.js') });
+await page.addScriptTag({ path: path.join(process.cwd(), 'node_modules/axe-core/axe.min.js') });
 const violations = await page.evaluate(async () => {
   const r = await window.axe.run(document, { runOnly: { type: 'tag', values: ['critical', 'serious'] } });
   return r.violations.map((v) => `${v.id}(${v.nodes.length})`);
 });
 console.log('axe map:', JSON.stringify(violations));
 await page.goto(`${BASE}/#run/${runId}/verify`, { waitUntil: 'networkidle' }); await sleep(2000);
-await page.addScriptTag({ path: join(process.cwd(), 'node_modules/axe-core/axe.min.js') });
+await page.addScriptTag({ path: path.join(process.cwd(), 'node_modules/axe-core/axe.min.js') });
 const vviol = await page.evaluate(async () => {
   const r = await window.axe.run(document, { runOnly: { type: 'tag', values: ['critical', 'serious'] } });
   return r.violations.map((v) => `${v.id}(${v.nodes.length})`);
@@ -74,6 +66,6 @@ await page.locator('.prov-filter button', { hasText: /检索|retrieval/i }).firs
 await sleep(300);
 const filteredRows = await page.evaluate(() => document.querySelectorAll('.receipt-row').length);
 console.log('after filter rows:', filteredRows);
-await page.screenshot({ path: 'C:/Users/RichardYuan/Desktop/new/artifacts/hx/qa-2026-08-29/34-verify-panel.png', fullPage: true });
+await page.screenshot({ path: path.join(ART, '34-verify-panel.png'), fullPage: true });
 await browser.close();
 console.log('DONE');

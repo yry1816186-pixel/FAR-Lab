@@ -3,10 +3,12 @@
 // evidence_backed state band, deep panels (verify/plan/revisions/hypotheses),
 // and inspector ops on real hypotheses. Real browser, real science.
 import { chromium } from '@playwright/test';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const BASE = 'http://127.0.0.1:3293';
 const RUN = process.argv[2];
-const OUT = 'C:/Users/RichardYuan/Desktop/new/artifacts/hx/qa-2026-08-29';
+const OUT = path.join(fileURLToPath(new URL('../..', import.meta.url)), 'artifacts', 'hx', 'qa-2026-08-29');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const browser = await chromium.launch({ channel: 'msedge' });
