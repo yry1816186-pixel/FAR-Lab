@@ -1,6 +1,7 @@
 // FAR-Lab 技术方案文档 DOCX renderer — content blocks come from blocks.json
 // (single source of truth: doc.html via html2blocks.py).
 // Usage: python3 {skill}/scripts/docx.py build create_docx.js output.docx
+/* global process, console */
 import fs from "node:fs";
 import path from "node:path";
 import {
