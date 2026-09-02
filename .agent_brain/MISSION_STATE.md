@@ -5,36 +5,42 @@
 
 ## FRAME
 
-- 持久目标：以真实能力+证据闭 66 项终局标准（当前 20 PASS / 34 PARTIAL / 10 FAIL / 2 BLOCKED_EXTERNAL），停止条件见 FINAL_ACCEPTANCE.stopConditions。
-- 本车道（lane/endgame-waveb）职责：FA-SEC-01 探索沙箱 OS 级隔离收口 + 平台事实链闭合（FA-PLT-02/03）。
+- 持久目标：以真实能力+证据闭 66 项终局标准（当前 **30 PASS / 25 PARTIAL / 9 FAIL / 2 BLOCKED**），停止条件见 FINAL_ACCEPTANCE.stopConditions。
+- 本车道（lane/endgame-waveb）职责：FA-SEC-01 沙箱收口 ✅ + 平台事实链 ✅ + 顺带可闭项清扫。
 - 兄弟车道资产（不触碰、不入库）：brand/、competition-inputs/、submission/、.impeccable/。
 
-## 状态（2026-09-02 本窗口）
+## 状态（2026-09-02 窗口收尾）
 
-- **Wave B 代码已提交 `d17e706`**（28 文件 +2603/-97）：OCI 沙箱（experiment-runtime Dockerfile/policy/sandbox_main + exploration-sandbox.ts + 四套测试）、取消传播/trust-root 生产接线、ci.yml hosted exploration-sandbox job、completion-gate requiredEvidence 防洗绿校验、BLOCKERS.json B-FA-SEC-01-HOSTED-OCI 登记。
-- 提交前全门禁复验（本窗口重跑）：tsc 0 错；定向 eslint 0 错；sandbox:verify PASS（镜像重建后 sha256:f00cad3d…，Dockerfile 未变、基镜像刷新）；全量 vitest 236 files/2370 过/15 跳（102.7s）；opt-in OCI 4 files/13 过；secret/path 扫描 0 error。
-- Wave D（HCI）已于 58c4c92 闭账；主线在 495e53c；87a1f3f（Wave A CLS 修复）是本车道祖先——车道合并即可推进 FA-PLT-02 hosted 绿。
+- **canonical main = 9983c30**（PR #137 0da4c68 + PR #138 已合并；两次 main CI：0da4c68 run 33583828122 全绿；9983c30 run 33586398800 进行中——含 perf gate 首次 hosted 跑，观察器 bb9yyxj9t）。合并走 --admin（ruleset required_status_checks 上下文过时 repo_hygiene/FAR-Lab CI 永不可满足；owner 自配 bypass:always；38 项检查绿后执行）。
+- **本窗口闭账 12 项**：FA-SEC-01（main SHA hosted 绿证：run 33583828122/镜像 fedefb6e/attach-client checked=4 remaining=0；B-FA-SEC-01-HOSTED-OCI RESOLVED 过机校；R-19 闭）、FA-PLT-01、FA-PLT-02、FA-REM-01、FA-SEC-04（五出口单一属主）、FA-SEC-08（fence crypto）、FA-HAR-01（per-tool deadline）、FA-HCI-04（dict 化）、FA-DAT-03（non-goal 决策）、FA-EVAL-02（预注册协议三件套）、FA-EVAL-04、FA-SEC-12（jszip 三限）。**计数 32 PASS / 23 PARTIAL / 8 FAIL / 2 BLOCKED**。completion-gate 仅剩 B-QWEN。
+- **6h soak 运行中**：PID 47288（76min：730 runs、RSS 144-234MB 锯齿 GC、非泄漏形态）。预计 ~15:59 出 soak.json 四判 → FA-PRF-06 首档；心跳/部分证据每 25 轮落盘。
+- **FA-W0-05 推进 79/959**：governance_assets 63/63 完成（本窗主代理逐文件真审+随审随修 5 件：CONTRIBUTING 工作流/PRODUCT 数字/ADR 引擎/TROUBLESHOOTING CRLF 条/manifest mission）；product_specs_docs 16/42。check PASS。三表代理（>3h 无响应）作废，教训=大批量 Explore 不可靠，后续 ≤40 文件/批。
+- 车道未合并提交 ×5（docs 随审随修+manifest+W0-05 账本×2）→ 下窗口开 PR #139。
+- 本地终态门禁：全量 vitest 2388 过/15 跳；typecheck/lint/secret/path 0。
 
-## 执行计划（按序）
+## 下窗口起点（按序）
 
-1. [DONE] 本地门禁复验 + 代码提交 d17e706。
-2. [DONE] 账本刷新（FINAL_ACCEPTANCE head→d17e706、EXECUTION_STATE、本文件）+ docs 提交。
-3. [RUNNING] 推送 lane/endgame-waveb → 观察 hosted ci.yml（重点 exploration-sandbox job on ubuntu-latest）。
-4. [TODO] 绿证：从 job summary 抓 run URL/source SHA/image ID → 写入 BLOCKERS.json resolutionEvidence → 闭 B-FA-SEC-01-HOSTED-OCI → FA-SEC-01 状态更新。
-5. [TODO] 评估主线收口：车道 hosted 全绿后合并 main（顺带 FA-PLT-02 canonical web-e2e hosted 绿核验）。
-6. [TODO] 若 hosted 红：按日志定位环境差异修复重推；不得以本地证据替代。
-7. [NEXT-WAVE] 完成后按 FINAL_GAPS P0 队列继续：FA-REM-01（ACC-25 措辞+suite 日志）、FA-SCI-01..04 评估波次、FA-SEC-04 进程边界 egress、FA-W0-05/06 全仓裁决推进。
+1. main CI 9983c30 结果 → 绿则从 ubuntu verify 抓 hosted perf 数字（FA-PRF-02 闭账+阈值收紧评估；perf-gate 阈值 provisional）。
+2. soak ~15:59 判读 soak.json 四判 → FA-PRF-06 推进；FAIL 则泄漏归因。
+3. PR #139（车道 5 提交）→ admin 合并。
+4. sweep 续：delivery_operations 127 件（3 批 ≤40）→ docs 余 26 → runtime 388/tests 339 分窗。工具链已备（sweep-apply + check）。
+5. FA-REM-02 远程 cell 去重 / FA-DAT-01 流式数据面 / FA-PRF-03 混沌补 4 项 / release-pack workflow_dispatch hosted 跑（FA-PLT-03 部分证据；tag 发布=用户决策）。
+6. [用户侧] B-QWEN 09-05 窗；FA-X-02 验收；ruleset 上下文更新建议（Verify (ubuntu-latest)/Exploration OCI sandbox/Web E2E (chromium / full)）；科学指标复测需配额。
 
 ## 环境与工具事实
 
-- 主会话有 PowerShell 工具（ToolSearch select:PowerShell 可加载）；Bash 亦可用但全局规则禁用于日常命令。
-- Docker Desktop 在线（Server 29.5.2，linux 引擎）；本机镜像 farlab-experiment-runtime:sec01 当前 ID sha256:f00cad3d…（与账本旧记录 4836603… 不同=基镜像重建漂移，Dockerfile 未变，已在 FINAL_ACCEPTANCE 记录）。
-- 远程：github.com/yry1816186-pixel/FAR-Lab；ci.yml `on: push` 无分支过滤——推车道即触发全矩阵（verify/web-e2e/exploration-sandbox/release-pack/audit）。
-- 全仓 lint 仍被兄弟未跟踪 submission/final/create_docx.js 两处 no-undef 阻断（已知，不触碰）；本车道定向 lint 0 错。
+- 主会话有 PowerShell 工具（ToolSearch select: 可加载）；Bash 禁用于日常命令（全局规则）。
+- Docker Desktop 在线（29.5.2 linux）；本地沙箱镜像 farlab-experiment-runtime:sec01 当前 ID f00cad3d…（基镜像会漂移——证据锚 Dockerfile+SHA，勿单锚镜像 ID）。
+- 远程：github.com/yry1816186-pixel/FAR-Lab；ci.yml `on: push` 无分支过滤；本地 commit main 被 hook 拒绝（PR 流程）；合并须 --admin（ruleset 过时上下文）。
+- 全仓 lint 被兄弟未跟踪 submission/final/create_docx.js 两处 no-undef 阻断（已知不触碰）。
+- work/、evidence/、.impeccable/ 本地不入库，账本引用路径；.control 下 BLOCKERS.json/FRONTIER_STATUS.json/EXECUTION_STATE-*.md 入库（add -f）。
 
 ## 教训（继承+新增）
 
 - 编辑期间跑 build 拿不一致快照——typecheck 先行、失败即停。
-- PowerShell here-string 写源码文件会触发 hook 误拦——源码一律 Edit/Write 工具。
-- 镜像 ID 会随基镜像刷新漂移——证据记录 Dockerfile 内容 + SHA，勿把镜像 ID 当唯一锚。
+- PowerShell here-string 写源码文件触发 hook 误拦——源码一律 Edit/Write 工具。
+- 镜像 ID 随基镜像刷新漂移——记录 Dockerfile 内容+SHA+重建说明。
 - add 后未即时 commit 有 rebase 吞改动前科——stage 白名单后立即 commit。
+- **.mjs 带 shebang 且被测试 import 的，必须 .gitattributes eol=lf**（shebang+CRLF=vite/vitest SyntaxError，windows-only）。
+- **Explore 大批量审查代理（>100 文件/个）可能超长运行**——小批量（≤40）+明确输出契约更可靠。
+- ruleset required_status_checks 上下文与 job 改名脱节会永久卡合并——改 CI job 名时同步审查 ruleset（用户设置面）。
