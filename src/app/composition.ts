@@ -11,6 +11,7 @@ import { parseRetractionWatchCsv } from '../sources/retraction-watch.js';
 import { resolveRunProvider } from './provider-resolver.js';
 import { withSpendGate } from './spend-limit.js';
 import { Orchestrator } from './orchestrator.js';
+import { createRunKernelPlane } from '../kernel/capability-plane.js';
 import type { StageHandler } from '../pipeline/types.js';
 import type { RunStageName } from '../domain/run.js';
 import type { ModelProvider, SourceAdapter, StructuredCallRequest, StructuredCallResult } from '../shared/ports.js';
@@ -123,6 +124,19 @@ export const createApp = async (opts: AppOptions = {}): Promise<App> => {
     stages: stageMap,
     signals: new Map(),
     responseCache,
+    // Ω ADR D5: the kernel capability plane rides the same per-run provider
+    // resolution, spend gate, budget and receipt governance as the stages.
+    kernelPlane: ({ run, budget, recordReceipt }) => createRunKernelPlane({
+      provider: gated(resolveRunProvider(store, run) ?? provider),
+      store,
+      runId: run.id,
+      integrations: store.listObjects('tool_integration', '__none__'),
+      sourceFor: (family) => opts.adaptersOverride?.[family] ?? sourceAdapterFor(family),
+      artifacts,
+      budget,
+      recordReceipt,
+      rolloutDir: path.join(dataDir, 'agent-sessions'),
+    }),
   });
   return {
     store, orchestrator, artifacts, provider, dataDir,

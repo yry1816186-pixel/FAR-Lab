@@ -16,25 +16,47 @@ import { STAGE_ORDER, RunStageName } from './run.js';
 
 const ISO_STRING = z.string().min(1);
 
-/** How a step is considered finished. `stage_terminal` = the stage record reaches a terminal state (done/skipped/failed). */
-export const StepCompletionSchema = z.object({
-  kind: z.literal('stage_terminal'),
-});
+/** How a step is considered finished. `stage_terminal` = the stage record reaches a terminal state (done/skipped/failed); `agent_result_ok` = the capability session completed with a schema-valid result. */
+export const StepCompletionSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('stage_terminal') }),
+  z.object({ kind: z.literal('agent_result_ok') }),
+]);
 export type StepCompletion = z.infer<typeof StepCompletionSchema>;
 
-export const WorkflowStepSchema = z.object({
+const StepBase = {
   /** Stable within one plan; deps reference it. */
   id: z.string().min(1),
-  /** Slice 1: `stage` only. The executor fails closed on any other kind. */
-  kind: z.literal('stage'),
-  /** Target stage primitive. */
-  target: RunStageName,
   /** Step ids that must reach a terminal state before this step may start. */
   after: z.array(z.string().min(1)),
-  completion: StepCompletionSchema,
-  /** Upper bound on stage attempts (matches the persisted attempt accounting; informational at slice 1 — enforcement stays with the stage machine). */
+  /** Upper bound on attempts (stage machine accounting / agent session restarts; informational — enforcement stays with the executor). */
   attemptCap: z.number().int().positive(),
+};
+
+/** A canonical pipeline stage primitive, executed by the durable stage machine. */
+export const StageStepSchema = z.object({
+  ...StepBase,
+  kind: z.literal('stage'),
+  target: RunStageName,
+  completion: z.object({ kind: z.literal('stage_terminal') }),
 });
+export type StageStep = z.infer<typeof StageStepSchema>;
+
+/**
+ * A kernel capability invocation (Ω ADR D5): the named capability owns its task
+ * construction, tools and result schema (src/kernel/capabilities/registry.ts).
+ * Progress/audit accounting is agent_session + agent_report + events — an agent
+ * step has NO run.stages record, so it never disturbs the stage progress bar.
+ */
+export const AgentStepSchema = z.object({
+  ...StepBase,
+  kind: z.literal('agent'),
+  /** Registered kernel capability name. */
+  target: z.string().min(1),
+  completion: z.object({ kind: z.literal('agent_result_ok') }),
+});
+export type AgentStep = z.infer<typeof AgentStepSchema>;
+
+export const WorkflowStepSchema = z.discriminatedUnion('kind', [StageStepSchema, AgentStepSchema]);
 export type WorkflowStep = z.infer<typeof WorkflowStepSchema>;
 
 export const WorkflowPlanSchema = z.object({
@@ -79,30 +101,46 @@ export function defaultWorkflow(runId: string, at = new Date().toISOString()): W
  * are skipped). `skipWithoutHandler` excludes steps whose handler is absent in this
  * build (the plan-loop equivalent of `cursor += 1`).
  */
+export function nextWorkflowStep(
+  plan: WorkflowPlan,
+  stepState: (step: WorkflowStep) => 'unvisited' | 'terminal' | 'pending',
+  skipTargets: ReadonlySet<string>,
+): WorkflowStep | undefined {
+  // A dependency is satisfied when its step reached a terminal state (stage record
+  // done/skipped, or an agent step that finished — ok or not), or when the executor
+  // passed over it this pass (record stays pending-but-visible; blocking the chain
+  // would diverge from the array loop's `cursor += 1` behavior). A FAILED dependency
+  // does not gate downstream steps — the stage machine stops at failures itself;
+  // agent failures are recorded on the step's outcome and are terminal for it.
+  for (const step of plan.steps) {
+    if (skipTargets.has(step.target)) continue;
+    if (stepState(step) === 'terminal') continue;
+    if (step.after.length > 0 && !step.after.every((depId) => {
+      const dep = plan.steps.find((s) => s.id === depId);
+      return dep !== undefined && (stepState(dep) === 'terminal' || skipTargets.has(dep.target));
+    })) continue;
+    return step;
+  }
+  return undefined;
+}
+
+/**
+ * Stage-record view over a plan (slice-A1 compatibility): agent steps have no
+ * stage record and therefore read as pending until executed.
+ */
 export function nextWorkflowStage(
   plan: WorkflowPlan,
   stageState: (target: RunStageName) => { state: string } | undefined,
   skipTargets: ReadonlySet<string>,
 ): RunStageName | undefined {
-  // A dependency is satisfied when its stage record reached a terminal state, or when
-  // the executor passed over it for a missing handler this pass (the record stays
-  // pending-but-visible; blocking the chain would diverge from the array loop's
-  // `cursor += 1` behavior). A FAILED dependency does not gate downstream steps —
-  // the stage machine stops at failures itself (resume retries the failed stage first).
-  const depSatisfied = (t: RunStageName): boolean => {
-    if (skipTargets.has(t)) return true;
-    const rec = stageState(t);
-    return rec !== undefined && (rec.state === 'done' || rec.state === 'skipped');
-  };
-  for (const step of plan.steps) {
-    if (skipTargets.has(step.target)) continue;
-    const rec = stageState(step.target);
-    if (rec !== undefined && (rec.state === 'done' || rec.state === 'skipped')) continue;
-    if (step.after.length > 0 && !step.after.every((depId) => {
-      const dep = plan.steps.find((s) => s.id === depId);
-      return dep !== undefined && depSatisfied(dep.target);
-    })) continue;
-    return step.target;
-  }
-  return undefined;
+  const step = nextWorkflowStep(
+    plan,
+    (s) => {
+      if (s.kind !== 'stage') return 'pending';
+      const rec = stageState(s.target);
+      return rec !== undefined && (rec.state === 'done' || rec.state === 'skipped') ? 'terminal' : 'pending';
+    },
+    skipTargets,
+  );
+  return step !== undefined && step.kind === 'stage' ? step.target : undefined;
 }

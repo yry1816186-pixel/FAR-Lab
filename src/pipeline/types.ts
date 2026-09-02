@@ -5,6 +5,7 @@ import type { ArtifactStore, ModelProvider, SourceAdapter } from '../shared/port
 import type { SourceFamily, SourceDocument } from '../domain/source.js';
 import type { FullTextFetchResult } from '../sources/fulltext.js';
 import type { RunBudgetView } from '../app/run-budget.js';
+import type { KernelCapabilityPlane } from '../kernel/capability-plane.js';
 
 /** What a stage may touch. Stage handlers stay pure of infrastructure wiring. */
 export interface StageContext {
@@ -59,6 +60,13 @@ export interface StageContext {
    * same view at stage boundaries. Spend authority stays with receipts.
    */
   budget?: RunBudgetView;
+  /**
+   * Ω ADR D5 capability plane: stages and future kernel-authored workflow steps
+   * may invoke agent-kernel capabilities (runCapability) through this seam. Absent
+   * (tests/minimal harnesses) = no kernel in this execution; consumers must degrade
+   * honestly, never fabricate agent work.
+   */
+  kernel?: KernelCapabilityPlane;
   /**
    * W-C bilingual display layer: when true, generation stages additionally produce
    * Simplified-Chinese renderings of primary display fields (hypothesis statements,

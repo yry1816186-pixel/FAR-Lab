@@ -2,7 +2,8 @@ import { ResearchRun, RunStatus, RunStageName, ProvenanceReceipt, newId } from '
 import { randomBytes } from 'node:crypto';
 import type { Store } from '../persistence/store.js';
 import type { StageHandler, StageContext } from '../pipeline/types.js';
-import { defaultWorkflow, nextWorkflowStage, type WorkflowPlan } from '../domain/workflow-plan.js';
+import { defaultWorkflow, nextWorkflowStep, type WorkflowPlan } from '../domain/workflow-plan.js';
+import type { KernelCapabilityPlane } from '../kernel/capability-plane.js';
 import { canonicalJson } from '../shared/crypto.js';
 import { totalBudgetFromEnv } from '../providers/http.js';
 import type { ArtifactStore, ModelProvider, SourceAdapter } from '../shared/ports.js';
@@ -34,6 +35,16 @@ export interface OrchestratorDeps {
   signals: Map<string, { cancelled: boolean }>;
   /** Retrieval response cache (composition-wired; absent = legacy uncached behavior). */
   responseCache?: ResponseCacheStore;
+  /**
+   * Ω ADR D5 capability plane factory: one plane per execution, bound to the run's
+   * provider/budget/receipt governance. Absent (tests/minimal harnesses) = agent-kind
+   * workflow steps are skipped honestly with an audit event, never silently faked.
+   */
+  kernelPlane?: (args: {
+    run: ResearchRun;
+    budget: RunBudgetView;
+    recordReceipt: StageContext['recordReceipt'];
+  }) => KernelCapabilityPlane;
 }
 
 /** Cross-process execution ownership refused (another live executor holds the lease). */
@@ -153,7 +164,26 @@ export class Orchestrator {
     return run;
   }
 
-  private makeContext(run: ResearchRun, lease?: string, budget?: RunBudgetView): StageContext {
+  /** Shared receipt sink (stage machine + kernel capability plane ride the same governance). */
+  private receiptSink(run: ResearchRun, lease?: string): StageContext['recordReceipt'] {
+    const store = this.deps.store;
+    return (partial) => {
+      const receipt = ProvenanceReceipt.parse({
+        ...partial, id: newId('rcp'), runId: run.id, at: partial.at ?? new Date().toISOString(),
+      });
+      store.putObject('receipt', receipt);
+      // every persisted write is a lease heartbeat (W8 S1): a live worker keeps its lease warm
+      if (lease !== undefined) store.renewLease(run.id, lease, new Date(Date.now() + LEASE_TTL_MS).toISOString());
+      // B3: the event carries the facts the wait-time narrative renders — one shared
+      // detail shape with the store-backed recorder (src/pipeline/llm.ts receiptEventDetail).
+      store.appendEvent(run.id, {
+        type: 'receipt_recorded', stage: partial.stage,
+        detail: receiptEventDetail(receipt), receiptId: receipt.id,
+      });
+    };
+  }
+
+  private makeContext(run: ResearchRun, lease?: string, budget?: RunBudgetView, kernel?: KernelCapabilityPlane): StageContext {
     const { store, signals } = this.deps;
     const signal = signals.get(run.id) ?? { cancelled: false };
     signals.set(run.id, signal);
@@ -180,22 +210,10 @@ export class Orchestrator {
       // (table + model clamps) inside invokeStructured; absent = legacy zero-field.
       ...(resolveRunReasoningRoute(store, run) ?? {}),
       budget,
+      ...(kernel !== undefined ? { kernel } : {}),
       sourceFor: this.deps.sourceFor,
       ...(this.deps.responseCache !== undefined ? { responseCache: this.deps.responseCache } : {}),
-      recordReceipt: (partial) => {
-        const receipt = ProvenanceReceipt.parse({
-          ...partial, id: newId('rcp'), runId: run.id, at: partial.at ?? new Date().toISOString(),
-        });
-        store.putObject('receipt', receipt);
-        // every persisted write is a lease heartbeat (W8 S1): a live worker keeps its lease warm
-        if (lease !== undefined) store.renewLease(run.id, lease, new Date(Date.now() + LEASE_TTL_MS).toISOString());
-        // B3: the event carries the facts the wait-time narrative renders — one shared
-        // detail shape with the store-backed recorder (src/pipeline/llm.ts receiptEventDetail).
-        store.appendEvent(run.id, {
-          type: 'receipt_recorded', stage: partial.stage,
-          detail: receiptEventDetail(receipt), receiptId: receipt.id,
-        });
-      },
+      recordReceipt: this.receiptSink(run, lease),
       progress: (done, total, note) => {
         // B3 sub-stage granularity: update the CURRENT stage record's subtasks
         // (known totals only — callers pass real domain counts) and append the
@@ -439,12 +457,73 @@ export class Orchestrator {
       ? undefined
       : plan.steps.findIndex((s) => s.target === opts.stopAfter);
     const noHandler = new Set<string>();
+    // Agent-step terminal set (this execution): an agent step has no stage record;
+    // its outcome lives in agent_session/agent_report objects + these events.
+    const doneAgentSteps = new Set<string>();
+    const kernelPlane = this.deps.kernelPlane?.({ run, budget, recordReceipt: this.receiptSink(run, lease) });
     for (;;) {
-      const stage = nextWorkflowStage(plan, (t) => this.stageRecord(run, t), noHandler);
-      if (stage === undefined) break;
+      const step = nextWorkflowStep(plan, (s) => {
+        if (s.kind === 'agent') return doneAgentSteps.has(s.id) ? 'terminal' : 'pending';
+        const rec = this.stageRecord(run, s.target);
+        return rec !== undefined && (rec.state === 'done' || rec.state === 'skipped') ? 'terminal' : 'pending';
+      }, noHandler);
+      if (step === undefined) break;
       // stop-after parks BEFORE the named stage runs — plan-position comparison keeps
       // the original "break at stopAfter even when its record is already done" semantics.
-      if (stopAfterIdx !== undefined && plan.steps.findIndex((s) => s.target === stage) >= stopAfterIdx) break;
+      if (stopAfterIdx !== undefined && plan.steps.indexOf(step) >= stopAfterIdx) break;
+
+      if (step.kind === 'agent') {
+        if (!budget.hasRemaining()) {
+          this.deps.store.appendEvent(runId, {
+            type: 'note',
+            detail: { reason: 'agent_step_skipped', capability: step.target, stepId: step.id, cause: BUDGET_EXHAUSTED_REASON, spent: budget.spent, cap: budget.cap },
+          });
+          doneAgentSteps.add(step.id); // terminal for this pass; a resume with a raised budget re-plans it
+          continue;
+        }
+        if (kernelPlane === undefined) {
+          noHandler.add(step.target);
+          this.deps.store.appendEvent(runId, {
+            type: 'note',
+            detail: { reason: 'agent_step_unavailable', capability: step.target, stepId: step.id, cause: 'kernel capability plane not wired in this build' },
+          });
+          continue;
+        }
+        const wireCancel = this.wireCancels.get(runId);
+        this.deps.store.appendEvent(runId, { type: 'note', detail: { reason: 'agent_step_started', capability: step.target, stepId: step.id } });
+        try {
+          const res = await kernelPlane.runCapability(step.target, ...(wireCancel !== undefined ? [{ signal: wireCancel.signal }] : []));
+          doneAgentSteps.add(step.id);
+          this.deps.store.appendEvent(runId, {
+            type: 'note',
+            detail: {
+              reason: 'agent_step_done', capability: step.target, stepId: step.id,
+              ok: res.ok, status: res.status, turns: res.turns,
+              ...(res.reportId !== null ? { reportId: res.reportId } : {}),
+              ...(res.error !== undefined ? { error: res.error } : {}),
+            },
+          });
+          if (res.status === 'aborted') {
+            const msg = `agent step ${step.id} (${step.target}) aborted`;
+            run = await this.transition(runId, (r) => {
+              r.status = 'cancelled' satisfies RunStatus;
+              r.lastError = msg;
+              r.cancelRequested = false;
+              return r;
+            }, lease);
+            this.deps.store.appendEvent(runId, { type: 'run_cancelled', stage: step.target, status: run.status, detail: { error: msg } });
+            return run;
+          }
+        } catch (e) {
+          doneAgentSteps.add(step.id);
+          this.deps.store.appendEvent(runId, {
+            type: 'note',
+            detail: { reason: 'agent_step_failed', capability: step.target, stepId: step.id, error: e instanceof Error ? e.message : String(e) },
+          });
+        }
+        continue;
+      }
+      const stage = step.target;
       const rec = this.stageRecord(run, stage);
 
       // Budget boundary: once the cap is spent, remaining model/retrieval stages are
@@ -473,7 +552,7 @@ export class Orchestrator {
       }, lease);
       this.deps.store.appendEvent(runId, { type: 'stage_started', stage, detail: { attempt: nextAttempt } });
 
-      const ctx = this.makeContext(run, lease, budget);
+      const ctx = this.makeContext(run, lease, budget, kernelPlane);
       try {
         if (await handler.applicable(ctx)) {
           if (signal.cancelled || (this.deps.store.getRun(run.id)?.cancelRequested ?? false)) throw new Error('cancelled by user');
