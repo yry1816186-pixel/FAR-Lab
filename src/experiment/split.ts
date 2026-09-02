@@ -42,10 +42,43 @@ export const splitSpecHash = (canonical: {
  * draw and allocated to train/val/test by ratio — exact counts, stable across runs.
  * A groupColumn forces all rows of a group into one partition (bucket by group hash);
  * it overrides stratification when both are set.
+ *
+ * FA-DAT-01: the allocation core below consumes ONLY per-row column VALUES, never
+ * full rows — applySplit (materialized rows) and applySplitColumns (streamed column
+ * arrays) share it, so the streaming path cannot drift from the audited behavior.
  */
 export const applySplit = (
   header: string[],
   rows: string[][],
+  opts: {
+    datasetRecordId: DatasetRecordId;
+    datasetContentRef: string;
+    targetColumn: string;
+    split: SplitSpec;
+    groupColumn?: string;
+  },
+): SplitOutcome => {
+  // Column indices are computed OUTSIDE the map callbacks: property narrowing on
+  // opts.groupColumn would not survive into the closures.
+  const targetIdx = header.indexOf(opts.targetColumn);
+  const groupIdx = opts.groupColumn !== undefined ? header.indexOf(opts.groupColumn) : -1;
+  return applySplitColumns(header, rows.length, {
+    targetValues: rows.map((r) => String(r[targetIdx] ?? '')),
+    groupValues: groupIdx >= 0 ? rows.map((r) => String(r[groupIdx] ?? '')) : null,
+  }, opts);
+};
+
+/** Column view for streaming splits: index-aligned values of the split-relevant columns. */
+export interface SplitColumnValues {
+  targetValues: string[];
+  /** Non-null iff the spec declares a group column. */
+  groupValues: string[] | null;
+}
+
+export const applySplitColumns = (
+  header: string[],
+  n: number,
+  cols: SplitColumnValues,
   opts: {
     datasetRecordId: DatasetRecordId;
     datasetContentRef: string;
@@ -60,8 +93,15 @@ export const applySplit = (
   if (opts.groupColumn !== undefined && groupIdx < 0) {
     throw new Error(`group column '${opts.groupColumn}' not in dataset header`);
   }
+  if (cols.targetValues.length !== n) {
+    throw new Error(`split column view inconsistent: ${cols.targetValues.length} target values for ${n} rows`);
+  }
+  if (cols.groupValues !== null && cols.groupValues.length !== n) {
+    throw new Error(`split column view inconsistent: ${cols.groupValues.length} group values for ${n} rows`);
+  }
+  const targetAt = (i: number): string => String(cols.targetValues[i] ?? '');
+  const groupAt = (i: number): string => (cols.groupValues !== null ? String(cols.groupValues[i] ?? '') : '');
 
-  const n = rows.length;
   const trainIdx: number[] = [];
   const valIdx: number[] = [];
   const testIdx: number[] = [];
@@ -69,12 +109,12 @@ export const applySplit = (
   if (groupIdx >= 0) {
     // Group bucketing: one unit draw per GROUP (not per row) — same partition for the whole group.
     const groups = new Map<string, number[]>();
-    rows.forEach((_row, i) => {
-      const key = String(rows[i]?.[groupIdx] ?? '');
+    for (let i = 0; i < n; i += 1) {
+      const key = groupAt(i);
       const list = groups.get(key);
       if (list === undefined) groups.set(key, [i]);
       else list.push(i);
-    });
+    }
     const ordered = [...groups.values()].sort((a, b) => unit(opts.split.seed, fnv1a(String(a[0]))) - unit(opts.split.seed, fnv1a(String(b[0]))));
     const nTrain = Math.max(1, Math.round(opts.split.ratios.train * n));
     const nVal = Math.round(opts.split.ratios.val * n);
@@ -85,14 +125,14 @@ export const applySplit = (
       assigned += members.length;
     }
   } else {
-    const strata: Map<string, number[]> = opts.split.method === 'random_stratified' ? new Map() : new Map([['__all__', rows.map((_, i) => i)]]);
+    const strata: Map<string, number[]> = opts.split.method === 'random_stratified' ? new Map() : new Map([['__all__', Array.from({ length: n }, (_, i) => i)]]);
     if (opts.split.method === 'random_stratified') {
-      rows.forEach((_row, i) => {
-        const key = String(rows[i]?.[targetIdx] ?? '');
+      for (let i = 0; i < n; i += 1) {
+        const key = targetAt(i);
         const list = strata.get(key);
         if (list === undefined) strata.set(key, [i]);
         else list.push(i);
-      });
+      }
     }
     for (const members of strata.values()) {
       const ordered = [...members].sort((a, b) => unit(opts.split.seed, a) - unit(opts.split.seed, b));
@@ -115,7 +155,7 @@ export const applySplit = (
   testIdx.sort(asc);
   const classBalance: Record<string, number> = {};
   for (const i of testIdx) {
-    const cls = String(rows[i]?.[targetIdx] ?? '');
+    const cls = targetAt(i);
     classBalance[cls] = (classBalance[cls] ?? 0) + 1;
   }
 

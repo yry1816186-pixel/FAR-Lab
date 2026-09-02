@@ -447,14 +447,16 @@
       "id": "FA-REM-02",
       "domain": "remote",
       "title": "Remote cell-level fingerprint dedup (resume not retrain)",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "self",
-      "gap": "executor.ts:336 previousCells not shared; remote retry = full retrain; scheduler.ts:19-20 comment contradicts implementation (only such spot)",
+      "gap": "已闭（2026-09-02 ce87d9c）：共享 cell-dedup 模块（指纹序列化形状冻结，存量指纹兼容回归锁定）接入 remote-executor——同设备重试回放缓存细胞 0 次重训（设备+python+pip 作用域，跨设备诚实重训）；失败/取消路径 rm -rf /tmp/farlab/<id> 设备清理；scheduler.ts 崩溃窗口注释与实现一致。验证：tests/remote-executor-dedup.test.ts 5 例（同设备重试 0 训练/细胞一致/统计回放、跨设备 4 训练对照、失败清理、指纹冻结×3）；全套 2398 过/15 跳；真 docker SSH e2e 过。",
       "target": "shared dedup module wired into remote-executor + failure-path cleanup of /tmp/farlab/<id>",
       "verify": "test comparing cached-lookup vs sequential",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/05-remote.md CAP-03"
+        "FINAL_EVIDENCE/audit-2026-08-30/05-remote.md CAP-03",
+        "tests/remote-executor-dedup.test.ts",
+        "src/experiment/cell-dedup.ts"
       ]
     },
     {
@@ -503,14 +505,17 @@
       "id": "FA-PRF-02",
       "domain": "perf",
       "title": "Backend perf gate in CI with p50/p95/p99",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "self",
-      "gap": "only web LCP/CLS gated; backend means only, no percentiles, no thresholds",
+      "gap": "CLOSED 2026-09-02: scripts/perf-gate.mjs measures ten real-path operations per run (CLI cold start, createApp, API server start/get-runs/heavy-run/events-pagination/health-chain-verify, store listEvents+verifyEventChain at 15k events, kernel turn machinery) with p50/p95/p99 and hard p95 ceilings (THRESHOLDS_MS); ci.yml runs `--ci` inside Verify (ubuntu-latest). Hosted first run GREEN on PR #139's verify (run 33588116282: cold-start 241ms, events-pagination 125ms, chain-verify 44ms — every metric far under threshold; artifact evidence/reliability/perf-gate.json per run). Fail-closed semantics are unit-locked (non-finite p95 = breach, missing threshold = breach). Thresholds remain provisional until tightened against more hosted artifacts.",
       "target": "reliability-perf.mjs -ci mode with hard thresholds in ci.yml",
       "verify": "CI log shows gate",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/06-perf-reliability.md PERF-1/3"
+        "FINAL_EVIDENCE/audit-2026-08-30/06-perf-reliability.md PERF-1/3",
+        "scripts/perf-gate.mjs + tests/perf-gate.test.ts",
+        ".github/workflows/ci.yml (Backend perf gate step)",
+        "hosted run 33588116282 job log (PERF-GATE CI PASS)"
       ]
     },
     {
@@ -958,7 +963,7 @@
       "status": "PARTIAL",
       "priority": "P0",
       "owner": "self",
-      "gap": "Deterministic five-table inventory, disjoint/full coverage validation, FA backfill, atomic updates, and honest red completion gate are implemented and tested. Progress 2026-09-02 (main-agent per-file review with same-pass fixes): governance_assets COMPLETE 63/63 (manifest mission-field fix; binary PNG magic-byte verification; five stale-doc fixes landed across tables), product_specs_docs 16/42 (CONTRIBUTING/PRODUCT/ADR-engine/TROUBLESHOOTING fixed in-pass), ledger check PASS. Remaining: docs 26, delivery 127, runtime 388, tests 339 (multi-window grind; parallel-agent batches sized <=40 files each after the first >100-file agents proved too slow).",
+      "gap": "Deterministic five-table inventory, disjoint/full coverage validation, FA backfill, atomic updates, and honest red completion gate are implemented and tested. Progress 2026-09-02 (main-agent per-file review + three parallel review agents whose findings were all verified and fixed in-pass): THREE of five tables COMPLETE — product_specs_docs 42/42, governance_assets 64/64 (three ever-mutating live ledgers re-adjudicated at each batch), delivery_operations 127/127 (agent verdicts incl. two verified LOW findings fixed: surgery invariant substring-count bug, harness-doctor obsolete-list false positive) = 233/960. On the way 17 real defects were fixed (stale test counts, SECURITY-vs-POLICY contradiction, dead references, ADR engine misstatement, refuted-0.58 headline replaced with the honest 0.226+refutation narrative, submission version drift, R-23/R-24 risk additions, four absolute-path portability fixes, and the two delivery-table fixes). Remaining: runtime 388, tests 339 (multi-window grind; batches sized <=40 files).",
       "target": "100% tracked-file adjudication with no open finding and every finding linked to FINAL_ACCEPTANCE before repair",
       "verify": "npm run endgame:sweep:sync && npm run endgame:sweep:complete",
       "evidence": [
@@ -1031,6 +1036,7 @@
   ],
   "stopConditions": {
     "note": "Mission stop requires ALL of: no internal FAIL/PARTIAL; canonical clean-clone CI green; science north-star met or externally justified; real evidence across all planes; 24h→72h soak+chaos; win/mac/linux matrix; sandbox attack suite; production-path-only flows; clean-machine bundle verify; honest BLOCKED_EXTERNAL only; docs==commit; final red-team audit no new P0/P1.",
-    "currentVerdict": "NOT READY — 8 FAIL, 23 PARTIAL, 32 PASS, 2 BLOCKED_EXTERNAL (66 tracked). Closed this wave: FA-SEC-01 (hosted ubuntu OCI evidence on canonical main 0da4c68, run 33583828122), FA-PLT-01/02 (canonical main CI fully green incl. chromium-full e2e and the windows/firefox/webkit matrix), FA-REM-01, FA-SEC-04, FA-SEC-08, FA-HAR-01, FA-HCI-04, FA-DAT-03 (decision record), FA-EVAL-02 (preregistered user-study protocol+materials+instrumentation; execution BLOCKED_EXTERNAL by design), FA-EVAL-04 (live CI/science tracking), FA-SEC-12 (web jszip bomb budget). Still open: hosted OIDC/release evidence, scientific targets (4 metrics), 6h+ soak (running), streaming data plane, evaluation-wave re-measurement, five-table sweep (in progress via parallel review), and B-QWEN (user-owned 09-05). The exhaustive five-table review and shallow-assertion adjudication remain the large PARTIAL blocks."
-  }
+    "currentVerdict": "NOT READY — 8 FAIL, 22 PARTIAL, 33 PASS, 2 BLOCKED_EXTERNAL (66 tracked). Closed this wave: FA-SEC-01 (hosted ubuntu OCI evidence on canonical main, run 33583828122), FA-PLT-01/02 (canonical main CI fully green), FA-REM-01, FA-SEC-04, FA-SEC-08, FA-HAR-01, FA-HCI-04, FA-DAT-03 (decision record), FA-EVAL-02 (preregistered user-study protocol; execution BLOCKED_EXTERNAL by design), FA-EVAL-04, FA-SEC-12, FA-PRF-02 (hosted perf gate PASS). Still open: hosted OIDC/release evidence, scientific targets (4 metrics), 6h+ soak (running; verdict at hour 6), streaming data plane, evaluation-wave re-measurement, five-table sweep (233/960: three of five tables complete; runtime+tests remain), and B-QWEN (user-owned 09-05)."
+  },
+  "currentVerdict": "NOT READY — 8 FAIL, 22 PARTIAL, 34 PASS, 2 BLOCKED_EXTERNAL (66 tracked)"
 }

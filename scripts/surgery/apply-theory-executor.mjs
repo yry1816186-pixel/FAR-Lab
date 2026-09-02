@@ -462,7 +462,11 @@ console.log('store.ts kind registration: delegated to apply-theory-store.mjs');
   const exp = read('src/domain/experiment.ts');
   if (!exp.includes("'identity_max_abs_residual'") || !exp.includes("'identity_grid'")) fail('invariant: experiment.ts contract members missing');
   const ops = read('experiment-runtime/farlab_experiment_runtime/ops.py');
-  if (countOf(ops, 'identity_check') !== 2) fail('invariant: ops.py identity_check wiring != def+registry');
+  // Count the two WIRING occurrences, not the raw substring: the patched file
+  // legitimately contains four 'identity_check' substrings (def + registry key
+  // + registry value + error-string mention), which made the old `!== 2` count
+  // fail even on the fully applied tree.
+  if (countOf(ops, 'def op_identity_check') !== 1 || countOf(ops, '"identity_check": op_identity_check') !== 1) fail('invariant: ops.py identity_check wiring != def+registry');
   const sfp = read('src/experiment/spec-from-plan.ts');
   if (!sfp.includes('THEORY_GRID_POINTS') || !sfp.includes('draftTheorySpecFromPlan')) fail('invariant: spec-from-plan drafter incomplete');
   const ex = read('src/pipeline/stages/execute.ts');

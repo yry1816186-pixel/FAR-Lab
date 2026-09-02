@@ -12,8 +12,9 @@ import {
 import { conformalInterval } from '../domain/conformal.js';
 import { expandAblationModels } from './matrix.js';
 import { acquireDataset } from './datasets.js';
-import { applySplit } from './split.js';
+import { applySplitColumns } from './split.js';
 import { createSidecar, type Sidecar } from './python.js';
+import { localCellFingerprint, previousRunCells, loadCachedPerRow } from './cell-dedup.js';
 import { elapsedMilliseconds, monotonicMilliseconds, type MonotonicClock } from '../shared/timing.js';
 
 /**
@@ -249,8 +250,8 @@ export const executeExperiment = async (
   // One sidecar session carries training AND statistics; logs flush to an artifact at close.
   const sidecar = (opts.sidecar ?? (() => createSidecar()))();
   try {
-    // 2. Dataset acquisition + deterministic split.
-    const { record, parsed } = await acquireDataset(store, artifacts, spec.runId, use);
+    // 2. Dataset acquisition + deterministic split (FA-DAT-01: column view, never full rows).
+    const { record, csv } = await acquireDataset(store, artifacts, spec.runId, use);
     // Wave-S/s2 #6 (g5) post-acquisition re-check: nRows is known now, so the nTest floor
     // and MDE attainability floor apply for real. Fail-closed before any training spend.
     const postAcquisition = checkExperimentSpec(validated, {
@@ -262,7 +263,10 @@ export const executeExperiment = async (
       throw new Error(`spec failed post-acquisition statistical gate: ${postAcquisition.missing.join('; ')}`);
     }
     if (opts.shouldCancel?.()) throw new Error('canceled before split');
-    const outcome: SplitOutcome = applySplit(parsed.header, parsed.rows, {
+    const outcome: SplitOutcome = applySplitColumns(csv.header, csv.nRows, {
+      targetValues: csv.targetValues,
+      groupValues: csv.groupValues,
+    }, {
       datasetRecordId: record.id,
       datasetContentRef: record.contentRef,
       targetColumn: use.targetColumn,
@@ -338,7 +342,7 @@ export const executeExperiment = async (
     }
 
     // 4. Train/eval per model, with fingerprint dedup against earlier cells (D-086-1).
-    const previousCells = (store.listObjects('result_set', spec.runId) as ResultSet[]).flatMap((rs) => rs.cells);
+    const previousCells = previousRunCells(store, spec.runId);
     // 14→10 wiring: full-factorial ablation expansion (matrix.ts is the single owner).
     // Expanded cells are APPENDED after all base models — spec comparison indices stay
     // valid, ablation cells are report-only by construction. Cells whose (builder,
@@ -354,14 +358,13 @@ export const executeExperiment = async (
     const perRowByModel = new Map<number, number[]>();
     for (const [modelIdx, model] of effectiveModels.entries()) {
       if (opts.shouldCancel?.()) throw new Error('canceled');
-      const fingerprint = createHash('sha256')
-        .update(JSON.stringify({ specHash, contentRef: record.contentRef, envLock: lock, modelIdx, seed: model.seed, builder: model.builderId, hyperparams: model.hyperparams }))
-        .digest('hex');
+      const fingerprint = localCellFingerprint({
+        specHash, contentRef: record.contentRef, envLock: lock,
+        modelIdx, seed: model.seed, builder: model.builderId, hyperparams: model.hyperparams,
+      });
       const cached = previousCells.find((c) => c.fingerprint === fingerprint);
       if (cached !== undefined) {
-        const raw = await artifacts.get(cached.perRowRef);
-        if (raw === null) fail(`cached cell ${cached.modelName} lost its per-row artifact ${cached.perRowRef}`);
-        perRowByModel.set(modelIdx, JSON.parse(raw) as number[]);
+        perRowByModel.set(modelIdx, await loadCachedPerRow(artifacts, cached, fail));
         cells.push(cached);
         continue;
       }

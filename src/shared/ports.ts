@@ -192,6 +192,12 @@ export interface SourceAdapter {
 export interface ArtifactStore {
   /** Returns the content-addressed ref (sha256:...) and guarantees immutability on collision mismatch. */
   put(payload: string | Uint8Array): Promise<{ ref: string; hash: string; size: number }>;
+  /**
+   * Streaming put (FA-DAT-01): hashes and lands chunks without ever holding the whole
+   * payload — the file-size capability path. Optional so test fakes stay valid; real-path
+   * callers fail loudly when absent instead of silently falling back to a full buffer.
+   */
+  putStream?(source: AsyncIterable<Uint8Array>): Promise<{ ref: string; hash: string; size: number }>;
   get(ref: string): Promise<string | null>;
   path(ref: string): string;
 }
