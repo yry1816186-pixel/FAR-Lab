@@ -626,14 +626,16 @@
       "id": "FA-SEC-08",
       "domain": "security",
       "title": "fence delimiter crypto-random (Math.random predictable)",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P1",
-      "owner": "sibling-lane",
-      "gap": "http.ts:418 Math.random 8-char delimiter; V8 xorshift128+ predictable (defense-in-depth; JSON escaping raises bar)",
+      "owner": "self",
+      "gap": "CLOSED 2026-09-02 at commit 08bcaf4: the untrusted-data fence delimiter is now randomBytes(6) hex (48 bits, node:crypto) instead of Math.random's predictable xorshift128+ stream; the dead random seam parameter was removed (backoff jitter keeps its own deterministic seam). Regression asserts the hex shape, within-request marker consistency and cross-request uniqueness.",
       "target": "crypto.randomBytes",
       "verify": "entropy assertion",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/03-security.md CAP-08, path D"
+        "FINAL_EVIDENCE/audit-2026-08-30/03-security.md CAP-08, path D",
+        "src/providers/http.ts buildMessages",
+        "tests/providers.test.ts (fence entropy regression)"
       ]
     },
     {
@@ -1026,6 +1028,6 @@
   ],
   "stopConditions": {
     "note": "Mission stop requires ALL of: no internal FAIL/PARTIAL; canonical clean-clone CI green; science north-star met or externally justified; real evidence across all planes; 24h→72h soak+chaos; win/mac/linux matrix; sandbox attack suite; production-path-only flows; clean-machine bundle verify; honest BLOCKED_EXTERNAL only; docs==commit; final red-team audit no new P0/P1.",
-    "currentVerdict": "NOT READY — 10 FAIL, 32 PARTIAL, 22 PASS, 2 BLOCKED_EXTERNAL (66 tracked). Wave 0 implementation, scope convergence, streaming durability, deterministic hygiene, Web artifact/static-cache contracts, version policy/TUI packaging, exact Rust pin, the locally verified multi-runtime source release pack, FA-REM-01 evidence alignment, and FA-SEC-04 process-boundary egress enforcement are closed at their stated scope. Hosted CI/CodeQL/OIDC release evidence, desktop distribution, scientific targets, soak/platform breadth, and several security boundaries remain open. The exhaustive five-table review is still only 5/902 files and shallow-assertion adjudication is 1/168, so those two Wave 0 criteria remain PARTIAL."
+    "currentVerdict": "NOT READY — 10 FAIL, 31 PARTIAL, 23 PASS, 2 BLOCKED_EXTERNAL (66 tracked). Wave 0 implementation, scope convergence, streaming durability, deterministic hygiene, Web artifact/static-cache contracts, version policy/TUI packaging, exact Rust pin, the locally verified multi-runtime source release pack, FA-REM-01 evidence alignment, FA-SEC-04 process-boundary egress enforcement, and FA-SEC-08 fence crypto-randomization are closed at their stated scope. Hosted CI/CodeQL/OIDC release evidence, desktop distribution, scientific targets, soak/platform breadth, and several security boundaries remain open. The exhaustive five-table review is still only 5/902 files and shallow-assertion adjudication is 1/168, so those two Wave 0 criteria remain PARTIAL."
   }
 }
