@@ -1,0 +1,412 @@
+{
+  "schemaVersion": 1,
+  "harnessVersion": 1,
+  "leg": "CURRENT",
+  "pinnedAt": "2026-09-02T13:31:39.698Z",
+  "gitCommit": "4780fc63ba0817109cd340a5516bf8197ef66ce0",
+  "gitTag": "omega-baseline-w0",
+  "route": "zai",
+  "problemsFile": "eval/problems.json",
+  "cli": {
+    "path": "work/omega-baseline-w0/dist/cli/main.js",
+    "argv": [
+      "research",
+      "start",
+      "<q>",
+      "--domain",
+      "<d>",
+      "--goal",
+      "<g>",
+      "--route",
+      "zai",
+      "--json"
+    ]
+  },
+  "results": [
+    {
+      "problemId": "P1",
+      "ok": true,
+      "snapshot": {
+        "runId": "run_9cvmbae566m3qdtyxetr0pzd59",
+        "status": "completed",
+        "stages": [
+          {
+            "stage": "scope",
+            "state": "done"
+          },
+          {
+            "stage": "retrieve",
+            "state": "done"
+          },
+          {
+            "stage": "verify_sources",
+            "state": "done"
+          },
+          {
+            "stage": "build_evidence",
+            "state": "done"
+          },
+          {
+            "stage": "generate_hypotheses",
+            "state": "done"
+          },
+          {
+            "stage": "critique_falsify",
+            "state": "done"
+          },
+          {
+            "stage": "rank",
+            "state": "done"
+          },
+          {
+            "stage": "plan",
+            "state": "done"
+          },
+          {
+            "stage": "execute",
+            "state": "skipped",
+            "reason": "tabular: routed out by method selection; literature-pool: The plan requires newly collected hospital drain biofilm samples and request-only paired short/long-read sequencing data; published literature does not report mechanism-attribution contrasts (conjugation vs transduction vs transformation) as pooled odds ratios, risk ratios, or standardized mean differences, so no published effect-estimate contrast exists to pool.; theory: The plan requires wet-lab conjugation/transduction/transformation experiments, environmental biofilm samples, marker abundance measurements, and meta-analysis of literature datasets. There is no claimed closed-form mathematical identity or bound expressible as numeric lhs == rhs expressions over a grid; the decision rules are empirical thresholds on measured rates and effect sizes, not checkable symbolic identities.; protocol: protocol drafting failed: model call failed (invalid_output) in execute/protocol-draft: zai: structured output rejected even after 3 corrective re-asks: schema validation failed: allocation.blockVariable:Ex"
+          },
+          {
+            "stage": "feedback",
+            "state": "skipped"
+          },
+          {
+            "stage": "revise",
+            "state": "skipped"
+          },
+          {
+            "stage": "export",
+            "state": "done"
+          }
+        ],
+        "metrics": {
+          "source_total": 12,
+          "source_verification_rate": 1,
+          "claim_total": 31,
+          "claim_binding_rate": 1,
+          "counter_evidence_relations": 4,
+          "hypothesis_candidates": 12,
+          "hypothesis_representatives": 12,
+          "falsification_completeness_rate": 1,
+          "plan_present": true,
+          "receipts": 129,
+          "model_calls": 83,
+          "receipt_modes": {
+            "live": 129
+          }
+        },
+        "modelVersions": []
+      },
+      "wallMs": 1600901
+    },
+    {
+      "problemId": "P2",
+      "ok": true,
+      "snapshot": {
+        "runId": "run_ds242z91hmxhymbeakndgqzqb5",
+        "status": "completed",
+        "stages": [
+          {
+            "stage": "scope",
+            "state": "done"
+          },
+          {
+            "stage": "retrieve",
+            "state": "done"
+          },
+          {
+            "stage": "verify_sources",
+            "state": "done"
+          },
+          {
+            "stage": "build_evidence",
+            "state": "done"
+          },
+          {
+            "stage": "generate_hypotheses",
+            "state": "done"
+          },
+          {
+            "stage": "critique_falsify",
+            "state": "done"
+          },
+          {
+            "stage": "rank",
+            "state": "done"
+          },
+          {
+            "stage": "plan",
+            "state": "done"
+          },
+          {
+            "stage": "execute",
+            "state": "skipped",
+            "reason": "tabular: routed out by method selection; literature-pool: The plan requires new analyses on individual-level shotgun metagenomic and tumor transcriptomic cohort data (pathway/taxon AUC modeling, PRR-inflame scores) that are not available as published effect estimates; no literature-reported OR/RR/SMD contrast of the exposure vs ICI-efficacy outcomes is specified for pooling.; theory: The plan requires empirical cohort data (16S/shotgun microbiome profiles, gene expression, RECIST outcomes) and statistical model fitting (cross-validated AUC, I² heterogeneity, adjusted odds ratios) — there is no claimed closed-form mathematical identity or bound checkable numerically on a grid.; protocol: Every plan step is purely computational or desk-based: tabular ML on existing cohort shotgun-metagenomic and transcriptomic datasets (cross-cohort pathway-vs-taxon models, PRR-inflame score regression), pooled synthesis of a published 12-source evidence base, and a human-review adjudication of model outputs. No step requires physical, field, bench, human-participant, archive, or laboratory execution; the mouse NOD2/TLR4-DTK companion arm is explicitly recorded as not executed. This is entirely within scope for software to run directly, so no real-world research-protocol draft is warranted."
+          },
+          {
+            "stage": "feedback",
+            "state": "skipped"
+          },
+          {
+            "stage": "revise",
+            "state": "skipped"
+          },
+          {
+            "stage": "export",
+            "state": "done"
+          }
+        ],
+        "metrics": {
+          "source_total": 12,
+          "source_verification_rate": 0.9166666666666666,
+          "claim_total": 20,
+          "claim_binding_rate": 1,
+          "counter_evidence_relations": 7,
+          "hypothesis_candidates": 12,
+          "hypothesis_representatives": 12,
+          "falsification_completeness_rate": 1,
+          "plan_present": true,
+          "receipts": 130,
+          "model_calls": 83,
+          "receipt_modes": {
+            "live": 130
+          }
+        },
+        "modelVersions": []
+      },
+      "wallMs": 1610847
+    },
+    {
+      "problemId": "P3",
+      "ok": true,
+      "snapshot": {
+        "runId": "run_v4ssgmpjgy2vxwj3anmkwxxvqm",
+        "status": "completed",
+        "stages": [
+          {
+            "stage": "scope",
+            "state": "done"
+          },
+          {
+            "stage": "retrieve",
+            "state": "done"
+          },
+          {
+            "stage": "verify_sources",
+            "state": "done"
+          },
+          {
+            "stage": "build_evidence",
+            "state": "done"
+          },
+          {
+            "stage": "generate_hypotheses",
+            "state": "skipped",
+            "reason": "evidence flagged insufficient for the question's subject (run tag evidence-insufficient) — the verified claims do not measure or observe the question's central subject; refusing to generate hypotheses about an uncovered subject"
+          },
+          {
+            "stage": "critique_falsify",
+            "state": "skipped"
+          },
+          {
+            "stage": "rank",
+            "state": "skipped"
+          },
+          {
+            "stage": "plan",
+            "state": "skipped",
+            "reason": "no defensible hypotheses were produced from the verified evidence — an honest plan is impossible; inspect the evidence tab for what was (in)sufficient"
+          },
+          {
+            "stage": "execute",
+            "state": "skipped"
+          },
+          {
+            "stage": "feedback",
+            "state": "skipped"
+          },
+          {
+            "stage": "revise",
+            "state": "skipped"
+          },
+          {
+            "stage": "export",
+            "state": "done"
+          }
+        ],
+        "metrics": {
+          "source_total": 12,
+          "source_verification_rate": 0.8333333333333334,
+          "claim_total": 22,
+          "claim_binding_rate": 1,
+          "counter_evidence_relations": 1,
+          "hypothesis_candidates": 0,
+          "hypothesis_representatives": 0,
+          "falsification_completeness_rate": null,
+          "plan_present": false,
+          "receipts": 53,
+          "model_calls": 17,
+          "receipt_modes": {
+            "live": 53
+          }
+        },
+        "modelVersions": []
+      },
+      "wallMs": 285419
+    },
+    {
+      "problemId": "P4",
+      "ok": true,
+      "snapshot": {
+        "runId": "run_6eay45ekw559ex5jf0b6pxhtz8",
+        "status": "completed",
+        "stages": [
+          {
+            "stage": "scope",
+            "state": "done"
+          },
+          {
+            "stage": "retrieve",
+            "state": "done"
+          },
+          {
+            "stage": "verify_sources",
+            "state": "done"
+          },
+          {
+            "stage": "build_evidence",
+            "state": "done"
+          },
+          {
+            "stage": "generate_hypotheses",
+            "state": "done"
+          },
+          {
+            "stage": "critique_falsify",
+            "state": "done"
+          },
+          {
+            "stage": "rank",
+            "state": "done"
+          },
+          {
+            "stage": "plan",
+            "state": "done"
+          },
+          {
+            "stage": "execute",
+            "state": "skipped",
+            "reason": "tabular: routed out by method selection; literature-pool: The plan requires collecting new in-lab PSG + behavioral experiment data (interference-load arms, fragmentation indices, bout durations, d-prime) that do not exist as published effect estimates; no literature-based intervention-vs-outcome contrast with pooled OR/RR/SMD can adjudicate these two mechanistic hypotheses.; theory: routed out by method selection; protocol: protocol drafting failed: model call failed (timeout) in execute/protocol-draft: zai: total budget 300000ms (incl. retries) exhausted before next attempt"
+          },
+          {
+            "stage": "feedback",
+            "state": "skipped"
+          },
+          {
+            "stage": "revise",
+            "state": "skipped"
+          },
+          {
+            "stage": "export",
+            "state": "done"
+          }
+        ],
+        "metrics": {
+          "source_total": 12,
+          "source_verification_rate": 1,
+          "claim_total": 15,
+          "claim_binding_rate": 1,
+          "counter_evidence_relations": 17,
+          "hypothesis_candidates": 12,
+          "hypothesis_representatives": 12,
+          "falsification_completeness_rate": 1,
+          "plan_present": true,
+          "receipts": 126,
+          "model_calls": 76,
+          "receipt_modes": {
+            "live": 126
+          }
+        },
+        "modelVersions": []
+      },
+      "wallMs": 1672164
+    },
+    {
+      "problemId": "P6",
+      "ok": true,
+      "snapshot": {
+        "runId": "run_cf7n4p7tjhzpee3r3sxsk7gm6q",
+        "status": "completed",
+        "stages": [
+          {
+            "stage": "scope",
+            "state": "done"
+          },
+          {
+            "stage": "retrieve",
+            "state": "done"
+          },
+          {
+            "stage": "verify_sources",
+            "state": "done"
+          },
+          {
+            "stage": "build_evidence",
+            "state": "done"
+          },
+          {
+            "stage": "generate_hypotheses",
+            "state": "done"
+          },
+          {
+            "stage": "critique_falsify",
+            "state": "done"
+          },
+          {
+            "stage": "rank",
+            "state": "done"
+          },
+          {
+            "stage": "plan",
+            "state": "done"
+          },
+          {
+            "stage": "execute",
+            "state": "done"
+          },
+          {
+            "stage": "feedback",
+            "state": "skipped"
+          },
+          {
+            "stage": "revise",
+            "state": "skipped"
+          },
+          {
+            "stage": "export",
+            "state": "done"
+          }
+        ],
+        "metrics": {
+          "source_total": 12,
+          "source_verification_rate": 0.9166666666666666,
+          "claim_total": 27,
+          "claim_binding_rate": 1,
+          "counter_evidence_relations": 18,
+          "hypothesis_candidates": 12,
+          "hypothesis_representatives": 10,
+          "falsification_completeness_rate": 1,
+          "plan_present": true,
+          "receipts": 118,
+          "model_calls": 74,
+          "receipt_modes": {
+            "live": 118
+          }
+        },
+        "modelVersions": []
+      },
+      "wallMs": 1461877
+    }
+  ]
+}
