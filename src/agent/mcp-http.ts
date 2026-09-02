@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { McpToolAnnotations, type McpToolInfo } from './mcp.js';
+import { assertFetchDestination } from '../shared/destination-guard.js';
 
 /**
  * MCP streamable-HTTP client (TIS): same narrow surface as McpStdioClient —
@@ -58,6 +59,18 @@ export class McpHttpClient {
 
   async connect(): Promise<void> {
     if (this.closed) throw new Error('mcp-http: client closed');
+    // Process-boundary egress guard (FA-SEC-04): reject a server URL pointing
+    // at a metadata endpoint / private range / plaintext public host before the
+    // initialize handshake carries headers anywhere. Local MCP servers on
+    // loopback stay legal in any scheme. Surfaced through the manager's honest
+    // per-server failed state, and the wording deliberately matches none of
+    // the retryable-transport patterns (an egress rejection is not transient).
+    try {
+      assertFetchDestination(this.opts.url);
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : String(e);
+      throw new Error(`mcp-http: egress guard rejected ${this.opts.url} — ${reason}`, { cause: e });
+    }
     const initResult = await this.request('initialize', {
       protocolVersion: this.opts.protocolVersion ?? '2025-06-18',
       capabilities: {},

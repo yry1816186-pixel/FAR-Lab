@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 import { canonicalSha256 } from '../shared/crypto.js';
+import { assertFetchDestination } from '../shared/destination-guard.js';
 import { repairJson } from './json-repair.js';
 import type { StructuredCallRequest, StructuredCallResult, StructuredOutputEvent } from '../shared/ports.js';
 import { REASONING_GEAR_BUDGET_TOKENS } from '../domain/model-config.js';
@@ -1397,6 +1398,22 @@ export async function runOpenAICompatStructuredCall<T>(
       executionMode: cfg.executionMode,
     },
   });
+
+  // Process-boundary egress guard (FA-SEC-04): validate the resolved endpoint
+  // before any wire traffic. A misconfigured or injected baseUrl pointing at a
+  // metadata endpoint / private range / plaintext public host must fail closed
+  // here — never carry the API key into a rejected fetch. Loopback hosts stay
+  // legal in any scheme (local LLM gateways are a product surface).
+  try {
+    assertFetchDestination(url);
+  } catch (guardError) {
+    const reason = guardError instanceof Error ? guardError.message : String(guardError);
+    return fail({
+      kind: 'provider_error',
+      retryable: false,
+      message: `${cfg.providerName}: egress guard rejected the endpoint — ${reason}; failing closed (no request sent)`,
+    });
+  }
 
   for (;;) {
     const remaining = totalTimeoutMs - elapsedMs();

@@ -6,6 +6,7 @@
  * returns one normalized library snapshot. Fail-visible: when Zotero is not
  * running the route surfaces 503, never a fake empty library.
  */
+import { assertFetchDestination } from '../shared/destination-guard.js';
 
 export interface ZoteroLibItem {
   key: string;
@@ -144,6 +145,9 @@ export interface ZoteroFetchOptions {
  */
 export async function fetchZoteroLibrary(opts: ZoteroFetchOptions = {}): Promise<ZoteroLibrary> {
   const base = opts.base ?? ZOTERO_BASE;
+  // Egress guard (FA-SEC-04): the local Zotero connector is loopback by design;
+  // an operator-configured non-loopback base must be https and not an IP literal.
+  assertFetchDestination(base);
   const pageSize = Math.min(Math.max(opts.pageSize ?? 100, 1), 100);
   const maxItems = opts.maxItems ?? 5000;
   const items: ZoteroLibItem[] = [];
@@ -234,6 +238,7 @@ export interface ZoteroAnnotationsResult {
 /** Pull every annotation in the library (paginated, same local API + fail-visible rules). */
 export async function fetchZoteroAnnotations(opts: ZoteroFetchOptions = {}): Promise<ZoteroAnnotationsResult> {
   const base = opts.base ?? ZOTERO_BASE;
+  assertFetchDestination(base);
   const pageSize = Math.min(Math.max(opts.pageSize ?? 100, 1), 100);
   const maxItems = Math.max(opts.maxItems ?? 10_000, 1);
   const annotations: ZoteroAnnotation[] = [];
