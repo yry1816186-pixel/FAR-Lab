@@ -3,3 +3,11 @@
 # and the license-ledger --check gate (drift = exit 1) would be red on
 # windows-latest while green on ubuntu/macos — not a dependency drift at all.
 submission/OSS_LEDGER.md text eol=lf
+
+# Node ESM scripts carry #! shebangs, and vite/vitest fails to transform a
+# shebang'd .mjs whose line endings are CRLF (reproduced 2026-09-02: hosted
+# windows-latest checkout rendered scripts/verify-exploration-sandbox.mjs with
+# CRLF and both suite imports died with "SyntaxError: Invalid or unexpected
+# token"; the identical LF tree was green locally and on ubuntu). LF-only .mjs
+# removes the platform-dependent parse failure class entirely.
+*.mjs text eol=lf
