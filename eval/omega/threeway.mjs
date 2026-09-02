@@ -310,6 +310,7 @@ const doSnapshot = async () => {
   const doc = JSON.parse(pick.doc);
   if (!TERMINAL.has(doc.status ?? '')) die(3, `run ${pick.id} not terminal (status=${doc.status}) — snapshot refuses non-final state`);
   const snapshot = await snapshotRun(resolve(dbPath), pick.id);
+  const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 17);
   const anchor = {
     schemaVersion: 1,
     harnessVersion: HARNESS_VERSION,
