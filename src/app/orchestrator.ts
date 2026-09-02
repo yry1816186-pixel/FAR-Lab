@@ -4,6 +4,7 @@ import type { Store } from '../persistence/store.js';
 import type { StageHandler, StageContext } from '../pipeline/types.js';
 import { defaultWorkflow, nextWorkflowStep, type WorkflowPlan } from '../domain/workflow-plan.js';
 import type { KernelCapabilityPlane } from '../kernel/capability-plane.js';
+import { kernelPlanRevisionFor } from '../kernel/planner.js';
 import { canonicalJson } from '../shared/crypto.js';
 import { totalBudgetFromEnv } from '../providers/http.js';
 import type { ArtifactStore, ModelProvider, SourceAdapter } from '../shared/ports.js';
@@ -453,6 +454,7 @@ export class Orchestrator {
     // omega-baseline-w0 pin comparison are the parity harness.
     const plan = this.deps.store.listObjects('workflow_plan', runId).at(-1)
       ?? this.adoptDefaultPlan(runId);
+    let activePlan = plan;
     const stopAfterIdx = opts?.stopAfter === undefined
       ? undefined
       : plan.steps.findIndex((s) => s.target === opts.stopAfter);
@@ -462,7 +464,7 @@ export class Orchestrator {
     const doneAgentSteps = new Set<string>();
     const kernelPlane = this.deps.kernelPlane?.({ run, budget, recordReceipt: this.receiptSink(run, lease) });
     for (;;) {
-      const step = nextWorkflowStep(plan, (s) => {
+      const step = nextWorkflowStep(activePlan, (s) => {
         if (s.kind === 'agent') return doneAgentSteps.has(s.id) ? 'terminal' : 'pending';
         const rec = this.stageRecord(run, s.target);
         return rec !== undefined && (rec.state === 'done' || rec.state === 'skipped') ? 'terminal' : 'pending';
@@ -470,7 +472,7 @@ export class Orchestrator {
       if (step === undefined) break;
       // stop-after parks BEFORE the named stage runs — plan-position comparison keeps
       // the original "break at stopAfter even when its record is already done" semantics.
-      if (stopAfterIdx !== undefined && plan.steps.indexOf(step) >= stopAfterIdx) break;
+      if (stopAfterIdx !== undefined && activePlan.steps.indexOf(step) >= stopAfterIdx) break;
 
       if (step.kind === 'agent') {
         if (!budget.hasRemaining()) {
@@ -626,6 +628,19 @@ export class Orchestrator {
                   type: 'note', stage: 'rank',
                   detail: { reason: 'quality_gate_weak_proceeding', round, budgetRemaining: budget.hasRemaining(), metrics: signalQg.metrics, reasons: signalQg.reasons },
                 });
+              }
+              // Ω ADR D4 kernel planner v1 (deterministic): a contested-mechanism
+              // problem earns an adversarial counter-evidence debate step once the
+              // ranked set is final (the QG regeneration loop above `continue`s
+              // early, so this only runs on the settling pass).
+              const revisedPlan = kernelPlanRevisionFor(this.deps.store, runId, activePlan);
+              if (revisedPlan !== null) {
+                this.deps.store.putObject('workflow_plan', revisedPlan);
+                this.deps.store.appendEvent(runId, {
+                  type: 'note', stage: 'rank',
+                  detail: { reason: 'workflow_plan_revised', by: 'kernel-planner-v1', origin: revisedPlan.origin, version: revisedPlan.version, inserted: 'counter-evidence-debate' },
+                });
+                activePlan = revisedPlan;
               }
             }
           }
