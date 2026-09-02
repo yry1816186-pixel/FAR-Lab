@@ -102,6 +102,57 @@ Independent search/critique branches may run concurrently with bounded fan-out a
 - structured errors, run IDs, tool/provider receipts and timings;
 - no unbounded concurrency/model/tool loops.
 
+### 8.1 Exploratory CodeAct isolation and threat profiles
+
+The production `explore_code` caller uses a dedicated Docker Linux OCI backend.
+Its release-baseline contract is exact and fail-closed: a non-root container
+process, no network, read-only rootfs, no Linux capabilities, no-new-privileges,
+Docker's seccomp filter, private PID/IPC/cgroup namespaces, no host mounts or
+devices, bounded cgroups/ulimits, an exact environment allowlist, pre-start
+inspection, in-container attestation, and forced timeout/error cleanup. Docker
+or the image being unavailable is a visible capability failure; the product
+must never fall back to executing agent-authored code in the host sidecar.
+
+This baseline is for the current single-user local/workstation product and
+assumes the Docker daemon, container runtime, and Linux kernel (or Docker
+Desktop's Linux VM) are not already compromised. Stronger controls are
+separate deployment profiles, not simultaneous requirements for every backend:
+
+- **Daemon hardening:** rootless Docker is required before claiming that a
+  native Linux deployment runs its daemon/runtime without host root privilege.
+- **Hostile or multi-tenant execution:** gVisor or a stronger VM/microVM
+  boundary is required before claiming resistance to hostile tenants or
+  container/runtime escape; ordinary OCI isolation is insufficient for that
+  claim.
+- **Windows:** Docker Desktop/WSL2 running Linux containers is the current
+  Windows-hosted backend. AppContainer plus Job Object is required only if a
+  Windows-native, no-Docker CodeAct backend is shipped; it is an alternative
+  backend, not an additional condition on the Linux OCI backend.
+
+Re-open the backend decision if FAR-Lab becomes multi-user/remote, accepts
+untrusted tenant code, claims rootless native-Linux operation, ships CodeAct
+without Docker on Windows, or measurements show that the current backend cannot
+meet its scientific-runtime/performance contract. Re-open it immediately when
+there is a known applicable high-severity Docker/runc/containerd/kernel CVE,
+a reproducible container/runtime escape, a change to daemon socket or privilege
+semantics, a Docker/WSL backend or runtime change, a security-option/seccomp
+profile default change, or a pinned image/runtime baseline upgrade that has not
+been through a fresh threat review. Any new backend must pass the same
+production-caller, adversarial, resource and cleanup evidence ladder with no
+silent fallback.
+
+The production trust-root rule is equally strict: the `runExploration` runner
+owns the `createExplorationSandbox` factory, and `ResearchToolDeps` has no
+caller-supplied sandbox factory. Deterministic runner tests replace that module
+boundary only inside an isolated Vitest worker; there is no runtime factory
+parameter or public custom-backend extension seam. A future extension or public
+runner boundary must introduce an authenticated capability mechanism before
+allowing custom sandbox implementations.
+
+Decision basis (rechecked 2026-09-02): Docker's official rootless-mode contract,
+gVisor's official security model, and Microsoft's AppContainer and Job Object
+documentation. Dynamic evidence and the decision record live under `.control/`.
+
 ## 9. Provenance and sensitive payloads
 
 Record enough to reconstruct a result: source IDs/hashes, retrieval time, provider/model/config, tool/version/parameters, commit/environment fingerprint, stage transitions and output hashes.

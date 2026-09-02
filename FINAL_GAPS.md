@@ -3,7 +3,7 @@
 > 机器可读版：`FINAL_ACCEPTANCE.json`。逐域审计报告：`FINAL_EVIDENCE/audit-2026-08-30/`（8 域并行只读审计 + 主代理抽验）。
 > 状态词汇：PASS / PARTIAL / FAIL / BLOCKED_EXTERNAL。**任何 FAIL/PARTIAL 不得宣布完成。** 本文件随修复持续更新。
 
-## 总判（2026-08-31，Wave A 本地 CLS 修复已闭，托管核验待集成）
+## 总判（2026-09-02，Wave B 本地 OCI/取消传播/trust-root 已验证，托管核验待集成）
 
 当前 66 项终局标准为 20 PASS / 34 PARTIAL / 10 FAIL / 2
 BLOCKED_EXTERNAL。Wave 0 的五项实现标准已经集成并通过全门禁；Wave A 已在
@@ -12,7 +12,7 @@ SBOM 与确定性归档的本地真跑，但 canonical hosted 绿、OIDC attesta
 GitHub Release 仍未发生，不能提前翻 PASS。当前阻断完成的是四类真相缺口：
 
 1. **平台事实链未闭合**：canonical `main@cc4009c` 的 hosted verify 已绿，但 web-e2e 因 loaded-home CLS 0.123795 连红；本地根因已在 `87a1f3f` 修复并通过 23/23 浏览器门，仍待集成后的 hosted 绿证。Ubuntu+Windows 与 Chromium+Firefox 矩阵已经进入工作流，但 8a5200f 的 hosted run 仍显示等待且 0/2 verify 完成；release-pack 只完成本地真跑，未有 hosted OIDC/GitHub Release。ACC-25 "real Linux target" 实为本机 Docker。
-2. **安全实边界**：CodeAct 别名/拆链/getattr、sidecar env、sources egress、OpenAlex key 与 netcdf symlink 已在静态/运行时层修复；真正的 OS 级隔离、provider/MCP 进程边界 egress、SBOM/SAST 与发布签名仍开放。
+2. **安全实边界**：CodeAct 别名/拆链/getattr、sidecar env、sources egress、OpenAlex key 与 netcdf symlink 已在静态/运行时层修复；Docker Linux OCI 隔离已在本机真实生产路径和对抗路径验证，镜像 tag 在 create 前解析为 immutable image ID 并绑定容器，取消传播已覆盖 warmup/in-flight 调用并验证幂等清理，`runExploration` 与 `wireResearchTools` 均固定拥有 Docker trust root，不再接受 caller-supplied factory。runner 测试只在隔离 Vitest worker 替换模块边界，不能充当运行时扩展或不可伪造 attestation token。清理失败保持可重试并有回归证据。最终源码 SHA 的 hosted Ubuntu 绿证与 Linux `/proc` 清理分支仍开放。D-SEC-01 已把 rootless daemon、gVisor/VM、Windows-native AppContainer+Job 拆为由部署声明触发的独立安全档位，当前单用户 Docker Linux OCI 基线不声称这些能力；provider/MCP 进程边界 egress、SBOM/SAST 与发布签名也仍开放。
 3. **科学指标未达标**：rediscovery 0.226/0.7、judge variance 0.267/0.15、relation agreement 0.61/0.8、structured-output 0.011/0.005；评估集 100% 生物医学，无跨领域 held-out。
 4. **规模与长程证据空档**：后端 1000+ claim 门仅是明确标注的 SYNTHETIC 容量证据，浏览器真实路径当前只有 7 claims/0 admissible hypotheses；数据面仍受内存上限约束，无 6h+ soak、Windows hosted 绿证与 macOS/WebKit 证据。发布包已在 clean committed copy 上覆盖 root/Web/TUI/Python/desktop 五腿，生成 CycloneDX 1.7（991 components）及两次字节一致的 890-file 归档，但 hosted 签名与真实 GitHub Release 仍为 0 次。
 
@@ -22,7 +22,8 @@ GitHub Release 仍未发生，不能提前翻 PASS。当前阻断完成的是四
 |---|---|---|---|
 | FA-PLT-02 | canonical CI：verify 绿、web-e2e loaded-home CLS 红 | self | **本地根因已修于 87a1f3f（home CLS 0.0001、map 0.0184–0.0185、完整 Chromium 23/23）；待集成后 hosted 绿核验，PARTIAL** |
 | FA-EVAL-14 | 提交文档 0.061 旧数三处 + north-star 引用错位 | self | **已修（含两份 PDF 重生成+抽取核验）** |
-| FA-SEC-02/01 | CodeAct 门绕过封堵 + malicious 回归语料 + sidecar env 白名单 | self | **静态+运行时层已落地（别名/拆链/getattr 全拒、危险模块运行时擦除、env 最小化）；OS 级隔离仍开放（FA-SEC-01 残余）** |
+| FA-SEC-02 | CodeAct 门绕过封堵 + malicious 回归语料 + sidecar env 白名单 | self | **已闭：别名/拆链/getattr 全拒、危险模块运行时擦除、env 最小化** |
+| FA-SEC-01 | Exploration CodeAct OS 级隔离 | self | **PARTIAL：单用户本地 Docker Linux OCI 基线已在本机验证（生产真实路径、合同、故障注入、对抗、超时清理、取消传播均绿）；生产 `wireResearchTools` 已移除可替换 factory，低层 runner factory 仅保留为内部测试 seam 并由缺失 attestation 回归锁定，尚非不可伪造 token。最终 SHA 的 hosted Ubuntu job 与 Linux `/proc` attach-client 清理分支待证。rootless/gVisor/Windows-native 已按 D-SEC-01 重裁为条件档位，不作为四项同时满足的基线门** |
 | FA-SEC-04 | sources 层 egress destination guard（私网段/重定向/协议） | self | **sources 层已落地；进程边界 allowlist（providers/MCP）开放** |
 | FA-SEC-06 | OpenAlex api_key → header + 错误脱敏 | self | **已修（Bearer header + 构造器 chokepoint 脱敏）** |
 | FA-SEC-07 | netcdf realpath 围栏 + symlink 回归 | self | **已修** |
@@ -60,7 +61,7 @@ outbox/lease/DLQ/原子落地/错误分类（faults.json 10 案全绿）；事�
 | 4 | 六面真实证据 | 部分（工程强/科学-外部薄） |
 | 5 | 24h+ soak & chaos | ✗（无 6h+ soak；混沌 10/14） |
 | 6 | Win/macOS/Linux 矩阵 | ✗（Windows+Firefox 已配置但 hosted 未完成；macOS/WebKit 未配置） |
-| 7 | sandbox attack suite | ✗（恶意回归语料与静态/运行时门已绿；OS 级隔离仍未闭） |
+| 7 | sandbox attack suite | ✗（本地 Docker Linux OCI 对抗、故障注入、超时清理、取消传播、immutable image pin 和可重试清理已验证；生产 runner/wiring 不再暴露 caller factory，测试仅替换隔离模块边界，仍不等于不可伪造证明；最终 SHA 的 hosted Ubuntu 绿证和 Linux `/proc` 分支尚未闭；更强/原生后端仅在 D-SEC-01 触发条件出现时重开） |
 | 8 | 全流程 production path | 大体 ✓（gold 场景 A/B live） |
 | 9 | clean machine bundle verify | ✓（far verify 16 checks，四 bundle 11/11） |
 | 10 | BLOCKED_EXTERNAL 诚实 | ✓（B-QWEN/S-1 如实登记） |
