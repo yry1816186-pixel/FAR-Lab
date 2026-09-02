@@ -294,6 +294,27 @@ describe('dashscope transport shell (mock fetch) — the OpenAI-compat core suit
     expect(body.tool_choice).toEqual({ type: 'function', function: { name: 'respond' } });
   });
 
+  it('untrusted-data fence delimiter is crypto-random: hex shape, unique per request (FA-SEC-08)', async () => {
+    const fences: string[] = [];
+    for (let i = 0; i < 2; i += 1) {
+      const { fetchImpl, calls } = recorderFetch([() => Promise.resolve(httpError(401, { error: { message: 'fixture' } }))]);
+      await runOpenAICompatStructuredCall(
+        { providerName: 'fence-entropy-test', baseUrl: 'https://unit.test/v1', apiKey: 'test-fixture-key-fence', modelId: 'm', executionMode: 'test' },
+        REQ,
+        parseHypothesis,
+        { fetchImpl, sleep: () => Promise.resolve() },
+      );
+      const content = lastUserContent(calls[0]!);
+      const matches = [...content.matchAll(/<<FARLAB-UNTRUSTED-DATA-[0-9a-f]+>>/g)].map((m) => m[0]);
+      // instruction mention + open + close markers, all identical within one request
+      expect(matches).toHaveLength(3);
+      expect(new Set(matches).size).toBe(1);
+      expect(matches[0]).toMatch(/^<<FARLAB-UNTRUSTED-DATA-[0-9a-f]{12}>>$/);
+      fences.push(matches[0]!);
+    }
+    expect(fences[0]).not.toBe(fences[1]);
+  });
+
   it('wire-level cancel: a PRE-aborted signal fails immediately, non-retryably, without dispatching', async () => {
     const controller = new AbortController();
     controller.abort();
