@@ -84,12 +84,20 @@ const snapshotRun = async (dbPath, runId) => {
   const hypotheses = objects('hypothesis');
   const plans = objects('plan');
   const receipts = objects('receipt');
+  const agentReports = objects('agent_report');
   const modelCalls = receipts.filter((r) => r.kind === 'model_call');
   const modes = {};
   for (const r of receipts) modes[r.executionMode ?? 'unknown'] = (modes[r.executionMode ?? 'unknown'] ?? 0) + 1;
   const reps = hypotheses.filter((h) => isRepresentative(h));
   const withSpec = reps.filter((h) => h.falsification);
   const completeSpecs = withSpec.filter((h) => h.falsification?.completenessCheck?.passed === true);
+  // Kernel capability outputs (Ω ADR D5): debate verdicts are enrichment-layer objects —
+  // they are reported as their own metric family, never merged into pipeline
+  // evidence_relation counts (which stay verification-disciplined).
+  const debateFindings = agentReports
+    .filter((r) => r.capability === 'counter-evidence-debate')
+    .flatMap((r) => Array.isArray(r.result?.verdicts) ? r.result.verdicts : [])
+    .flatMap((v) => Array.isArray(v.counterFindings) ? v.counterFindings : []);
   const stages = (runDoc.stages ?? []).map((s) => ({ stage: s.stage, state: s.state, ...(s.error ? { reason: s.error } : {}) }));
   db.close();
   return {
@@ -111,6 +119,12 @@ const snapshotRun = async (dbPath, runId) => {
       receipts: receipts.length,
       model_calls: modelCalls.length,
       receipt_modes: modes,
+      agent_reports: agentReports.length,
+      debate_counter_findings: debateFindings.length,
+      debate_verdict_counts: agentReports
+        .filter((r) => r.capability === 'counter-evidence-debate')
+        .flatMap((r) => Array.isArray(r.result?.verdicts) ? r.result.verdicts : [])
+        .reduce((acc, v) => { const k = String(v.verdict ?? 'unknown'); acc[k] = (acc[k] ?? 0) + 1; return acc; }, {}),
     },
     modelVersions: [...new Set(modelCalls.map((r) => r.modelVersion ?? r.modelId).filter(Boolean))],
   };
@@ -283,7 +297,11 @@ const doSnapshot = async () => {
   const runId = flag('--run', 'auto');
   const route = flag('--route', 'zai');
   const leg = flag('--leg', 'CURRENT');
-  if (!dbPath) die(2, 'snapshot --db <workspace>/far.db [--run <id|auto>] [--route zai] [--leg CURRENT|REBUILT]');
+  // The anchor's git fields must describe the tree the RUN executed on, not the tree
+  // deriving the bundle — post-hoc derivations pass --commit/--tag explicitly.
+  const commit = flag('--commit', null) ?? gitOut(['rev-parse', 'HEAD']);
+  const tag = flag('--tag', null) ?? (() => { try { return gitOut(['describe', '--tags', '--exact-match', 'HEAD']); } catch { return null; } })();
+  if (!dbPath) die(2, 'snapshot --db <workspace>/far.db [--run <id|auto>] [--route zai] [--leg CURRENT|REBUILT] [--commit <sha>] [--tag <tag>] [--problem P5]');
   const db = new DatabaseSync(resolve(dbPath), { readOnly: true });
   const rows = db.prepare('SELECT id, doc FROM runs').all();
   db.close();
@@ -291,8 +309,6 @@ const doSnapshot = async () => {
   if (!pick) die(3, `run not found (${runId}) in ${dbPath}`);
   const doc = JSON.parse(pick.doc);
   if (!TERMINAL.has(doc.status ?? '')) die(3, `run ${pick.id} not terminal (status=${doc.status}) — snapshot refuses non-final state`);
-  const commit = gitOut(['rev-parse', 'HEAD']);
-  const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 17);
   const snapshot = await snapshotRun(resolve(dbPath), pick.id);
   const anchor = {
     schemaVersion: 1,
@@ -301,7 +317,7 @@ const doSnapshot = async () => {
     pinnedAt: new Date().toISOString(),
     derivedFrom: { dbPath, note: 'snapshot of a completed run workspace (post-hoc bundle derivation)' },
     gitCommit: commit,
-    gitTag: (() => { try { return gitOut(['describe', '--tags', '--exact-match', 'HEAD']); } catch { return null; } })(),
+    gitTag: tag,
     route,
     problemsFile: process.env.FARLAB_PROBLEMS ?? 'eval/problems.json',
     results: [{ problemId: flag('--problem', 'unknown'), ok: true, snapshot, wallMs: null }],
@@ -319,6 +335,6 @@ else if (cmd === 'status') doStatus();
 else if (cmd === 'compare') doCompare();
 else if (cmd === 'naked') doNaked();
 else {
-  console.error('usage: node eval/omega/threeway.mjs status | pin [--problems P1,P5] [--route zai] [--timeout-min 90] | snapshot --db <ws>/far.db [--run <id|auto>] [--leg CURRENT] [--route zai] [--problem P5] | compare <a> <b> | naked');
+  console.error('usage: node eval/omega/threeway.mjs status | pin [--problems P1,P5] [--route zai] [--timeout-min 90] [--cli <dist/main.js>] [--commit <sha>] | snapshot --db <ws>/far.db [--run <id|auto>] [--leg CURRENT] [--route zai] [--problem P5] [--commit <sha>] [--tag <tag>] | compare <a> <b> | naked');
   process.exit(2);
 }
