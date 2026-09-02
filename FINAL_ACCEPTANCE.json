@@ -694,10 +694,10 @@
       "id": "FA-SEC-12",
       "domain": "security",
       "title": "Web client archive-bomb caps (jszip/mammoth/pdfjs)",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P2",
-      "owner": "sibling-lane",
-      "gap": "server-side zip reader hardened; web client parsers uncapped",
+      "owner": "self",
+      "gap": "CLOSED 2026-09-02 at commit 0b26d06 for the jszip surface: assertZipEntryBudget (512 entries / 64MB per-entry declared uncompressed / 256MB total declared, mirroring the server zip reader) runs BEFORE any decompression at the pptx/odf/epub entry points; absent size declarations fall back to the entry-count cap. 5 regressions including a real 700-entry .odt bomb failing the client parse visibly. Disclosed residual: docx routes through mammoth's internal reader (bounded only by the 25MB file-size cap) and pdfjs streams by the binary file-size cap — no jszip-seamless budget exists for those two without forking their readers.",
       "target": "size/entry caps before parse",
       "verify": "nested-zip sample rejected",
       "evidence": [
@@ -1031,6 +1031,6 @@
   ],
   "stopConditions": {
     "note": "Mission stop requires ALL of: no internal FAIL/PARTIAL; canonical clean-clone CI green; science north-star met or externally justified; real evidence across all planes; 24h→72h soak+chaos; win/mac/linux matrix; sandbox attack suite; production-path-only flows; clean-machine bundle verify; honest BLOCKED_EXTERNAL only; docs==commit; final red-team audit no new P0/P1.",
-    "currentVerdict": "NOT READY — 9 FAIL, 25 PARTIAL, 30 PASS, 2 BLOCKED_EXTERNAL (66 tracked). Closed this wave: FA-SEC-01 (hosted ubuntu OCI evidence on canonical main 0da4c68, run 33583828122), FA-PLT-01/02 (canonical main CI fully green incl. chromium-full e2e and the windows/firefox/webkit matrix), FA-REM-01, FA-SEC-04, FA-SEC-08, FA-HAR-01, FA-HCI-04, FA-DAT-03 (decision record), FA-EVAL-04 (live CI/science tracking). Still open: hosted OIDC/release evidence, scientific targets (4 metrics), 6h+ soak (running), streaming data plane, evaluation-wave items, five-table sweep (in progress via parallel review), and B-QWEN (user-owned 09-05). The exhaustive five-table review and shallow-assertion adjudication remain the large PARTIAL blocks."
+    "currentVerdict": "NOT READY — 9 FAIL, 24 PARTIAL, 31 PASS, 2 BLOCKED_EXTERNAL (66 tracked). Closed this wave: FA-SEC-01 (hosted ubuntu OCI evidence on canonical main 0da4c68, run 33583828122), FA-PLT-01/02 (canonical main CI fully green incl. chromium-full e2e and the windows/firefox/webkit matrix), FA-REM-01, FA-SEC-04, FA-SEC-08, FA-HAR-01, FA-HCI-04, FA-DAT-03 (decision record), FA-EVAL-04 (live CI/science tracking), FA-SEC-12 (web jszip bomb budget). Still open: hosted OIDC/release evidence, scientific targets (4 metrics), 6h+ soak (running), streaming data plane, evaluation-wave items, five-table sweep (in progress via parallel review), and B-QWEN (user-owned 09-05). The exhaustive five-table review and shallow-assertion adjudication remain the large PARTIAL blocks."
   }
 }

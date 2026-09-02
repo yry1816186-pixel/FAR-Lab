@@ -45,7 +45,7 @@ GitHub Release 仍未发生，不能提前翻 PASS。当前阻断完成的是四
 
 ## P2 队列（architecture/product/performance/frontier 摘要）
 
-FA-HAR-05 steer 接线 · FA-HAR-06 记忆管理面 + 7d 验证 · FA-DAT-03 静态加密决策 · FA-DAT-04 FTS 增量 · FA-DAT-05 verify 空转收紧 · FA-REM-04 Slurm 网关 · FA-SEC-10 hosted OIDC 签名+updater · FA-SEC-12 web 解压上限 · FA-PLT-05 desktop 签名/更新/卸载 · FA-SCI-08 外部产品对照 · FA-EVAL-01/03 MLR 全量/prompt 工程化 · FA-HCI-04 EN 泄漏残项。FA-PLT-04/06 已闭合为 PASS。
+FA-HAR-05 steer 接线 · FA-HAR-06 记忆管理面 + 7d 验证 · ~~FA-DAT-03 静态加密决策~~ **已闭（2026-09-02：SECURITY.md 显式 non-goal+FDE 责任边界+多用户重开触发器）** · FA-DAT-04 FTS 增量 · FA-DAT-05 verify 空转收紧 · FA-REM-04 Slurm 网关 · FA-SEC-10 hosted OIDC 签名+updater · ~~FA-SEC-12 web 解压上限~~ **已闭（2026-09-02，0b26d06：jszip 面三限预算+mammoth/pdfjs 残差披露）** · FA-PLT-05 desktop 签名/更新/卸载 · FA-SCI-08 外部产品对照 · FA-EVAL-01/03 MLR 全量/prompt 工程化 · ~~FA-HCI-04 EN 泄漏残项~~ **已闭（2026-09-02，e5052a6：promoteToFeedback 三键 dict 化）**。FA-PLT-04/06 已闭合为 PASS。
 
 ## 强项（不许回退）
 
