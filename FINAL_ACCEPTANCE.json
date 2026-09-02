@@ -388,14 +388,15 @@
       "id": "FA-DAT-03",
       "domain": "data",
       "title": "At-rest encryption decision recorded and implemented or scoped out",
-      "status": "FAIL",
+      "status": "PASS",
       "priority": "P2",
       "owner": "self",
-      "gap": "plaintext far.db+artifacts; no decision record",
+      "gap": "CLOSED 2026-09-02 via the decision-record path: SECURITY.md now carries an explicit at-rest-encryption NON-GOAL section (FA-DAT-03/D-DAT-03) — single-user local deployment, FDE (BitLocker/FileVault/LUKS) is the correct control against the stated threat actors, app-layer cipher adds no OS-enforced boundary while adding a key-management surface; API keys are not stored in the databases (env/local secrets file; receipts hash-only). Reopen trigger recorded: any multi-user/shared-workspace/server mode REQUIRES per-workspace encryption (SQLCipher/AES-GCM) before that mode ships.",
       "target": "SECURITY.md explicit non-goal OR SQLCipher+AES-GCM",
       "verify": "decision record + implementation/tests if in scope",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/04-data.md CAP-08"
+        "FINAL_EVIDENCE/audit-2026-08-30/04-data.md CAP-08",
+        "SECURITY.md (At-Rest Encryption section)"
       ]
     },
     {
