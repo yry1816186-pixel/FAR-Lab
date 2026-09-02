@@ -958,7 +958,7 @@
       "status": "PARTIAL",
       "priority": "P0",
       "owner": "self",
-      "gap": "Deterministic five-table inventory, disjoint/full coverage validation, FA backfill, atomic updates, and honest red completion gate are implemented and tested. The synchronized 902-file ledger remains incomplete: runtime 2/378, tests/evaluation/evidence 2/321, delivery/operations 1/114, product/specs/docs 0/38, governance/assets 0/51. Completion is intentionally red.",
+      "gap": "Deterministic five-table inventory, disjoint/full coverage validation, FA backfill, atomic updates, and honest red completion gate are implemented and tested. Progress 2026-09-02: the product_specs_docs table began real per-file adjudication — 16/959 files reviewed by the main agent with four stale-doc fixes landing in the same pass (CONTRIBUTING workflow-vs-PR reality, PRODUCT evidence numbers, ADR engine misstatement, TROUBLESHOOTING new verified incident entry); ledger check PASS. Remaining: docs 26, governance 63, delivery 127, runtime 388, tests 339 (multi-window grind; parallel-agent batches sized <=40 files each after the first >100-file agents proved too slow).",
       "target": "100% tracked-file adjudication with no open finding and every finding linked to FINAL_ACCEPTANCE before repair",
       "verify": "npm run endgame:sweep:sync && npm run endgame:sweep:complete",
       "evidence": [
