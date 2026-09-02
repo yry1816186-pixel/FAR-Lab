@@ -139,7 +139,11 @@ const pinOne = async (problem, route, timeoutMin, workspaceDir) => {
   const env = { ...process.env, FARLAB_DATA_DIR: workspaceDir };
   delete env.FARLAB_TEST_DOUBLE; // a pin must never inherit offline test doubles
   const t0 = Date.now();
-  const res = spawnSync('node', args, { encoding: 'utf8', env, timeout: timeoutMin * 60_000, stdio: ['ignore', 'pipe', 'inherit'] });
+  // cwd MUST be the CLI's own tree root: the D-031 freshness guard resolves src
+  // relative to process.cwd(), so launching a worktree build from the harness repo
+  // would compare that build against THIS tree's (differently-versioned) src.
+  const cliCwd = resolve(dirname(cliPath()), '..', '..');
+  const res = spawnSync('node', args, { encoding: 'utf8', env, cwd: cliCwd, timeout: timeoutMin * 60_000, stdio: ['ignore', 'pipe', 'inherit'] });
   const stdoutLine = (res.stdout ?? '').split('\n').find((l) => l.trim().startsWith('{'));
   let runId = null;
   if (stdoutLine) {
