@@ -75,6 +75,67 @@ _FORBIDDEN_BUILTINS = (
 # traversal (np.f2py.os was a live-confirmed escape surface).
 _DANGEROUS_MODULES = frozenset({_os, _sys, _subprocess, _socket})
 
+_SUCCESS_STDOUT_CHARS = 8_000
+_ERROR_STDOUT_CHARS = 4_000
+
+
+class _BoundedTextBuffer(io.TextIOBase):
+    """Text sink that retains only the newest ``max_output_chars`` chars."""
+
+    def __init__(self, max_output_chars: int) -> None:
+        if max_output_chars < 0:
+            raise ValueError("max_output_chars must be non-negative")
+        super().__init__()
+        self.max_output_chars = max_output_chars
+        self.truncated = False
+        self._chunks: _collections.deque[str] = _collections.deque()
+        self._size = 0
+
+    def writable(self) -> bool:
+        return True
+
+    def write(self, text: str) -> int:
+        if not isinstance(text, str):
+            raise TypeError(f"write() argument must be str, not {type(text).__name__}")
+
+        chars_written = len(text)
+        if chars_written == 0:
+            return 0
+
+        if self._size + chars_written > self.max_output_chars:
+            self.truncated = True
+
+        if self.max_output_chars == 0:
+            self._chunks.clear()
+            self._size = 0
+            return chars_written
+
+        if chars_written >= self.max_output_chars:
+            self._chunks.clear()
+            tail = text[-self.max_output_chars:]
+            self._chunks.append(tail)
+            self._size = len(tail)
+            return chars_written
+
+        self._chunks.append(text)
+        self._size += chars_written
+        overflow = self._size - self.max_output_chars
+        while overflow > 0:
+            oldest = self._chunks[0]
+            if len(oldest) <= overflow:
+                self._chunks.popleft()
+                self._size -= len(oldest)
+                overflow -= len(oldest)
+            else:
+                self._chunks[0] = oldest[overflow:]
+                self._size -= overflow
+                overflow = 0
+        return chars_written
+
+    def getvalue(self) -> str:
+        return "".join(self._chunks)
+
+
 # Dunder introspection names banned at AST level (mirror of the TS gate's
 # E-ESCAPE). Adversarial audit 2026-08-24: without this ban the restricted
 # namespace is defeatable by pure attribute traversal —
@@ -230,7 +291,7 @@ def run_exploration(payload: dict[str, Any]) -> dict[str, Any]:
 
     _check_source(code)
 
-    stdout = io.StringIO()
+    stdout = _BoundedTextBuffer(_SUCCESS_STDOUT_CHARS)
     safe_builtins = {n: getattr(builtins, n) for n in dir(builtins) if n not in _FORBIDDEN_BUILTINS}
     try:
         import numpy as np  # family env always has numpy; degrade loudly if not
@@ -276,7 +337,7 @@ def run_exploration(payload: dict[str, Any]) -> dict[str, Any]:
             "ok": False,
             "errorKind": type(exc).__name__,
             "errorMessage": str(exc)[:500],
-            "stdout": stdout.getvalue()[-4000:],
+            "stdout": stdout.getvalue()[-_ERROR_STDOUT_CHARS:],
         }
     finally:
         for obj, name, val in removed:
@@ -287,8 +348,8 @@ def run_exploration(payload: dict[str, Any]) -> dict[str, Any]:
 
     return {
         "ok": True,
-        "stdout": stdout.getvalue()[-8000:],  # bounded preview; full text via artifacts when needed
-        "stdoutTruncated": len(stdout.getvalue()) > 8000,
+        "stdout": stdout.getvalue(),
+        "stdoutTruncated": stdout.truncated,
     }
 
 

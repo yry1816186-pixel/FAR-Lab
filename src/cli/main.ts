@@ -1193,15 +1193,18 @@ const main = async (): Promise<void> => {
   }
 
   if (sub === 'resume') {
+    // Parse usage-sensitive options before the stale-dist execution guard. A
+    // malformed request must retain its usage exit code even when a rebuild is
+    // also required; otherwise the guard masks the actionable CLI diagnostic.
+    const stopAfter = arg('--stop-after');
+    // A typo'd stage name must never silently run the whole pipeline (adversarial
+    // round-2): the old `as never` cast made an unmatched name a full resume.
+    if (stopAfter !== undefined && !(STAGE_ORDER as readonly string[]).includes(stopAfter)) {
+      die(`unknown --stop-after stage '${stopAfter}' — valid stages: ${STAGE_ORDER.join(', ')}`, 2);
+    }
     assertDistFresh();
     const app = await createApp();
     try {
-      const stopAfter = arg('--stop-after');
-      // A typo'd stage name must never silently run the whole pipeline (adversarial
-      // round-2): the old `as never` cast made an unmatched name a full resume.
-      if (stopAfter !== undefined && !(STAGE_ORDER as readonly string[]).includes(stopAfter)) {
-        die(`unknown --stop-after stage '${stopAfter}' — valid stages: ${STAGE_ORDER.join(', ')}`, 2);
-      }
       if (stopAfter !== undefined) {
         // Crash guard (mirror of scopeProposal's): a stop-after run tagged 'parking:*'
         // before execution is never watchdog-adopted if this CLI dies before the park.

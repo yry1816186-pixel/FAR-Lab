@@ -6,7 +6,7 @@ import { openDb } from '../src/persistence/db.js';
 import { Store } from '../src/persistence/store.js';
 import { ResearchQuestion, newId } from '../src/domain/index.js';
 import type { ArtifactStore } from '../src/shared/ports.js';
-import { wireResearchTools } from '../src/agent/capabilities/research-tools.js';
+import { wireResearchTools, type ResearchToolDeps } from '../src/agent/capabilities/research-tools.js';
 
 /**
  * Wiring tests for the research-tools capability: the AVO-fusion planes
@@ -74,24 +74,45 @@ describe('preview_ref tool', () => {
 });
 
 describe('explore_code tool (real sidecar)', () => {
-  it('runs gated analysis end-to-end and returns candidate findings with audit chain', async () => {
-    const uvAvailable = await new Promise<boolean>((res) => {
-      import('node:child_process').then(({ execFile }) =>
-        execFile('uv', ['--version'], { timeout: 10_000 }, (e) => res(e === null)),
-      );
-    });
-    if (!uvAvailable) {
-      console.warn('SKIP-EVIDENCE: uv unavailable');
-      return;
-    }
-    const { createSidecar } = await import('../src/experiment/python.js');
+  it('forwards the cooperative ToolContext signal before spawning a sidecar', async () => {
+    const { store, runId, artifacts } = fixture();
+    const tool = wireResearchTools({ store, runId, artifacts })
+      .find((candidate) => candidate.name === 'explore_code');
+    expect(tool).toBeDefined();
+
+    const out = await tool!.execute(
+      { purpose: 'cancel before exploration starts', code: 'print(1)' },
+      { signal: { aborted: true } },
+    );
+    expect(out.ok).toBe(false);
+    expect(out.error).toMatch(/aborted/);
+  });
+
+  it('does not read a legacy caller-supplied sidecarFactory', () => {
+    const { store, runId, artifacts } = fixture();
+    let reads = 0;
+    const legacyDeps = {
+      store,
+      runId,
+      artifacts,
+      get sidecarFactory(): never {
+        reads += 1;
+        throw new Error('production wiring must not consume sidecarFactory');
+      },
+    };
+    // Runtime callers may still carry an old extra property; the production
+    // dependency contract intentionally has no such field and must ignore it.
+    expect(() => wireResearchTools(legacyDeps as ResearchToolDeps)).not.toThrow();
+    expect(reads).toBe(0);
+  });
+
+  it.skipIf(process.env.FARLAB_VERIFY_EXPLORATION_SANDBOX !== '1')('runs gated analysis end-to-end and returns candidate findings with audit chain', async () => {
     const { store, runId } = fixture();
-    // rewire with the REAL sidecar factory
+    // No injection: exercise wireResearchTools' production Docker default.
     const realTools = Object.fromEntries(
       wireResearchTools({
         store, runId,
         artifacts: { put: async (p) => ({ ref: `sha256:${'c'.repeat(56)}`, hash: 'h', size: String(p).length }), get: async () => null, path: () => '' },
-        sidecarFactory: () => createSidecar(),
       }).map((t) => [t.name, t]),
     ) as Record<string, (typeof realTools extends infer T ? T : never)[string]>;
 
@@ -107,7 +128,8 @@ describe('explore_code tool (real sidecar)', () => {
 
     // audit chain landed on the run
     const receipts = store.listObjects('receipt', runId);
-    expect(receipts.some((r) => r.toolExec?.tool === 'run_exploration')).toBe(true);
+    const receipt = receipts.find((r) => r.toolExec?.tool === 'run_exploration');
+    expect(receipt?.toolExec?.sandbox?.backend).toBe('docker-linux');
 
     // gate rejection path surfaces violation codes to the model
     const rejected = await (realTools.explore_code as { execute: (a: unknown) => Promise<{ ok: boolean; error?: string }> }).execute({

@@ -58,6 +58,42 @@ if (!gate.__error && Array.isArray(gate.gates)) {
 if (!blockers.__error && Array.isArray(blockers.items)) {
   for (const b of blockers.items) {
     if (b.critical === true && b.status === 'OPEN') failed.push({ id: b.id, status: b.status, reason: 'critical-blocker-open' });
+
+    // Some release blockers carry a machine-checkable evidence contract.  An
+    // arbitrary non-OPEN status must not be enough to launder an unresolved
+    // hosted-validation gap into a green completion verdict.
+    if (b.requiredEvidence !== undefined) {
+      const required = b.requiredEvidence;
+      if (required === null || typeof required !== 'object' || Array.isArray(required)) {
+        errors.push(`invalid-blocker-required-evidence:${b.id}`);
+        continue;
+      }
+      if (b.status !== 'OPEN') {
+        const resolved = b.resolutionEvidence;
+        if (resolved === null || typeof resolved !== 'object' || Array.isArray(resolved)) {
+          errors.push(`resolved-blocker-without-resolution-evidence:${b.id}`);
+          continue;
+        }
+        if (typeof required.workflow === 'string' && resolved.workflow !== required.workflow) {
+          errors.push(`resolved-blocker-workflow-mismatch:${b.id}`);
+        }
+        if (typeof required.runner === 'string' && resolved.runner !== required.runner) {
+          errors.push(`resolved-blocker-runner-mismatch:${b.id}`);
+        }
+        if ('runUrl' in required && (typeof resolved.runUrl !== 'string' || !/^https?:\/\/\S+$/.test(resolved.runUrl))) {
+          errors.push(`resolved-blocker-run-url-missing:${b.id}`);
+        }
+        if ('sourceSha' in required && (typeof resolved.sourceSha !== 'string' || !/^[0-9a-f]{40}$/i.test(resolved.sourceSha))) {
+          errors.push(`resolved-blocker-source-sha-missing:${b.id}`);
+        }
+        if ('imageId' in required && (typeof resolved.imageId !== 'string' || !/^sha256:[0-9a-f]{64}$/i.test(resolved.imageId))) {
+          errors.push(`resolved-blocker-image-id-missing:${b.id}`);
+        }
+        if ('linuxProcAttachCleanup' in required && resolved.linuxProcAttachCleanup !== true) {
+          errors.push(`resolved-blocker-linux-proc-cleanup-unproven:${b.id}`);
+        }
+      }
+    }
   }
 }
 

@@ -25,7 +25,7 @@ rl.on('line', (line) => {
   } else if (msg.method === 'tools/list') {
     send(msg.id, { tools: [{ name: 'echo', description: 'echo args back', inputSchema: { type: 'object' } }] });
   } else if (msg.method === 'tools/call') {
-    const delay = msg.params && msg.params.name === 'slow' ? 500 : 0;
+    const delay = msg.params && msg.params.name === 'slow' ? 5000 : 0;
     setTimeout(() => {
       if (msg.params && msg.params.name === 'echo') {
         send(msg.id, { content: [{ type: 'text', text: JSON.stringify(msg.params.arguments ?? {}) }], isError: false });
@@ -80,10 +80,13 @@ describe('MCP stdio client (real child process)', () => {
   });
 
   it('times out a hanging request instead of blocking the loop forever', async () => {
-    const client = new McpStdioClient({ command: process.execPath, args: [scriptPath], timeoutMs: 150 });
+    // The timeout also covers spawning and initializing the real Node child.
+    // Keep enough headroom for a saturated CI worker while the fake tool stays
+    // far beyond the budget, so this tests request timeout rather than startup.
+    const client = new McpStdioClient({ command: process.execPath, args: [scriptPath], timeoutMs: 1000 });
     clients.push(client);
     await client.connect();
-    await expect(client.callTool('slow', {})).rejects.toThrow(/timed out after 150ms/);
+    await expect(client.callTool('slow', {})).rejects.toThrow(/timed out after 1000ms/);
   });
 
   it('rejects requests made before connect (fail-closed)', async () => {

@@ -3,8 +3,7 @@ import type { Store } from '../../persistence/store.js';
 import type { ArtifactStore } from '../../shared/ports.js';
 import { queryRunEvents, previewFor } from '../research-query.js';
 import { runExploration } from '../exploration-runner.js';
-import type { SidecarFactory, Sidecar } from '../../experiment/python.js';
-import { createSidecar } from '../../experiment/python.js';
+import type { ToolContext } from '../tool.js';
 
 /**
  * Research-tools capability (AVO fusion wiring): the G4/G5/G6 planes exposed
@@ -21,8 +20,6 @@ export interface ResearchToolDeps {
   store: Store;
   runId: string;
   artifacts: ArtifactStore;
-  /** Injectable sidecar factory; production default createSidecar(). */
-  sidecarFactory?: () => Sidecar;
 }
 
 // ---- G6: event queries as a tool ----
@@ -80,7 +77,7 @@ export const wireResearchTools = (
   inputSchema: z.ZodType<unknown>;
   riskClass: 'read' | 'execute';
   summarize?: (payload: unknown) => string;
-  execute: (args: unknown) => Promise<{ ok: boolean; data?: unknown; summary?: string; error?: string }>;
+  execute: (args: unknown, ctx?: Pick<ToolContext, 'signal'>) => Promise<{ ok: boolean; data?: unknown; summary?: string; error?: string }>;
 }> => [
   {
     name: query_run_events.name,
@@ -121,9 +118,8 @@ export const wireResearchTools = (
     },
   },
   (() => {
-    // exploration tool bound to deps; sidecar spawned per call (same lifecycle
-    // as runExploration's own management).
-    const sidecarFactory: SidecarFactory = deps.sidecarFactory ?? (() => createSidecar());
+    // The runner owns the production sandbox trust root and its lifecycle.
+    // This adapter binds only the research run/artifact dependencies.
     return {
       name: 'explore_code',
       description: makeExplorationTool().description,
@@ -133,7 +129,7 @@ export const wireResearchTools = (
         const p = payload as { ok?: boolean; stdout?: string };
         return `${p?.ok ? 'completed' : 'failed'}: ${String(p?.stdout ?? '').slice(0, 80)}`;
       },
-      async execute(args) {
+      async execute(args, ctx) {
         try {
           const parsed = (makeExplorationTool().inputSchema as z.ZodType<{ purpose: string; code: string }>).parse(args);
           const r = await runExploration({
@@ -143,7 +139,7 @@ export const wireResearchTools = (
             purpose: parsed.purpose,
             code: parsed.code,
             maxRuntimeMs: 120_000,
-            sidecarFactory,
+            ...(ctx !== undefined ? { signal: ctx.signal } : {}),
           });
           return {
             ok: true,

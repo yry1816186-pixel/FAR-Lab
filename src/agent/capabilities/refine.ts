@@ -273,8 +273,8 @@ export const runEvidenceGapRefinement = async (deps: RefineDeps, runId: string, 
       inputSchema: t.inputSchema as z.ZodType<unknown>,
       riskClass: t.riskClass,
       summarize: t.summarize,
-      async execute(args: unknown): Promise<ToolResult> {
-        const r = await t.execute(args);
+      async execute(args: unknown, ctx: ToolContext): Promise<ToolResult> {
+        const r = await t.execute(args, ctx);
         return r.ok
           ? { ok: true, data: r.data, ...(r.summary !== undefined ? { summary: r.summary } : {}) }
           : { ok: false, error: { kind: 'execution' as const, message: r.error ?? 'research tool failed' } };

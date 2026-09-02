@@ -16,6 +16,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "sandbox:build": "docker build -t farlab-experiment-runtime:sec01 experiment-runtime",
+    "sandbox:verify": "node scripts/verify-exploration-sandbox.mjs",
     "far": "node dist/cli/main.js",
     "serve": "node scripts/serve.mjs",
     "fetch:asr-model": "node scripts/fetch-asr-model.mjs",

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -6,7 +6,17 @@ import { openDb } from '../src/persistence/db.js';
 import { Store } from '../src/persistence/store.js';
 import { ResearchQuestion, newId } from '../src/domain/index.js';
 import { analyzeExplorationCode } from '../src/agent/exploratory-codeact.js';
-import { createSidecar, type SidecarFactory } from '../src/experiment/python.js';
+import { createSidecar, type SandboxAttestation, type Sidecar, type SidecarCallResult } from '../src/experiment/python.js';
+
+// Keep deterministic runner doubles inside this test worker. The production
+// runner has no caller-supplied factory; its sandbox module is the only seam
+// replaced here, and real OCI tests remain in their dedicated suite.
+const sandboxHarness = vi.hoisted(() => ({
+  factory: (() => { throw new Error('sandbox test harness was not configured'); }) as () => import('../src/experiment/python.js').Sidecar,
+}));
+vi.mock('../src/experiment/exploration-sandbox.js', () => ({
+  createExplorationSandbox: () => sandboxHarness.factory(),
+}));
 import { runExploration } from '../src/agent/exploration-runner.js';
 
 /**
@@ -28,9 +38,140 @@ const openStore = (): { store: Store; runId: string } => {
   return { store, runId: run.id };
 };
 
-const realFactory: SidecarFactory = () => createSidecar();
+const TEST_ATTESTATION: SandboxAttestation = {
+  backend: 'docker-linux',
+  imageRef: 'test-only-attested-double',
+  imageId: `sha256:${'a'.repeat(64)}`,
+  policyHash: 'b'.repeat(64),
+  policyVersion: 1,
+  uid: 65532,
+  gid: 65532,
+  noNewPrivs: true,
+  seccompEnabled: true,
+  seccompMode: 2,
+  capEff: '0000000000000000',
+  rootfsReadOnly: true,
+  tmpWritable: true,
+  networkDisabled: true,
+  interfaces: ['lo'],
+  cgroup: { memoryMaxBytes: 512 * 1024 * 1024, pidsMax: 64, cpuMax: '50000 100000' },
+};
 
-describe('runExploration (real sidecar)', () => {
+// TEST ONLY: the Python process is real, but the attestation is synthetic.
+// This exercises the runner's persistence/cancellation seam and is never
+// production isolation evidence; the production wiring uses Docker directly.
+const attestedHostDouble = (): Sidecar => {
+  const sidecar = createSidecar();
+  return { ...sidecar, sandboxAttestation: () => TEST_ATTESTATION };
+};
+
+const realFactory = attestedHostDouble;
+
+const pendingSidecar = (phase: 'warmup' | 'call'): { sidecar: Sidecar; started: Promise<void>; close: ReturnType<typeof vi.fn> } => {
+  let markStarted!: () => void;
+  const started = new Promise<void>((resolve) => { markStarted = resolve; });
+  let rejectPending!: (error: Error) => void;
+  const pending = new Promise<SidecarCallResult<unknown>>((_resolve, reject) => { rejectPending = reject; });
+  const close = vi.fn(() => rejectPending(new Error('sidecar closed')));
+  const sidecar: Sidecar = {
+    warmup: async () => {
+      if (phase === 'warmup') {
+        markStarted();
+        await new Promise<never>((_resolve, reject) => { rejectPending = reject; });
+      }
+      return { pythonVersion: 'test', versions: {} };
+    },
+    call: async <T>() => {
+      markStarted();
+      return await pending as SidecarCallResult<T>;
+    },
+    logs: () => [],
+    envInfo: () => null,
+    lockfileHash: () => null,
+    sandboxAttestation: () => TEST_ATTESTATION,
+    close,
+  };
+  return { sidecar, started, close };
+};
+
+describe('runExploration (test seam + real execution sidecar)', () => {
+  beforeEach(() => {
+    sandboxHarness.factory = realFactory;
+  });
+  afterEach(() => {
+    sandboxHarness.factory = () => { throw new Error('sandbox test harness was not configured'); };
+  });
+
+  it('aborts during sandbox warmup and closes the sidecar promptly', async () => {
+    const { store, runId } = openStore();
+    const signal = { aborted: false };
+    const fixture = pendingSidecar('warmup');
+    sandboxHarness.factory = () => fixture.sidecar;
+    const running = runExploration({
+      store,
+      runId,
+      artifacts: { put: async () => ({ ref: 'r', hash: 'h', size: 0 }), get: async () => null, path: () => '' },
+      purpose: 'cancel during sandbox warmup',
+      code: 'print(1)',
+      maxRuntimeMs: 60_000,
+      signal,
+    });
+    await fixture.started;
+    signal.aborted = true;
+    await expect(running).rejects.toMatchObject({ name: 'AbortError' });
+    expect(fixture.close).toHaveBeenCalledOnce();
+  });
+
+  it('aborts an in-flight exploration and closes the sidecar before returning', async () => {
+    const { store, runId } = openStore();
+    const signal = { aborted: false };
+    const fixture = pendingSidecar('call');
+    sandboxHarness.factory = () => fixture.sidecar;
+    const running = runExploration({
+      store,
+      runId,
+      artifacts: { put: async () => ({ ref: 'r', hash: 'h', size: 0 }), get: async () => null, path: () => '' },
+      purpose: 'cancel an in-flight sandbox exploration',
+      code: 'print(1)',
+      maxRuntimeMs: 60_000,
+      signal,
+    });
+    await fixture.started;
+    signal.aborted = true;
+    await expect(running).rejects.toMatchObject({ name: 'AbortError' });
+    expect(fixture.close).toHaveBeenCalledOnce();
+  });
+
+  it('fails closed when a sidecar does not provide an OS attestation', async () => {
+    const { store, runId } = openStore();
+    const close = vi.fn();
+    let executionCalls = 0;
+    const unverified: Sidecar = {
+      warmup: async () => ({ pythonVersion: 'host', versions: {} }),
+      call: async () => {
+        executionCalls += 1;
+        return { ok: true, result: { exploration: { ok: true, stdout: 'unexpected' } } };
+      },
+      logs: () => [],
+      envInfo: () => null,
+      lockfileHash: () => null,
+      sandboxAttestation: () => null,
+      close,
+    };
+    sandboxHarness.factory = () => unverified;
+
+    await expect(runExploration({
+      store,
+      runId,
+      artifacts: { put: async () => ({ ref: 'r', hash: 'h', size: 0 }), get: async () => null, path: () => '' },
+      purpose: 'refuse an unverified host execution sidecar',
+      code: 'print(1)',
+      maxRuntimeMs: 1_000,
+    })).rejects.toThrow('verified OS sandbox');
+    expect(executionCalls).toBe(0);
+    expect(close).toHaveBeenCalledOnce();
+  });
+
   it('executes gated analysis code and persists artifact + receipt + event', async () => {
     const { store, runId } = openStore();
     const result = await runExploration({
@@ -48,7 +189,6 @@ describe('runExploration (real sidecar)', () => {
         'print("mean", statistics.mean(xs))',
       ].join('\n'),
       maxRuntimeMs: 60_000,
-      sidecarFactory: realFactory,
     });
 
     expect(result.gate.allowed).toBe(true);
@@ -71,17 +211,17 @@ describe('runExploration (real sidecar)', () => {
   it('refuses to spawn the sidecar when the static gate fails (fail-closed)', async () => {
     const { store, runId } = openStore();
     let spawned = false;
-    const countingFactory: SidecarFactory = () => {
+    const countingFactory = () => {
       spawned = true;
       return createSidecar();
     };
+    sandboxHarness.factory = countingFactory;
     await expect(runExploration({
       store, runId,
       artifacts: { put: async () => ({ ref: 'r', hash: 'h', size: 0 }), get: async () => null, path: () => '' },
       purpose: '',
       code: 'import socket',
       maxRuntimeMs: 1000,
-      sidecarFactory: countingFactory,
     })).rejects.toThrow(/E-NETWORK|E-PURPOSE|gate/);
     expect(spawned).toBe(false); // gate failure never reaches the sandbox layer
   });
@@ -94,7 +234,6 @@ describe('runExploration (real sidecar)', () => {
       purpose: 'probe division by zero behavior of the dataset pipeline',
       code: 'x = 1 / 0',
       maxRuntimeMs: 60_000,
-      sidecarFactory: realFactory,
     });
     expect(result.execution.ok).toBe(false);
     expect(result.execution.errorKind).toBe('ZeroDivisionError');
@@ -124,17 +263,17 @@ describe('runExploration (real sidecar)', () => {
     // Layer 1: the TS gate refuses before any process spawn (fail-closed).
     const { store, runId } = openStore();
     let spawned = false;
-    const countingFactory: SidecarFactory = () => {
+    const countingFactory = () => {
       spawned = true;
       return createSidecar();
     };
+    sandboxHarness.factory = countingFactory;
     await expect(runExploration({
       store, runId,
       artifacts: { put: async () => ({ ref: 'r', hash: 'h', size: 0 }), get: async () => null, path: () => '' },
       purpose: 'recover builtins',
       code: escapeCode,
       maxRuntimeMs: 1000,
-      sidecarFactory: countingFactory,
     })).rejects.toThrow(/E-ESCAPE/);
     expect(spawned).toBe(false);
 
@@ -170,7 +309,6 @@ describe('runExploration (real sidecar)', () => {
         "print(float(np.percentile([1, 2, 3, 4], 50)))",      // percentile (function-base lazy path)
       ].join('\n'),
       maxRuntimeMs: 60_000,
-      sidecarFactory: realFactory,
     });
 
     expect(result.gate.allowed).toBe(true);
