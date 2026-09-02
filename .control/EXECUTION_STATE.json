@@ -1,8 +1,8 @@
 {
   "status": "IN_PROGRESS",
-  "updatedAt": "2026-09-02T12:40:00+08:00",
-  "lane": "lane/endgame-waveb @ 本地 5 提交待 PR #139；canonical main = 9983c30（PR #137+#138 已合并）",
-  "currentObjective": "①main CI 9983c30（含 perf-gate hosted 首跑）结果落地→FA-PRF-02 闭账；②soak ~15:59 四判→FA-PRF-06；③PR #139 合并车道余量；④sweep 续（delivery 127→docs 余 26→runtime/tests 分窗，工具链已备）；本窗口已闭账 12 项（SEC-01/PLT-01/02/REM-01/SEC-04/08/HAR-01/HCI-04/DAT-03/EVAL-02/04/SEC-12），计数 32/23/8/2",
+  "updatedAt": "2026-09-02T14:05:00+08:00",
+  "lane": "lane/endgame-waveb @ 8481c22（已推 origin：c3b8f3f FA-DAT-01 流式数据面 + 2fd75b4 gaps 闭账 + 8481c22 收尾交接批）",
+  "currentObjective": "本收尾窗完成：在途 FA-DAT-01 流式数据面已提交（等价回归 14 测试 + typecheck/build 绿；容量基准 1GB/500MB 全量跑按用户指令移交下窗）；项目进入 Ω-ULTRA 终局重构交接——权威任务书=仓库根 OMEGA-ULTRA-CONTRACT.md，入口=Claude Code /omega 斜杠命令（.claude/commands/omega.md）",
   "criticalProblemSet": [
     {
       "rank": 1,
@@ -18,6 +18,7 @@
     }
   ],
   "missionFacts": [
+    "2026-09-02 收尾窗（用户指令：免重跑、全部提交推送）：125d499..8481c22 三提交已推 origin；competition-inputs/ 与 submission/final/pdf-qa*（~77MB）按 .gitignore 治理边界留本地不入公开库；GitHub Dependabot 现报 2 漏洞（1 moderate/1 low）待处理；root 全量 vitest/lint 本窗未重跑（上一窗口 2370 过/15 跳基线，改动面定向验证已绿）",
     "主线收口：main cc4009c→495e53c（+7838/-766，125 文件）——Wave 0 全量+Wave A 大部+夜间车道五族 CI 根因修复（windows verify 三红/license CRLF/e2e 三族/retrieve 取消检查点/cancel 事件单源化）",
     "桌面发布链实证：NSIS 126.1MB 真包（sidecar 173MB 随包）静默安装→离源树 1s 健康→打包资源服务 web→退出无孤儿→卸载文件全清（BUILD_SCOPE 已更新）",
     "TUI+桌面壳 i18n 机制（FARLANG）+设计基线走查 9C+26W 入 HCI 账本（修复落点 Wave D）",
@@ -28,5 +29,5 @@
     "兄弟车道：wave0/wavea 账本+485d925（fresh 锚）已并入主线；当前活跃于 brand/competition-inputs/submission-final（未跟踪目录——发布物料，未触碰）",
     "教训入账：add 后未即时 commit→rebase 吞改动+主题混杂（已在 d8a1416 消息纠正）；PowerShell here-string 触发 hook 误拦（源码写操作一律 Edit 工具）；本地 vite-node 对 web/ 下 .mjs 的 Windows 空产物（测试走子进程边界）"
   ],
-  "nextAction": "推送 lane/endgame-waveb（d17e706）触发 ci.yml exploration-sandbox job；绿证后把 run URL/source SHA/image ID/Linux /proc 证据写入 BLOCKERS.json resolutionEvidence 并闭 B-FA-SEC-01-HOSTED-OCI，随后评估主线收口（车道含 87a1f3f，合并可同时推进 FA-PLT-02 hosted 绿）。若 hosted 失败：按 job 日志定位环境差异（本地 Docker Desktop vs ubuntu-latest），不得以本地证据替代。仅在 D-SEC-01 反转触发器出现时重开 rootless/gVisor/VM/AppContainer 后端工作"
+  "nextAction": "下一任务：执行 OMEGA-ULTRA-CONTRACT.md（/omega 启动，Mission State=.control/OMEGA-MISSION-STATE.md；Wave 0=Reality Map+baseline freeze+benchmark harness 骨架；容量基准全量跑可并入 Wave 0 或 Wave F）。遗留外部项不变：B-QWEN 09-05 用户窗口、hosted SEC-01/PLT-02 核验、FA-EVAL-02 被试 BLOCKED_EXTERNAL"
 }

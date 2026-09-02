@@ -99,6 +99,9 @@ work/
 # HX/design-lane iteration artifacts (impeccable outputs — never uploaded, per HX lane rule)
 /.impeccable/
 
+# HX walkthrough screenshots (user-local review captures, never upload)
+/hx-t1-*.png
+
 # Competition organizer materials (third-party docs, local reference only — never upload)
 /competition-inputs/
 
