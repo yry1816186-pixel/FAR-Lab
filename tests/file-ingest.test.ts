@@ -132,7 +132,17 @@ describe('archive-bomb budget (FA-SEC-12)', () => {
   });
 
   it('end-to-end: a real 600-entry odt fails the client parse visibly (null)', async () => {
-    const JSZip = (await import('jszip')).default;
+    // jszip lives in web/package.json; module resolution walks up from the
+    // IMPORTING file, so a bare import('jszip') from tests/ finds nothing in
+    // root node_modules (CI proved this). Resolve through web's package root.
+    const { createRequire } = await import('node:module');
+    const webRequire = createRequire(join(__dirname, '..', 'web', 'package.json'));
+    // Structural type of the jszip CJS surface this test uses (jszip's own
+    // types resolve from web/, not from the root tsconfig that owns tests/).
+    const JSZip = webRequire('jszip') as new () => {
+      file: (name: string, data: string) => unknown;
+      generateAsync: (opts: { type: 'uint8array' }) => Promise<Uint8Array>;
+    };
     const zip = new JSZip();
     zip.file('content.xml', '<document>ok</document>');
     for (let i = 0; i < 700; i += 1) zip.file(`filler/f${i}.xml`, 'x');
