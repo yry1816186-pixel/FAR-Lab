@@ -36,6 +36,13 @@ const flag = (name, fallback) => {
   const i = argv.indexOf(name);
   return i >= 0 && argv[i + 1] ? argv[i + 1] : fallback;
 };
+/**
+ * --cli pins the pipeline entry to a DIFFERENT tree (ΩF-003 lesson: the CURRENT leg
+ * must run an immutable build). --commit records that tree's commit in the anchor —
+ * the harness commit stays separate, so anchor provenance is two-headed and honest.
+ */
+const CLI_FLAG = flag('--cli', null);
+const cliPath = () => (CLI_FLAG ? resolve(REPO, CLI_FLAG) : CLI);
 
 const die = (code, msg) => {
   console.error(`FATAL: ${msg}`);
@@ -123,7 +130,7 @@ async function importDist() {
 const pinOne = async (problem, route, timeoutMin, workspaceDir) => {
   const dbPath = resolve(workspaceDir, 'far.db');
   const args = [
-    CLI, 'research', 'start', problem.text,
+    cliPath(), 'research', 'start', problem.text,
     '--domain', problem.domain ?? 'general science',
     '--goal', problem.goalType ?? 'explanatory',
     '--route', route,
@@ -169,10 +176,16 @@ const doPin = async () => {
   const route = flag('--route', 'zai');
   const timeoutMin = Number(flag('--timeout-min', '90'));
   const wanted = flag('--problems', null);
+  const commitOverride = flag('--commit', null);
   assertLiveRoute(route);
-  if (!existsSync(CLI)) die(3, 'dist not built — run npm run build first');
-  const commit = gitOut(['rev-parse', 'HEAD']);
-  const tag = (() => { try { return gitOut(['describe', '--tags', '--exact-match', 'HEAD']); } catch { return null; } })();
+  if (!existsSync(cliPath())) die(3, `dist not built (${cliPath()} missing) — run npm run build first`);
+  const commit = commitOverride ?? gitOut(['rev-parse', 'HEAD']);
+  const tag = (() => {
+    if (commitOverride !== null) {
+      try { return gitOut(['describe', '--tags', '--exact-match', commitOverride]); } catch { return null; }
+    }
+    try { return gitOut(['describe', '--tags', '--exact-match', 'HEAD']); } catch { return null; }
+  })();
   const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 17);
   const bundleDir = resolve(RESULTS_DIR, `pin-${stamp}-${route}`);
   mkdirSync(bundleDir, { recursive: true });
@@ -196,7 +209,10 @@ const doPin = async () => {
     gitTag: tag,
     route,
     problemsFile: process.env.FARLAB_PROBLEMS ?? 'eval/problems.json',
-    cli: { argv: ['dist/cli/main.js', 'research', 'start', '<q>', '--domain', '<d>', '--goal', '<g>', '--route', route, '--json'] },
+    cli: {
+      path: CLI_FLAG ?? 'dist/cli/main.js',
+      argv: ['research', 'start', '<q>', '--domain', '<d>', '--goal', '<g>', '--route', route, '--json'],
+    },
     results,
   };
   const anchorPath = resolve(ANCHORS_DIR, `${stamp}-${route}-${commit.slice(0, 7)}.json`);
