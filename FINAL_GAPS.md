@@ -5,7 +5,7 @@
 
 ## 总判（2026-09-02，Wave B 本地 OCI/取消传播/trust-root 已验证，托管核验待集成）
 
-当前 66 项终局标准为 20 PASS / 34 PARTIAL / 10 FAIL / 2
+当前 66 项终局标准为 21 PASS / 33 PARTIAL / 10 FAIL / 2
 BLOCKED_EXTERNAL。Wave 0 的五项实现标准已经集成并通过全门禁；Wave A 已在
 独立车道关闭 loaded-shell CLS 的本地根因，并完成多运行时公开源码包、三生态
 SBOM 与确定性归档的本地真跑，但 canonical hosted 绿、OIDC attestation 和
@@ -27,7 +27,7 @@ GitHub Release 仍未发生，不能提前翻 PASS。当前阻断完成的是四
 | FA-SEC-04 | sources 层 egress destination guard（私网段/重定向/协议） | self | **sources 层已落地；进程边界 allowlist（providers/MCP）开放** |
 | FA-SEC-06 | OpenAlex api_key → header + 错误脱敏 | self | **已修（Bearer header + 构造器 chokepoint 脱敏）** |
 | FA-SEC-07 | netcdf realpath 围栏 + symlink 回归 | self | **已修** |
-| FA-REM-01 | ACC-25 措辞对齐 + suite 日志存档 | self | 待办 |
+| FA-REM-01 | ACC-25 措辞对齐 + suite 日志存档 | self | **已闭（2026-09-02：合同措辞改 containerized same-host Linux target + 物理远端披露未测；远程套件在活 Docker 引擎复跑 3 文件 10 过真路径（含 host-key 篡改拒绝/远程训练/worker 全链），日志存档 evidence/r2-10-scientific-execution/remote-suite-2026-09-02.log）** |
 | FA-SCI-01..04 | rediscovery/judge-variance/relation 治理 + 跨领域 gold suite | self | 分批（评估波次） |
 | FA-X-01 | B-QWEN 凭证（09-05 用户裁定） | user | BLOCKED_EXTERNAL |
 | FA-W0-01 | CJK/Unicode 证据对齐分词 | self | **已修（目标测试 34/34 通过，含同字符逆序负例）** |
@@ -65,7 +65,7 @@ outbox/lease/DLQ/原子落地/错误分类（faults.json 10 案全绿）；事�
 | 8 | 全流程 production path | 大体 ✓（gold 场景 A/B live） |
 | 9 | clean machine bundle verify | ✓（far verify 16 checks，四 bundle 11/11） |
 | 10 | BLOCKED_EXTERNAL 诚实 | ✓（B-QWEN/S-1 如实登记） |
-| 11 | 文档与 commit 一致 | ✗（0.061 旧数已修；ACC-25 "real Linux" 措辞仍开放） |
+| 11 | 文档与 commit 一致 | ✓（0.061 旧数已修；ACC-25 措辞已闭 2026-09-02） |
 | 12 | 终局红队无新 P0/P1 | ✗（本轮审计即产出新 P0） |
 
 ## 修复纪律

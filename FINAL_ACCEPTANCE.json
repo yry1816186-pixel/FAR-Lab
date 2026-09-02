@@ -425,14 +425,16 @@
       "id": "FA-REM-01",
       "domain": "remote",
       "title": "ACC-25 claim wording matches evidence (containerized same-host target)",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P0",
       "owner": "self",
-      "gap": "'real Linux target' is localhost Docker; suite-2026-08-26 has no persisted log; currently not reproducible (docker daemon down)",
+      "gap": "CLOSED 2026-09-02: project-spec/ACCEPTANCE.md ACC-25 now reads 'remote device via gateway on a containerized same-host Linux target (live_verified; physical/HPC target untested — disclosed)'; the remote suite was RE-RUN on a live Docker engine and its log persisted at evidence/r2-10-scientific-execution/remote-suite-2026-09-02.log (gateway/gateway-discipline/remote-executor: 3 files, 10 real-path tests passed incl. key-only SSH, remote training, host-key-tamper rejection, full worker chain; the only 2 skipped tests are the inverse docker-unavailable disclosure guards, which correctly did not run).",
       "target": "ACCEPTANCE wording 'containerized Linux target live_verified; physical/HPC untested' + suite log persisted",
       "verify": "evidence dir contains suite log",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/05-remote.md CAP-09"
+        "FINAL_EVIDENCE/audit-2026-08-30/05-remote.md CAP-09",
+        "evidence/r2-10-scientific-execution/remote-suite-2026-09-02.log",
+        "project-spec/ACCEPTANCE.md ACC-25"
       ]
     },
     {
@@ -1021,6 +1023,6 @@
   ],
   "stopConditions": {
     "note": "Mission stop requires ALL of: no internal FAIL/PARTIAL; canonical clean-clone CI green; science north-star met or externally justified; real evidence across all planes; 24h→72h soak+chaos; win/mac/linux matrix; sandbox attack suite; production-path-only flows; clean-machine bundle verify; honest BLOCKED_EXTERNAL only; docs==commit; final red-team audit no new P0/P1.",
-    "currentVerdict": "NOT READY — 10 FAIL, 34 PARTIAL, 20 PASS, 2 BLOCKED_EXTERNAL (66 tracked). Wave 0 implementation, scope convergence, streaming durability, deterministic hygiene, Web artifact/static-cache contracts, version policy/TUI packaging, exact Rust pin, and the locally verified multi-runtime source release pack are closed at their stated scope. Hosted CI/CodeQL/OIDC release evidence, desktop distribution, scientific targets, soak/platform breadth, and several security boundaries remain open. The exhaustive five-table review is still only 5/902 files and shallow-assertion adjudication is 1/168, so those two Wave 0 criteria remain PARTIAL."
+    "currentVerdict": "NOT READY — 10 FAIL, 33 PARTIAL, 21 PASS, 2 BLOCKED_EXTERNAL (66 tracked). Wave 0 implementation, scope convergence, streaming durability, deterministic hygiene, Web artifact/static-cache contracts, version policy/TUI packaging, exact Rust pin, the locally verified multi-runtime source release pack, and FA-REM-01 evidence alignment are closed at their stated scope. Hosted CI/CodeQL/OIDC release evidence, desktop distribution, scientific targets, soak/platform breadth, and several security boundaries remain open. The exhaustive five-table review is still only 5/902 files and shallow-assertion adjudication is 1/168, so those two Wave 0 criteria remain PARTIAL."
   }
 }

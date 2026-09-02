@@ -28,7 +28,7 @@ This file defines **what must be proven**. Live status/evidence exists only in `
 | ACC-22 | Dataset layer acquires real external datasets (checksum/license/lineage persisted) with seeded reproducible splits and declared leakage controls | live_verified |
 | ACC-23 | Model lab builds/trains/evaluates real domain models; identical (spec, seed, env) executions reproduce identical results | live_verified |
 | ACC-24 | Executed experiments produce ResultSet + StatReport with effect sizes/uncertainty under the preregistered multiple-testing policy; verdicts derive mechanically from hypothesis decision rules, never LLM judgment | live_verified |
-| ACC-25 | Execution infrastructure: per-experiment environment pinning (lockfile hash), local execution with cancel/checkpoint/resume, remote device via gateway on a real Linux target | live_verified |
+| ACC-25 | Execution infrastructure: per-experiment environment pinning (lockfile hash), local execution with cancel/checkpoint/resume, remote device via gateway on a containerized same-host Linux target (live_verified; physical/HPC target untested — disclosed) | live_verified |
 | ACC-26 | Experiment results feed FeedbackSignal → traceable revision and appear in export/bundle with artifact hashes | live_verified |
 | ACC-27 | Adaptive quality gate: deterministic post-rank detection of weak hypothesis sets triggers exactly one bounded regeneration round with critique injection and a paraphrase guard; attempt counts stay honest in the timeline | tested |
 | ACC-28 | Run-level token budget: receipts are the only spend authority; exhausted budget skips stages with a truthful reason, never gates export, and re-opens exactly the skipped stages when the cap is raised | tested |
