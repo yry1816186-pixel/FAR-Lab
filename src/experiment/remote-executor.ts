@@ -9,7 +9,7 @@ import {
   type StatReport, type FeedbackSignal, type HypothesisCandidate, type SplitOutcome,
 } from '../domain/index.js';
 import { acquireDataset } from './datasets.js';
-import { applySplit } from './split.js';
+import { applySplitColumns } from './split.js';
 import { createSidecar, type Sidecar } from './python.js';
 import { SSHGateway, remoteTimeoutWrap, truncateOutput } from './gateway.js';
 import { experimentSpecHash, computeStatReports, buildFeedback } from './executor.js';
@@ -105,8 +105,9 @@ export const executeRemoteExperiment = async (
   const remoteDir = `/tmp/farlab/${expRun.id}`;
   let remoteDirPrepared = false;
   try {
-    // 1. Data identity locally; ship raw CSV + split assignment to the device.
-    const { record, parsed } = await acquireDataset(store, artifacts, spec.runId, use);
+    // 1. Data identity locally; ship raw CSV + split assignment to the device
+    //    (FA-DAT-01: column view — acquisition never materializes full rows).
+    const { record, csv } = await acquireDataset(store, artifacts, spec.runId, use);
     // Wave-S/s2 #6 (g5) post-acquisition re-check (nRows known → nTest + MDE floors apply).
     const postAcquisition = checkExperimentSpec(validated, {
       hypothesisIds: hypotheses.map((h) => h.id),
@@ -116,7 +117,10 @@ export const executeRemoteExperiment = async (
     if (!postAcquisition.passed) {
       throw new Error(`spec failed post-acquisition statistical gate: ${postAcquisition.missing.join('; ')}`);
     }
-    const outcome: SplitOutcome = applySplit(parsed.header, parsed.rows, {
+    const outcome: SplitOutcome = applySplitColumns(csv.header, csv.nRows, {
+      targetValues: csv.targetValues,
+      groupValues: csv.groupValues,
+    }, {
       datasetRecordId: record.id, datasetContentRef: record.contentRef,
       targetColumn: use.targetColumn, split: use.split, groupColumn: use.groupColumn,
     });

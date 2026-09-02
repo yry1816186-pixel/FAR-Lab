@@ -12,6 +12,9 @@ export interface FetchResponseLike {
   readonly status: number;
   /** Present on real fetch responses; read for manual redirect handling. */
   readonly headers?: { get(name: string): string | null };
+  /** Present on real fetch responses (Undici; null for empty bodies); absent on test
+   *  fakes — the capped reader below falls back to text(). */
+  readonly body?: ReadableStream<Uint8Array> | null;
   text(): Promise<string>;
 }
 
@@ -44,6 +47,30 @@ export interface HttpGetResult {
 }
 
 export const DEFAULT_TIMEOUT_MS = 30_000;
+
+/** Scholarly-metadata response guard (FA-DAT-01): a runaway response body must fail
+ *  closed mid-read instead of being buffered whole by res.text() until OOM. This is a
+ *  defensive bound on the citation plane, not a dataset capability cap (the dataset
+ *  plane streams via the artifact store). */
+export const MAX_RESPONSE_BYTES = 64 * 1024 * 1024;
+
+const readBodyCapped = async (res: FetchResponseLike, context: HttpGetContext, url: string): Promise<string> => {
+  if (res.body === undefined || res.body === null) return res.text(); // test fakes / empty body
+  const reader = res.body.getReader();
+  const parts: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (value === undefined) continue;
+    total += value.byteLength;
+    if (total > MAX_RESPONSE_BYTES) {
+      throw new Error(`response body exceeds ${MAX_RESPONSE_BYTES} bytes (${context.family} ${url}) — refusing to buffer`);
+    }
+    parts.push(value);
+  }
+  return new TextDecoder('utf-8').decode(Buffer.concat(parts));
+};
 
 /**
  * Egress destination guard for the scholarly-fetch chokepoint: the shared
@@ -100,7 +127,7 @@ export async function httpGet(
       finalUrl = next;
       res = await doFetch(next, { headers: opts.headers, signal: controller.signal, redirect: 'manual' });
     }
-    const bodyText = await res.text();
+    const bodyText = await readBodyCapped(res, opts.context, finalUrl);
     return {
       ok: res.ok,
       status: res.status,

@@ -1,8 +1,22 @@
 import { createHash } from 'node:crypto';
+import { createReadStream } from 'node:fs';
 
 /** sha256 hex of a string/buffer — the content-addressing primitive used across artifacts and receipts. */
 export const sha256Hex = (data: string | Uint8Array): string =>
   createHash('sha256').update(data).digest('hex');
+
+/**
+ * Streaming sha256 of a file (FA-DAT-01): O(chunk) memory regardless of file size —
+ * the full-buffer hash paths (dataset fences, CSV checksums) must not cap capability.
+ * Hash is over RAW BYTES (a decoded-and-reencoded string could differ on non-UTF8 input).
+ */
+export const sha256FileHex = async (filePath: string): Promise<string> => {
+  const hash = createHash('sha256');
+  for await (const chunk of createReadStream(filePath)) {
+    hash.update(chunk as Buffer);
+  }
+  return hash.digest('hex');
+};
 
 /**
  * Canonical JSON: recursively sorted object keys, no insignificant whitespace.

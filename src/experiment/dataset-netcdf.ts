@@ -1,8 +1,9 @@
-import { createHash } from 'node:crypto';
-import fs from 'node:fs';
 import nodePath from 'node:path';
+import fs from 'node:fs';
+import { createReadStream } from 'node:fs';
 import type { Store } from '../persistence/store.js';
 import type { ArtifactStore } from '../shared/ports.js';
+import { sha256FileHex } from '../shared/crypto.js';
 import { DatasetRecord, newId, type RunId } from '../domain/index.js';
 import { createSidecar, type Sidecar } from './python.js';
 
@@ -96,11 +97,15 @@ export const acquireNetcdfDataset = async (
 ): Promise<DatasetRecord> => {
   const now = opts.now ?? (() => new Date().toISOString());
   assertLocalNetcdfPath(path);
-  const size = fs.statSync(path).size;
-  if (size > 200 * 1024 * 1024) throw new Error(`netcdf file exceeds 200MB: ${path} (${size} bytes)`);
-  const buf = fs.readFileSync(path);
-  const sha = createHash('sha256').update(buf).digest('hex');
-  const raw = await artifacts.put(buf);
+  // FA-DAT-01 streaming acquisition: the file is hashed and landed chunk-by-chunk
+  // (putStream), so the 200MB full-buffer ceiling is gone — a 500MB+ NetCDF is a
+  // capability, not an OOM. The xarray PROFILE stays sidecar-owned (the sidecar
+  // memory-maps/reads the file itself).
+  if (artifacts.putStream === undefined) {
+    throw new Error('artifact store does not support streaming put — netcdf acquisition cannot proceed without a full buffer');
+  }
+  const raw = await artifacts.putStream(createReadStream(path));
+  const sha = raw.hash;
 
   const sidecar = (opts.sidecar ?? (() => createSidecar()))();
   let profile: NetcdfProfileResult;
@@ -116,7 +121,7 @@ export const acquireNetcdfDataset = async (
   if (!profile.variables.some((v) => v.name === variable)) {
     throw new Error(`variable '${variable}' not present in ${path} (vars: ${profile.variables.map((v) => v.name).join(', ')})`);
   }
-  const shaAfter = createHash('sha256').update(fs.readFileSync(path)).digest('hex');
+  const shaAfter = await sha256FileHex(path);
   if (shaAfter !== sha) {
     throw new Error(`netcdf file changed during acquisition (hash mismatch ${sha.slice(0, 12)} -> ${shaAfter.slice(0, 12)}) — refusing a lineage that does not match the profiled bytes`);
   }
@@ -187,8 +192,9 @@ export const extractNetcdfFeatures = async (
     // Engineering audit W5 (residual): sha256Expected written at acquisition is
     // now VERIFIED at consumption — bytes that changed between acquire and
     // extract must not produce a derived record whose lineage lies.
+    // (FA-DAT-01: streaming hash, no full-buffer read of the raw file.)
     if (rawRecord.source.sha256Expected !== undefined) {
-      const shaNow = createHash('sha256').update(fs.readFileSync(rawRecord.source.path)).digest('hex');
+      const shaNow = await sha256FileHex(rawRecord.source.path);
       if (shaNow !== rawRecord.source.sha256Expected) {
         throw new Error(`raw netcdf changed since acquisition (expected sha256 ${rawRecord.source.sha256Expected.slice(0, 12)}, found ${shaNow.slice(0, 12)}) — refusing to derive features from unverified bytes`);
       }

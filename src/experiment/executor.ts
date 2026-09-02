@@ -12,7 +12,7 @@ import {
 import { conformalInterval } from '../domain/conformal.js';
 import { expandAblationModels } from './matrix.js';
 import { acquireDataset } from './datasets.js';
-import { applySplit } from './split.js';
+import { applySplitColumns } from './split.js';
 import { createSidecar, type Sidecar } from './python.js';
 import { localCellFingerprint, previousRunCells, loadCachedPerRow } from './cell-dedup.js';
 import { elapsedMilliseconds, monotonicMilliseconds, type MonotonicClock } from '../shared/timing.js';
@@ -250,8 +250,8 @@ export const executeExperiment = async (
   // One sidecar session carries training AND statistics; logs flush to an artifact at close.
   const sidecar = (opts.sidecar ?? (() => createSidecar()))();
   try {
-    // 2. Dataset acquisition + deterministic split.
-    const { record, parsed } = await acquireDataset(store, artifacts, spec.runId, use);
+    // 2. Dataset acquisition + deterministic split (FA-DAT-01: column view, never full rows).
+    const { record, csv } = await acquireDataset(store, artifacts, spec.runId, use);
     // Wave-S/s2 #6 (g5) post-acquisition re-check: nRows is known now, so the nTest floor
     // and MDE attainability floor apply for real. Fail-closed before any training spend.
     const postAcquisition = checkExperimentSpec(validated, {
@@ -263,7 +263,10 @@ export const executeExperiment = async (
       throw new Error(`spec failed post-acquisition statistical gate: ${postAcquisition.missing.join('; ')}`);
     }
     if (opts.shouldCancel?.()) throw new Error('canceled before split');
-    const outcome: SplitOutcome = applySplit(parsed.header, parsed.rows, {
+    const outcome: SplitOutcome = applySplitColumns(csv.header, csv.nRows, {
+      targetValues: csv.targetValues,
+      groupValues: csv.groupValues,
+    }, {
       datasetRecordId: record.id,
       datasetContentRef: record.contentRef,
       targetColumn: use.targetColumn,

@@ -4,17 +4,35 @@ import type { Store } from '../persistence/store.js';
 import type { ArtifactStore } from '../shared/ports.js';
 import { assertFetchDestination } from '../shared/destination-guard.js';
 import type { DatasetRecord, DatasetSource, DatasetUse, RunId } from '../domain/index.js';
-import { parseCsv, type ParsedCsv } from './csv.js';
+import { parseCsv, analyzeCsvFile, type CsvFileStats } from './csv.js';
 
 /**
  * Dataset acquisition (E2). Resolvers fetch raw data, verify checksums and persist an
  * immutable DatasetRecord + raw-content artifact. Identity is source-derived (D-086-2):
  * acquiring the same OpenML dataset twice resolves to the same record — the second
  * fetch re-verifies the content hash and skips re-download work at the caller's option.
+ *
+ * FA-DAT-01 streaming: acquisition returns a COLUMN VIEW (header/nRows/split-relevant
+ * values), never materialized rows — executor memory is bounded by the named columns,
+ * not by file size. Local files are hashed and landed chunk-by-chunk (putStream), so
+ * the acquisition path has no full-buffer size ceiling.
  */
 
 const OPENML_API = 'https://www.openml.org/api/v1/json/data';
+/** Network-path guard (ARFF text must be converted in memory); the LOCAL path is
+ *  streaming and uncapped — this bound no longer limits capability. */
 const MAX_BYTES = 100 * 1024 * 1024;
+
+/**
+ * Row-count guard for CSV ingestion (FA-DAT-01): memory is now bounded by the named
+ * columns, so this is a data-quality guard rather than an OOM guard. The default
+ * stays at the audited 500k; FARLAB_CSV_MAX_ROWS raises it for capacity runs
+ * (the 1GB benchmark sets it) — clamped to a sane floor so a typo cannot disable it.
+ */
+const csvMaxRows = (): number => {
+  const n = Number(process.env.FARLAB_CSV_MAX_ROWS ?? 500_000);
+  return Number.isFinite(n) && n >= 1_000 ? Math.floor(n) : 500_000;
+};
 
 interface OpenmlMeta {
   name: string;
@@ -62,19 +80,14 @@ const fetchOpenmlArff = async (meta: OpenmlMeta): Promise<string> => {
   return [csvStringifyRow(parsed.header), ...parsed.rows.map(csvStringifyRow)].join('\n') + '\n';
 };
 
-const readLocalCsv = (path: string): string => {
-  const buf = fs.readFileSync(path);
-  if (buf.length > MAX_BYTES) throw new Error(`local dataset ${path} exceeds ${MAX_BYTES} bytes`);
-  return buf.toString('utf8');
-};
-
 /** Deterministic dataset identity from the source descriptor (D-086-2). */
 export const datasetIdFor = (source: DatasetSource): string =>
   `ds_${createHash('sha256').update(JSON.stringify(source)).digest('hex').slice(0, 26)}`;
 
 export interface AcquiredDataset {
   record: DatasetRecord;
-  parsed: ParsedCsv;
+  /** Column view for split allocation + record bookkeeping (FA-DAT-01 streaming). */
+  csv: CsvFileStats;
 }
 
 /**
@@ -91,38 +104,90 @@ export const acquireDataset = async (
   const id = datasetIdFor(use.source) as DatasetRecord['id'];
   const existing = store.getObject('dataset_record', id);
   if (existing !== null) {
-    const raw = await artifacts.get(existing.contentRef);
-    if (raw === null) throw new Error(`dataset ${id} record exists but raw artifact ${existing.contentRef} is missing`);
-    const parsed = parseCsv(raw);
     if (use.targetColumn !== existing.targetColumn) {
       throw new Error(`dataset ${id} was acquired with target '${existing.targetColumn}' but the spec declares '${use.targetColumn}'`);
     }
-    return { record: existing, parsed };
-  }
-
-  let csvText: string;
-  let name: string;
-  let license: string;
-  if (use.source.resolver === 'openml') {
-    const meta = await fetchOpenmlMeta(use.source.openmlId);
-    csvText = await fetchOpenmlArff(meta);
-    name = use.source.name ?? meta.name;
-    license = meta.licence;
-    const target = use.targetColumn;
-    if (meta.defaultTargetAttribute !== null && meta.defaultTargetAttribute !== target) {
-      // The spec's declared target must match the catalog's — a mismatch is a spec bug, not auto-corrected.
-      throw new Error(`openml ${use.source.openmlId} default target is '${meta.defaultTargetAttribute}' but spec declares '${target}'`);
+    // Column view re-derivation (FA-DAT-01): prefer re-streaming the ORIGINAL SOURCE
+    // when the resolver still has it (local file); fall back to the stored artifact.
+    // A row-count disagreement with the record is a split-breaking inconsistency —
+    // refused loudly, never guessed.
+    if (use.source.resolver === 'local' && fs.existsSync(use.source.path)) {
+      const stats = await analyzeCsvFile(use.source.path, {
+        targetColumn: use.targetColumn,
+        groupColumn: use.groupColumn,
+        maxRows: csvMaxRows(),
+      });
+      if (stats.nRows !== existing.nRows) {
+        throw new Error(`dataset ${id} source now has ${stats.nRows} rows but was acquired with ${existing.nRows} — refusing to split inconsistent bytes`);
+      }
+      return { record: existing, csv: stats };
     }
-  } else {
-    csvText = readLocalCsv(use.source.path);
-    name = use.source.path.split(/[\\/]/).pop() ?? 'local-dataset';
-    license = 'operator-provided';
+    const raw = await artifacts.get(existing.contentRef);
+    if (raw === null) throw new Error(`dataset ${id} record exists but raw artifact ${existing.contentRef} is missing`);
+    const parsed = parseCsv(raw);
+    const targetIdx = parsed.header.indexOf(use.targetColumn);
+    const groupIdx = use.groupColumn !== undefined ? parsed.header.indexOf(use.groupColumn) : -1;
+    return {
+      record: existing,
+      csv: {
+        header: parsed.header,
+        nRows: parsed.rows.length,
+        targetValues: parsed.rows.map((r) => String(r[targetIdx] ?? '')),
+        groupValues: use.groupColumn !== undefined ? parsed.rows.map((r) => String(r[groupIdx] ?? '')) : null,
+      },
+    };
   }
 
-  const contentHash = createHash('sha256').update(csvText, 'utf8').digest('hex');
-  if (use.source.resolver === 'local' && use.source.sha256Expected !== undefined && use.source.sha256Expected !== contentHash) {
-    throw new Error(`local dataset checksum mismatch: expected ${use.source.sha256Expected}, got ${contentHash}`);
+  if (use.source.resolver === 'local') {
+    // FA-DAT-01 streaming acquisition: chunked put with in-flight hash + one
+    // readline pass for the column view — no size ceiling, O(chunk) memory. The
+    // checksum gate hashes RAW BYTES (a decoded-string hash could differ from the
+    // file on non-UTF8 input).
+    if (artifacts.putStream === undefined) {
+      throw new Error('artifact store does not support streaming put — local dataset acquisition cannot proceed without a full buffer');
+    }
+    const raw = await artifacts.putStream(fs.createReadStream(use.source.path));
+    if (use.source.sha256Expected !== undefined && use.source.sha256Expected !== raw.hash) {
+      throw new Error(`local dataset checksum mismatch: expected ${use.source.sha256Expected}, got ${raw.hash}`);
+    }
+    const stats = await analyzeCsvFile(use.source.path, {
+      targetColumn: use.targetColumn,
+      groupColumn: use.groupColumn,
+      maxRows: csvMaxRows(),
+    });
+    const now = new Date().toISOString();
+    const record: DatasetRecord = {
+      id,
+      runId,
+      name: use.source.path.split(/[\\/]/).pop() ?? 'local-dataset',
+      source: use.source,
+      license: 'operator-provided',
+      format: 'csv',
+      contentRef: raw.ref,
+      targetColumn: use.targetColumn,
+      columns: stats.header,
+      nRows: stats.nRows,
+      lineage: [{ kind: 'acquired', detail: `resolver=local; sha256=${raw.hash}; bytes=${raw.size}; license=operator-provided`, at: now }],
+      fetchedAt: now,
+    };
+    store.putObject('dataset_record', record);
+    return { record, csv: stats };
   }
+
+  if (use.source.resolver !== 'openml') {
+    // local_netcdf sources are acquired by acquireNetcdfDataset (sidecar-profiled);
+    // reaching here with one is a routing bug, not a CSV to guess at.
+    throw new Error(`acquireDataset cannot resolve resolver '${use.source.resolver}' — netcdf sources go through acquireNetcdfDataset`);
+  }
+
+  const meta = await fetchOpenmlMeta(use.source.openmlId);
+  const target = use.targetColumn;
+  if (meta.defaultTargetAttribute !== null && meta.defaultTargetAttribute !== target) {
+    // The spec's declared target must match the catalog's — a mismatch is a spec bug, not auto-corrected.
+    throw new Error(`openml ${use.source.openmlId} default target is '${meta.defaultTargetAttribute}' but spec declares '${target}'`);
+  }
+  const csvText = await fetchOpenmlArff(meta);
+  const contentHash = createHash('sha256').update(csvText, 'utf8').digest('hex');
   const parsed = parseCsv(csvText);
   if (!parsed.header.includes(use.targetColumn)) {
     throw new Error(`target column '${use.targetColumn}' not in dataset header [${parsed.header.join(', ')}]`);
@@ -133,19 +198,29 @@ export const acquireDataset = async (
   const record: DatasetRecord = {
     id,
     runId,
-    name,
+    name: use.source.name ?? meta.name,
     source: use.source,
-    license,
+    license: meta.licence,
     format: 'csv',
     contentRef: ref,
     targetColumn: use.targetColumn,
     columns: parsed.header,
     nRows: parsed.rows.length,
-    lineage: [{ kind: 'acquired', detail: `resolver=${use.source.resolver}; sha256=${contentHash}; license=${license}`, at: now }],
+    lineage: [{ kind: 'acquired', detail: `resolver=openml; sha256=${contentHash}; license=${meta.licence}`, at: now }],
     fetchedAt: now,
   };
   store.putObject('dataset_record', record);
-  return { record, parsed };
+  const targetIdx = parsed.header.indexOf(use.targetColumn);
+  const groupIdx = use.groupColumn !== undefined ? parsed.header.indexOf(use.groupColumn) : -1;
+  return {
+    record,
+    csv: {
+      header: parsed.header,
+      nRows: parsed.rows.length,
+      targetValues: parsed.rows.map((r) => String(r[targetIdx] ?? '')),
+      groupValues: use.groupColumn !== undefined ? parsed.rows.map((r) => String(r[groupIdx] ?? '')) : null,
+    },
+  };
 };
 
 /** Split artifact persistence helper — the assignment is data, stored content-addressed. */

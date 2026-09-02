@@ -1,7 +1,7 @@
 import path from 'node:path';
 import fs from 'node:fs';
-import { randomBytes } from 'node:crypto';
-import { sha256Hex } from '../shared/crypto.js';
+import { createHash, randomBytes } from 'node:crypto';
+import { createReadStream } from 'node:fs';
 import type { ArtifactStore } from '../shared/ports.js';
 
 /** Best-effort removal of an orphaned put-temp: ENOENT is the happy path, any other
@@ -30,43 +30,74 @@ export const openArtifactStore = (rootDir: string): ArtifactStore => {
   };
   const pathOf = (hash: string) => path.join(root, hash.slice(0, 2), hash);
 
+  /**
+   * Collision check for the streaming path: the target exists under `hash`, so it
+   * CLAIMS that digest — byte-identity is proven by re-hashing it (a full compare
+   * would defeat the point of streaming). Different content under a taken hash is
+   * refused exactly like the buffer path.
+   */
+  const streamEqualsHash = async (file: string, hash: string): Promise<boolean> => {
+    const h = createHash('sha256');
+    for await (const chunk of createReadStream(file)) h.update(chunk as Buffer);
+    return h.digest('hex') === hash;
+  };
+
   return {
     async put(payload) {
       const buf = typeof payload === 'string' ? Buffer.from(payload, 'utf8') : Buffer.from(payload);
-      const hash = sha256Hex(buf);
-      const file = pathOf(hash);
-      if (fs.existsSync(file)) {
-        const existing = fs.readFileSync(file);
-        if (!existing.equals(buf)) {
-          throw new Error(`artifact hash collision refused: ${hash} exists with different content`);
+      // One implementation of landing semantics (FA-DAT-01): the buffer path is a
+      // single-chunk streaming put — collision refusal and atomic rename cannot drift.
+      return this.putStream!((async function* () { yield buf; })());
+    },
+    async putStream(source) {
+      const hash = createHash('sha256');
+      let size = 0;
+      // The final shard path depends on the FULL digest, unknown until the stream
+      // ends — stage in an anonymous temp at the store root, then rename into place.
+      const tmp = path.join(root, `.incoming-${process.pid}-${randomBytes(6).toString('hex')}`);
+      const out = fs.createWriteStream(tmp, { flags: 'wx' });
+      try {
+        for await (const chunk of source) {
+          const b = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+          hash.update(b);
+          size += b.length;
+          // Node convention: the write callback receives null on success (and an
+          // Error only on failure) — both null and undefined mean "write ok".
+          await new Promise<void>((resolve, reject) => {
+            out.write(b, (err) => (err === undefined || err === null ? resolve() : reject(err)));
+          });
         }
-      } else {
-        // Atomic landing (reliability 2026-08-24): writeFileSync('wx') directly at the
-        // content-addressed path is NOT crash-atomic — a process death mid-write leaves
-        // a truncated blob that get() would silently return as the artifact (only the
-        // bundle-verify path hashes content; fullText/revise-archive readers trust it).
-        // Write a temp sibling, then rename into place: same-directory rename(2) is
-        // atomic on POSIX and NTFS, so readers see either the old state or the complete
-        // blob — never a partial one.
-        const tmp = path.join(path.dirname(file), `.${hash}.tmp-${process.pid}-${randomBytes(4).toString('hex')}`);
-        fs.mkdirSync(path.dirname(file), { recursive: true });
-        try {
-          fs.writeFileSync(tmp, buf, { flag: 'wx' });
-        } catch (e) {
-          removeOrphanTemp(tmp); // ENOSPC/EPERM can leave a partial temp behind
-          throw e;
-        }
-        try {
-          // Concurrent put of the same content racing between our existsSync and this
-          // rename: the target is replaced with byte-identical content (same hash), so
-          // the collision-refusal semantics above are preserved either way.
-          fs.renameSync(tmp, file);
-        } catch (e) {
-          removeOrphanTemp(tmp); // best effort — the primary failure below wins
-          throw e;
-        }
+        await new Promise<void>((resolve, reject) => {
+          out.end((err?: Error | null) => (err === undefined || err === null ? resolve() : reject(err)));
+        });
+      } catch (e) {
+        out.destroy();
+        removeOrphanTemp(tmp); // failed source/write leaves no partial blob behind
+        throw e;
       }
-      return { ref: `sha256:${hash}`, hash, size: buf.length };
+      const hex = hash.digest('hex');
+      const file = pathOf(hex);
+      if (fs.existsSync(file)) {
+        removeOrphanTemp(tmp);
+        if (!(await streamEqualsHash(file, hex))) {
+          throw new Error(`artifact hash collision refused: ${hex} exists with different content`);
+        }
+        // Byte-identical content already landed — this put is a no-op.
+        return { ref: `sha256:${hex}`, hash: hex, size };
+      }
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      try {
+        // Atomic landing (reliability 2026-08-24): a same-directory rename(2) is atomic
+        // on POSIX and NTFS, so readers see either the old state or the complete blob —
+        // never a partial one. A concurrent put of the same content racing between the
+        // existsSync and this rename replaces the target with byte-identical bytes
+        // (same hash), so collision-refusal semantics hold either way.
+        fs.renameSync(tmp, file);
+      } catch (e) {
+        removeOrphanTemp(tmp); // best effort — the primary failure below wins
+        throw e;
+      }
+      return { ref: `sha256:${hex}`, hash: hex, size };
     },
     async get(ref) {
       let hash: string;
