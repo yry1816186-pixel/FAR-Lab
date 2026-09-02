@@ -2,7 +2,7 @@ import { ResearchRun, RunStatus, RunStageName, ProvenanceReceipt, newId } from '
 import { randomBytes } from 'node:crypto';
 import type { Store } from '../persistence/store.js';
 import type { StageHandler, StageContext } from '../pipeline/types.js';
-import { STAGE_ORDER } from '../domain/run.js';
+import { defaultWorkflow, nextWorkflowStage, type WorkflowPlan } from '../domain/workflow-plan.js';
 import { canonicalJson } from '../shared/crypto.js';
 import { totalBudgetFromEnv } from '../providers/http.js';
 import type { ArtifactStore, ModelProvider, SourceAdapter } from '../shared/ports.js';
@@ -106,6 +106,17 @@ export class Orchestrator {
 
   private stageRecord(run: ResearchRun, stage: RunStageName) {
     return run.stages.find((s) => s.stage === stage);
+  }
+
+  /** Persist and announce the canonical linear plan when a run has none yet (first execution). */
+  private adoptDefaultPlan(runId: string): WorkflowPlan {
+    const plan = defaultWorkflow(runId);
+    this.deps.store.putObject('workflow_plan', plan);
+    this.deps.store.appendEvent(runId, {
+      type: 'note',
+      detail: { reason: 'workflow_plan_adopted', origin: 'default', version: plan.version, steps: plan.steps.length },
+    });
+    return plan;
   }
 
   private async transition(runId: string, fn: (run: ResearchRun) => Promise<ResearchRun> | ResearchRun, lease?: string): Promise<ResearchRun> {
@@ -417,15 +428,24 @@ export class Orchestrator {
       });
     }
 
-    // Index-based cursor (not for-of): the BP-1 quality gate may jump the cursor BACK to
-    // generate_hypotheses for one bounded regeneration round — adaptive sequencing, still
-    // fully auditable through stage attempts + events.
-    let cursor = 0;
-    while (cursor < STAGE_ORDER.length) {
-      const stage = STAGE_ORDER[cursor]!;
-      if (opts?.stopAfter && stage === opts.stopAfter) break;
+    // Workflow-as-data (ADR D4): the stage walk is driven by the persisted plan
+    // (defaultWorkflow ≡ STAGE_ORDER order and deps), so plan revisions and
+    // kernel-authored plans compose without touching the durable stage machine.
+    // Equivalence with the previous index-cursor loop: the full suite plus the
+    // omega-baseline-w0 pin comparison are the parity harness.
+    const plan = this.deps.store.listObjects('workflow_plan', runId).at(-1)
+      ?? this.adoptDefaultPlan(runId);
+    const stopAfterIdx = opts?.stopAfter === undefined
+      ? undefined
+      : plan.steps.findIndex((s) => s.target === opts.stopAfter);
+    const noHandler = new Set<string>();
+    for (;;) {
+      const stage = nextWorkflowStage(plan, (t) => this.stageRecord(run, t), noHandler);
+      if (stage === undefined) break;
+      // stop-after parks BEFORE the named stage runs — plan-position comparison keeps
+      // the original "break at stopAfter even when its record is already done" semantics.
+      if (stopAfterIdx !== undefined && plan.steps.findIndex((s) => s.target === stage) >= stopAfterIdx) break;
       const rec = this.stageRecord(run, stage);
-      if (rec?.state === 'done' || rec?.state === 'skipped') { cursor += 1; continue; }
 
       // Budget boundary: once the cap is spent, remaining model/retrieval stages are
       // skipped with the marker reason (resume with a raised cap reopens them). export
@@ -436,12 +456,11 @@ export class Orchestrator {
           return r;
         }, lease);
         this.deps.store.appendEvent(runId, { type: 'stage_skipped', stage, detail: { reason: BUDGET_EXHAUSTED_REASON, spent: budget.spent, cap: budget.cap } });
-        cursor += 1;
         continue;
       }
 
       const handler = this.deps.stages.get(stage);
-      if (!handler) { cursor += 1; continue; } // not implemented in this build — stays pending and visible
+      if (!handler) { noHandler.add(stage); continue; } // not implemented in this build — stays pending and visible
 
       // Cumulative 1-based attempt counting: a stage that has never started (no startedAt,
       // e.g. fresh pending records whose zod default attempt=1 must not act as a prior try)
@@ -518,7 +537,9 @@ export class Orchestrator {
                   }
                   return r;
                 }, lease);
-                cursor = STAGE_ORDER.indexOf('generate_hypotheses');
+                // The re-marked pending stages are picked up by nextWorkflowStage in
+                // plan order (generate_hypotheses first) — the plan-order equivalent
+                // of the old cursor back-jump.
                 continue;
               }
               if (signalQg.weak && (round >= MAX_QUALITY_ROUNDS || !budget.hasRemaining())) {
@@ -555,7 +576,6 @@ export class Orchestrator {
             return r;
           }, lease);
           this.deps.store.appendEvent(runId, { type: 'stage_skipped', stage, detail: { reason: BUDGET_EXHAUSTED_REASON, midStage: true } });
-          cursor += 1;
           continue;
         }
         if (e instanceof RunLeaseLostError || /^run lease lost/i.test(e instanceof Error ? e.message : String(e))) {
@@ -580,7 +600,6 @@ export class Orchestrator {
         });
         return run; // stop pipeline on failure — resume continues from this stage
       }
-      cursor += 1;
     }
 
     // stopAfter exit: park the run BEFORE the lease releases (execute()'s finally).

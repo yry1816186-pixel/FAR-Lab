@@ -21,6 +21,7 @@ import {
   TheorySpec,
   OdeSpec,
   FemSpec,
+  WorkflowPlanSchema,
 } from '../domain/index.js';
 import { z } from 'zod';
 import { STAGE_ORDER } from '../domain/run.js';
@@ -71,6 +72,7 @@ const KIND_SCHEMAS = {
   iteration: IterationRecord,
   screening_session: ScreeningSession,
   screening_decision: ScreeningDecision,
+  workflow_plan: WorkflowPlanSchema,
 } as const;
 
 export type ObjectKind = keyof typeof KIND_SCHEMAS & (string & {});
