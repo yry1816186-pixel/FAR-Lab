@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "harnessVersion": 1,
   "leg": "CURRENT",
-  "pinnedAt": "2026-09-02T10:48:21.386Z",
+  "pinnedAt": "2026-09-02T11:48:38.588Z",
   "derivedFrom": {
     "dbPath": "eval\\results\\omega\\pin-2026-09-02-10-38--zai\\ws-P5\\far.db",
     "note": "snapshot of a completed run workspace (post-hoc bundle derivation)"
@@ -84,7 +84,10 @@
           "model_calls": 13,
           "receipt_modes": {
             "live": 55
-          }
+          },
+          "agent_reports": 0,
+          "debate_counter_findings": 0,
+          "debate_verdict_counts": {}
         },
         "modelVersions": []
       },
