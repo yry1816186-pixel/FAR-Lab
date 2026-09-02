@@ -258,14 +258,16 @@
       "id": "FA-HAR-01",
       "domain": "harness",
       "title": "Agent kernel per-tool deadline (silent-hang seam)",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P1",
-      "owner": "sibling-lane",
-      "gap": "loop.ts:477 bare await tool.execute; stepTimeoutMs only checked at boundaries",
+      "owner": "self",
+      "gap": "CLOSED 2026-09-02 at commit e944c57: the bare `await tool.execute` now races the REMAINING step budget when stepTimeoutMs is configured; a tool that never settles (and ignores its abort signal) finishes the run as step_timeout with the hung tool named in the error, transcript (skipped/hung tool_result) and turn record. The abandoned promise keeps a no-op catch so a late rejection never becomes unhandled; unconfigured stepTimeoutMs preserves the previous behavior. Regression: tests/agent-loop.test.ts hung-tool case.",
       "target": "per-tool deadline wrapper + hung-tool test returns step_timeout",
       "verify": "new regression test",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/02-harness.md CAP-11"
+        "FINAL_EVIDENCE/audit-2026-08-30/02-harness.md CAP-11",
+        "src/agent/loop.ts (ToolStepDeadlineExceeded race)",
+        "tests/agent-loop.test.ts (hung-tool regression)"
       ]
     },
     {
@@ -1028,6 +1030,6 @@
   ],
   "stopConditions": {
     "note": "Mission stop requires ALL of: no internal FAIL/PARTIAL; canonical clean-clone CI green; science north-star met or externally justified; real evidence across all planes; 24h→72h soak+chaos; win/mac/linux matrix; sandbox attack suite; production-path-only flows; clean-machine bundle verify; honest BLOCKED_EXTERNAL only; docs==commit; final red-team audit no new P0/P1.",
-    "currentVerdict": "NOT READY — 10 FAIL, 31 PARTIAL, 23 PASS, 2 BLOCKED_EXTERNAL (66 tracked). Wave 0 implementation, scope convergence, streaming durability, deterministic hygiene, Web artifact/static-cache contracts, version policy/TUI packaging, exact Rust pin, the locally verified multi-runtime source release pack, FA-REM-01 evidence alignment, FA-SEC-04 process-boundary egress enforcement, and FA-SEC-08 fence crypto-randomization are closed at their stated scope. Hosted CI/CodeQL/OIDC release evidence, desktop distribution, scientific targets, soak/platform breadth, and several security boundaries remain open. The exhaustive five-table review is still only 5/902 files and shallow-assertion adjudication is 1/168, so those two Wave 0 criteria remain PARTIAL."
+    "currentVerdict": "NOT READY — 10 FAIL, 30 PARTIAL, 24 PASS, 2 BLOCKED_EXTERNAL (66 tracked). Wave 0 implementation, scope convergence, streaming durability, deterministic hygiene, Web artifact/static-cache contracts, version policy/TUI packaging, exact Rust pin, the locally verified multi-runtime source release pack, FA-REM-01 evidence alignment, FA-SEC-04 process-boundary egress enforcement, FA-SEC-08 fence crypto-randomization, and FA-HAR-01 per-tool deadline are closed at their stated scope. Hosted CI/CodeQL/OIDC release evidence, desktop distribution, scientific targets, soak/platform breadth, and several security boundaries remain open. The exhaustive five-table review is still only 5/902 files and shallow-assertion adjudication is 1/168, so those two Wave 0 criteria remain PARTIAL."
   }
 }
