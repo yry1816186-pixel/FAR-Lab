@@ -1,0 +1,152 @@
+{
+  "recordVersion": 1,
+  "asOf": "2026-09-02T11:30:00+08:00",
+  "head": "0da4c68 (canonical main, CI success — run 33583828122 fully green)",
+  "lastCIgreenSHA": "0da4c68adf0ac1496d67de59990e9755edced64d",
+  "lastCIgreenRunUrl": "https://github.com/yry1816186-pixel/FAR-Lab/actions/runs/33583828122",
+  "scienceMetrics": {
+    "source": "eval/north-star.json (08-29 measurement; re-measurement deferred to the evaluation wave by quota)",
+    "rediscoveryF1": { "value": 0.226, "target": 0.7, "status": "below-target" },
+    "judgeVarianceWorstTask": { "value": 0.267, "target": 0.15, "status": "below-target" },
+    "relationAgreement": { "value": 0.61, "target": 0.8, "status": "below-target" },
+    "structuredOutputFailureRate": { "value": 0.011, "target": 0.005, "status": "below-target" }
+  },
+  "refreshRule": "refresh asOf/head/lastCIgreenSHA/scienceMetrics after every merged wave (main CI green) and every evaluation wave",
+  "reconcileNote": "Refreshed 2026-09-02 after PR #137 merged and canonical main went fully green (was 9c0819e-era 08-30). Adds the FA-EVAL-04-required lastCIgreenSHA field and a science-metrics dimension (all four north-star metrics honestly below target until the evaluation wave re-measures).",
+  "dimensions": [
+    {
+      "id": "product-restructure",
+      "name": "产品结构重构（研究结果阅读/假设比较/证据绑定/工作区模型）",
+      "status": "verified",
+      "target": "verified",
+      "evidence": "8 commits 3df63f5..c38e1f5 browser-verified on real runs (artifacts/product-reconstruction-m1/); independent DOM revalidation by sibling lane (evidence/web-revalidation-2026-08-26/); gates green each commit (vitest exit 0, web+root typecheck/build, secret/path 0)"
+    },
+    {
+      "id": "offline-full-journey",
+      "name": "离线确定性全程路线（演示/界面验收）",
+      "status": "verified",
+      "target": "verified",
+      "evidence": "2026-08-26 isolated-server browser journey: preset -> run -> live watch ~20s -> brief/table rendered; 3 real defects found+fixed (c38e1f5); 2011-test integration proof by sibling lane @1a67b09"
+    },
+    {
+      "id": "live-provider-route",
+      "name": "真实 Provider 完整主路径 LIVE_VERIFIED（B-QWEN-LIVE-ROUTE / ACC-02）",
+      "status": "tested",
+      "target": "live_verified",
+      "evidence": "Qwen-via-Bailian route implemented + contract tests green @42452c9; CI verify+web-e2e SUCCESS (4 latest runs through eee2b84). DASHSCOPE_API_KEY still absent from live process as of 2026-08-27 probes. USER DECISION 2026-08-27: DEFER receipted run to 09-05 submission-logistics batch alongside S-1 review/video/netdisk/form — not a waiver; do not probe for the key meanwhile.",
+      "blocker": "external credential, user-owned; deferred by explicit user decision to 09-05 batch"
+    },
+    {
+      "id": "submission-materials",
+      "name": "竞赛提交材料（S-1 文档/视频/网盘/报名表）",
+      "status": "partial",
+      "target": "accepted",
+      "evidence": "S-1 v3 @486fe73 aligned with the Research Map architecture (§5 rewritten from retired sidebar/brief flow), rendered submission/技术方案文档.pdf 5pp<=20 (refreshed 2026-08-27); video/netdisk/stamped form are user-owned (deadline 2026-09-05); after B-QWEN lands only the live-route line needs updating",
+      "blocker": "user review + user-owned actions"
+    },
+    {
+      "id": "user-acceptance",
+      "name": "用户验收驱动（任务书 §5：用户反馈优先于自评）",
+      "status": "waiting_for_user",
+      "target": "accepted",
+      "evidence": "2026-08-27 window-4: user granted full authorization; agent executed the G12 proxy drive itself (real browsers, 6-step journey, evidence/hx/g12-visual-2026-08-27/) — every step passes structurally on a current instance and screenshots are archived for the owner. Formal owner verdict still pending (mission §5: user feedback outranks self-verification); note the user's 3196 instance needs a server restart + key re-injection before its scope-preview works (stale process, user-owned)."
+    },
+    {
+      "id": "engineering-quality",
+      "name": "工程门禁（测试/类型/安全扫描/审计链）",
+      "status": "verified",
+      "target": "verified",
+      "evidence": "vitest 2036 pass/4 skip across the full merge range (2026-08-27); web E2E 20/20 green on isolated port + sibling suites; root+web typecheck/build/secret/path 0; GitHub Actions verify+web-e2e SUCCESS on all four latest pushes through eee2b84 (33044645222 head=eee2b84)"
+    }
+  ],
+  "independentAudit": {
+    "status": "passed",
+    "summary": "Fresh independent adversarial audit of the session delta (3076208..bea2a3e) executed by an adversarial-auditor subagent with no prior involvement: 2xP1 + 5xP2 found, both P1s and four P2s fixed in 4d9c1eb (fixes re-verified: browser smoke, web+root typecheck/build, secret/path 0, vitest exit 0), one P2 deferred with restart trigger (wire-enum triplication). M1/M2/R3/gapfix delta additionally revalidated by the sibling lane earlier.",
+    "evidence": "evidence/independent-audit-2026-08-26/audit-delta-3076208-bea2a3e.md; fix commit 4d9c1eb; evidence/web-revalidation-2026-08-26/ (sibling, earlier delta)"
+  },
+  "opportunitySweep": {
+    "status": "pass",
+    "decisionSaturation": true,
+    "asOf": "2026-08-26T15:55:00.000Z",
+    "evidence": "inline sweep against mission-book priorities + current CPS; every candidate below carries an explicit disposition, owner or restart trigger",
+    "highValueOpportunities": [
+      {
+        "id": "live-run-watching-live",
+        "opportunity": "browser-verify the live watching UX on a REAL provider run",
+        "status": "blocked",
+        "reason": "needs live credential; offline route already proves the watching path (verified 2026-08-26); unblocks with DASHSCOPE key or post-2026-08-29 zai quota reset"
+      },
+      {
+        "id": "offline-agent-actions",
+        "opportunity": "offline wire resident-agent action shapes (conversation-first creation on the keyless demo route)",
+        "status": "resolved",
+        "reason": "taken over and fixed @bbfbad8 (conversation:turn:turn finish handler + seedless-launch P0); browser-verified end-to-end on an isolated instance 2026-08-27"
+      },
+      {
+        "id": "offline-relation-edges",
+        "opportunity": "offline evidence template claim->hypothesis relation edges (R3 chips on offline runs)",
+        "status": "resolved",
+        "reason": "taken over and fixed @bbfbad8 (payload-field corrections + decidable decisionRule + claim-grounded statements); verified: 18 edges incl. 6 weakening, 18 binding chips rendered, counter claim first"
+      },
+      {
+        "id": "receipt-level-degradation",
+        "opportunity": "server-side route-degradation projection from receipts (survives run deletion)",
+        "status": "deferred",
+        "reason": "web-level projection shipped (3076208) covers the live incident class; server version trigger: next repeated quota-wall incident"
+      },
+      {
+        "id": "zh-display-policy",
+        "opportunity": "apply the flag-gated zh display layer to run content broadly",
+        "status": "low_value",
+        "reason": "policy decision (hybrid, user-flagged) already made; content language honesty preserved; revisit on explicit user request"
+      },
+      {
+        "id": "s1-review-loop",
+        "opportunity": "S-1 refinement loops (page count, wording, evidence links)",
+        "status": "resolved",
+        "reason": "v2 rendered and committed bea2a3e; next loop is USER review feedback"
+      },
+      {
+        "id": "domain-packages",
+        "opportunity": "domain semantic packages (astro/bio/chem)",
+        "status": "deferred",
+        "reason": "mission book: generic scientific core first, domain semantics extend later; disclosed as known boundary in S-1 §8"
+      },
+      {
+        "id": "evidence-tab-deeper",
+        "opportunity": "deeper evidence-reading restructure (GRADE surfacing, source cards)",
+        "status": "low_value",
+        "reason": "R3 bindings landed the core judgment loop; further polish is lower marginal value than user acceptance + B-QWEN right now"
+      }
+    ]
+  },
+  "marginalValue": {
+    "status": "pass",
+    "reason": "At this checkpoint (2026-08-26 ~24:00) every remaining high-value item is user-owned or externally blocked (DASHSCOPE key, user acceptance, user submission actions, sibling-lane gaps with recorded triggers, subagent quota). All engineering work with a live verification path has been executed and shipped (8 commits, gates green). Continuing engineering now would repeat green suites or add unverified surface — negative marginal value per mission §2.",
+    "remainingHighValueWork": [
+      {
+        "id": "B-QWEN-LIVE-ROUTE",
+        "status": "blocked",
+        "reason": "DASHSCOPE_API_KEY absent; execute receipted run the moment the live process carries the key"
+      },
+      {
+        "id": "USER-ACCEPTANCE",
+        "status": "blocked",
+        "reason": "waiting_for_user drive on 3196"
+      },
+      {
+        "id": "S-1-USER-REVIEW",
+        "status": "blocked",
+        "reason": "waiting_for_user review of submission/技术方案文档.pdf"
+      },
+      {
+        "id": "submission-video-netdisk-form",
+        "status": "blocked",
+        "reason": "user-owned, deadline 2026-09-05"
+      }
+    ]
+  },
+  "notes": [
+    "ENDGAME WINDOW 1-2 (2026-08-30): FINAL_* control plane established (56-item capability matrix, 8-domain audit in FINAL_EVIDENCE/). Batch1: CI verify green restored (netcdf guard + ledger platform-family/orphan root fixes), submission-doc 0.061 honesty fix, security P0 (CodeAct alias/getattr + runtime os-scrub, OpenAlex Bearer, netcdf realpath, egress guard, sidecar env allowlist). Batch2: far restore drill, capacity gate (1000 claims SYNTHETIC), cancel 0.6ms pin, sweep tests, probe fingerprint, verify vacuous marking, ODE honesty, held-out 6Q sealed. SCIENCE METRICS STILL BELOW TARGET (rediscovery 0.226/0.7, judge-variance 0.267/0.15, relation 0.61/0.8) — see eval/north-star.json; held-out cross-domain execution pending. web-e2e perf CLS red on runners = sibling shell lane surface (locally green with their WIP)."
+  ]
+}

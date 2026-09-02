@@ -3,15 +3,15 @@
 > 机器可读版：`FINAL_ACCEPTANCE.json`。逐域审计报告：`FINAL_EVIDENCE/audit-2026-08-30/`（8 域并行只读审计 + 主代理抽验）。
 > 状态词汇：PASS / PARTIAL / FAIL / BLOCKED_EXTERNAL。**任何 FAIL/PARTIAL 不得宣布完成。** 本文件随修复持续更新。
 
-## 总判（2026-09-02，Wave B 本地 OCI/取消传播/trust-root 已验证，托管核验待集成）
+## 总判（2026-09-02 晚：canonical main 0da4c68 全绿，SEC-01/PLT-01/02 等八项闭账）
 
-当前 66 项终局标准为 22 PASS / 32 PARTIAL / 10 FAIL / 2
+当前 66 项终局标准为 29 PASS / 26 PARTIAL / 9 FAIL / 2
 BLOCKED_EXTERNAL。Wave 0 的五项实现标准已经集成并通过全门禁；Wave A 已在
 独立车道关闭 loaded-shell CLS 的本地根因，并完成多运行时公开源码包、三生态
 SBOM 与确定性归档的本地真跑，但 canonical hosted 绿、OIDC attestation 和
 GitHub Release 仍未发生，不能提前翻 PASS。当前阻断完成的是四类真相缺口：
 
-1. **平台事实链未闭合**：canonical `main@cc4009c` 的 hosted verify 已绿，但 web-e2e 因 loaded-home CLS 0.123795 连红；本地根因已在 `87a1f3f` 修复并通过 23/23 浏览器门，仍待集成后的 hosted 绿证。Ubuntu+Windows 与 Chromium+Firefox 矩阵已经进入工作流，但 8a5200f 的 hosted run 仍显示等待且 0/2 verify 完成；release-pack 只完成本地真跑，未有 hosted OIDC/GitHub Release。ACC-25 "real Linux target" 实为本机 Docker。
+1. **平台事实链基本闭合**：canonical main `0da4c68` run 33583828122 全绿（三 OS verify、chromium full 26/26、firefox/webkit smoke、exploration-sandbox、CodeQL×4）——FA-PLT-01/02 已闭。仍开放：hosted attested release-pack/OIDC 签名/GitHub Release（FA-PLT-03/FA-SEC-09/10）与 macOS 全量+webkit 非 smoke 深度。ACC-25 "real Linux target" 措辞已闭（FA-REM-01）。
 2. **安全实边界**：CodeAct 别名/拆链/getattr、sidecar env、sources egress、OpenAlex key 与 netcdf symlink 已在静态/运行时层修复；Docker Linux OCI 隔离已在本机真实生产路径和对抗路径验证，镜像 tag 在 create 前解析为 immutable image ID 并绑定容器，取消传播已覆盖 warmup/in-flight 调用并验证幂等清理，`runExploration` 与 `wireResearchTools` 均固定拥有 Docker trust root，不再接受 caller-supplied factory。runner 测试只在隔离 Vitest worker 替换模块边界，不能充当运行时扩展或不可伪造 attestation token。清理失败保持可重试并有回归证据。最终源码 SHA 的 hosted Ubuntu 绿证与 Linux `/proc` 清理分支仍开放。D-SEC-01 已把 rootless daemon、gVisor/VM、Windows-native AppContainer+Job 拆为由部署声明触发的独立安全档位，当前单用户 Docker Linux OCI 基线不声称这些能力；进程边界 egress 已于 2026-09-02 在 providers/MCP/zotero/datasets 五出口收口（单一属主策略+9 回归，DNS rebinding 为披露限制）；SBOM/SAST 与发布签名仍开放。
 3. **科学指标未达标**：rediscovery 0.226/0.7、judge variance 0.267/0.15、relation agreement 0.61/0.8、structured-output 0.011/0.005；评估集 100% 生物医学，无跨领域 held-out。
 4. **规模与长程证据空档**：后端 1000+ claim 门仅是明确标注的 SYNTHETIC 容量证据，浏览器真实路径当前只有 7 claims/0 admissible hypotheses；数据面仍受内存上限约束，无 6h+ soak、Windows hosted 绿证与 macOS/WebKit 证据。发布包已在 clean committed copy 上覆盖 root/Web/TUI/Python/desktop 五腿，生成 CycloneDX 1.7（991 components）及两次字节一致的 890-file 归档，但 hosted 签名与真实 GitHub Release 仍为 0 次。
@@ -20,7 +20,7 @@ GitHub Release 仍未发生，不能提前翻 PASS。当前阻断完成的是四
 
 | ID | 缺口 | owner | 状态 |
 |---|---|---|---|
-| FA-PLT-02 | canonical CI：verify 绿、web-e2e loaded-home CLS 红 | self | **本地根因已修于 87a1f3f（home CLS 0.0001、map 0.0184–0.0185、完整 Chromium 23/23）；待集成后 hosted 绿核验，PARTIAL** |
+| FA-PLT-02 | canonical CI：verify 绿、web-e2e loaded-home CLS 红 | self | **已闭（2026-09-02：canonical main 0da4c68 run 33583828122 全绿——三 OS verify+chromium full e2e 26/26；87a1f3f CLS 修复经 PR #137 集成后 hosted 核验通过）** |
 | FA-EVAL-14 | 提交文档 0.061 旧数三处 + north-star 引用错位 | self | **已修（含两份 PDF 重生成+抽取核验）** |
 | FA-SEC-02 | CodeAct 门绕过封堵 + malicious 回归语料 + sidecar env 白名单 | self | **已闭：别名/拆链/getattr 全拒、危险模块运行时擦除、env 最小化** |
 | FA-SEC-01 | Exploration CodeAct OS 级隔离 | self | **已闭（2026-09-02）：canonical main 0da4c68 的 hosted ubuntu exploration-sandbox 绿证 run 33583828122（镜像 fedefb6e…+attach-client checked=4 remaining=0+容器残留 0）；B-FA-SEC-01-HOSTED-OCI RESOLVED 且过 control-doctor 机校；本地与托管双证齐；rootless/gVisor/Windows-native 保持 D-SEC-01 条件档位不声称** |
