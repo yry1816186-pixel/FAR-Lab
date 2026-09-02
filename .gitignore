@@ -19,6 +19,9 @@ tmp/
 
 # Isolated external-source research clones/staging (covered by /research/ below)
 
+# Ω-ULTRA reuse-first evaluation clones (RUN/COMPARE only; repo+commit recorded in .control) — never upload
+/external/
+
 # OS/editor noise
 .DS_Store
 Thumbs.db

@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "declaredAt": "2026-09-02",
+  "note": "Golden Journeys per OMEGA-ULTRA-CONTRACT.md P9: product-level regressions, maintained long-term and auto-regressed continuously. status: automated=maps to an existing executable real-path command today; partial=real assets exist but the full journey is not yet one product path (gap listed); planned=spec only. 'command' fields are executed by `node eval/omega/threeway.mjs journeys --run <id>`.",
+  "journeys": [
+    {
+      "id": "A",
+      "name": "research-question-to-plan",
+      "definition": "科研问题→检索→证据→空白→假设→反证→研究计划",
+      "status": "automated",
+      "mapping": [
+        { "asset": "web/e2e/core-journey.spec.ts", "role": "browser e2e of the full product journey" },
+        { "asset": "tests/draft-journey.test.ts", "role": "deterministic journey test" },
+        { "asset": "eval/omega/corpus.json#OM-KA-01..06", "role": "problem set (W4 frame)" }
+      ],
+      "commands": [
+        { "cwd": ".", "cmd": "npx", "args": ["vitest", "run", "tests/draft-journey.test.ts"] },
+        { "cwd": "web", "cmd": "npx", "args": ["playwright", "test", "e2e/core-journey.spec.ts"] }
+      ],
+      "gap": null
+    },
+    {
+      "id": "B",
+      "name": "paper-to-improvement",
+      "definition": "论文→方法分析→漏洞→复现→改进方案",
+      "status": "partial",
+      "mapping": [
+        { "asset": "tests/citation-chase.test.ts", "role": "citation-chase unit coverage" },
+        { "asset": "tests/ingest-pdf-e2e.test.ts", "role": "PDF ingest honest-boundary e2e" },
+        { "asset": "eval/omega/corpus.json#OM-RE-01..05", "role": "rediscovery GT tasks approximate the 'reproduce established finding' half" }
+      ],
+      "commands": [
+        { "cwd": ".", "cmd": "npx", "args": ["vitest", "run", "tests/citation-chase.test.ts", "tests/ingest-pdf-e2e.test.ts"] }
+      ],
+      "gap": "no single product path paper->method-analysis->flaw->reproduction->improvement yet; method-analysis and improvement-plan stages exist only inside the fixed pipeline for questions, not for an ingested paper object. Building this journey is Wave G product work."
+    },
+    {
+      "id": "C",
+      "name": "data-to-interpretation",
+      "definition": "数据→理解→分析→统计验证→可视化→解释",
+      "status": "partial",
+      "mapping": [
+        { "asset": "scripts/scenario-b-driver.mjs", "role": "real-path driver: dataset registration->QC->ExperimentSpec->real sidecar execution->mechanical StatReport" },
+        { "asset": "scripts/scenario-b-register-datasets.mjs", "role": "dataset registration" }
+      ],
+      "commands": [
+        { "cwd": ".", "cmd": "node", "args": ["scripts/scenario-b-driver.mjs"] }
+      ],
+      "gap": "visualization/interpretation surface is scenario-driver output, not yet a StudyMap-integrated product path (Wave G)."
+    },
+    {
+      "id": "D",
+      "name": "long-horizon-program",
+      "definition": "长期科研项目→多轮证据积累→实验版本→假设修订→协作",
+      "status": "partial",
+      "mapping": [
+        { "asset": "tests/agent-longhorizon.test.ts", "role": "long-horizon runtime behavior" },
+        { "asset": "tests/agent-resume.test.ts", "role": "crash/resume recovery" },
+        { "asset": "eval/omega/corpus.json#OM-LH-01", "role": "protocol entry that forces session-continuity scoring" }
+      ],
+      "commands": [
+        { "cwd": ".", "cmd": "npx", "args": ["vitest", "run", "tests/agent-longhorizon.test.ts", "tests/agent-resume.test.ts"] }
+      ],
+      "gap": "multi-SESSION evidence accumulation with hypothesis lineage and user steer is not a product path; scoring for cross-session continuity does not exist yet (OM-LH-01 exists to force it)."
+    }
+  ]
+}

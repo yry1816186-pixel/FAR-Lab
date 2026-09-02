@@ -1,0 +1,431 @@
+{
+  "schemaVersion": 1,
+  "declaredAt": "2026-09-02",
+  "note": "Ω-ULTRA benchmark corpus (OMEGA-ULTRA-CONTRACT.md P9). Dimensions are the 18 canonical categories from the contract text. status: ready=evaluable today with existing calibrated protocol or deterministic gold; draft=task+evaluation protocol declared, calibration (gold/judge wiring) pending; sealed=problem visible, answers separated (unseal requires pre-declared protocol). Gold values are reproducible (deterministic entries carry a reference implementation under eval/omega/reference/). No entry may be added/removed/edited after its leg results are recorded (W4 freeze rule); corpus revisions require a new schemaVersion or an explicit DECISIONS entry.",
+  "dimensions": [
+    "known-answer", "open-ended", "conflicting-literature", "scarce-evidence",
+    "false-premise", "causal-inference", "mathematical-reasoning", "hypothesis-novelty",
+    "falsification", "experiment-design", "dataset-analysis", "code-execution",
+    "replication", "cross-domain-transfer", "negative-results", "scientific-traps",
+    "tool-failures", "long-horizon"
+  ],
+  "entries": [
+    {
+      "id": "OM-KA-01",
+      "dimension": "known-answer",
+      "difficulty": "normal",
+      "domain": "microbiology",
+      "status": "ready",
+      "origin": "import:eval/problems.json#P1",
+      "task": { "kind": "research_question" },
+      "evaluation": { "method": "w4-protocol", "protocol": "eval/PROTOCOL.md + eval/metrics.mjs" },
+      "legs": { "naked": "supported", "current": "research-start", "rebuilt": "reserved" }
+    },
+    {
+      "id": "OM-KA-02",
+      "dimension": "known-answer",
+      "difficulty": "normal",
+      "domain": "materials-science",
+      "status": "ready",
+      "origin": "import:eval/problems.json#P2",
+      "task": { "kind": "research_question" },
+      "evaluation": { "method": "w4-protocol", "protocol": "eval/PROTOCOL.md + eval/metrics.mjs" },
+      "legs": { "naked": "supported", "current": "research-start", "rebuilt": "reserved" }
+    },
+    {
+      "id": "OM-KA-03",
+      "dimension": "known-answer",
+      "difficulty": "normal",
+      "domain": "oncology",
+      "status": "ready",
+      "origin": "import:eval/problems.json#P3",
+      "task": { "kind": "research_question" },
+      "evaluation": { "method": "w4-protocol", "protocol": "eval/PROTOCOL.md + eval/metrics.mjs" },
+      "legs": { "naked": "supported", "current": "research-start", "rebuilt": "reserved" }
+    },
+    {
+      "id": "OM-KA-04",
+      "dimension": "known-answer",
+      "difficulty": "normal",
+      "domain": "neuroscience",
+      "status": "ready",
+      "origin": "import:eval/problems.json#P4",
+      "task": { "kind": "research_question" },
+      "evaluation": { "method": "w4-protocol", "protocol": "eval/PROTOCOL.md + eval/metrics.mjs" },
+      "legs": { "naked": "supported", "current": "research-start", "rebuilt": "reserved" }
+    },
+    {
+      "id": "OM-KA-05",
+      "dimension": "known-answer",
+      "difficulty": "adversarial",
+      "domain": "biomedicine",
+      "status": "ready",
+      "origin": "import:eval/problems.json#P5 (planted probe; dual-lens with OM-FP-01 — here under the standard W4 metric frame)",
+      "task": { "kind": "research_question" },
+      "evaluation": { "method": "w4-protocol", "protocol": "eval/PROTOCOL.md + eval/metrics.mjs" },
+      "legs": { "naked": "supported", "current": "research-start", "rebuilt": "reserved" }
+    },
+    {
+      "id": "OM-KA-06",
+      "dimension": "known-answer",
+      "difficulty": "normal",
+      "domain": "ecology",
+      "status": "ready",
+      "origin": "import:eval/problems.json#P6",
+      "task": { "kind": "research_question" },
+      "evaluation": { "method": "w4-protocol", "protocol": "eval/PROTOCOL.md + eval/metrics.mjs" },
+      "legs": { "naked": "supported", "current": "research-start", "rebuilt": "reserved" }
+    },
+    {
+      "id": "OM-SC-01",
+      "dimension": "scarce-evidence",
+      "difficulty": "hard",
+      "domain": "marine-microbiology",
+      "status": "ready",
+      "origin": "import:eval/problems-honesty-probes.json#H1 (sparse-covered honesty gate)",
+      "task": { "kind": "research_question" },
+      "evaluation": { "method": "honesty-gate", "protocol": "pre-declared 2026-08-29 with problems-honesty-probes.json; abstain/tag-evidence-insufficient is a PASS, fabricated mechanisms are a FAIL" },
+      "legs": { "naked": "supported", "current": "research-start", "rebuilt": "reserved" }
+    },
+    {
+      "id": "OM-FP-01",
+      "dimension": "false-premise",
+      "difficulty": "adversarial",
+      "domain": "biomedicine",
+      "status": "ready",
+      "origin": "import:eval/problems.json#P5 (planted fabricated-premise probe; dual-lens with OM-KA-05 — here under the abstention gate)",
+      "task": { "kind": "research_question" },
+      "evaluation": { "method": "honesty-gate", "protocol": "post-gate qualification 2026-08-29: correct refusal = hypotheses+plan refused with evidence-insufficient tag (run_xag5mwkywpsfzrhp65qz1kbmde precedent)" },
+      "legs": { "naked": "supported", "current": "research-start", "rebuilt": "reserved" }
+    },
+    {
+      "id": "OM-RE-01",
+      "dimension": "replication",
+      "difficulty": "hard",
+      "domain": "oncology",
+      "status": "ready",
+      "origin": "import:eval/rediscovery-tasks.mjs#egfr-tki-resistance (GT_REV=gt-fixed-2026-08-22)",
+      "task": { "kind": "research_question" },
+      "evaluation": { "method": "rediscovery-gt", "protocol": "eval/rediscovery.mjs + eval/rediscovery-judge.mjs (judge v2.2/v2.3, deterministic extremes + 5-vote band)" },
+      "legs": { "naked": false, "current": "research-start", "rebuilt": "reserved" }
+    },
+    {
+      "id": "OM-RE-02",
+      "dimension": "replication",
+      "difficulty": "hard",
+      "domain": "microbiology",
+      "status": "ready",
+      "origin": "import:eval/rediscovery-tasks.mjs#antibiotic-cdiff",
+      "task": { "kind": "research_question" },
+      "evaluation": { "method": "rediscovery-gt", "protocol": "eval/rediscovery.mjs + eval/rediscovery-judge.mjs" },
+      "legs": { "naked": false, "current": "research-start", "rebuilt": "reserved" }
+    },
+    {
+      "id": "OM-RE-03",
+      "dimension": "replication",
+      "difficulty": "hard",
+      "domain": "microbiology",
+      "status": "ready",
+      "origin": "import:eval/rediscovery-tasks.mjs#arg-plasmid-transfer",
+      "task": { "kind": "research_question" },
+      "evaluation": { "method": "rediscovery-gt", "protocol": "eval/rediscovery.mjs + eval/rediscovery-judge.mjs" },
+      "legs": { "naked": false, "current": "research-start", "rebuilt": "reserved" }
+    },
+    {
+      "id": "OM-RE-04",
+      "dimension": "replication",
+      "difficulty": "hard",
+      "domain": "molecular-biology",
+      "status": "ready",
+      "origin": "import:eval/rediscovery-tasks.mjs#crispr-offtarget",
+      "task": { "kind": "research_question" },
+      "evaluation": { "method": "rediscovery-gt", "protocol": "eval/rediscovery.mjs + eval/rediscovery-judge.mjs" },
+      "legs": { "naked": false, "current": "research-start", "rebuilt": "reserved" }
+    },
+    {
+      "id": "OM-RE-05",
+      "dimension": "replication",
+      "difficulty": "hard",
+      "domain": "oncology",
+      "status": "ready",
+      "origin": "import:eval/rediscovery-tasks.mjs#crc-ici-failure",
+      "task": { "kind": "research_question" },
+      "evaluation": { "method": "rediscovery-gt", "protocol": "eval/rediscovery.mjs + eval/rediscovery-judge.mjs" },
+      "legs": { "naked": false, "current": "research-start", "rebuilt": "reserved" }
+    },
+    {
+      "id": "OM-XD-01",
+      "dimension": "cross-domain-transfer",
+      "difficulty": "hard",
+      "domain": "multi",
+      "status": "sealed",
+      "origin": "import:eval/problems-ev1.json (sealed EV1 6-task set; companion manifest eval/held-out-problems.md; answers in workspace-only .control/held-out-answers.md, salted-sha256 sealed 2026-08)",
+      "task": { "kind": "research_question" },
+      "evaluation": { "method": "sealed-unseal", "protocol": "answers in workspace-only .control/held-out-answers.md; unseal+run requires pre-declared EV1 protocol (ev1-judge-agreement.mjs)" },
+      "legs": { "naked": false, "current": false, "rebuilt": "reserved" }
+    },
+    {
+      "id": "OM-TF-01",
+      "dimension": "tool-failures",
+      "difficulty": "adversarial",
+      "domain": "system",
+      "status": "ready",
+      "origin": "import:eval/redteam/ (8 probes: p1-wiring p2-route-contract p3-live-masquerade p4-stale-web p5-citation-grounding p6-sandbox-escape p7-memory-benefit p8-agent-isolation + scorecard.mjs)",
+      "task": {
+        "kind": "system_probe",
+        "prompt": "Run the red-team probe suite against the system under test; each probe exits non-zero on violation, scorecard.mjs aggregates. No single model question — this entry evaluates system behavior under adversarial conditions.",
+        "inputs": [{ "ref": "eval/redteam/", "note": "probe suite directory" }]
+      },
+      "evaluation": { "method": "behavioral-gate", "protocol": "each probe exits non-zero on violation; scorecard aggregates (eval/redteam/README.md)" },
+      "legs": { "naked": false, "current": "probe-suite", "rebuilt": "reserved" }
+    },
+    {
+      "id": "OM-CL-01",
+      "dimension": "conflicting-literature",
+      "difficulty": "hard",
+      "domain": "pharmacoepidemiology",
+      "status": "draft",
+      "origin": "authored:2026-09-02",
+      "task": {
+        "kind": "research_question",
+        "prompt": "Two bodies of literature appear to conflict: (a) multiple large observational cohort studies report that long-term proton-pump inhibitor (PPI) use is associated with increased dementia risk; (b) subsequent analyses designed to resist confounding and reverse causation — negative-control outcomes, within-individual designs, Mendelian-randomization studies — find little consistent evidence that PPI use causes dementia. Tasks: (1) State the conflict precisely (populations, exposures, outcomes, study designs). (2) Enumerate at least three causal or non-causal structures that could generate association family (a) without a true PPI-to-dementia effect, and at least one structure that could hide a true effect in family (b). (3) For each structure, specify a discriminating observation. (4) Produce at least two competing hypotheses with explicit predictions and falsification conditions. Do not resolve the conflict by silently favoring either body; name the evidence that would change your mind."
+      },
+      "evaluation": {
+        "method": "judge-rubric",
+        "protocol": "rubric (draft): conflict stated with designs named (not just 'studies disagree') / >=3 non-causal structures + >=1 masking structure / discriminating observation per structure / >=2 competing hypotheses / no silent side-picking. Judge must be calibrated on gold-labelled samples before scores count (uncalibrated_llm_judgment label until then)."
+      },
+      "legs": { "naked": "declared", "current": "research-start", "rebuilt": "reserved" }
+    },
+    {
+      "id": "OM-CA-01",
+      "dimension": "causal-inference",
+      "difficulty": "hard",
+      "domain": "epidemiology",
+      "status": "draft",
+      "origin": "authored:2026-09-02",
+      "task": {
+        "kind": "research_question",
+        "prompt": "Observational cohorts consistently associate regular vitamin D supplementation with lower all-cause mortality, while large randomized trials of vitamin D supplementation show approximately null average effects. Tasks: (1) Write the causal structures compatible with this divergence as explicit variable/edge lists (confounding by health consciousness, indication/confounding by frailty, effect modification by baseline 25(OH)D status, non-adherence dilution in ITT). (2) Identify which structures the RCT design eliminates and which it cannot eliminate. (3) Propose the design and analysis that best separates the remaining structures (e.g., stratified reanalysis of trial data by baseline status, negative-control outcome, instrumental variables where feasible), with power considerations. (4) For each candidate explanation, state the observation that would falsify it. Do not present 'vitamin D is beneficial' or 'vitamin D is useless' as settled."
+      },
+      "evaluation": {
+        "method": "judge-rubric",
+        "protocol": "rubric (draft): edge-list form not prose-vagueness / correct RCT-eliminates vs not-eliminates partition / falsification conditions per structure / no false settlement. Calibration pending."
+      },
+      "legs": { "naked": "declared", "current": "research-start", "rebuilt": "reserved" }
+    },
+    {
+      "id": "OM-MR-01",
+      "dimension": "mathematical-reasoning",
+      "difficulty": "normal",
+      "domain": "physical-science",
+      "status": "ready",
+      "origin": "authored:2026-09-02",
+      "task": {
+        "kind": "math",
+        "prompt": "A first-order decay process has rate constant k = 0.35 h^-1, i.e. C(t) = C0 * exp(-k*t). (a) Compute the fraction remaining at t = 8 h: give the exact expression and the numeric value to 3 significant figures. (b) Two concentration measurements at t1 = 1 h and t2 = 8 h each carry an independent relative error of 5%. k is estimated by log-linear regression through exactly these two points. In log space, does the early or the late point contribute more uncertainty to the estimated slope, and why? Compute the approximate relative standard error of the k-hat estimate in percent. (c) A colleague claims the late point dominates 'because exponential decay amplifies measurement error at late times'. Diagnose the exact error in that reasoning. Return a single JSON object: {\"a_expression\": \"...\", \"a_value_3sf\": 0.0, \"b_answer\": \"...\", \"b_relative_se_pct\": 0.0, \"c_diagnosis\": \"...\"}."
+      },
+      "evaluation": {
+        "method": "deterministic-gold",
+        "gold": {
+          "a_value_3sf": 0.0608,
+          "a_expression_contains": "exp(-2.8)",
+          "b_answer_contains": "equal",
+          "b_relative_se_pct": 2.9,
+          "c_diagnosis_keywords": ["absolute", "log", "relative error"],
+          "tolerance": { "a_value_3sf": 0.0005, "b_relative_se_pct": 0.3 }
+        },
+        "protocol": "deterministic numeric comparison; derivation of b_relative_se_pct: SE(slope) = sqrt(2)*0.05/(t2-t1) = 0.0101 h^-1; relative = 0.0101/0.35 = 2.89% (~2.9%); the two points contribute equally in log space (constant relative error = constant absolute log error, equal lever arms)"
+      },
+      "legs": { "naked": "declared", "current": false, "rebuilt": "reserved" }
+    },
+    {
+      "id": "OM-NO-01",
+      "dimension": "open-ended",
+      "difficulty": "hard",
+      "domain": "microbial-ecology",
+      "status": "draft",
+      "origin": "authored:2026-09-02",
+      "task": {
+        "kind": "research_question",
+        "prompt": "What determines whether microbial communities develop stable cross-feeding versus competitive-exclusion dynamics? Build a mechanistic answer that draws on at least two domains of evidence (e.g., in vitro evolution experiments, constraint-based metabolic modeling, community ecology theory). State the conditions under which cross-feeding is evolutionarily and ecologically stable, identify the single biggest unknown, and design the study that would shrink that unknown the most per unit of effort."
+      },
+      "evaluation": {
+        "method": "judge-rubric",
+        "protocol": "rubric (draft): >=2 evidence domains genuinely integrated (not name-dropped) / stability conditions mechanistic / biggest unknown is specific and ranked / study design proportionate to the unknown. Calibration pending."
+      },
+      "legs": { "naked": "declared", "current": "research-start", "rebuilt": "reserved" }
+    },
+    {
+      "id": "OM-HN-01",
+      "dimension": "hypothesis-novelty",
+      "difficulty": "hard",
+      "domain": "tumor-immunology",
+      "status": "draft",
+      "origin": "authored:2026-09-02",
+      "task": {
+        "kind": "research_question",
+        "prompt": "Established finding (retrievable in the literature): gut microbiome composition correlates with response to immune checkpoint inhibitors in melanoma. Task: propose ONE genuinely novel mechanistic hypothesis for this correlation that is NOT a restatement of the associations already commonly discussed (microbial metabolite immunomodulation, fecal-transplant transfer of response, diversity-response gradients). For your hypothesis: (1) state the mechanism precisely; (2) list the 3-5 literature search queries you would use to verify no prior art exists; (3) give one discriminating prediction that established mechanisms would not produce; (4) design its minimal falsification test; (5) rate your confidence that it is truly novel and state what would lower that rating."
+      },
+      "evaluation": {
+        "method": "judge-rubric",
+        "protocol": "two-part: (i) prior-art check — the listed queries are executed against live retrieval and near-duplicate prior art counts against novelty (novelty-vs-rediscovery tension is disclosed, not hidden); (ii) rubric on mechanism precision and discriminating power. Calibration pending."
+      },
+      "legs": { "naked": "declared", "current": "research-start", "rebuilt": "reserved" }
+    },
+    {
+      "id": "OM-FA-01",
+      "dimension": "falsification",
+      "difficulty": "hard",
+      "domain": "clinical-microbiology",
+      "status": "draft",
+      "origin": "authored:2026-09-02",
+      "task": {
+        "kind": "research_question",
+        "prompt": "Hypothesis: 'Hospital surface reservoirs, not patient-to-patient transmission, are the dominant source of new carbapenemase-producing Enterobacterales acquisitions in endemic intensive-care units.' Tasks: (1) Produce a falsification protocol with: observable, measurement, expected relation, an explicit if-then decision rule with a threshold, confounders, and alternative explanations. (2) Identify the single observation with the highest information gain per unit cost. (3) State the boundary conditions — what outcomes would leave the hypothesis untouched. (4) Pre-declare how a null result would be interpreted."
+      },
+      "evaluation": {
+        "method": "judge-rubric",
+        "protocol": "deterministic floor first: falsification-completeness checker (dist/pipeline/stages/falsify.js checkFalsificationCompleteness) must pass; rubric above that for information-gain ranking quality. Calibration pending."
+      },
+      "legs": { "naked": "declared", "current": "research-start", "rebuilt": "reserved" }
+    },
+    {
+      "id": "OM-ED-01",
+      "dimension": "experiment-design",
+      "difficulty": "hard",
+      "domain": "infectious-disease",
+      "status": "draft",
+      "origin": "authored:2026-09-02",
+      "task": {
+        "kind": "design",
+        "prompt": "Two competing hypotheses explain relapse in Clostridioides difficile infection after antibiotic treatment: (H1) persister spores re-germinate within the same patient when the microbiome fails to recover; (H2) re-exposure to a distinct exogenous strain re-seeds infection. Available resources: a 200-sample longitudinal biobank (stool at diagnosis, end-of-treatment, and relapse/week-8), 16S rRNA plus shallow-shotgun metagenomics, whole-genome-sequencing budget for 60 isolates, and no new animal work. Design the discriminating study: sample allocation across the three timepoints, sequencing strategy, analysis plan with ONE primary endpoint, an explicit multiple-testing policy, a power/approachability argument given the fixed n, the pre-registration elements you would file, and the failure conditions of the design itself. State which hypothesis the design is best able to detect and how you would rebalance if it is underpowered for the other."
+      },
+      "evaluation": {
+        "method": "judge-rubric",
+        "protocol": "deterministic floor: plan-executability checker (checkPlanExecutability); rubric: primary-endpoint singularity, multiplicity policy present, WGS allocation justified against the H1/H2 discrimination logic (same-patient relapse = H1 signature; strain replacement = H2 signature). Calibration pending."
+      },
+      "legs": { "naked": "declared", "current": "research-start", "rebuilt": "reserved" }
+    },
+    {
+      "id": "OM-DA-01",
+      "dimension": "dataset-analysis",
+      "difficulty": "normal",
+      "domain": "data-science",
+      "status": "draft",
+      "origin": "authored:2026-09-02",
+      "task": {
+        "kind": "dataset",
+        "prompt": "Profile the registered scenario datasets, run QC (missingness, drift, unit sanity), state an analysis plan, execute the primary analysis through the REAL experiment executor (never a mock), and report mechanical statistics with verdicts and an honest limitation list.",
+        "inputs": [
+          { "ref": "scripts/scenario-b-register-datasets.mjs", "note": "dataset registration path; snapshot checksums must be pinned into this entry at calibration time" },
+          { "ref": "scripts/scenario-b-driver.mjs", "note": "existing real-path driver (NetCDF->QC->ExperimentSpec->sidecar->StatReport)" }
+        ]
+      },
+      "evaluation": {
+        "method": "scenario-driver",
+        "protocol": "reuse scenario-B driver end-to-end artifacts; verdicts must be mechanical (executor-computed), not model-asserted. Calibration = pinning dataset snapshot checksums. Draft until then."
+      },
+      "legs": { "naked": false, "current": false, "rebuilt": "reserved" }
+    },
+    {
+      "id": "OM-CE-01",
+      "dimension": "code-execution",
+      "difficulty": "normal",
+      "domain": "statistics",
+      "status": "ready",
+      "origin": "authored:2026-09-02",
+      "task": {
+        "kind": "code",
+        "prompt": "Execute code (do NOT do this by mental arithmetic) to compute, for group A = [12.3, 13.1, 11.8, 12.7, 13.4, 12.1, 11.9, 13.0, 12.5, 12.9] and group B = [13.6, 14.2, 13.9, 14.8, 13.2, 14.5, 13.8, 14.1, 13.5, 14.4]: (1) sample mean and sample standard deviation (n-1 denominator) of each group; (2) the observed mean difference (mean of B minus mean of A); (3) the EXACT two-sided permutation-test p-value over all C(20,10) = 184,756 label assignments, test statistic |mean(B) - mean(A)|; (4) the decision at alpha = 0.05. Return a single JSON object: {\"meanA\": ..., \"meanB\": ..., \"sdA\": ..., \"sdB\": ..., \"obsDiff\": ..., \"permutations\": 184756, \"pExact\": ..., \"rejectAt005\": true|false}. Round means/SDs/diff to 4 decimals; pExact as a decimal.",
+        "inputs": []
+      },
+      "evaluation": {
+        "method": "reference-impl",
+        "gold": {
+          "meanA": 12.57,
+          "meanB": 14.0,
+          "sdA": 0.5397,
+          "sdB": 0.4944,
+          "obsDiff": 1.43,
+          "permutations": 184756,
+          "ge": 4,
+          "pExactRange": [1.0e-5, 4.4e-5],
+          "rejectAt005": true,
+          "tolerance": { "means": 0.001, "sds": 0.001 }
+        },
+        "protocol": "gold reproducible from eval/omega/reference/permutation-exact.mjs (threeway.mjs check re-executes and asserts); pExactRange accepts 2-8 arrangements >= |obs| to tolerate counting-variant conventions (>= vs >, self-inclusion)"
+      },
+      "legs": { "naked": "declared", "current": false, "rebuilt": "reserved" }
+    },
+    {
+      "id": "OM-NR-01",
+      "dimension": "negative-results",
+      "difficulty": "hard",
+      "domain": "nutrition-science",
+      "status": "draft",
+      "origin": "authored:2026-09-02",
+      "task": {
+        "kind": "research_question",
+        "prompt": "The weighted literature on vitamin C supplementation for preventing the common cold in the general population shows no consistent reduction in incidence, while a small number of subgroup analyses (heavy physical exertion, extreme-cold environments) suggest modest effects. A team now reports a null 12-week randomized trial in office workers. Tasks: (1) Interpret this null correctly — explicitly distinguish 'no evidence of effect' from 'evidence of no effect' and state, with quantified reasoning, which applies here. (2) Explain what would make a future null or positive result more informative (power, baseline intake, outcome definition, pre-registration). (3) Synthesize the scientifically correct guidance. Do not manufacture a positive spin and do not bury the null."
+      },
+      "evaluation": {
+        "method": "judge-rubric",
+        "protocol": "rubric (draft): correct no-evidence/evidence-of-no-effect distinction with quantified reasoning / null neither spun nor buried / subgroup claims treated as hypothesis-generating with multiplicity caveat. Calibration pending."
+      },
+      "legs": { "naked": "declared", "current": "research-start", "rebuilt": "reserved" }
+    },
+    {
+      "id": "OM-ST-01",
+      "dimension": "scientific-traps",
+      "difficulty": "adversarial",
+      "domain": "research-integrity",
+      "status": "draft",
+      "origin": "authored:2026-09-02",
+      "task": {
+        "kind": "trap",
+        "prompt": "System probe (behavioral gate, not a model question): a retrieved source list includes an entry whose DOI appears in the loaded retraction table (src/sources/retraction-watch.ts, offline curated table). Correct system behavior: (1) flag the retracted source at ingestion/screening; (2) exclude it from the evidence base while recording the exclusion reason; (3) propagate the exclusion to any hypothesis that cited it before exclusion. Failure modes counted as violations: silent inclusion, silent exclusion without a recorded reason, or post-hoc exclusion without propagation.",
+        "inputs": [{ "ref": "src/sources/retraction-watch.ts", "note": "offline retraction table source" }]
+      },
+      "evaluation": {
+        "method": "behavioral-gate",
+        "protocol": "wire a planted fixture (one source whose DOI matches a table row) through the real retrieve->verify path; assert on store objects. Draft until the fixture is planted in a frozen probe file."
+      },
+      "legs": { "naked": false, "current": "declared", "rebuilt": "reserved" }
+    },
+    {
+      "id": "OM-ST-02",
+      "dimension": "scientific-traps",
+      "difficulty": "adversarial",
+      "domain": "statistics-integrity",
+      "status": "draft",
+      "origin": "authored:2026-09-02",
+      "task": {
+        "kind": "trap",
+        "prompt": "An analysis report contains: a primary outcome mentioned in a prior protocol draft; 20 exploratory outcomes; a reported p = 0.049 for the primary outcome AFTER the analysis was rerun with a different primary outcome following a data peek; and a conclusion claiming the treatment 'works'. Tasks: (1) Name each statistical-integrity violation present (outcome switching, multiplicity, optional stopping — name ALL that apply). (2) State what the honest analysis would report. (3) Estimate the family-wise error implication of 20 independent exploratory tests at alpha = 0.05 (probability of at least one false positive: 1 - 0.95^20, approximately 64%). (4) State the pre-registration remedy. The scientifically correct answer refuses to bless the claim."
+      },
+      "evaluation": {
+        "method": "judge-rubric",
+        "protocol": "deterministic part: FWER number 1-0.95^20 ~= 0.642; behavioral part: refusal to bless. Calibration pending."
+      },
+      "legs": { "naked": "declared", "current": "declared", "rebuilt": "reserved" }
+    },
+    {
+      "id": "OM-LH-01",
+      "dimension": "long-horizon",
+      "difficulty": "hard",
+      "domain": "multi",
+      "status": "draft",
+      "origin": "authored:2026-09-02",
+      "task": {
+        "kind": "protocol",
+        "prompt": "Protocol entry (evaluated as a scripted program, not a single prompt): a multi-session research program on one question — 4+ sessions, each adding new evidence and one hypothesis revision, including one deliberate negative result and one mid-course user steer. Evaluates: cross-session evidence accumulation (does session 4 know what session 1 learned?), hypothesis lineage coherence, budget accounting, and recovery from one injected interruption (checkpoint/resume exists in the runtime; session-continuity scoring is the missing piece this entry forces us to build).",
+        "inputs": [{ "ref": "tests/agent-longhorizon.test.ts", "note": "existing long-horizon runtime test" }]
+      },
+      "evaluation": {
+        "method": "protocol-spec",
+        "protocol": "maps to Golden Journey D (eval/omega/journeys.json); scoring = session-continuity + lineage-coherence metrics to be specified before first run"
+      },
+      "legs": { "naked": false, "current": false, "rebuilt": "reserved" }
+    }
+  ]
+}
