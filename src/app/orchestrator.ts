@@ -502,6 +502,7 @@ export class Orchestrator {
               reason: 'agent_step_done', capability: step.target, stepId: step.id,
               ok: res.ok, status: res.status, turns: res.turns,
               ...(res.reportId !== null ? { reportId: res.reportId } : {}),
+              ...(res.materialized !== undefined ? { materialized: res.materialized } : {}),
               ...(res.error !== undefined ? { error: res.error } : {}),
             },
           });

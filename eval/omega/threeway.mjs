@@ -85,6 +85,7 @@ const snapshotRun = async (dbPath, runId) => {
   const plans = objects('plan');
   const receipts = objects('receipt');
   const agentReports = objects('agent_report');
+  const feedbackSignals = objects('feedback');
   const modelCalls = receipts.filter((r) => r.kind === 'model_call');
   const modes = {};
   for (const r of receipts) modes[r.executionMode ?? 'unknown'] = (modes[r.executionMode ?? 'unknown'] ?? 0) + 1;
@@ -121,6 +122,7 @@ const snapshotRun = async (dbPath, runId) => {
       receipt_modes: modes,
       agent_reports: agentReports.length,
       debate_counter_findings: debateFindings.length,
+      feedback_signals: feedbackSignals.length,
       debate_verdict_counts: agentReports
         .filter((r) => r.capability === 'counter-evidence-debate')
         .flatMap((r) => Array.isArray(r.result?.verdicts) ? r.result.verdicts : [])

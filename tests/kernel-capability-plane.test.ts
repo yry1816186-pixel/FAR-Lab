@@ -26,7 +26,19 @@ const noSource: (f: SourceFamily) => SourceAdapter = () => {
 const finishDebate = JSON.stringify({
   action: 'finish', reason: 'review complete',
   result: {
-    verdicts: [{ hypothesisId: 'hyp_1', verdict: 'insufficient_evidence', counterFindings: [], uncertainties: ['no literature found'] }],
+    verdicts: [
+      {
+        hypothesisId: 'hyp_testhypothesis00000000000aaaaa',
+        verdict: 'mixed',
+        counterFindings: [{
+          statement: 'a boundary-condition failure at low temperatures',
+          relation: 'weakens',
+          sourceRef: 'arXiv:2401.00001',
+        }],
+        uncertainties: ['no literature found'],
+      },
+      { hypothesisId: 'hyp_not persisted here', verdict: 'insufficient_evidence', counterFindings: [], uncertainties: [] },
+    ],
     discriminatingObservations: [],
     honestLimits: 'stub provider; mechanics test only',
   },
@@ -85,6 +97,14 @@ describe('kernel capability plane', () => {
     expect(report).toBeDefined();
     expect(receipts.length).toBeGreaterThanOrEqual(1);
     expect(receipts.every((r) => r.kind === 'model_call')).toBe(true);
+    // Ω A4 materialization: the counter-finding became a FeedbackSignal bound to
+    // the debate report; the malformed hypothesisId degraded to a targetless signal.
+    expect(out.materialized).toBe(1);
+    const signals = store.listObjects('feedback', run.id);
+    expect(signals).toHaveLength(1);
+    expect(signals[0]?.source).toBe('tool_result');
+    expect(signals[0]?.content).toContain('counter-evidence-debate:weakens');
+    expect(signals[0]?.structured?.reportId).toBe(out.reportId);
   });
 
   it('runCapability bridges the persisted cancelRequested flag into the loop (external cancels stop agent steps)', async () => {

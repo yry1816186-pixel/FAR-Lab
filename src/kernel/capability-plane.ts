@@ -46,6 +46,8 @@ export interface KernelAgentOutcome {
   turns: number;
   sessionId: string;
   reportId: string | null;
+  /** Objects the capability materialized into the scientific layer (Ω A4), when > 0. */
+  materialized?: number;
 }
 
 export interface KernelCapabilityPlane {
@@ -157,6 +159,7 @@ export const createRunKernelPlane = (deps: RunKernelPlaneDeps): KernelCapability
         ...(res.error !== undefined ? { lastError: res.error } : {}),
       }));
       let reportId: string | null = null;
+      let materialized = 0;
       if (res.status === 'completed' && res.result !== undefined) {
         reportId = newId('agr');
         deps.store.putObject('agent_report', AgentReport.parse({
@@ -168,6 +171,12 @@ export const createRunKernelPlane = (deps: RunKernelPlaneDeps): KernelCapability
           result: res.result,
           telemetry: telemetry.summary(),
         }));
+        // Ω A4: capability-owned materialization into the scientific layer (debate
+        // findings → FeedbackSignals). Count is surfaced in the outcome for audit.
+        const spec = resolveKernelCapability(req.capability);
+        if (spec?.materialize !== undefined) {
+          materialized = spec.materialize(deps.store, deps.runId, { id: reportId, sessionId, result: res.result });
+        }
       }
       return {
         ok: res.status === 'completed' && res.result !== undefined,
@@ -179,6 +188,7 @@ export const createRunKernelPlane = (deps: RunKernelPlaneDeps): KernelCapability
         turns: res.turns.length,
         sessionId,
         reportId,
+        ...(materialized > 0 ? { materialized } : {}),
       };
     } finally {
       await assembly.close();

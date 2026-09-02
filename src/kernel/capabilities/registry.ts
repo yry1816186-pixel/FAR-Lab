@@ -4,6 +4,8 @@ import type { Store } from '../../persistence/store.js';
 import type { AgentTool } from '../../agent/tool.js';
 import type { RunKernelPlaneDeps } from '../capability-plane.js';
 import { isRepresentative } from '../../pipeline/stages/shared.js';
+import { FeedbackSignal } from '../../domain/feedback.js';
+import { newId } from '../../domain/ids.js';
 
 /**
  * Kernel capability registry (Ω ADR D5): the closed set of capabilities a
@@ -23,6 +25,12 @@ export interface KernelCapabilitySpec {
   build: (store: Store, runId: string) => { task: string; contextEntries: Array<{ label: string; payload: unknown }> };
   /** Capability-scoped tools bound to this run's store/sources/receipts. */
   makeTools: (deps: RunKernelPlaneDeps) => AgentTool[];
+  /**
+   * Ω A4: materialize a completed report into the scientific layer (e.g. debate
+   * counter-findings as FeedbackSignals for the human-review + revise loop).
+   * Returns the number of objects written; absent = nothing to materialize.
+   */
+  materialize?: (store: Store, runId: string, report: { id: string; sessionId: string; result: Record<string, unknown> }) => number;
 }
 
 // ---------------------------------------------------------------------------
@@ -156,6 +164,38 @@ const counterEvidenceDebate: KernelCapabilitySpec = {
       },
     };
     return [listHypotheses, readEvidence, searchSources];
+  },
+  materialize: (store, runId, report) => {
+    // Debate counter-findings become FeedbackSignals (source 'tool_result'): the
+    // feedback stage records them, the revise stage consumes them into causal
+    // Revisions — the debate's evidence flows through the SAME verification-
+    // disciplined rails as every other signal, never a private side channel.
+    const verdicts = Array.isArray(report.result.verdicts) ? report.result.verdicts : [];
+    let written = 0;
+    for (const v of verdicts) {
+      if (v === null || typeof v !== 'object') continue;
+      const findings = Array.isArray(v.counterFindings) ? v.counterFindings : [];
+      for (const f of findings) {
+        if (f === null || typeof f !== 'object') continue;
+        const statement = typeof f.statement === 'string' ? f.statement.trim() : '';
+        if (statement === '') continue;
+        const target = typeof v.hypothesisId === 'string' && /^hyp_/.test(v.hypothesisId)
+          ? { kind: 'hypothesis' as const, id: v.hypothesisId }
+          : undefined;
+        store.putObject('feedback', FeedbackSignal.parse({
+          id: newId('fbk'),
+          runId,
+          source: 'tool_result',
+          content: `[counter-evidence-debate:${f.relation ?? 'unknown'}] ${statement} (source: ${typeof f.sourceRef === 'string' ? f.sourceRef : 'unreferenced'})`,
+          structured: { finding: f, verdict: v.verdict ?? 'unknown', capability: 'counter-evidence-debate', reportId: report.id, sessionId: report.sessionId },
+          ...(target !== undefined ? { target } : {}),
+          provenance: `agent:counter-evidence-debate report=${report.id} session=${report.sessionId}`,
+          receivedAt: new Date().toISOString(),
+        }));
+        written += 1;
+      }
+    }
+    return written;
   },
 };
 
