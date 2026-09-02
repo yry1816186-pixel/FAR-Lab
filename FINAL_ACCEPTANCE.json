@@ -447,14 +447,16 @@
       "id": "FA-REM-02",
       "domain": "remote",
       "title": "Remote cell-level fingerprint dedup (resume not retrain)",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "self",
-      "gap": "executor.ts:336 previousCells not shared; remote retry = full retrain; scheduler.ts:19-20 comment contradicts implementation (only such spot)",
+      "gap": "已闭（2026-09-02 ce87d9c）：共享 cell-dedup 模块（指纹序列化形状冻结，存量指纹兼容回归锁定）接入 remote-executor——同设备重试回放缓存细胞 0 次重训（设备+python+pip 作用域，跨设备诚实重训）；失败/取消路径 rm -rf /tmp/farlab/<id> 设备清理；scheduler.ts 崩溃窗口注释与实现一致。验证：tests/remote-executor-dedup.test.ts 5 例（同设备重试 0 训练/细胞一致/统计回放、跨设备 4 训练对照、失败清理、指纹冻结×3）；全套 2398 过/15 跳；真 docker SSH e2e 过。",
       "target": "shared dedup module wired into remote-executor + failure-path cleanup of /tmp/farlab/<id>",
       "verify": "test comparing cached-lookup vs sequential",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/05-remote.md CAP-03"
+        "FINAL_EVIDENCE/audit-2026-08-30/05-remote.md CAP-03",
+        "tests/remote-executor-dedup.test.ts",
+        "src/experiment/cell-dedup.ts"
       ]
     },
     {
@@ -1035,5 +1037,6 @@
   "stopConditions": {
     "note": "Mission stop requires ALL of: no internal FAIL/PARTIAL; canonical clean-clone CI green; science north-star met or externally justified; real evidence across all planes; 24h→72h soak+chaos; win/mac/linux matrix; sandbox attack suite; production-path-only flows; clean-machine bundle verify; honest BLOCKED_EXTERNAL only; docs==commit; final red-team audit no new P0/P1.",
     "currentVerdict": "NOT READY — 8 FAIL, 22 PARTIAL, 33 PASS, 2 BLOCKED_EXTERNAL (66 tracked). Closed this wave: FA-SEC-01 (hosted ubuntu OCI evidence on canonical main, run 33583828122), FA-PLT-01/02 (canonical main CI fully green), FA-REM-01, FA-SEC-04, FA-SEC-08, FA-HAR-01, FA-HCI-04, FA-DAT-03 (decision record), FA-EVAL-02 (preregistered user-study protocol; execution BLOCKED_EXTERNAL by design), FA-EVAL-04, FA-SEC-12, FA-PRF-02 (hosted perf gate PASS). Still open: hosted OIDC/release evidence, scientific targets (4 metrics), 6h+ soak (running; verdict at hour 6), streaming data plane, evaluation-wave re-measurement, five-table sweep (233/960: three of five tables complete; runtime+tests remain), and B-QWEN (user-owned 09-05)."
-  }
+  },
+  "currentVerdict": "NOT READY — 8 FAIL, 22 PARTIAL, 34 PASS, 2 BLOCKED_EXTERNAL (66 tracked)"
 }
