@@ -84,11 +84,64 @@ export const buildDecomposeTask = (agentText, gtClaims) => {
   };
 };
 
-/** Median pass by claim count. Odd pass counts (the pipeline default, 3) take the
- * true middle; an even count takes the UPPER middle pass (documented behavior). */
+/**
+ * Medoid pass selection (v2.4, 2026-09-03 variance fix). Behavior:
+ *   1. Filter to passes with the MEDIAN claim count (the old medianPass semantics —
+ *      odd counts take the true middle, even counts the upper middle band).
+ *   2. Among equal-count candidates pick the MEDOID: the pass whose claim set is most
+ *      representative of all passes (max mean best-claim token-Jaccard similarity).
+ *   3. Deterministic tie-break by content hash.
+ * Rationale (live-measured 2026-09-03, qwen3.7-max R3): with 6 of 7 passes sharing a
+ * count, the old pick-any-median-count-pass made the SELECTED CONTENT a sampling
+ * lottery — crispr flipped whole-repeat F1 0.267/0.267/0.000 on which pass won the
+ * tie while every pass's count was stable. The medoid removes the lottery without
+ * touching the gold-calibrated matching/adjudication layers.
+ */
+const claimTokens = (c) => new Set(String(c).toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2));
+const jaccard = (a, b) => {
+  if (a.size === 0 || b.size === 0) return 0;
+  let inter = 0;
+  for (const w of a) if (b.has(w)) inter += 1;
+  return inter / (a.size + b.size - inter);
+};
+
 export const medianPass = (passes) => {
+  if (passes.length === 0) return [];
   const sorted = [...passes].sort((a, b) => a.length - b.length);
-  return sorted[Math.floor(sorted.length / 2)] ?? [];
+  const target = sorted[Math.floor(sorted.length / 2)].length;
+  const band = sorted.filter((p) => p.length === target);
+  if (band.length === 1) return band[0];
+  const tokenized = passes.map((p) => p.map(claimTokens));
+  const contentHash = (p) => {
+    let h = 0;
+    for (const c of p) h = (h * 31 + [...claimTokens(c)].map((w) => w.charCodeAt(0)).reduce((a, b) => a + b, 0)) | 0;
+    return h;
+  };
+  let best = band[0];
+  let bestScore = -1;
+  let bestHash = Infinity;
+  for (const cand of band) {
+    const candTokens = cand.map(claimTokens);
+    let simSum = 0;
+    let comparisons = 0;
+    for (let i = 0; i < passes.length; i += 1) {
+      if (passes[i] === cand) continue;
+      for (const ct of candTokens) {
+        let bestPair = 0;
+        for (const ot of tokenized[i]) bestPair = Math.max(bestPair, jaccard(ct, ot));
+        simSum += bestPair;
+        comparisons += 1;
+      }
+    }
+    const score = comparisons > 0 ? simSum / comparisons : 0;
+    const hash = contentHash(cand);
+    if (score > bestScore || (score === bestScore && hash < bestHash)) {
+      best = cand;
+      bestScore = score;
+      bestHash = hash;
+    }
+  }
+  return best;
 };
 
 /**

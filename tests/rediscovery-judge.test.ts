@@ -21,6 +21,18 @@ describe('medianPass (D-037 behavior preserved)', () => {
   it('returns the single pass unchanged', () => {
     expect(medianPass([['only']])).toEqual(['only']);
   });
+  it('v2.4 medoid: among equal-count passes picks the most representative, deterministically (crispr lottery fix)', () => {
+    // 6 of 7 passes agree on the mechanistic claim; one outlier drops it. The old
+    // pick-any-median-count behavior made the SELECTED content a lottery — the medoid
+    // must return a consensus pass, and the same input must always pick the same one.
+    const consensus = ['seed mismatch disrupts cleavage licensing', 'distal bubbles relax the heteroduplex'];
+    const outlier = ['seed mismatch disrupts licensing', 'unrelated content entirely here'];
+    const passes = [consensus, [...consensus], [...consensus], outlier, [...consensus], [...consensus], [...consensus]];
+    const picked = medianPass(passes);
+    expect(picked).toEqual(consensus);
+    // deterministic tie-break: identical score → same pass on every invocation
+    expect(medianPass([...passes].reverse())).toEqual(consensus);
+  });
 });
 
 describe('buildDecomposeTask fixed-granularity protocol (D-029)', () => {

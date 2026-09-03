@@ -160,14 +160,18 @@
       "id": "FA-SCI-02",
       "domain": "science",
       "title": "Judge variance to <=0.15",
-      "status": "FAIL",
+      "status": "PASS",
       "priority": "P0",
       "owner": "self",
-      "gap": "0.267 worst (crispr: agent-side decomposition variance); 4/5 tasks already <=0.045 after v2.2 5-vote boolean-strict",
+      "gap": "CLOSED 2026-09-03: worstTaskSwing 0.057 (target 0.15, stretch 0.08 both met) via v2.4 judge protocol — three-iteration root-cause chain: (1) qwen3.7-max R3 baseline worst 0.2; (2) passes 7/votes 9 stabilized 4/5 tasks; (3) diagnostic isolated the residual to medianPass's equal-count content lottery -> medoid selection (most-representative pass, deterministic hash tie-break). crispr 0.267x3 stable; all five tasks swing 0/0/0.057/0/0",
       "target": "worstTaskSwing<=0.15 via 5-pass decomposition stabilization",
-      "verify": "node eval/judge-variance.mjs --live 3",
+      "verify": "node eval/judge-variance.mjs --live 3 (exit 0, allUnderTarget015 true, 2026-09-03)",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md CAP-03"
+        "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md CAP-03",
+        "eval/omega/anchors/judgevar-v24-20260903.json (committed verdict run)",
+        "eval/omega/anchors/judgevar-v23-intermediate-20260903.md (stabilization chain)",
+        "eval/rediscovery-judge.mjs medoid + tests/rediscovery-judge.test.ts regression",
+        "eval/north-star.json rediscovery-judge-variance 0.267 -> 0.057"
       ]
     },
     {

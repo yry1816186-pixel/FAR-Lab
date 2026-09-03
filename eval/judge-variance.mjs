@@ -126,7 +126,7 @@ if (PROVIDER === 'zai') {
 if (!provider.liveReady) { console.error(`FATAL: ${PROVIDER} route not live-ready (missing API key?)`); process.exit(1); }
 const runs = readFileSync(RUNS_FILE, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l));
 const byTask = new Map(TASKS.map((t) => [t.id, t]));
-const out = { mode: 'live', gtRev: GT_REV, repeats: R, judgeRoute: { provider: PROVIDER, modelId: provider.modelId }, generated: new Date().toISOString(), tasks: [] };
+const out = { mode: 'live', gtRev: GT_REV, repeats: R, judgeProtocol: 'v2.4 (passes 7, votes 9, medoid decomposition selection — 2026-09-03 stabilization)', judgeRoute: { provider: PROVIDER, modelId: provider.modelId }, generated: new Date().toISOString(), tasks: [] };
 for (const r of runs) {
   const t = byTask.get(r.task);
   if (!t || !r.runId) continue;
@@ -137,7 +137,15 @@ for (const r of runs) {
   const f1s = [];
   const detail = [];
   for (let i = 0; i < R; i += 1) {
-    const res = await judgeRediscovery({ agentText: text, gtClaims: t.gtClaims, call: (req, validate) => provider.structuredCall(req, validate) });
+    // v2.3 judge protocol (2026-09-03, live-measured drivers): passes 5->7 and
+    // votes 5->9. The 2026-09-03 R3 run (qwen3.7-max) isolated the residual swing:
+    // crc 0.196 = borderline-ADJUDICATION flips (decomposition count-stable 8/8/8,
+    // 10-11 pairs in band), crispr 0.2 = decomposition content drift (borderline
+    // 7->5) plus flips. Protocol change disclosed with the numbers (route + params).
+    const res = await judgeRediscovery({
+      agentText: text, gtClaims: t.gtClaims, passes: 7, votes: 9,
+      call: (req, validate) => provider.structuredCall(req, validate),
+    });
     if (!res.ok) { detail.push({ repeat: i + 1, error: res.error }); continue; }
     f1s.push(res.f1);
     detail.push({ repeat: i + 1, f1: res.f1, decomposition: res.decomposition, borderline: res.matcher.borderline });
