@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { openRolloutWriter, readRollout, reconstructSession, rolloutFile } from '../src/agent/rollout.js';
+import { openRolloutWriter, readRollout, reconstructSession, rolloutFile, type RolloutLine } from '../src/agent/rollout.js';
 
 const DIR = () => fs.mkdtempSync(path.join(os.tmpdir(), 'far-rollout-'));
 
@@ -73,6 +73,33 @@ describe('session rollout (Codex JSONL format, TS port)', () => {
       { kind: 'handoff', summary: 'handoff with durable keep window' },
       kept,
     ]);
+  });
+
+  it('a compacted baseline carrying the explicit forgotten set round-trips and projects the same condensed view', () => {
+    const dir = DIR();
+    const w = openRolloutWriter(dir, 'ags_forgotten00000000000aaaa');
+    const kept = { kind: 'tool_result' as const, turn: 3, tool: 'read', ok: true, payload: 'x' };
+    const lines = [
+      { type: 'session_meta', at: 't0', sessionId: 'ags_forgotten00000000000aaaa', capability: 'c', purpose: 'p', task: 'objective', maxTurns: 8 },
+      { type: 'transcript_item', at: 't1', entry: { kind: 'task', text: 'objective' } },
+      { type: 'transcript_item', at: 't2', entry: { kind: 'action', turn: 1, action: 'use_tool' as const, tool: 'search', reason: 'r' } },
+      { type: 'transcript_item', at: 't3', entry: { kind: 'tool_result', turn: 1, tool: 'search', ok: true, payload: 'old-irrelevant' } },
+      { type: 'compacted', at: 't4', summary: 'condensed turns 1 into the handoff', keptEntries: [kept], forgotten: { entries: 3, turns: [1] } },
+      { type: 'transcript_item', at: 't5', entry: { kind: 'action', turn: 4, action: 'use_tool' as const, tool: 'read', reason: 'next' } },
+    ] satisfies RolloutLine[];
+    for (const l of lines) w.append(l);
+    const read = readRollout(w.file);
+    expect(read.malformed).toBe(0);
+    const baseline = read.lines.find((l): l is Extract<RolloutLine, { type: 'compacted' }> => l.type === 'compacted')!;
+    expect(baseline.forgotten).toEqual({ entries: 3, turns: [1] });
+    const rec = reconstructSession(read.lines);
+    expect(rec.transcript).toEqual([
+      { kind: 'task', text: 'objective' },
+      { kind: 'handoff', summary: 'condensed turns 1 into the handoff' },
+      kept,
+      { kind: 'action', turn: 4, action: 'use_tool', tool: 'read', reason: 'next' },
+    ]);
+    expect(rec.transcript.some((e) => e.kind === 'tool_result' && e.turn === 1)).toBe(false);
   });
 
   it('retains committed effects outside the compacted model transcript', () => {

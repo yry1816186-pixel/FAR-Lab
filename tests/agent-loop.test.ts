@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { runAgentLoop, stopAfterTurns, stopOnTokenBudget, type AgentLoopConfig, type AgentLoopDeps } from '../src/agent/loop.js';
+import { openRolloutWriter, readRollout, reconstructSession, type RolloutLine } from '../src/agent/rollout.js';
 import { ToolRegistry, type AgentTool } from '../src/agent/tool.js';
 import { PermissionEngine } from '../src/agent/permissions.js';
 import { SessionTelemetry } from '../src/agent/telemetry.js';
@@ -324,6 +328,59 @@ describe('agent kernel loop', () => {
     const degradeEvent = events.find((e): e is Extract<AgentEvent, { type: 'compaction' }> => e.type === 'compaction' && e.layer === 'degrade');
     expect(degradeEvent?.tokensAfter).toBeLessThanOrEqual(120);
     expect(degradeEvent?.bySourceAfter).toBeDefined();
+  });
+
+  it('T3 condensation-as-event: full handoff names its forgotten set; originals stay on the immutable log', async () => {
+    const big: AgentTool = {
+      name: 'echo',
+      description: 'echo text back',
+      inputSchema: z.object({ text: z.string() }),
+      async execute(args) { return { ok: true, data: { echo: (args as { text: string }).text, blob: 'x'.repeat(2_000) } }; },
+    };
+    const { deps } = depsFor([
+      { rawOutput: useTool('echo', { text: 'a' }) },
+      { rawOutput: useTool('echo', { text: 'b' }) },
+      { rawOutput: finish({ answer: 'ok' }) },
+      {
+        rawOutput: JSON.stringify({
+          objective: 'Complete the test task and return a contract-valid answer.',
+          completed: ['Ran two distinct echo actions and retained their successful outputs.'],
+          decisions: ['Use the successful echo outputs; do not execute those calls again.'],
+          remaining: ['Return the final answer from the preserved recent transcript.'],
+          references: [],
+        }),
+        forPurpose: 'test:loop:compact',
+      },
+    ]);
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'far-t3-condense-'));
+    const rollout = openRolloutWriter(dir, 'ags_t3condense00000000000aaaa');
+    const res = await runAgentLoop(
+      baseCfg({ maxTurns: 3, budget: { transcriptSoft: 60, transcriptHard: 120, maxToolResultChars: 100_000 } }),
+      { ...deps, tools: new ToolRegistry().register(big), rollout },
+    );
+    expect(res.status).toBe('completed');
+    const { lines, malformed } = readRollout(rollout.file);
+    expect(malformed).toBe(0);
+    const baselines = lines.filter((l): l is Extract<RolloutLine, { type: 'compacted' }> => l.type === 'compacted');
+    expect(baselines.length).toBeGreaterThanOrEqual(1); // a tight soft budget can condense at several turn gates
+    const baseline = baselines.at(-1)!; // the newest baseline is the one reconstruction projects from
+    const forgotten = baseline.forgotten;
+    expect(forgotten).toBeDefined();
+    expect(forgotten!.entries).toBeGreaterThanOrEqual(2); // at least the original task + one dropped entry
+    expect(forgotten!.turns.length).toBeGreaterThan(0);
+    expect(forgotten!.turns).toEqual([...forgotten!.turns].sort((a, b) => a - b));
+    // the immutable log keeps everything the condensation dropped: the original task
+    // entry (always replaced in memory) and every forgotten turn's original entry
+    const baselineIdx = lines.findLastIndex((l) => l.type === 'compacted');
+    const before = lines.slice(0, baselineIdx);
+    expect(before.some((l) => l.type === 'transcript_item' && l.entry.kind === 'task' && l.entry.text === 'do the thing')).toBe(true);
+    for (const t of forgotten!.turns) {
+      expect(before.some((l) => l.type === 'transcript_item' && (l.entry as { turn?: number }).turn === t)).toBe(true);
+    }
+    // the reconstructed view is the condensed projection, strictly smaller than the raw log
+    const rec = reconstructSession(lines);
+    const rawItems = lines.filter((l) => l.type === 'transcript_item').length;
+    expect(rec.transcript.length).toBeLessThan(rawItems);
   });
 
   it('a malformed handoff summary degrades to a fact-only local handoff instead of crashing', async () => {

@@ -297,6 +297,7 @@ export async function runAgentLoop(cfg: AgentLoopConfig, deps: AgentLoopDeps): P
         const handoff = await handoffSummary(deps, transcript, cfg.task, cfg.signal);
         const summary = handoff.summary;
         const compacted = compactedTranscript(micro, cfg.task, summary, keepLast);
+        const preCompact = [...transcript];
         transcript.length = 0;
         transcript.push(...compacted);
         let after = transcriptTokens(transcript);
@@ -329,11 +330,20 @@ export async function runAgentLoop(cfg: AgentLoopConfig, deps: AgentLoopDeps): P
         }
         const unrecoverableHardOverflow = after > budget.transcriptHard;
         const finalHandoff = transcript.find((entry) => entry.kind === 'handoff');
+        // Condensation-as-event (ADR D2): name what this condensation dropped. The
+        // originals stay on the rollout log above the baseline — never rewritten.
+        const survivors = new Set(transcript);
+        const dropped = preCompact.filter((e) => !survivors.has(e));
+        const forgotten = {
+          entries: dropped.length,
+          turns: [...new Set(dropped.map((e) => (e.kind === 'action' || e.kind === 'tool_result' || e.kind === 'error') ? e.turn : undefined).filter((t): t is number => t !== undefined))].sort((a, b) => a - b),
+        };
         rl().append({
           type: 'compacted',
           at: at(),
           summary: finalHandoff?.kind === 'handoff' ? finalHandoff.summary : '',
           keptEntries: transcript.slice(finalHandoff === undefined ? 1 : 2),
+          forgotten,
         });
         deps.telemetry.recordCompaction();
         if (handoff.modelCallCompleted) {
