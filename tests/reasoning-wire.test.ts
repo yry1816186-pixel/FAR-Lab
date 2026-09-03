@@ -93,6 +93,32 @@ describe('reasoningBodyFields (single owner of the dialect map)', () => {
     expect(reasoningBodyFields('anthropic', { style: 'reasoning_effort', gear: 'low' })).toEqual({});
     expect(reasoningBodyFields('openai', { style: 'thinking_budget', gear: 'low' })).toEqual({});
   });
+
+  it('disableThinking emits explicit enable_thinking:false and strips any gear budget (qwen default-thinking models)', async () => {
+    const { fetchImpl, calls } = recorderFetch(async () => chatOk('{"ok":true}'));
+    const provider = createCustomProvider(config(), { fetchImpl });
+    await provider.structuredCall(
+      { ...REQ, reasoning: { style: 'enable_thinking', gear: 'high' }, disableThinking: true },
+      parseAny,
+    );
+    const body = bodyOf(calls[0]!);
+    expect(body.enable_thinking).toBe(false);
+    expect(body.thinking_budget).toBeUndefined();
+    await provider.structuredCall({ ...REQ, disableThinking: true }, parseAny);
+    const body2 = bodyOf(calls[1]!);
+    expect(body2.enable_thinking).toBe(false);
+    expect(body2.thinking_budget).toBeUndefined();
+  });
+
+  it('no reasoning config and no disableThinking = zero thinking fields (exact legacy wire)', async () => {
+    const { fetchImpl, calls } = recorderFetch(async () => chatOk('{"ok":true}'));
+    const provider = createCustomProvider(config(), { fetchImpl });
+    await provider.structuredCall(REQ, parseAny);
+    const body = bodyOf(calls[0]!);
+    expect(body.enable_thinking).toBeUndefined();
+    expect(body.thinking_budget).toBeUndefined();
+    expect(body.reasoning_effort).toBeUndefined();
+  });
 });
 
 describe('transport emission via createCustomProvider', () => {
