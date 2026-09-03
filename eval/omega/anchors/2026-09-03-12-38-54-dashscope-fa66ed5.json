@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 1,
+  "harnessVersion": 1,
+  "leg": "REBUILT-candidate",
+  "pinnedAt": "2026-09-03T12:41:08.591Z",
+  "gitCommit": "fa66ed5f650e9bfb4917b9b5ee0cf84037f039d1",
+  "gitTag": null,
+  "route": "dashscope",
+  "problemsFile": "eval/problems.json",
+  "cli": {
+    "path": "dist/cli/main.js",
+    "argv": [
+      "research",
+      "start",
+      "<q>",
+      "--domain",
+      "<d>",
+      "--goal",
+      "<g>",
+      "--route",
+      "dashscope",
+      "--json"
+    ]
+  },
+  "results": [
+    {
+      "problemId": "P3",
+      "ok": true,
+      "snapshot": {
+        "runId": "run_3e2y141afxgw0njjegy5gnh9q2",
+        "status": "completed",
+        "stages": [
+          {
+            "stage": "scope",
+            "state": "done"
+          },
+          {
+            "stage": "retrieve",
+            "state": "done"
+          },
+          {
+            "stage": "verify_sources",
+            "state": "done"
+          },
+          {
+            "stage": "build_evidence",
+            "state": "done"
+          },
+          {
+            "stage": "generate_hypotheses",
+            "state": "skipped",
+            "reason": "evidence flagged insufficient for the question's subject (run tag evidence-insufficient) — the verified claims do not measure or observe the question's central subject; refusing to generate hypotheses about an uncovered subject"
+          },
+          {
+            "stage": "critique_falsify",
+            "state": "skipped",
+            "reason": "not applicable (stage predicate returned false)"
+          },
+          {
+            "stage": "rank",
+            "state": "skipped",
+            "reason": "not applicable (stage predicate returned false)"
+          },
+          {
+            "stage": "plan",
+            "state": "skipped",
+            "reason": "no defensible hypotheses were produced from the verified evidence — an honest plan is impossible; inspect the evidence tab for what was (in)sufficient"
+          },
+          {
+            "stage": "execute",
+            "state": "skipped",
+            "reason": "not applicable (stage predicate returned false)"
+          },
+          {
+            "stage": "feedback",
+            "state": "skipped",
+            "reason": "not applicable (stage predicate returned false)"
+          },
+          {
+            "stage": "revise",
+            "state": "skipped",
+            "reason": "no unconsumed feedback signals (every signal already has a revision)"
+          },
+          {
+            "stage": "export",
+            "state": "done"
+          }
+        ],
+        "metrics": {
+          "source_total": 12,
+          "source_verification_rate": 1,
+          "claim_total": 9,
+          "claim_binding_rate": 1,
+          "counter_evidence_relations": 0,
+          "hypothesis_candidates": 0,
+          "hypothesis_representatives": 0,
+          "falsification_completeness_rate": null,
+          "plan_present": false,
+          "receipts": 58,
+          "model_calls": 14,
+          "receipt_modes": {
+            "live": 58
+          },
+          "agent_reports": 0,
+          "debate_counter_findings": 0,
+          "feedback_signals": 0,
+          "debate_verdict_counts": {}
+        },
+        "modelVersions": []
+      },
+      "wallMs": 134346
+    }
+  ]
+}

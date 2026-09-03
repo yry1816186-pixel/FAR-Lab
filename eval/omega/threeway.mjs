@@ -252,16 +252,21 @@ const doPin = async () => {
 };
 
 const doStatus = () => {
-  const anchors = existsSync(ANCHORS_DIR) ? readdirSync(ANCHORS_DIR).filter((f) => f.endsWith('.json')).sort() : [];
-  console.log(`anchors: ${anchors.length}`);
-  for (const f of anchors) {
-    const a = JSON.parse(readFileSync(resolve(ANCHORS_DIR, f), 'utf8'));
+  const files = existsSync(ANCHORS_DIR) ? readdirSync(ANCHORS_DIR).filter((f) => f.endsWith('.json')).sort() : [];
+  // The anchors dir also holds judge-* artifacts (non-bundle shape); parse once and
+  // skip anything without a results array instead of crashing on it.
+  const parsed = files.flatMap((f) => {
+    try { return [{ f, a: JSON.parse(readFileSync(resolve(ANCHORS_DIR, f), 'utf8')) }]; } catch { return []; }
+  });
+  const anchors = parsed.filter(({ a }) => Array.isArray(a.results));
+  console.log(`anchors: ${anchors.length}${parsed.length !== anchors.length ? ` (+${parsed.length - anchors.length} non-anchor artifact(s), e.g. judge files)` : ''}`);
+  for (const { f, a } of anchors) {
     const per = a.results.map((r) => `${r.problemId}:${r.ok ? r.snapshot.status : `ERR:${r.error.kind}`}`).join(' ');
     console.log(`  ${f} leg=${a.leg} commit=${a.gitCommit.slice(0, 7)} route=${a.route} [${per}]`);
   }
   const naked = resolve(REPO, 'eval/results/baseline-direct.jsonl');
   console.log(`naked leg (baseline-direct.jsonl): ${existsSync(naked) ? `${readFileSync(naked, 'utf8').trim().split('\n').length} records` : 'ABSENT'}`);
-  const rebuilt = anchors.filter((f) => !JSON.parse(readFileSync(resolve(ANCHORS_DIR, f), 'utf8')).leg.startsWith('CURRENT'));
+  const rebuilt = anchors.filter(({ a }) => !a.leg.startsWith('CURRENT'));
   console.log(`rebuilt anchors: ${rebuilt.length}`);
 };
 
@@ -275,6 +280,21 @@ const doCompare = () => {
   console.log(`B: leg=${B.leg} commit=${B.gitCommit.slice(0, 7)} route=${B.route} at=${B.pinnedAt}`);
   if (A.route !== B.route) console.log('DISCLOSED: routes differ between anchors — cross-route numbers are NOT comparable (PROTOCOL ADDENDUM rule)');
   const bBy = Object.fromEntries(B.results.map((r) => [r.problemId, r]));
+  // Judge dimension (A6): when independent-judge artifacts exist for these runs, surface
+  // them next to the metrics — defensibility is a quality dimension, not a count.
+  const judgeFiles = existsSync(ANCHORS_DIR) ? readdirSync(ANCHORS_DIR).filter((f) => f.startsWith('judge-')) : [];
+  const judgeByRun = new Map(judgeFiles.flatMap((f) => {
+    try {
+      const j = JSON.parse(readFileSync(resolve(ANCHORS_DIR, f), 'utf8'));
+      return [[j.runId, j]];
+    } catch { return []; }
+  }));
+  const judgeLine = (runId) => {
+    const j = judgeByRun.get(runId);
+    if (j === undefined) return null;
+    const total = Object.values(j.counts).reduce((a, b) => a + b, 0);
+    return `    judge: ${j.counts.sound ?? 0}/${total} sound (rate ${j.soundRate ?? 'n/a'}, judge=${j.judge.model})`;
+  };
   for (const ra of A.results) {
     const rb = bBy[ra.problemId];
     if (!rb) { console.log(`${ra.problemId}: MISSING in B`); continue; }
@@ -286,6 +306,9 @@ const doCompare = () => {
         const vb = rb.snapshot.metrics[k];
         if (va !== vb) console.log(`    ${k}: ${va} -> ${vb} (${vb > va ? '+' : ''}${(vb - va).toFixed?.(4) ?? vb - va})`);
       }
+    }
+    for (const line of [judgeLine(ra.ok ? ra.snapshot.runId : null), judgeLine(rb.ok ? rb.snapshot.runId : null)]) {
+      if (line !== null) console.log(line);
     }
   }
 };
