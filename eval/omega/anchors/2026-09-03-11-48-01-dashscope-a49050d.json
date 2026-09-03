@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "harnessVersion": 1,
+  "leg": "REBUILT-candidate",
+  "pinnedAt": "2026-09-03T11:58:54.794Z",
+  "gitCommit": "a49050d6e82d7ec10c73e51ea65677622a2ae126",
+  "gitTag": null,
+  "route": "dashscope",
+  "problemsFile": "eval/problems.json",
+  "cli": {
+    "path": "dist/cli/main.js",
+    "argv": [
+      "research",
+      "start",
+      "<q>",
+      "--domain",
+      "<d>",
+      "--goal",
+      "<g>",
+      "--route",
+      "dashscope",
+      "--json"
+    ]
+  },
+  "results": [
+    {
+      "problemId": "P2",
+      "ok": true,
+      "snapshot": {
+        "runId": "run_9nda1j47z2qrcsed30rpk7tbdy",
+        "status": "completed",
+        "stages": [
+          {
+            "stage": "scope",
+            "state": "done"
+          },
+          {
+            "stage": "retrieve",
+            "state": "done"
+          },
+          {
+            "stage": "verify_sources",
+            "state": "done"
+          },
+          {
+            "stage": "build_evidence",
+            "state": "done"
+          },
+          {
+            "stage": "generate_hypotheses",
+            "state": "done"
+          },
+          {
+            "stage": "critique_falsify",
+            "state": "done"
+          },
+          {
+            "stage": "rank",
+            "state": "done"
+          },
+          {
+            "stage": "plan",
+            "state": "done"
+          },
+          {
+            "stage": "execute",
+            "state": "skipped",
+            "reason": "tabular: Requires private wet-lab biospecimen data (serum metabolomics, stool metagenomics) and clinical records not available in public OpenML tabular datasets; literature-pool: Requires pooling individual-level serum metabolite concentrations and microbiome taxa abundance data to test mechanistic hypotheses; published literature typically reports associations rather than standardized effect estimates (OR/RR/SMD) for these specific continuous biomarkers suitable for meta-analysis.; theory: theory spec drafting failed: model call failed (invalid_output) in execute/theory-spec-draft: dashscope: structured output rejected even after 3 corrective re-asks: schema validation failed: variables:Array mu; protocol: All plan steps are defined as 'data_analysis' involving statistical testing and correlation analysis on existing datasets; no physical, human, field, engineering, archive, or theoretical execution steps are present."
+          },
+          {
+            "stage": "feedback",
+            "state": "skipped"
+          },
+          {
+            "stage": "revise",
+            "state": "skipped"
+          },
+          {
+            "stage": "export",
+            "state": "done"
+          }
+        ],
+        "metrics": {
+          "source_total": 12,
+          "source_verification_rate": 1,
+          "claim_total": 24,
+          "claim_binding_rate": 1,
+          "counter_evidence_relations": 0,
+          "hypothesis_candidates": 9,
+          "hypothesis_representatives": 9,
+          "falsification_completeness_rate": 1,
+          "plan_present": true,
+          "receipts": 112,
+          "model_calls": 73,
+          "receipt_modes": {
+            "live": 112
+          },
+          "agent_reports": 0,
+          "debate_counter_findings": 0,
+          "feedback_signals": 0,
+          "debate_verdict_counts": {}
+        },
+        "modelVersions": []
+      },
+      "wallMs": 653432
+    }
+  ]
+}
