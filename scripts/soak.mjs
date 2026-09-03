@@ -72,6 +72,24 @@ const samples = [];
 const deadline = Date.now() + HOURS * 3_600_000;
 let nextWork = Date.now(); // first workload immediately
 const sleep = (ms) => new Promise((r) => { setTimeout(r, ms); });
+/** Interim verdict every hour of sampling — a killed run still leaves interpretable evidence. */
+const verdictOf = (slice, hoursElapsed) => {
+  const first = slice.slice(0, Math.max(1, Math.floor(slice.length * 0.1)));
+  const last = slice.slice(-Math.max(1, Math.floor(slice.length * 0.1)));
+  const mean = (xs, f) => xs.reduce((s, x) => s + f(x), 0) / xs.length;
+  const rssGrowthPct = ((mean(last, (s) => s.rssMb) - mean(first, (s) => s.rssMb)) / mean(first, (s) => s.rssMb)) * 100;
+  return {
+    rssMbFirst: Math.round(mean(first, (s) => s.rssMb) * 10) / 10,
+    rssMbLast: Math.round(mean(last, (s) => s.rssMb) * 10) / 10,
+    rssGrowthPct: Math.round(rssGrowthPct * 10) / 10,
+    activeHandlesFirst: Math.round(mean(first, (s) => s.activeHandles) * 10) / 10,
+    activeHandlesLast: Math.round(mean(last, (s) => s.activeHandles) * 10) / 10,
+    dbGrowthBytesPerHour: hoursElapsed > 0 ? (slice.at(-1).dbBytes - slice[0].dbBytes) / hoursElapsed : 0,
+    runsLaunched: runIndex,
+    leakRssPctBound: LEAK_RSS_PCT,
+    pass: rssGrowthPct < LEAK_RSS_PCT,
+  };
+};
 
 while (Date.now() < deadline) {
   const proc = sampleProcess();
@@ -79,6 +97,9 @@ while (Date.now() < deadline) {
   const line = { kind: 'sample', t: Date.now(), ...proc, ...storage };
   samples.push(line);
   appendFileSync(OUT, `${JSON.stringify(line)}\n`);
+  if (samples.length > 1 && samples.length % Math.round(3600 / SAMPLE_S) === 0) {
+    appendFileSync(OUT, `${JSON.stringify({ kind: 'soak-interim', hoursElapsed: Math.round((samples.length * SAMPLE_S) / 360) / 10, ...verdictOf(samples, (samples.length * SAMPLE_S) / 3600), at: new Date().toISOString() })}\n`);
+  }
   if (Date.now() >= nextWork) {
     nextWork = Date.now() + WORK_MIN * 60_000;
     workloads.push(runWorkload());
