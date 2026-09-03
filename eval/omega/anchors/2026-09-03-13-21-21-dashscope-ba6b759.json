@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "harnessVersion": 1,
+  "leg": "REBUILT-candidate",
+  "pinnedAt": "2026-09-03T13:29:53.688Z",
+  "gitCommit": "ba6b759ce7b7ecd671d297764b6dd74a56b006fd",
+  "gitTag": null,
+  "route": "dashscope",
+  "problemsFile": "eval/problems.json",
+  "cli": {
+    "path": "dist/cli/main.js",
+    "argv": [
+      "research",
+      "start",
+      "<q>",
+      "--domain",
+      "<d>",
+      "--goal",
+      "<g>",
+      "--route",
+      "dashscope",
+      "--json"
+    ]
+  },
+  "results": [
+    {
+      "problemId": "P3",
+      "ok": true,
+      "snapshot": {
+        "runId": "run_f4856p6y46g7m0ha600z1d0eyt",
+        "status": "partial",
+        "stages": [
+          {
+            "stage": "scope",
+            "state": "done"
+          },
+          {
+            "stage": "retrieve",
+            "state": "done"
+          },
+          {
+            "stage": "verify_sources",
+            "state": "done"
+          },
+          {
+            "stage": "build_evidence",
+            "state": "done"
+          },
+          {
+            "stage": "generate_hypotheses",
+            "state": "done"
+          },
+          {
+            "stage": "critique_falsify",
+            "state": "done"
+          },
+          {
+            "stage": "rank",
+            "state": "failed",
+            "reason": "model call failed (invalid_output) in rank/hypothesis-ranking:dimension-scores: dashscope: structured output rejected even after 3 corrective re-asks: schema validation failed: assessments:Array must contain at least 1 element(s); last raw output head: {\n  \"assessments\": [\n   ]\n}"
+          },
+          {
+            "stage": "plan",
+            "state": "pending"
+          },
+          {
+            "stage": "execute",
+            "state": "pending"
+          },
+          {
+            "stage": "feedback",
+            "state": "pending"
+          },
+          {
+            "stage": "revise",
+            "state": "pending"
+          },
+          {
+            "stage": "export",
+            "state": "pending"
+          }
+        ],
+        "metrics": {
+          "source_total": 12,
+          "source_verification_rate": 0.9166666666666666,
+          "claim_total": 12,
+          "claim_binding_rate": 1,
+          "counter_evidence_relations": 5,
+          "hypothesis_candidates": 9,
+          "hypothesis_representatives": 9,
+          "falsification_completeness_rate": 1,
+          "plan_present": false,
+          "receipts": 91,
+          "model_calls": 43,
+          "receipt_modes": {
+            "live": 91
+          },
+          "agent_reports": 0,
+          "debate_counter_findings": 0,
+          "feedback_signals": 0,
+          "debate_verdict_counts": {}
+        },
+        "modelVersions": []
+      },
+      "wallMs": 511950
+    }
+  ]
+}
