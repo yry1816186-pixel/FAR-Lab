@@ -111,9 +111,22 @@ export type StageOutcome =
   | { kind: 'done'; summary: string; artifacts?: string[] }
   | { kind: 'skipped'; reason: string };
 
+/**
+ * Not-applicable verdict carrying the branch-local reason. Persisted verbatim on the
+ * skipped stage record + stage_skipped event — an applicable=false must never be a
+ * silent skip (live finding 2026-09-03: revise/export second-pass skips recorded an
+ * empty reason and the anchor's stage view could not say why).
+ */
+export interface NotApplicable {
+  applicable: false;
+  reason: string;
+}
+
+export type Applicability = boolean | NotApplicable;
+
 export interface StageHandler {
   readonly stage: RunStageName;
-  /** True when the stage legitimately has nothing to do for this run (e.g. no feedback yet). */
-  applicable(ctx: StageContext): Promise<boolean>;
+  /** True when the stage legitimately has nothing to do for this run (e.g. no feedback yet). The object form explains WHY. */
+  applicable(ctx: StageContext): Promise<Applicability>;
   execute(ctx: StageContext): Promise<StageOutcome>;
 }

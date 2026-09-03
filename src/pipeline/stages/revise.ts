@@ -433,7 +433,9 @@ export const reviseStage: StageHandler = {
   stage: 'revise',
 
   async applicable(ctx) {
-    return unconsumedSignals(ctx).length > 0;
+    return unconsumedSignals(ctx).length > 0
+      ? true
+      : { applicable: false as const, reason: 'no unconsumed feedback signals (every signal already has a revision)' };
   },
 
   async execute(ctx: StageContext): Promise<StageOutcome> {

@@ -579,7 +579,14 @@ export class Orchestrator {
 
       const ctx = this.makeContext(run, lease, budget, kernelPlane);
       try {
-        if (await handler.applicable(ctx)) {
+        const applicability = await handler.applicable(ctx);
+        // applicable=false must never be silent: the object form carries the
+        // stage's branch-local reason; the bare boolean form still names its
+        // cause class so the skipped record is always self-explaining.
+        const skipReason = typeof applicability === 'object'
+          ? applicability.reason
+          : 'not applicable (stage predicate returned false)';
+        if (applicability === true) {
           if (signal.cancelled || (this.deps.store.getRun(run.id)?.cancelRequested ?? false)) throw new Error('cancelled by user');
           const outcome = await handler.execute(ctx);
           if (outcome.kind === 'skipped') {
@@ -678,10 +685,10 @@ export class Orchestrator {
         } else {
           run = await this.transition(runId, (r) => {
             // no attempt arg: keep the attempt count persisted by the running transition
-            this.setStage(r, stage, { state: 'skipped', endedAt: new Date().toISOString() });
+            this.setStage(r, stage, { state: 'skipped', endedAt: new Date().toISOString(), error: skipReason });
             return r;
           }, lease);
-          this.deps.store.appendEvent(runId, { type: 'stage_skipped', stage, detail: {} });
+          this.deps.store.appendEvent(runId, { type: 'stage_skipped', stage, detail: { reason: skipReason } });
         }
       } catch (e) {
         if (e instanceof RunBudgetExhaustedError) {

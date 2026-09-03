@@ -697,7 +697,12 @@ export const exportStage: StageHandler = {
     // layer — re-export under the filtering discipline mints a clean bundle
     // (legacy objects stay in the audit store; the OLD bundle stays hash-stable
     // for provenance).
-    return latestBundleTemplateTainted(ctx.artifacts, latestBundle);
+    return (await latestBundleTemplateTainted(ctx.artifacts, latestBundle))
+      ? true
+      : {
+          applicable: false as const,
+          reason: 'bundle current: no newer revision, protocol ledger growth, uncovered sources, or template taint',
+        };
   },
 
   execute: async (ctx) => {

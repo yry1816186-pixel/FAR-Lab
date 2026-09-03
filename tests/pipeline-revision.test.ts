@@ -557,7 +557,11 @@ describe('revise stage', () => {
     expect(store.getObject('hypothesis', hyp.id)?.version).toBe(1);
 
     // second pass: nothing left to consume — no extra model call, no second version bump
-    expect(await reviseStage.applicable(ctx)).toBe(false);
+    // (contract: the false verdict carries the persisted skip reason — never silent)
+    expect(await reviseStage.applicable(ctx)).toStrictEqual({
+      applicable: false,
+      reason: 'no unconsumed feedback signals (every signal already has a revision)',
+    });
     const second = await reviseStage.execute(makeCtx(run, []).ctx);
     expect(second).toMatchObject({ kind: 'skipped' });
     expect(second.kind === 'skipped' ? second.reason : '').toMatch(/no unconsumed/);

@@ -242,8 +242,7 @@ describe('orchestrator: agent-kind workflow steps', () => {
     expect(calls).toHaveLength(1); // the debate step stayed terminal across the re-entry
   });
 
-  it('attemptCap is enforced for agent steps via the persisted counter (bounded capability budget)', async () => {
-    const dir = tmp();
+  it('attemptCap is enforced for agent steps via the persisted counter (bounded capability budget)', async () => {    const dir = tmp();
     const store = openStore(dir);
     const run = makeRun(store);
     const plan = planWithDebate(run.id);
@@ -268,5 +267,35 @@ describe('orchestrator: agent-kind workflow steps', () => {
     expect(calls).toHaveLength(0); // cap exhausted -> the capability never ran
     const reasons = store.listEvents(run.id).map((e) => (e.detail as { reason?: unknown; cause?: unknown })?.reason);
     expect(reasons).toContain('agent_step_skipped');
+  });
+});
+
+describe('orchestrator: applicable=false observability (no silent skips)', () => {
+  it('a NotApplicable verdict lands verbatim on the skipped stage record and the stage_skipped event', async () => {
+    const dir = tmp();
+    const store = openStore(dir);
+    const q = ResearchQuestion.parse({
+      id: newId('q'), text: 'q', background: '', goalType: 'explanatory',
+      scope: { domain: 'd', phenomena: ['p'] }, constraints: {}, createdAt: new Date().toISOString(),
+    });
+    const run = store.createRun(q);
+    const reason = 'nothing to refine (test fixture)';
+    const stages = new Map(STAGE_ORDER.map((s) => [
+      s,
+      {
+        stage: s,
+        applicable: async () => ({ applicable: false as const, reason }),
+        execute: async () => ({ kind: 'done' as const, summary: 'unreachable' }),
+      },
+    ] as [RunStageName, StageHandler]));
+    const after = await new Orchestrator({
+      store, artifacts: {} as ArtifactStore, provider: {} as ModelProvider,
+      sourceFor: noSource, stages, signals: new Map(),
+    }).execute(run.id);
+    expect(after.status).toBe('completed');
+    expect(after.stages.every((s) => s.state === 'skipped' && s.error === reason)).toBe(true);
+    const skippedEvents = store.listEvents(run.id).filter((e) => e.type === 'stage_skipped');
+    expect(skippedEvents.length).toBe(STAGE_ORDER.length);
+    expect(skippedEvents.every((e) => (e.detail as { reason?: unknown }).reason === reason)).toBe(true);
   });
 });
