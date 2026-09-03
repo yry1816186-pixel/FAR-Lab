@@ -152,6 +152,30 @@ const RAW_CATALOG: Array<z.input<typeof ModelCapabilities>> = [
     sourceRefs: src(ALIYUN_MODELS),
   },
   {
+    // Catalog listing verified 2026-09-02 (help.aliyun.com models page, 文本生成);
+    // capability details NOT yet doc-verified — every live-observed fact below cites
+    // the B-QWEN/EV1 receipts. Unverified fields stay at schema defaults.
+    modelKey: 'qwen3.8-flash', provider: 'dashscope', family: 'qwen',
+    aliases: [],
+    text: true,
+    structuredOutput: 'json_object',
+    reasoning: true,
+    contextTokens: undefined,
+    streaming: true,
+    latencyClass: 'fast',
+    region: ['cn-beijing'],
+    knownLimitations: [
+      '默认开启思考（live 实测 2026-09-03：无思考字段时 34/35 调用返回 reasoning tokens，p50 65s / p90 188s——管线须显式 FARLAB_DASHSCOPE_THINKING=off）',
+      '不支持 json_schema strict（模型卡未核验；json_object 档 live 实测 plan-revision 前缀 id schema 三连矫正失败 2026-09-03）',
+      THINKING_JSON_OBJECT_MAY_FAIL,
+    ],
+    interfaceNotes: [NO_MAX_TOKENS_WITH_SO],
+    sourceRefs: [
+      { url: ALIYUN_MODELS, retrievedAt: '2026-09-02' },
+      { url: 'evidence/b-qwen/report.md', retrievedAt: '2026-09-03' },
+    ],
+  },
+  {
     modelKey: 'qwen3.7-max', provider: 'dashscope', family: 'qwen',
     aliases: ['qwen3.7-max-2026-05-20', 'qwen3.7-max-2026-06-08'],
     text: true, toolCalling: true,
