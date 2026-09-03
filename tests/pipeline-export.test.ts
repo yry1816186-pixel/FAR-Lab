@@ -526,13 +526,13 @@ describe('export stage', () => {
     const g = seedRun();
     const { outcome, exportCtx } = await runPlanThenExport(g);
     expect(outcome.kind).toBe('done');
-    expect(await exportStage.applicable(exportCtx)).toBe(false);
+    expect(await exportStage.applicable(exportCtx)).toMatchObject({ applicable: false });
   });
 
   it('re-exports when the corpus grew beyond the bundle\'s covered sources (§5.2 evidence debt, audit P1-1)', async () => {
     const g = seedRun();
     const { exportCtx } = await runPlanThenExport(g);
-    expect(await exportStage.applicable(exportCtx)).toBe(false);
+    expect(await exportStage.applicable(exportCtx)).toMatchObject({ applicable: false });
     // counter-search-style growth: one more source doc than the bundle covers
     const before = store.listObjects('source_document', g.run.id).length;
     store.putObject('source_document', SourceDocument.parse({

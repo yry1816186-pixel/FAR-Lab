@@ -237,7 +237,7 @@ describe('feedback stage', () => {
   it('flips applicable when a signal exists and records exactly one feedback_received event per signal', async () => {
     const { run } = seedRun();
     const empty = makeCtx(run, []);
-    expect(await feedbackStage.applicable(empty.ctx)).toBe(false);
+    expect(await feedbackStage.applicable(empty.ctx)).toMatchObject({ applicable: false });
 
     const signal = seedSignal(run.id, 'expert: the duration effect did not replicate');
     store.putObject('feedback', signal);

@@ -65,7 +65,16 @@ describe('orchestrator: closed-loop truth and terminal guidance', () => {
               }),
             }
           : stage === 'feedback' || stage === 'revise'
-            ? { stage, applicable: async () => false, execute: async () => ({ kind: 'done' as const, summary: 'unreachable' }) }
+            ? {
+                stage,
+                applicable: async () => ({
+                  applicable: false as const,
+                  reason: stage === 'feedback'
+                    ? 'no feedback signals stored for this run'
+                    : 'no unconsumed feedback signals (nothing to revise from)',
+                }),
+                execute: async () => ({ kind: 'done' as const, summary: 'unreachable' }),
+              }
             : okHandler(stage),
       ] as const),
     );
