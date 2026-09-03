@@ -2,17 +2,28 @@
   "items": [
     {
       "id": "B-QWEN-LIVE-ROUTE",
-      "status": "OPEN",
+      "status": "RESOLVED",
       "critical": true,
       "reason": "Competition-mandated Qwen-via-Bailian/DashScope receipted live route does not exist: needs user-provided credential. DeepSeek-era live evidence superseded (DeepSeek banned project-side). No fabrication allowed; live-API policy forbids spending any key 'to feel sure'. [2026-08-27 window: Qwen-via-Bailian route contract tests green at 42452c9 + CI verify/web-e2e both SUCCESS; engineering side fully ready — only the credential run remains.]",
       "owner": "user (credential) + model-plane (route already implemented and contract-tested)",
       "openedAt": "2026-08-24",
-      "lastReviewed": "2026-08-27",
+      "lastReviewed": "2026-09-03",
       "userDecision": {
         "decidedAt": "2026-08-27T06:35:00.000Z",
         "decision": "DEFER to the 09-05 submission-logistics batch (user-selected via explicit prompt: key injection or adjudication happens alongside S-1 review / video / netdisk / registration form)",
         "implication": "Not a waiver: ACC-02 target stays live_verified; engineering stays fully ready (route + contract tests green at 42452c9, CI verify+web-e2e SUCCESS). Next action on user key arrival or submission window."
-      }
+      },
+      "resolvedAt": "2026-09-03",
+      "resolutionEvidence": {
+        "runId": "run_24yjzszwyg36qds4mh7hy2hat6",
+        "status": "completed",
+        "route": "dashscope (routeOverride pinned)",
+        "model": "qwen3.8-flash via compatible-mode",
+        "receipts": "229 total, all executionMode=live, provider=dashscope",
+        "artifacts": "12 sources / 20 claims / critique bindings / plan / causal revisions with alpha-spending; bundle bnd_d1b2vq0v8hdk3w6hj8fjncfvjz",
+        "evidenceDir": "evidence/b-qwen/ (README + report.md + far.db copy)"
+      },
+      "resolutionNote": "User provided the DashScope credential early (2026-09-03, was deferred to 09-05). Runbook executed: full live pipeline run on the mandated route; attempt 1 timed out at critique_falsify (qwen3.8-flash default thinking-ON, 34/35 calls with reasoningTokens, p90 188s); fixed by explicit thinking-off (commit d116bb6, FARLAB_DASHSCOPE_THINKING=off) and resumed — completed with 0 reasoningTokens on 118 post-resume calls. Key held in process env only; user advised to rotate it (it appeared in chat)."
     },
     {
       "id": "B-S1-TECHNICAL-PDF",
