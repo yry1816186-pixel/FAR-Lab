@@ -461,11 +461,20 @@ export class Orchestrator {
     const noHandler = new Set<string>();
     // Agent-step terminal set (this execution): an agent step has no stage record;
     // its outcome lives in agent_session/agent_report objects + these events.
+    // ΩF-005: completion ALSO persists to store meta — executeOwned re-entries
+    // (iteration reopen, resume) must not re-run an already-completed agent step
+    // (stage steps get this for free from their persisted stage records).
     const doneAgentSteps = new Set<string>();
+    const agentStepDone = (stepId: string): boolean =>
+      doneAgentSteps.has(stepId) || this.deps.store.getMeta(`wfp:agent-done:${runId}:${stepId}`) === '1';
+    const markAgentStepDone = (stepId: string): void => {
+      doneAgentSteps.add(stepId);
+      this.deps.store.setMeta(`wfp:agent-done:${runId}:${stepId}`, '1');
+    };
     const kernelPlane = this.deps.kernelPlane?.({ run, budget, recordReceipt: this.receiptSink(run, lease) });
     for (;;) {
       const step = nextWorkflowStep(activePlan, (s) => {
-        if (s.kind === 'agent') return doneAgentSteps.has(s.id) ? 'terminal' : 'pending';
+        if (s.kind === 'agent') return agentStepDone(s.id) ? 'terminal' : 'pending';
         const rec = this.stageRecord(run, s.target);
         return rec !== undefined && (rec.state === 'done' || rec.state === 'skipped') ? 'terminal' : 'pending';
       }, noHandler);
@@ -480,7 +489,7 @@ export class Orchestrator {
             type: 'note',
             detail: { reason: 'agent_step_skipped', capability: step.target, stepId: step.id, cause: BUDGET_EXHAUSTED_REASON, spent: budget.spent, cap: budget.cap },
           });
-          doneAgentSteps.add(step.id); // terminal for this pass; a resume with a raised budget re-plans it
+          markAgentStepDone(step.id); // terminal for this pass; a resume with a raised budget re-plans it
           continue;
         }
         if (kernelPlane === undefined) {
@@ -495,7 +504,7 @@ export class Orchestrator {
         this.deps.store.appendEvent(runId, { type: 'note', detail: { reason: 'agent_step_started', capability: step.target, stepId: step.id } });
         try {
           const res = await kernelPlane.runCapability(step.target, ...(wireCancel !== undefined ? [{ signal: wireCancel.signal }] : []));
-          doneAgentSteps.add(step.id);
+          markAgentStepDone(step.id);
           this.deps.store.appendEvent(runId, {
             type: 'note',
             detail: {
@@ -518,7 +527,7 @@ export class Orchestrator {
             return run;
           }
         } catch (e) {
-          doneAgentSteps.add(step.id);
+          markAgentStepDone(step.id);
           this.deps.store.appendEvent(runId, {
             type: 'note',
             detail: { reason: 'agent_step_failed', capability: step.target, stepId: step.id, error: e instanceof Error ? e.message : String(e) },

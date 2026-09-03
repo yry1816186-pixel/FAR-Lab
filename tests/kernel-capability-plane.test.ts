@@ -8,7 +8,7 @@ import { createRunKernelPlane, type KernelCapabilityPlane, type RunKernelPlaneDe
 import { resolveKernelCapability, KERNEL_CAPABILITY_NAMES } from '../src/kernel/capabilities/registry.js';
 import { defaultWorkflow, WorkflowPlanSchema } from '../src/domain/workflow-plan.js';
 import { Orchestrator } from '../src/app/orchestrator.js';
-import { ResearchQuestion, newId, RunStageName } from '../src/domain/index.js';
+import { ResearchQuestion, newId, RunStageName, FeedbackSignal } from '../src/domain/index.js';
 import { STAGE_ORDER } from '../src/domain/run.js';
 import type { StageHandler } from '../src/pipeline/types.js';
 import type { ModelProvider, ArtifactStore, SourceAdapter } from '../src/shared/ports.js';
@@ -207,5 +207,38 @@ describe('orchestrator: agent-kind workflow steps', () => {
     expect(after.status).toBe('completed');
     const reasons = store.listEvents(run.id).map((e) => (e.detail as { reason?: unknown })?.reason);
     expect(reasons).toContain('agent_step_unavailable');
+  });
+
+  it('ΩF-005: agent-step completion persists — re-entry (feedback reopen) never re-runs it', async () => {
+    const dir = tmp();
+    const store = openStore(dir);
+    const run = makeRun(store);
+    store.putObject('workflow_plan', planWithDebate(run.id));
+    const calls: string[] = [];
+    const plane: KernelCapabilityPlane = {
+      runCapability: async (name) => {
+        calls.push(name);
+        return { ok: true, status: 'completed' as const, turns: 1, sessionId: 'ags_t', reportId: 'agr_t' };
+      },
+      runAgent: async () => { throw new Error('not used'); },
+    };
+    const orch = new Orchestrator({
+      store, artifacts: {} as ArtifactStore, provider: {} as ModelProvider,
+      sourceFor: noSource, stages: okStages(), signals: new Map(),
+      kernelPlane: () => plane,
+    });
+    const first = await orch.execute(run.id);
+    expect(first.status).toBe('completed');
+    expect(calls).toHaveLength(1);
+
+    // New feedback signal -> the resume reopen channel re-enters the plan walk.
+    store.putObject('feedback', FeedbackSignal.parse({
+      id: newId('fbk'), runId: run.id, source: 'human_expert',
+      content: 'expert disagrees with the dominant mechanism',
+      provenance: 'test fixture', receivedAt: new Date().toISOString(),
+    }));
+    const second = await orch.execute(run.id);
+    expect(second.status).toBe('completed');
+    expect(calls).toHaveLength(1); // the debate step stayed terminal across the re-entry
   });
 });

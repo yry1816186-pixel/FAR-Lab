@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "harnessVersion": 1,
+  "leg": "REBUILT-candidate",
+  "pinnedAt": "2026-09-03T06:22:42.821Z",
+  "gitCommit": "d116bb6",
+  "gitTag": null,
+  "route": "dashscope",
+  "problemsFile": "eval/problems.json",
+  "cli": {
+    "path": "dist/cli/main.js",
+    "argv": [
+      "research",
+      "start",
+      "<q>",
+      "--domain",
+      "<d>",
+      "--goal",
+      "<g>",
+      "--route",
+      "dashscope",
+      "--json"
+    ]
+  },
+  "results": [
+    {
+      "problemId": "P2",
+      "ok": true,
+      "snapshot": {
+        "runId": "run_j1vbrazxjcpv69q01sfhbr04bb",
+        "status": "completed",
+        "stages": [
+          {
+            "stage": "scope",
+            "state": "done"
+          },
+          {
+            "stage": "retrieve",
+            "state": "done"
+          },
+          {
+            "stage": "verify_sources",
+            "state": "done"
+          },
+          {
+            "stage": "build_evidence",
+            "state": "done"
+          },
+          {
+            "stage": "generate_hypotheses",
+            "state": "done"
+          },
+          {
+            "stage": "critique_falsify",
+            "state": "done"
+          },
+          {
+            "stage": "rank",
+            "state": "done"
+          },
+          {
+            "stage": "plan",
+            "state": "done"
+          },
+          {
+            "stage": "execute",
+            "state": "skipped",
+            "reason": "tabular: The research plan requires retrospective clinical cohort data with specific gut microbiome sequencing metrics (Akkermansia muciniphila abundance, Shannon diversity) and detailed antibiotic exposure history linked to immune checkpoint inhibitor outcomes. This is private medical/wet-lab data not available in public tabular OpenML datasets.; literature-pool: The research plan requires collecting new primary data (retrospective clinical cohort with specific stool sequencing and antibiotic history) to perform multivariable regression analyses controlling for confounders. It does not propose pooling published effect estimates from existing literature.; theory: routed out by method selection; protocol: The research plan consists entirely of retrospective data analysis steps (Data Acquisition and Harmonization, Survival Analysis, Secondary Analysis, Sensitivity Analysis) performed on existing clinical and microbiome datasets. There are no physical wet-lab procedures, field observations, human participant interventions, or engineering tests required to execute the protocol as described. The work is purely computational/statistical."
+          },
+          {
+            "stage": "feedback",
+            "state": "skipped"
+          },
+          {
+            "stage": "revise",
+            "state": "skipped"
+          },
+          {
+            "stage": "export",
+            "state": "done"
+          }
+        ],
+        "metrics": {
+          "source_total": 12,
+          "source_verification_rate": 1,
+          "claim_total": 19,
+          "claim_binding_rate": 1,
+          "counter_evidence_relations": 7,
+          "hypothesis_candidates": 10,
+          "hypothesis_representatives": 8,
+          "falsification_completeness_rate": 1,
+          "plan_present": true,
+          "receipts": 130,
+          "model_calls": 78,
+          "receipt_modes": {
+            "live": 130
+          },
+          "agent_reports": 0,
+          "debate_counter_findings": 0,
+          "feedback_signals": 0,
+          "debate_verdict_counts": {}
+        },
+        "modelVersions": []
+      },
+      "wallMs": 635395
+    }
+  ]
+}
