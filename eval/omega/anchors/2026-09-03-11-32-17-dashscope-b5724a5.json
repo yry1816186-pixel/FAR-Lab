@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "harnessVersion": 1,
+  "leg": "REBUILT-candidate",
+  "pinnedAt": "2026-09-03T11:46:02.015Z",
+  "gitCommit": "b5724a54ab9a825fbb68ed05c8640e8ff3adb649",
+  "gitTag": null,
+  "route": "dashscope",
+  "problemsFile": "eval/problems.json",
+  "cli": {
+    "path": "dist/cli/main.js",
+    "argv": [
+      "research",
+      "start",
+      "<q>",
+      "--domain",
+      "<d>",
+      "--goal",
+      "<g>",
+      "--route",
+      "dashscope",
+      "--json"
+    ]
+  },
+  "results": [
+    {
+      "problemId": "P2",
+      "ok": true,
+      "snapshot": {
+        "runId": "run_bxep4ebwg8k6x6e5zp9sv3cyky",
+        "status": "completed",
+        "stages": [
+          {
+            "stage": "scope",
+            "state": "done"
+          },
+          {
+            "stage": "retrieve",
+            "state": "done"
+          },
+          {
+            "stage": "verify_sources",
+            "state": "done"
+          },
+          {
+            "stage": "build_evidence",
+            "state": "done"
+          },
+          {
+            "stage": "generate_hypotheses",
+            "state": "done"
+          },
+          {
+            "stage": "critique_falsify",
+            "state": "done"
+          },
+          {
+            "stage": "rank",
+            "state": "done"
+          },
+          {
+            "stage": "plan",
+            "state": "done"
+          },
+          {
+            "stage": "execute",
+            "state": "skipped",
+            "reason": "tabular: routed out by method selection; literature-pool: The research objective requires mechanistic discrimination via mediation analysis and partial correlations using integrated individual-level clinical, microbiome, and metabolome datasets, which cannot be achieved by pooling published aggregate effect estimates (OR/RR/SMD).; theory: theory spec drafting failed: model call failed (invalid_output) in execute/theory-spec-draft: dashscope: structured output rejected even after 3 corrective re-asks: schema validation failed: variables:Array mu; protocol: All plan steps are pure tabular data analysis (harmonization, correlation, mediation) on existing datasets; no physical, human, field, engineering, archive, or theoretical execution is required."
+          },
+          {
+            "stage": "feedback",
+            "state": "skipped"
+          },
+          {
+            "stage": "revise",
+            "state": "skipped"
+          },
+          {
+            "stage": "export",
+            "state": "done"
+          }
+        ],
+        "metrics": {
+          "source_total": 12,
+          "source_verification_rate": 1,
+          "claim_total": 33,
+          "claim_binding_rate": 1,
+          "counter_evidence_relations": 1,
+          "hypothesis_candidates": 10,
+          "hypothesis_representatives": 10,
+          "falsification_completeness_rate": 1,
+          "plan_present": true,
+          "receipts": 121,
+          "model_calls": 75,
+          "receipt_modes": {
+            "live": 121
+          },
+          "agent_reports": 0,
+          "debate_counter_findings": 0,
+          "feedback_signals": 0,
+          "debate_verdict_counts": {}
+        },
+        "modelVersions": []
+      },
+      "wallMs": 824906
+    }
+  ]
+}
