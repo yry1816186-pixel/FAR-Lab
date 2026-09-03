@@ -42,11 +42,11 @@
       "id": "relation-blind-agreement",
       "what": "Blind same-family re-judging exact agreement, claim->hypothesis relations (upper bound)",
       "current": {
-        "value": 0.61,
-        "detail": "supports 11/18 pooled; contradicts structurally eliminated (0/21 post-fix)",
-        "at": "2026-08-22",
-        "evidence": "evidence/W-EV2/relation-precision.md",
-        "note": "live re-measurement BLOCKED (D-036); W5-F5 anchored bands + independent link audit landed (D-050) — expected direction: audited labels are modal labels, raising expected single-draw agreement; NOT claimed as measured until re-judged live"
+        "value": 0.5,
+        "detail": "LIVE RE-MEASURED 2026-09-04, D-036 unblocked (funded route): stratified seeded sample n=30 over completed-run claim->hypothesis relations, BLIND re-judging. PROTOCOL UPGRADE = cross-family (glm-4.6 judging qwen3.7-max-generated relations; the 2026-08-22 0.61 was SAME-family self-agreement = upper bound) — numbers are NOT directly comparable; cross-family removes the self-agreement bias and is the honest estimate. Cuts: overall exact 15/30=0.500; supports 8/12=0.667 (vs 0.611 same-family prior); counter-family strict hit 6/13=0.462 (Wilson [0.232,0.709]), misses decompose inverted(supports)=2 / empty(unrelated)=4 / qualifies-only=1 (eval/counter-evidence-metric.mjs). Wide Wilson disclosed; directional until larger n.",
+        "at": "2026-09-04",
+        "evidence": "spikes/output/relation-precision.jsonl (n=30, 0 errors, 2026-09-04); eval/counter-evidence-metric.mjs output; historical: evidence/W-EV2/relation-precision.md (same-family 0.61 @ 2026-08-22)",
+        "note": "target 0.8 unchanged; prior same-family 0.61 reclassified as upper-bound reference, not the operating number"
       },
       "target": 0.8,
       "stretch": 0.9,
