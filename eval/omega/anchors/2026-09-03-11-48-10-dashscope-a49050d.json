@@ -1,0 +1,111 @@
+{
+  "schemaVersion": 1,
+  "harnessVersion": 1,
+  "leg": "REBUILT-candidate",
+  "pinnedAt": "2026-09-03T12:06:53.954Z",
+  "gitCommit": "a49050d6e82d7ec10c73e51ea65677622a2ae126",
+  "gitTag": null,
+  "route": "dashscope",
+  "problemsFile": "eval/problems.json",
+  "cli": {
+    "path": "dist/cli/main.js",
+    "argv": [
+      "research",
+      "start",
+      "<q>",
+      "--domain",
+      "<d>",
+      "--goal",
+      "<g>",
+      "--route",
+      "dashscope",
+      "--json"
+    ]
+  },
+  "results": [
+    {
+      "problemId": "P2",
+      "ok": true,
+      "snapshot": {
+        "runId": "run_xjqyzx93vx1b7qbze4crkdybtr",
+        "status": "completed",
+        "stages": [
+          {
+            "stage": "scope",
+            "state": "done"
+          },
+          {
+            "stage": "retrieve",
+            "state": "done"
+          },
+          {
+            "stage": "verify_sources",
+            "state": "done"
+          },
+          {
+            "stage": "build_evidence",
+            "state": "done"
+          },
+          {
+            "stage": "generate_hypotheses",
+            "state": "done"
+          },
+          {
+            "stage": "critique_falsify",
+            "state": "done"
+          },
+          {
+            "stage": "rank",
+            "state": "done"
+          },
+          {
+            "stage": "plan",
+            "state": "done"
+          },
+          {
+            "stage": "execute",
+            "state": "skipped",
+            "reason": "tabular: Requires wet-lab data (gut microbiome metagenomic sequencing and serum metabolomics) and private clinical records not available in public tabular OpenML datasets.; literature-pool: Plan requires collecting new primary data (stool metagenomics, serum metabolomics, clinical records) and testing mechanistic hypotheses via partial correlations and subgroup interactions rather than pooling published effect estimates of intervention vs outcome.; theory: routed out by method selection; protocol: protocol draft failed schema validation: : step ps1 produces unknown measurement 'Toxicity-driven discontinuation classification'; : step ps1 produces unknown measurement 'Prior antibiotic exposure flag'; : step ps2 produces unknown measurement 'Producer taxa abundance'; : step ps4 produces unknown measurement 'PFS duration'"
+          },
+          {
+            "stage": "feedback",
+            "state": "skipped"
+          },
+          {
+            "stage": "revise",
+            "state": "skipped"
+          },
+          {
+            "stage": "export",
+            "state": "done"
+          }
+        ],
+        "metrics": {
+          "source_total": 12,
+          "source_verification_rate": 1,
+          "claim_total": 44,
+          "claim_binding_rate": 1,
+          "counter_evidence_relations": 11,
+          "hypothesis_candidates": 12,
+          "hypothesis_representatives": 12,
+          "falsification_completeness_rate": 1,
+          "plan_present": true,
+          "receipts": 142,
+          "model_calls": 90,
+          "receipt_modes": {
+            "live": 142
+          },
+          "agent_reports": 1,
+          "debate_counter_findings": 0,
+          "feedback_signals": 0,
+          "debate_verdict_counts": {
+            "supported": 4,
+            "insufficient_evidence": 1
+          }
+        },
+        "modelVersions": []
+      },
+      "wallMs": 1123263
+    }
+  ]
+}
