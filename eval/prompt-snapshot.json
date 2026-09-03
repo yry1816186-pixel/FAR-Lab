@@ -1,25 +1,32 @@
 {
-  "generatedAt": "2026-08-23T22:05:08.072Z",
+  "generatedAt": "2026-09-03T13:38:34.565Z",
   "prompts": [
     {
       "file": "src/pipeline/stages/scope.ts",
       "name": "SYSTEM_PROMPT",
-      "chars": 922,
-      "sha256": "bba9c4e0b91d1dfa",
+      "chars": 933,
+      "sha256": "fc7ebc0d166b0d5f",
       "sample": "You refine a user's research question into a structured, fal"
+    },
+    {
+      "file": "src/pipeline/stages/scope.ts",
+      "name": "PROBLEM_MODEL_PROMPT",
+      "chars": 3568,
+      "sha256": "53b392bc2edc0074",
+      "sample": "You formalize a research question into a Scientific Problem "
     },
     {
       "file": "src/pipeline/stages/retrieve.ts",
       "name": "SYSTEM_PROMPT",
-      "chars": 1336,
-      "sha256": "751ae08f8167328c",
+      "chars": 1345,
+      "sha256": "f98e127916e52ede",
       "sample": "You plan the evidence retrieval for one scientific research "
     },
     {
       "file": "src/pipeline/stages/retrieve.ts",
       "name": "RERANK_SYSTEM_PROMPT",
-      "chars": 653,
-      "sha256": "497257d74c8fb43c",
+      "chars": 659,
+      "sha256": "c8bfd906ac349c66",
       "sample": "You are reranking scholarly documents for one scientific res"
     },
     {
@@ -74,9 +81,16 @@
     {
       "file": "src/pipeline/stages/evidence.ts",
       "name": "INLINE:Youassesswhether",
-      "chars": 79,
-      "sha256": "6aa62b7763878ac0",
-      "sample": "You assess whether the current verified evidence base is too"
+      "chars": 66,
+      "sha256": "d4c232605cdf601f",
+      "sample": "You assess whether the current verified evidence base can su"
+    },
+    {
+      "file": "src/pipeline/stages/evidence.ts",
+      "name": "INLINE:Youareanindepend",
+      "chars": 84,
+      "sha256": "6eafad3d0d05b35a",
+      "sample": "You are an independent auditor. A reviewer claimed the verif"
     },
     {
       "file": "src/pipeline/stages/evidence.ts",
@@ -137,8 +151,8 @@
     {
       "file": "src/pipeline/stages/hypotheses.ts",
       "name": "INLINE:definstructionan",
-      "chars": 83,
-      "sha256": "88f5d9b99c3ab774",
+      "chars": 111,
+      "sha256": "9f5637d7f9f1890c",
       "sample": "${def.instruction}${antiRepetitionInstruction(raws.length)} "
     },
     {
@@ -193,8 +207,8 @@
     {
       "file": "src/pipeline/stages/rank.ts",
       "name": "PAIR_JUDGE_SYSTEM_PROMPT",
-      "chars": 1020,
-      "sha256": "55a40bca793d2477",
+      "chars": 1031,
+      "sha256": "21bf05a3cc1be732",
       "sample": "You are a rigorous research supervisor comparing exactly two"
     },
     {
@@ -242,149 +256,219 @@
     {
       "file": "src/pipeline/stages/plan.ts",
       "name": "PLAN_SYSTEM_PROMPT[5]",
+      "chars": 113,
+      "sha256": "43f13ae26145e1a0",
+      "sample": "priorResearchMemory (when present) lists past experiment out"
+    },
+    {
+      "file": "src/pipeline/stages/plan.ts",
+      "name": "PLAN_SYSTEM_PROMPT[6]",
+      "chars": 110,
+      "sha256": "45e8f520b40332fc",
+      "sample": "it is DATA, never a verdict on this question: a previously f"
+    },
+    {
+      "file": "src/pipeline/stages/plan.ts",
+      "name": "PLAN_SYSTEM_PROMPT[7]",
+      "chars": 110,
+      "sha256": "aedbbb0a2f0f1fb1",
+      "sample": "relevant steps' failureConditions or be explicitly designed "
+    },
+    {
+      "file": "src/pipeline/stages/plan.ts",
+      "name": "PLAN_SYSTEM_PROMPT[8]",
+      "chars": 28,
+      "sha256": "3b0fb7db936a8823",
+      "sample": "the falsification loop gets."
+    },
+    {
+      "file": "src/pipeline/stages/plan.ts",
+      "name": "PLAN_SYSTEM_PROMPT[9]",
       "chars": 88,
       "sha256": "8765ac1c8eb3009f",
       "sample": "Where something is unknown, surface it in risks/prerequisite"
     },
     {
       "file": "src/pipeline/stages/plan.ts",
-      "name": "PLAN_SYSTEM_PROMPT[6]",
+      "name": "PLAN_SYSTEM_PROMPT[10]",
       "chars": 117,
       "sha256": "436793bf5241afbc",
       "sample": "Scale discipline: the payload states the actual evidence bas"
     },
     {
       "file": "src/pipeline/stages/plan.ts",
-      "name": "PLAN_SYSTEM_PROMPT[7]",
+      "name": "PLAN_SYSTEM_PROMPT[11]",
       "chars": 117,
       "sha256": "d21a367d97530500",
       "sample": "timelines and quantitative thresholds that are not derived f"
     },
     {
       "file": "src/pipeline/stages/plan.ts",
-      "name": "PLAN_SYSTEM_PROMPT[8]",
+      "name": "PLAN_SYSTEM_PROMPT[12]",
       "chars": 109,
       "sha256": "17c87b92aef5262e",
       "sample": "keep them proportionate to that evidence base and record the"
     },
     {
       "file": "src/pipeline/stages/plan.ts",
-      "name": "PLAN_SYSTEM_PROMPT[9]",
+      "name": "PLAN_SYSTEM_PROMPT[13]",
       "chars": 61,
       "sha256": "eb9f39a33c4cdd52",
       "sample": "presenting invented numbers as if they were evidence-derived"
     },
     {
       "file": "src/pipeline/stages/plan.ts",
-      "name": "PLAN_SYSTEM_PROMPT[10]",
+      "name": "PLAN_SYSTEM_PROMPT[14]",
       "chars": 118,
       "sha256": "a945d04a701658fd",
       "sample": "Multiple-testing discipline (POPPER-extracted): when the pla"
     },
     {
       "file": "src/pipeline/stages/plan.ts",
-      "name": "PLAN_SYSTEM_PROMPT[11]",
+      "name": "PLAN_SYSTEM_PROMPT[15]",
       "chars": 118,
       "sha256": "3c5416e5cab46b42",
       "sample": "inferential checks will run and the chance that something lo"
     },
     {
       "file": "src/pipeline/stages/plan.ts",
-      "name": "PLAN_SYSTEM_PROMPT[12]",
+      "name": "PLAN_SYSTEM_PROMPT[16]",
       "chars": 119,
       "sha256": "4a4023c035d00e61",
       "sample": "State multipleTestingPolicy explicitly — \"single_primary\" (d"
     },
     {
       "file": "src/pipeline/stages/plan.ts",
-      "name": "PLAN_SYSTEM_PROMPT[13]",
+      "name": "PLAN_SYSTEM_PROMPT[17]",
+      "chars": 121,
+      "sha256": "e24277cee89c2ae2",
+      "sample": "everything else is secondary/descriptive) or \"alpha_spending"
+    },
+    {
+      "file": "src/pipeline/stages/plan.ts",
+      "name": "PLAN_SYSTEM_PROMPT[18]",
+      "chars": 114,
+      "sha256": "250f862db99216d8",
+      "sample": "and justify the allocation in multipleTestingNote. Do NOT de"
+    },
+    {
+      "file": "src/pipeline/stages/plan.ts",
+      "name": "PLAN_SYSTEM_PROMPT[19]",
       "chars": 118,
-      "sha256": "1445e189dc1781e2",
-      "sample": "everything else is secondary/descriptive), \"alpha_spending\" "
+      "sha256": "34196c7b58d97cd9",
+      "sample": "implemented, such plans fail validation. Single-hypothesis p"
     },
     {
       "file": "src/pipeline/stages/plan.ts",
-      "name": "PLAN_SYSTEM_PROMPT[14]",
-      "chars": 108,
-      "sha256": "0736f9621b473bab",
-      "sample": "or \"e_value_accumulation\" (anytime-valid e-values aggregated"
-    },
-    {
-      "file": "src/pipeline/stages/plan.ts",
-      "name": "PLAN_SYSTEM_PROMPT[15]",
-      "chars": 98,
-      "sha256": "741a27baa55dbb84",
-      "sample": "multipleTestingNote. Single-hypothesis plans may omit it (on"
-    },
-    {
-      "file": "src/pipeline/stages/plan.ts",
-      "name": "PLAN_SYSTEM_PROMPT[16]",
+      "name": "PLAN_SYSTEM_PROMPT[20]",
       "chars": 125,
       "sha256": "db5da094455eac01",
       "sample": "Structured preregistration (Wave-S): alongside the prose fie"
     },
     {
       "file": "src/pipeline/stages/plan.ts",
-      "name": "PLAN_SYSTEM_PROMPT[17]",
+      "name": "PLAN_SYSTEM_PROMPT[21]",
       "chars": 125,
-      "sha256": "e4e8132e188dd7ab",
+      "sha256": "29ddf12da18aff60",
       "sample": "direction higher_better|lower_better|two_sided), testSpecs ("
     },
     {
       "file": "src/pipeline/stages/plan.ts",
-      "name": "PLAN_SYSTEM_PROMPT[18]",
+      "name": "PLAN_SYSTEM_PROMPT[22]",
       "chars": 125,
-      "sha256": "7a75e51976b2feaf",
-      "sample": "mde_gate|descriptive + predicted effect supports|weakens|exc"
+      "sha256": "4e4c3eddeaf6afee",
+      "sample": "have executors today, do NOT promise permutation/wilson/kapp"
     },
     {
       "file": "src/pipeline/stages/plan.ts",
-      "name": "PLAN_SYSTEM_PROMPT[19]",
+      "name": "PLAN_SYSTEM_PROMPT[23]",
+      "chars": 104,
+      "sha256": "98df5be6fb6ef246",
+      "sample": "+ predicted effect supports|weakens|excludes + threshold + t"
+    },
+    {
+      "file": "src/pipeline/stages/plan.ts",
+      "name": "PLAN_SYSTEM_PROMPT[24]",
       "chars": 126,
       "sha256": "8ce2249dc91ab76f",
       "sample": "{observable, condition, expectedRelation} — two hypotheses g"
     },
     {
       "file": "src/pipeline/stages/plan.ts",
-      "name": "PLAN_SYSTEM_PROMPT[20]",
+      "name": "PLAN_SYSTEM_PROMPT[25]",
       "chars": 129,
       "sha256": "2423b82aa36be3ce",
       "sample": "same observable+condition. Provide expectedInfoGain {decisio"
     },
     {
       "file": "src/pipeline/stages/plan.ts",
-      "name": "PLAN_SYSTEM_PROMPT[21]",
+      "name": "PLAN_SYSTEM_PROMPT[26]",
       "chars": 124,
       "sha256": "2852d51acd96932d",
       "sample": "when the plan discriminates >1 hypothesis or has branches; s"
     },
     {
       "file": "src/pipeline/stages/plan.ts",
-      "name": "PLAN_SYSTEM_PROMPT[22]",
+      "name": "PLAN_SYSTEM_PROMPT[27]",
       "chars": 123,
       "sha256": "bc3b7d03e908daea",
       "sample": "{type} when a step repeats prior work; targetTrialProtocol ("
     },
     {
       "file": "src/pipeline/stages/plan.ts",
-      "name": "PLAN_SYSTEM_PROMPT[23]",
+      "name": "PLAN_SYSTEM_PROMPT[28]",
       "chars": 124,
       "sha256": "37198840b2144743",
       "sample": "and measurable/estimand/controlRun one-liners when applicabl"
     },
     {
       "file": "src/pipeline/stages/plan.ts",
-      "name": "PLAN_SYSTEM_PROMPT[24]",
+      "name": "PLAN_SYSTEM_PROMPT[29]",
       "chars": 125,
       "sha256": "2e1015aec5dae139",
       "sample": "metric succeeds at \">= threshold\" and weakens/excludes at \"<"
     },
     {
       "file": "src/pipeline/stages/plan.ts",
-      "name": "PLAN_SYSTEM_PROMPT[25]",
+      "name": "PLAN_SYSTEM_PROMPT[30]",
       "chars": 51,
       "sha256": "3ca3f80aa449c4eb",
       "sample": "absence is disclosed, fabrication is not tolerated."
+    },
+    {
+      "file": "src/pipeline/stages/plan.ts",
+      "name": "PLAN_SYSTEM_PROMPT[31]",
+      "chars": 102,
+      "sha256": "e9ffee241fa21c36",
+      "sample": "Problem-model alignment (AOSSA): when the payload carries pr"
+    },
+    {
+      "file": "src/pipeline/stages/plan.ts",
+      "name": "PLAN_SYSTEM_PROMPT[32]",
+      "chars": 106,
+      "sha256": "ffebe4049ca6be31",
+      "sample": "truth for what the plan must discriminate and its selectedMe"
+    },
+    {
+      "file": "src/pipeline/stages/plan.ts",
+      "name": "PLAN_SYSTEM_PROMPT[33]",
+      "chars": 105,
+      "sha256": "d3b528d37eb68562",
+      "sample": "objective — plan steps must operate INSIDE those families (a"
+    },
+    {
+      "file": "src/pipeline/stages/plan.ts",
+      "name": "PLAN_SYSTEM_PROMPT[34]",
+      "chars": 104,
+      "sha256": "6d4149f2fb1ae656",
+      "sample": "steps with discretization-error analysis, not a literature s"
+    },
+    {
+      "file": "src/pipeline/stages/plan.ts",
+      "name": "PLAN_SYSTEM_PROMPT[35]",
+      "chars": 72,
+      "sha256": "1dded7365defe9b9",
+      "sample": "legal only as an explicitly justified additional lane record"
     },
     {
       "file": "src/pipeline/stages/revise.ts",
@@ -431,6 +515,27 @@
     {
       "file": "src/pipeline/stages/revise.ts",
       "name": "CAUSAL_ANALYSIS_PROMPT[6]",
+      "chars": 104,
+      "sha256": "db6b8fa81d1dad19",
+      "sample": "When the payload carries registeredDatasets and the feedback"
+    },
+    {
+      "file": "src/pipeline/stages/revise.ts",
+      "name": "CAUSAL_ANALYSIS_PROMPT[7]",
+      "chars": 109,
+      "sha256": "10047fa7a073ee47",
+      "sample": "response is usually a PLAN revision binding that data (data "
+    },
+    {
+      "file": "src/pipeline/stages/revise.ts",
+      "name": "CAUSAL_ANALYSIS_PROMPT[8]",
+      "chars": 24,
+      "sha256": "80e600bfff2da3cd",
+      "sample": "not only the hypotheses."
+    },
+    {
+      "file": "src/pipeline/stages/revise.ts",
+      "name": "CAUSAL_ANALYSIS_PROMPT[9]",
       "chars": 126,
       "sha256": "71f4710b6f006a17",
       "sample": "expectedQualityDelta is your honest expectation: \"inconclusi"
@@ -466,6 +571,27 @@
     {
       "file": "src/pipeline/stages/revise.ts",
       "name": "HYPOTHESIS_REVISION_PROMPT[4]",
+      "chars": 104,
+      "sha256": "b71cd00c356079ec",
+      "sample": "When the payload carries registeredDatasets (operator-acquir"
+    },
+    {
+      "file": "src/pipeline/stages/revise.ts",
+      "name": "HYPOTHESIS_REVISION_PROMPT[5]",
+      "chars": 106,
+      "sha256": "22b93bfb012883f5",
+      "sample": "dataRequirements (availability public, name the dataset by i"
+    },
+    {
+      "file": "src/pipeline/stages/revise.ts",
+      "name": "HYPOTHESIS_REVISION_PROMPT[6]",
+      "chars": 79,
+      "sha256": "4cdeb10a2df5d807",
+      "sample": "that data — a plan that can now execute beats one that still"
+    },
+    {
+      "file": "src/pipeline/stages/revise.ts",
+      "name": "HYPOTHESIS_REVISION_PROMPT[7]",
       "chars": 124,
       "sha256": "c36289ffd4ec0160",
       "sample": "Never erase existing uncertainties — only add. revisionRatio"
@@ -536,8 +662,8 @@
     {
       "file": "src/agent/loop.ts",
       "name": "PROTOCOL_PROMPT",
-      "chars": 1248,
-      "sha256": "12a31faf160793dc",
+      "chars": 1257,
+      "sha256": "e55f57b9a2ed1534",
       "sample": "You act inside a tool-using agent loop. Each turn you MUST a"
     },
     {
