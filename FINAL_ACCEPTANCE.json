@@ -864,11 +864,14 @@
       "status": "PARTIAL",
       "priority": "P2",
       "owner": "self",
-      "gap": "sha256 drift-lock only; no semantic versioning/corpus/taxonomy",
+      "gap": "version field + CI gate DONE (2026-09-03: snapshot entries carry version/provenance/history; --snapshot refuses unannotated overwrites; ci.yml verify job runs the check; the 48-entry drift batch was audited zero-real-regression before re-anchor). Remaining: per-prompt gold corpus + taxonomy eval",
       "target": "version field + per-prompt gold corpus + taxonomy eval",
-      "verify": "prompt-regression --check extended",
+      "verify": "node eval/prompt-regression.mjs --check (exit 0 at HEAD; wired into .github/workflows/ci.yml)",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md CAP-11"
+        "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md CAP-11",
+        "eval/prompt-snapshot.json (96 prompts, per-entry version/provenance/history)",
+        "eval/prompt-regression.mjs --snapshot --note bump flow (refusal path verified live)",
+        ".github/workflows/ci.yml prompt drift gate step"
       ]
     },
     {
