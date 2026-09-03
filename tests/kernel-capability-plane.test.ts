@@ -241,4 +241,32 @@ describe('orchestrator: agent-kind workflow steps', () => {
     expect(second.status).toBe('completed');
     expect(calls).toHaveLength(1); // the debate step stayed terminal across the re-entry
   });
+
+  it('attemptCap is enforced for agent steps via the persisted counter (bounded capability budget)', async () => {
+    const dir = tmp();
+    const store = openStore(dir);
+    const run = makeRun(store);
+    const plan = planWithDebate(run.id);
+    store.putObject('workflow_plan', plan);
+    // the debate step already burned its single attempt in a prior execution
+    const debateStep = plan.steps.find((s) => s.kind === 'agent')!;
+    store.setMeta(`wfp:agent-attempts:${run.id}:${debateStep.id}`, '1');
+    const calls: string[] = [];
+    const plane: KernelCapabilityPlane = {
+      runCapability: async (name) => {
+        calls.push(name);
+        return { ok: true, status: 'completed' as const, turns: 1, sessionId: 'ags_t', reportId: 'agr_t' };
+      },
+      runAgent: async () => { throw new Error('not used'); },
+    };
+    const after = await new Orchestrator({
+      store, artifacts: {} as ArtifactStore, provider: {} as ModelProvider,
+      sourceFor: noSource, stages: okStages(), signals: new Map(),
+      kernelPlane: () => plane,
+    }).execute(run.id);
+    expect(after.status).toBe('completed');
+    expect(calls).toHaveLength(0); // cap exhausted -> the capability never ran
+    const reasons = store.listEvents(run.id).map((e) => (e.detail as { reason?: unknown; cause?: unknown })?.reason);
+    expect(reasons).toContain('agent_step_skipped');
+  });
 });

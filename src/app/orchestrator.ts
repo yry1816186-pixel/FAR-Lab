@@ -500,6 +500,19 @@ export class Orchestrator {
           });
           continue;
         }
+        // attemptCap is ENFORCED for agent steps via a persisted counter (plan semantics:
+        // a bounded capability budget, immune to in-memory Set resets across re-entries).
+        const attemptKey = `wfp:agent-attempts:${runId}:${step.id}`;
+        const attempts = Number(this.deps.store.getMeta(attemptKey) ?? '0');
+        if (attempts >= step.attemptCap) {
+          markAgentStepDone(step.id);
+          this.deps.store.appendEvent(runId, {
+            type: 'note',
+            detail: { reason: 'agent_step_skipped', capability: step.target, stepId: step.id, cause: `attempt_cap (${attempts}/${step.attemptCap})` },
+          });
+          continue;
+        }
+        this.deps.store.setMeta(attemptKey, String(attempts + 1));
         const wireCancel = this.wireCancels.get(runId);
         this.deps.store.appendEvent(runId, { type: 'note', detail: { reason: 'agent_step_started', capability: step.target, stepId: step.id } });
         try {

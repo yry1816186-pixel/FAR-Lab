@@ -26,6 +26,11 @@ const REPO = resolve(HERE, '../..');
 const ANCHORS_DIR = resolve(HERE, 'anchors');
 const RESULTS_DIR = resolve(REPO, 'eval/results/omega');
 const CLI = resolve(REPO, 'dist/cli/main.js');
+/**
+ * Anchor stamp: second precision — two pins launched in the same minute must never
+ * overwrite each other's bundle (live-observed 2026-09-03 arrearage double-death).
+ */
+const stampNow = () => new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
 const HARNESS_VERSION = 1;
 const TERMINAL = new Set(['partial', 'completed', 'failed', 'cancelled']);
 const COUNTER_RELATIONS = new Set(['contradicts', 'weakens', 'fails_to_replicate', 'alternative_explanation']);
@@ -206,7 +211,7 @@ const doPin = async () => {
     }
     try { return gitOut(['describe', '--tags', '--exact-match', 'HEAD']); } catch { return null; }
   })();
-  const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 17);
+  const stamp = stampNow();
   const bundleDir = resolve(RESULTS_DIR, `pin-${stamp}-${route}`);
   mkdirSync(bundleDir, { recursive: true });
   const problems = loadProblems().filter((p) => !wanted || wanted.split(',').includes(p.id));
@@ -312,7 +317,7 @@ const doSnapshot = async () => {
   const doc = JSON.parse(pick.doc);
   if (!TERMINAL.has(doc.status ?? '')) die(3, `run ${pick.id} not terminal (status=${doc.status}) — snapshot refuses non-final state`);
   const snapshot = await snapshotRun(resolve(dbPath), pick.id);
-  const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 17);
+  const stamp = stampNow();
   const anchor = {
     schemaVersion: 1,
     harnessVersion: HARNESS_VERSION,
