@@ -628,6 +628,15 @@ export const zh = {
   'iter.stop.budget': '预算耗尽',
   'iter.stop.noDelta': '本轮无实质增量',
   'iter.stop.noWork': '无可执行迭代',
+
+  // ---- kernel capability actions (Ω ADR D4/D5) ----
+  'kernel.section': '内核动作',
+  'kernel.planRevised': '研究计划按争议性修订 · 插入 {capability} 步（计划 v{v}）',
+  'kernel.stepFindings': '{capability} 完成 · {n} 条反证发现已入科学层（待人审因果修订）',
+  'kernel.stepDone': '{capability} 完成 · {turns} 轮会话',
+  'kernel.stepFailed': '{capability} 失败 · {error}',
+  'kernel.stepUnavailable': '{capability} 不可用 · {cause}',
+  'kernel.stepSkipped': '{capability} 跳过 · 预算耗尽',
   // ---- HX4: hypothesis workspace redo ----
   'hyp.counts': '共 {total} 组假设 · {reps} 组簇代表参与排序 · {extras} 组同簇合并',
   'hyp.methodsTitle': '排序方法与依据（评分对照 · 锦标赛 · 判别性分析）',
@@ -2450,6 +2459,15 @@ export const en: Record<DictKey, string> = {
   'iter.stop.budget': 'budget exhausted',
   'iter.stop.noDelta': 'no material change this round',
   'iter.stop.noWork': 'no actionable iteration leg',
+
+  // ---- kernel capability actions (Ω ADR D4/D5) ----
+  'kernel.section': 'Kernel actions',
+  'kernel.planRevised': 'Research plan revised for contested mechanisms · {capability} step inserted (plan v{v})',
+  'kernel.stepFindings': '{capability} completed · {n} counter-evidence findings entered the science layer (awaiting human causal revision)',
+  'kernel.stepDone': '{capability} completed · {turns}-turn session',
+  'kernel.stepFailed': '{capability} failed · {error}',
+  'kernel.stepUnavailable': '{capability} unavailable · {cause}',
+  'kernel.stepSkipped': '{capability} skipped · budget exhausted',
   // ---- HX4: hypothesis workspace redo ----
   'hyp.counts': '{total} hypotheses · {reps} cluster representatives ranked · {extras} merged into clusters',
   'hyp.methodsTitle': 'Ranking methods & basis (scorecards · tournament · diagnosticity)',
