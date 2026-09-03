@@ -51,6 +51,22 @@ stuck detector 五模式+nudge、退出码终态分类学、requery 纠错不污
 - T2：conversation-agent.ts 平行工具循环（触发=对话面迁移完成 + conversation e2e 绿）
 - T3：kernel 旧 compaction 改写路径（触发=condensation 事件化 + rollout 回归绿）
 
+## 删除 ticket 状态（2026-09-03 夜批）
+
+- **T1 ✓ 构造性闭**：计划驱动执行器等价替换 + 全量门禁绿（Wave A 出口对账在 MISSION STATE）。
+- **T2 侦察判决：收敛而非删除，当前不可触发**。2026-09-03 只读侦查（file:line 证据链入会话）证实：
+  「第二套工具循环」指控已过时——conversation-agent.ts:11,712 与 capability-plane.ts:117 同跑
+  runAgentLoop，真正平行的只是 ~60 行 assembly/telemetry/rollout 包装。kernel plane 缺口（无流式
+  出口 emit=no-op、无 resume 透传、无 skills、runId 必填不适配 workspace 级对话）恰是对话面核心
+  UX；web/e2e 零 conversation spec，「conversation e2e 绿」前置客观不成立。收敛形态：扩展
+  KernelAgentRequest（emit/onModelOutput/initialTranscript+resume/skills/作用域放宽）后让
+  generateConversationTurn 改走 plane，被替代包装段才成为删除对象。
+- **T3 ✓ 闭（a49050d）**：事实核验——持久层本已事件化（pushEntry 即时落盘 loop.ts:190、rollout
+  仅 append、compacted=基线事件、reconstructSession=纯投影、effect ledger 独立存活）；票面缺口仅
+  compacted 事件缺遗忘集。补 forgotten {entries, turns}（ADR D2 字面要求）+ loop/rollout 双回归，
+  全量门禁 244 文件 2440 测试 exit 0。已知残余（如实披露）：micro 压缩不落事件（原条目仍在日志，
+  可推导；replay 后视图偏胖无害）。
+
 ## 反悔触发
 
 - substrate 对拍发现 scheduler/orchestrator 语义无法统一（写域冲突不可参数化）→ 回退为共享类型+各自实现。
