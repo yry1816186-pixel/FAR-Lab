@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "kind": "debate-verdict-judge",
+  "judgedAt": "2026-09-03T13:31:25.979Z",
+  "runId": "run_xjqyzx93vx1b7qbze4crkdybtr",
+  "runStatus": "completed",
+  "judge": {
+    "route": "dashscope",
+    "model": "qwen3.7-max",
+    "sameModelAsDebate": null
+  },
+  "disclosedLimitation": "same-family judge ceiling — defensibility audit, not ground truth",
+  "counts": {
+    "partial": 3,
+    "sound": 2
+  },
+  "soundRate": 0.4,
+  "verdicts": [
+    {
+      "hypothesisId": "hyp_t515exbc7tmx7y357fg1t8tt69",
+      "verdict": "supported",
+      "counterFindings": 0,
+      "ok": true,
+      "judgment": "partial",
+      "rationale": "The verdict 'supported' is directionally defensible as the evidence layer contains multiple verified claims linking specific microbial metabolites (SCFAs, inosine) to T-cell activation and ICI efficacy. However, the review fails to meet the 'sound' standard because it cites zero counter-findings despite explicitly acknowledging an unresolved uncertainty regarding the dual immunosuppressive vs. activating role of SCFAs; omitting this known biological complexity prevents a fully rigorous assessment of the specific mechanistic hypothesis.",
+      "wallMs": 2878
+    },
+    {
+      "hypothesisId": "hyp_rsp4bs4bvfr46hhwnbcbzntpsa",
+      "verdict": "supported",
+      "counterFindings": 0,
+      "ok": true,
+      "judgment": "sound",
+      "rationale": "The verdict 'supported' is defensible because the evidence layer explicitly contains a verified claim stating that 'A more robust and interconnected gut microbiome co-occurrence network correlates with effective immune checkpoint inhibitor therapy efficacy,' which directly maps to the hypothesis. While the review cites no counter-findings, this absence is consistent with the provided evidence layer, which offers direct corroboration of the specific mechanism (network connectivity) rather than merely general diversity or taxonomic associations.",
+      "wallMs": 2708
+    },
+    {
+      "hypothesisId": "hyp_jbs971e5skp8repqyxtd9cvehg",
+      "verdict": "supported",
+      "counterFindings": 0,
+      "ok": true,
+      "judgment": "partial",
+      "rationale": "The verdict 'supported' is directionally defensible as the evidence layer confirms associations between specific taxa (Akkermansia, Bifidobacterium) and ICI efficacy, plus mechanistic links via dendritic cell priming and metabolites. However, the review overclaims by omitting critical uncertainties explicitly present in the evidence: the hypothesis specifies 'antigen mimicry' as a mechanism, but the provided evidence only supports adjuvant-like stimulation (e.g., IL-12 induction, PRR signaling) and states that 'precise mechanisms remain incompletely characterized.' Furthermore, the counter-findings list is empty despite the evidence citing heterogeneity, lack of standardization, and unverified context-dependency, making the unqualified 'supported' verdict insufficiently rigorous.",
+      "wallMs": 4307
+    },
+    {
+      "hypothesisId": "hyp_7306q75w9kek99cmga8j2e117e",
+      "verdict": "insufficient_evidence",
+      "counterFindings": 0,
+      "ok": true,
+      "judgment": "sound",
+      "rationale": "The verdict 'insufficient_evidence' is defensible because the hypothesis specifically posits a non-causal confounding mechanism (shared host genetics/environment) that the provided evidence layer cannot adjudicate. While the evidence contains numerous verified claims supporting causal modulation (e.g., FMT reversing resistance, metabolites regulating T-cells), it lacks the specific host-genetics or environmental control studies required to confirm or refute the proposed confounder; thus, the absence of targeted counter-findings and the citation of retrieval failures accurately reflect an inability to test the specific biomarker-vs-causality distinction central to this hypothesis.",
+      "wallMs": 3714
+    },
+    {
+      "hypothesisId": "hyp_gpem8xrcqstmaf4h68b2kjcxx1",
+      "verdict": "supported",
+      "counterFindings": 0,
+      "ok": true,
+      "judgment": "partial",
+      "rationale": "The verdict 'supported' is directionally defensible as the evidence layer confirms associations between dysbiosis/Malassezia and poor ICI response, and explicitly links dysbiosis to immune suppression and therapy resistance. However, the review overclaims by treating correlational data and general mechanistic statements as definitive proof of the specific causal pathway proposed (that detrimental taxa promote Treg/MDSC accumulation which *directly* antagonizes efficacy *regardless* of effector potential). The evidence supports a link but does not validate the exclusivity or precise molecular mechanism asserted in the hypothesis without qualification.",
+      "wallMs": 3839
+    }
+  ]
+}
