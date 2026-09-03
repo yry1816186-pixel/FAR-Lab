@@ -185,7 +185,7 @@ const RAW_CATALOG: Array<z.input<typeof ModelCapabilities>> = [
     latencyClass: 'deep',
     priceRef: { currency: 'CNY', inputPerMTok: 0, outputPerMTok: 0, pricingNote: '见计费页（本 registry 不抄录未取到实价的数字）', url: ALIYUN_BILLING },
     region: ['cn-beijing'],
-    knownLimitations: [THINKING_NEEDS_STREAMING],
+    knownLimitations: [THINKING_NEEDS_STREAMING, 'rank 拒评（live 实测 2026-09-03：9 候选假设时三连返回空 assessments 触发 min(1) 校验失败——模型拒绝/无法产出排序，非 schema 死锁）'],
     interfaceNotes: ['仅文本接口（多模态接口不含此系列）', 'qwen3.7-max-2026-06-08 走多模态接口', NO_MAX_TOKENS_WITH_SO],
     sourceRefs: src(ALIYUN_MODELS),
   },
