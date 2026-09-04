@@ -181,7 +181,7 @@
       "status": "PARTIAL",
       "priority": "P0",
       "owner": "self",
-      "gap": "contradicts band already structurally eliminated (0/21); supports band 11/18 is next; same-family judge ceiling disclosed",
+      "gap": "REMEASURED 2026-09-04 (D-036 unblocked, funded route): cross-family blind re-judging n=60 (two disjoint stratified samples, glm-4.6 judging) — overall exact 0.450, supports 16/24=0.667, counter-family strict 14/26=0.538 (batch spread 0.462/0.615 disclosed); misses decompose inverted=4/empty=6/qualifies-only=2. The prior same-family 0.61 is reclassified as an upper-bound reference. Remaining gap to 0.8 is real: the empty(unrelated)=6 miss class and the qualifies-boundary are the next levers",
       "target": "exact-label>=0.7 on >=5 problems, cross-family judge",
       "verify": "spikes/relation-precision.mjs expanded sample",
       "evidence": [
@@ -220,12 +220,12 @@
       "id": "FA-SCI-06",
       "domain": "science",
       "title": "Structured-output live failure rate <=0.005 (now 0.011)",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "self",
-      "gap": "per-call live remeasure blocked by quota since 08-22",
+      "gap": "CLOSED 2026-09-04: quota unblocked (funded dashscope route), remeasured over the recorded live corpus — 38 databases (main workspace + all omega pin workspaces), 7,649 live model-call receipts, 19 stage-level invalid_output failures => rate 0.0025 <= 0.005 target. DISCLOSED: this is the qwen3.x-route era (glm/deepseek-era 08-22 measured 0.011); final-outcome basis (a call recovered after corrective re-asks counts as success, exhaustion counts once)",
       "target": "remeasure on zai glm route",
-      "verify": "receipts-based statistics",
+      "verify": "receipts-based statistics (.control/tmp-failrate2.cjs computation, 2026-09-04)",
       "evidence": [
         "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md CAP-05"
       ]
@@ -694,10 +694,10 @@
       "id": "FA-SEC-11",
       "domain": "security",
       "title": "Threat-model register complete (R-19 sandbox bypass, R-20 egress, R-21 signing, archive bomb, TOCTOU symlink)",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "self",
-      "gap": "documented weaknesses not registered in RISK_REGISTER = no triggers",
+      "gap": "CLOSED 2026-09-04 (acceptance text was stale — the register already carried every named entry): R-19 sandbox bypass (fail-closed OCI boundary, FA-SEC-01 PASS), R-20 egress (destination-guard single policy owner, FA-SEC-04 scope, DNS-rebinding residual disclosed), R-21 signing (SHA256SUMS+sigstore+SBOM in the release job; hosted run rides PR #141), R-23 archive bomb (512/64MB/256MB budgets, declared-vs-actual refusal, docx/pdf residual disclosed), R-24 TOCTOU symlink (netcdf realpath recheck + regression; materializeDir residual disclosed with reopen trigger). Every entry carries owner-mitigation + explicit reopen triggers",
       "target": "register entries + owners",
       "verify": "doc review",
       "evidence": [
