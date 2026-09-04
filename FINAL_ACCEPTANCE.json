@@ -349,11 +349,12 @@
       "status": "PARTIAL",
       "priority": "P2",
       "owner": "self",
-      "gap": "ACT-R 14d decay never validated on real long data; memory-negative-conditioning no A/B; no user-facing memory management UI audited",
+      "gap": "ACT-R 14d decay never validated on real long data; memory-negative-conditioning no A/B (live legs). Offline subset CLOSED 2026-09-05 via PR #146: management surface (edit=audited supersession with trust re-derivation, archive=terminal+append-only, export=cap-disclosed attachment) + poisoning red-team suites + UI e2e (21 consolidated rows, real armed archive).",
       "target": "live recheck after >=7d + red-team injection + memory management surface",
       "verify": "memory-live-check rerun + UI e2e",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/02-harness.md CAP-06"
+        "FINAL_EVIDENCE/audit-2026-08-30/02-harness.md CAP-06",
+        "PR #146 (add1fd8): tests/memory-{management,management-api,poisoning-redteam}.test.ts 33/33; web/e2e/memory-surface.spec.ts 2/2; full suite 2486/0"
       ]
     },
     {
