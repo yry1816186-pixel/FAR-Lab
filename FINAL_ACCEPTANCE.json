@@ -153,7 +153,8 @@
       "verify": "node eval/rediscovery.mjs, artifacts with seed/route/prompt receipts",
       "evidence": [
         "FINAL_EVIDENCE/audit-2026-08-30/01-science.md CAP-12",
-        "eval/north-star.json"
+        "eval/north-star.json",
+        "INSTRUMENT CAVEAT 2026-09-04 (sweep finding, commit 0aeeb6d): the frozen 0.226 F1 was measured with an INVERTED cdiff gtClaim (Loss of secondary bile acids inhibits... — corrected to Secondary bile acids inhibit...); forward re-measurements may shift; the frozen number stands as recorded-at-the-time"
       ]
     },
     {
@@ -991,7 +992,7 @@
       "status": "PARTIAL",
       "priority": "P0",
       "owner": "self",
-      "gap": "Deterministic five-table inventory, disjoint/full coverage validation, FA backfill, atomic updates, and honest red completion gate are implemented and tested. Progress 2026-09-02 (main-agent per-file review + three parallel review agents whose findings were all verified and fixed in-pass): THREE of five tables COMPLETE — product_specs_docs 42/42, governance_assets 64/64 (three ever-mutating live ledgers re-adjudicated at each batch), delivery_operations 127/127 (agent verdicts incl. two verified LOW findings fixed: surgery invariant substring-count bug, harness-doctor obsolete-list false positive) = 233/960. On the way 17 real defects were fixed (stale test counts, SECURITY-vs-POLICY contradiction, dead references, ADR engine misstatement, refuted-0.58 headline replaced with the honest 0.226+refutation narrative, submission version drift, R-23/R-24 risk additions, four absolute-path portability fixes, and the two delivery-table fixes). Remaining: runtime 388, tests 339 (multi-window grind; batches sized <=40 files).",
+      "gap": "Progress 2026-09-04 15:30: runtime 194/389 (49.9%), tests 202/340 (59.4%), delivery 127/127, specs 42/42, governance 64/64 — 429 files whole-file reviewed by 6 parallel agents + main-agent adjudication; 4 real findings verified and FIXED (commit 0aeeb6d: cdiff GT inversion, metrics silent-empty-baseline, tautological uv-gate assertion, EvidenceGraph per-render drag state); remaining: runtime batches 1-3 + tests batches 3/5 (~300 files, blocked on API 5h cap until 16:54) + 188 shallow assertions",
       "target": "100% tracked-file adjudication with no open finding and every finding linked to FINAL_ACCEPTANCE before repair",
       "verify": "npm run endgame:sweep:sync && npm run endgame:sweep:complete",
       "evidence": [
