@@ -17,7 +17,7 @@ import {
   normalizeEvidence, normalizeEvents, normalizeHypotheses, normalizePlan, normalizeQuestion, normalizeScience,
   normalizeReceipts, normalizeRevisions, normalizeRun, normalizeRunSummaries, normalizeSearch, normalizeSources,
 } from './normalize';
-import type { Automation, BuiltinRouteSummary, ProviderTemplate as ProviderTemplateInfo, BuiltinRouteUpdateInput, BuiltinRoutesResponse, BundleSummary, Conversation, CorpusSnapshotInfo, FeedbackSourceKind, HealthReport, LibrarySource, ModelConfigsResponse, ModelConfigInput, ModelConfigSummary, ModelConfigTestInput, ModelConfigTestResult, ResearchActionResponse, ResearchRun, RunEvent, RunSummary, ScientificGoalType, ScreeningDecisionResult, ScreeningStopResult, ScreeningView, SearchResponse, ToolIntegrationView, ToolTestRecord, UsageAggregate, VerificationReport, ZoteroAnnotation, ZoteroAnnotationsResponse, ZoteroLibItem, ZoteroLibraryResponse } from './types';
+import type { Automation, BuiltinRouteSummary, ProviderTemplate as ProviderTemplateInfo, BuiltinRouteUpdateInput, BuiltinRoutesResponse, BundleSummary, Conversation, CorpusSnapshotInfo, FeedbackSourceKind, HealthReport, LibrarySource, MemoryItemView, ModelConfigsResponse, ModelConfigInput, ModelConfigSummary, ModelConfigTestInput, ModelConfigTestResult, ResearchActionResponse, ResearchRun, RunEvent, RunSummary, ScientificGoalType, ScreeningDecisionResult, ScreeningStopResult, ScreeningView, SearchResponse, ToolIntegrationView, ToolTestRecord, UsageAggregate, VerificationReport, ZoteroAnnotation, ZoteroAnnotationsResponse, ZoteroLibItem, ZoteroLibraryResponse } from './types';
 
 const BASE = '/api/v1';
 
@@ -51,6 +51,66 @@ export const getLibrarySources = async (signal?: AbortSignal): Promise<LibrarySo
   return list.filter((v): v is LibrarySource =>
     typeof v === 'object' && v !== null && typeof (v as { title?: unknown }).title === 'string' && Array.isArray((v as { runIds?: unknown }).runIds));
 };
+
+/* ---- workspace memory management (FA-HAR-06) ---- */
+
+const memoryItemOf = (v: unknown): v is MemoryItemView =>
+  typeof v === 'object' && v !== null
+  && typeof (v as { id?: unknown }).id === 'string'
+  && typeof (v as { title?: unknown }).title === 'string'
+  && typeof (v as { status?: unknown }).status === 'string';
+
+const memoryListErr = (): ApiError =>
+  new ApiError({ code: 'unexpected_schema', message: 'memory list response shape mismatch', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'memory' } });
+
+/** Items plus the honest-enumeration contract the server discloses (cap 500). */
+export interface MemoryListView {
+  items: MemoryItemView[];
+  /** false when the workspace holds more items than the list cap — counts are
+   *  then subset counts and the UI must not present them as totals. */
+  complete: boolean;
+}
+
+export const getMemoryItems = async (opts: { kind?: string; status?: string } = {}, signal?: AbortSignal): Promise<MemoryListView> => {
+  const qs = new URLSearchParams();
+  if (opts.kind !== undefined) qs.set('kind', opts.kind);
+  if (opts.status !== undefined) qs.set('status', opts.status);
+  const q = qs.size > 0 ? `?${qs.toString()}` : '';
+  const data = await api.getJson(`${BASE}/memory${q}`, signal);
+  const list = (data as { items?: unknown }).items;
+  if (!Array.isArray(list)) throw memoryListErr();
+  const complete = (data as { complete?: unknown }).complete;
+  if (typeof complete !== 'boolean') throw memoryListErr();
+  return { items: list.filter(memoryItemOf), complete };
+};
+
+export interface MemoryMutationResponse {
+  memoryId: string;
+  newId?: string;
+  status: 'active' | 'superseded' | 'archived';
+  eventId: number | null;
+}
+
+const memoryMutationOf = (data: unknown): MemoryMutationResponse => {
+  // Narrowed to the fields the UI contract consumes (status drives reload
+  // behavior; newId/eventId are informational) — malformed shapes fail loud.
+  if (typeof data !== 'object' || data === null) throw memoryListErr();
+  const memoryId = (data as { memoryId?: unknown }).memoryId;
+  const status = (data as { status?: unknown }).status;
+  if (typeof memoryId !== 'string') throw memoryListErr();
+  if (status !== 'active' && status !== 'superseded' && status !== 'archived') throw memoryListErr();
+  const newId = (data as { newId?: unknown }).newId;
+  const eventId = (data as { eventId?: unknown }).eventId;
+  if (newId !== undefined && typeof newId !== 'string') throw memoryListErr();
+  if (eventId !== undefined && eventId !== null && typeof eventId !== 'number') throw memoryListErr();
+  return { memoryId, ...(newId !== undefined ? { newId } : {}), status, eventId: eventId ?? null };
+};
+
+export const editMemoryItem = async (id: string, body: { title?: string; body?: string; failureReason?: string; reason: string }, signal?: AbortSignal): Promise<MemoryMutationResponse> =>
+  memoryMutationOf(await api.post(`${BASE}/memory/${encodeURIComponent(id)}/edit`, body, signal));
+
+export const archiveMemoryItem = async (id: string, reason: string, signal?: AbortSignal): Promise<MemoryMutationResponse> =>
+  memoryMutationOf(await api.post(`${BASE}/memory/${encodeURIComponent(id)}/archive`, { reason }, signal));
 
 export const getEvidence = async (runId: string, signal?: AbortSignal) =>
   normalizeEvidence(await api.getJson(`${BASE}/runs/${encodeURIComponent(runId)}/evidence`, signal));

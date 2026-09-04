@@ -1228,8 +1228,14 @@ export class Store {
     return ranked;
   }
 
-  /** Append-only supersession: new item replaces old; old is marked, never deleted. */
-  supersedeMemory(oldId: string, replacement: MemoryItem): void {
+  /**
+   * Append-only supersession: new item replaces old; old is marked, never
+   * deleted. When `reasonRelationType` is given it rides the SAME transaction —
+   * a committed supersession can never exist without its human-act audit edge
+   * (archiveMemory discipline; a bare post-commit INSERT would strand the
+   * change if the process died in between, and a retry would 409 on lifecycle).
+   */
+  supersedeMemory(oldId: string, replacement: MemoryItem, reasonRelationType?: string): void {
     const old = this.getMemory(oldId);
     if (old === null) throw new Error(`supersedeMemory: no such memory item ${oldId}`);
     if (!MEMORY_LIFECYCLE[old.status].includes('superseded')) {
@@ -1242,7 +1248,44 @@ export class Store {
       this.putMemory(next);
       this.db.prepare('INSERT OR IGNORE INTO memory_edges (from_id, to_id, relation_type, at) VALUES (?,?,?,?)')
         .run(oldId, next.id, 'supersedes', next.createdAt);
+      if (reasonRelationType !== undefined) {
+        this.db.prepare('INSERT OR IGNORE INTO memory_edges (from_id, to_id, relation_type, at) VALUES (?,?,?,?)')
+          .run(next.id, next.id, reasonRelationType, next.createdAt);
+      }
     });
+  }
+
+  /**
+   * Append-only archive (terminal lifecycle transition, FA-HAR-06). The row is
+   * KEPT — never deleted — and drops out of every retrieval surface because
+   * searchMemory/conditioning read status='active' only. The human act rides a
+   * self-referential memory_edges row: the edge table is the memory plane's
+   * audit spine (relation_type carries no CHECK, verified in migration v6).
+   */
+  archiveMemory(id: string, relationType: string, at = new Date().toISOString()): void {
+    const item = this.getMemory(id);
+    if (item === null) throw new Error(`archiveMemory: no such memory item ${id}`);
+    if (!MEMORY_LIFECYCLE[item.status].includes('archived')) {
+      throw new Error(`archiveMemory: lifecycle forbids ${item.status} -> archived`);
+    }
+    const marked = MemoryItemSchema.parse({ ...item, status: 'archived' });
+    this.db.transaction(() => {
+      this.putMemory(marked);
+      this.db.prepare('INSERT INTO memory_edges (from_id, to_id, relation_type, at) VALUES (?,?,?,?)')
+        .run(id, id, relationType, at);
+    });
+  }
+
+  /** Read-time projection over the memory audit spine. */
+  listMemoryEdges(filter: { fromId?: string; toId?: string } = {}): Array<{ fromId: string; toId: string; relationType: string; at: string }> {
+    const where: string[] = [];
+    const params: unknown[] = [];
+    if (filter.fromId !== undefined) { where.push('from_id=?'); params.push(filter.fromId); }
+    if (filter.toId !== undefined) { where.push('to_id=?'); params.push(filter.toId); }
+    const rows = this.db.prepare(
+      `SELECT from_id, to_id, relation_type, at FROM memory_edges${where.length > 0 ? ` WHERE ${where.join(' AND ')}` : ''} ORDER BY at DESC LIMIT 500`,
+    ).all(...params) as Array<{ from_id: string; to_id: string; relation_type: string; at: string }>;
+    return rows.map((r) => ({ fromId: r.from_id, toId: r.to_id, relationType: r.relation_type, at: r.at }));
   }
 
   private memoryFromRow(r: Record<string, unknown>): MemoryItem {

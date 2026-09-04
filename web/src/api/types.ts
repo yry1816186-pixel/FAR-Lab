@@ -255,6 +255,33 @@ export interface LibrarySource {
   runIds: string[];
 }
 
+// ---- workspace memory (FA-HAR-06, src/domain/memory.ts) ----
+
+export type MemoryKind = 'episodic' | 'semantic' | 'experiment_outcome' | 'profile';
+export type MemoryStatus = 'active' | 'superseded' | 'archived';
+export type MemoryTrustClass = 'own_verified' | 'own_unverified' | 'external_literature' | 'external_untrusted';
+
+/** Projection of the stored MemoryItem (the store row stays the truth plane).
+ *  Human edits supersede: an edited row points back via supersedesId and the
+ *  OLD id keeps status 'superseded' — never a silent overwrite. */
+export interface MemoryItemView {
+  id: string;
+  kind: MemoryKind;
+  entityType: string;
+  title: string;
+  body: string;
+  status: MemoryStatus;
+  outcome?: 'succeeded' | 'failed' | 'inconclusive';
+  failureReason?: string;
+  trustClass: MemoryTrustClass;
+  taint: string;
+  provenance: { runId?: string; receiptId?: string; sourceRef?: string };
+  createdAt: string;
+  lastAccessedAt: string;
+  accessCount: number;
+  supersedesId?: string;
+}
+
 // ---- claims (src/domain/claim.ts) ----
 
 export type CitationBindingStatus = 'verified' | 'resolved_unaligned' | 'unresolved' | 'missing';

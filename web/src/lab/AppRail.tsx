@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  BookOpen, ChevronLeft, ChevronRight, FlaskConical, Home, MessageSquare,
+  BookOpen, Brain, ChevronLeft, ChevronRight, FlaskConical, Home, MessageSquare,
   Pencil, Plus, Settings, TerminalSquare, Trash2,
 } from 'lucide-react';
 import { useI18n } from '../i18n/LanguageContext';
@@ -17,7 +17,7 @@ import './lab.css';
  * zone at the top of 工作台), so the rail never offers two competing "start
  * here" destinations.
  */
-export type RailSurface = 'home' | 'library' | 'study' | 'conv' | 'terminal';
+export type RailSurface = 'home' | 'library' | 'memory' | 'study' | 'conv' | 'terminal';
 
 const COLLAPSE_KEY = 'farlab.railCollapsed';
 
@@ -29,7 +29,7 @@ const COLLAPSE_KEY = 'farlab.railCollapsed';
  *  and "n". */
 export function AppRail({
   surface, runs, runsLoading, conversations, judgmentCount,
-  onHome, onLibrary, onOpenStudy, onOpenConversation,
+  onHome, onLibrary, onMemory, onOpenStudy, onOpenConversation,
   onDeleteConversation, onRenameConversation, onNewConversation, onOpenSettings, onTerminal,
 }: {
   surface: RailSurface;
@@ -41,6 +41,8 @@ export function AppRail({
   judgmentCount: number;
   onHome: () => void;
   onLibrary: () => void;
+  /** FA-HAR-06: open the workspace memory management surface (#memory). */
+  onMemory: () => void;
   onOpenStudy: (runId: string) => void;
   onOpenConversation: (id: string) => void;
   onDeleteConversation: (id: string) => void;
@@ -107,6 +109,7 @@ export function AppRail({
             "new research" entry made the choice ambiguous. */}
         {navItem('rail.home', <Home size={15} aria-hidden="true" />, surface === 'home', onHome, { badge: judgmentCount })}
         {navItem('rail.library', <BookOpen size={15} aria-hidden="true" />, surface === 'library', onLibrary)}
+        {navItem('rail.memory', <Brain size={15} aria-hidden="true" />, surface === 'memory', onMemory)}
         {/* Terminal: the workspace terminal is a SHELL panel (IDE parity), so
             this entry toggles that panel instead of navigating to a route.
             Optional while the shell finishes wiring it — never a dead link. */}
