@@ -6,6 +6,7 @@ import { getEvents, getRun, listRuns, listConversations, createConversation, del
 import { AppRail, type RailSurface } from './lab/AppRail';
 import { TerminalPanel } from './lab/TerminalPanel';
 import { Library } from './lab/Library';
+import { Memory } from './lab/Memory';
 import type { Conversation, ResearchRun, RunEvent, RunSummary } from './api/types';
 import { useI18n } from './i18n/LanguageContext';
 import { usePolling } from './hooks/usePolling';
@@ -69,6 +70,8 @@ export function App(): JSX.Element {
   // Workspace literature library (#library) + welcome-box question prefill
   // (#lab/new?q=…). Prefill is consumed once by NewResearch on mount.
   const [libraryView, setLibraryView] = useState(false);
+// Workspace memory management surface (#memory, FA-HAR-06)
+const [memoryView, setMemoryView] = useState(false);
   // ---- global panel (IDE parity: the terminal is SHELL state, not a route) ----
   // It stays open and its sessions stay alive across every surface, so it
   // never competes with research objects for the rail or the main view.
@@ -346,6 +349,7 @@ export function App(): JSX.Element {
     setStudyView(true);
     setNewResearchView(false);
     setLibraryView(false);
+    setMemoryView(false);
     if (selectedConvId !== null) setConvDocked(true);
   }, [selectedConvId]);
   const openHome = useCallback((): void => {
@@ -353,6 +357,7 @@ export function App(): JSX.Element {
     setStudyView(false);
     setNewResearchView(false);
     setLibraryView(false);
+    setMemoryView(false);
     closeConversation();
   }, [closeConversation]);
   const openNewResearch = useCallback((prefill: string | null = null): void => {
@@ -360,12 +365,22 @@ export function App(): JSX.Element {
     setSelectedRunId(null);
     setStudyView(false);
     setLibraryView(false);
+    setMemoryView(false);
     setSelectedConvId(null);
     setConvDocked(false);
     setPrefilledQuestion(prefill);
   }, []);
   const openLibrary = useCallback((): void => {
     setLibraryView(true);
+    setNewResearchView(false);
+    setSelectedRunId(null);
+    setStudyView(false);
+    setMemoryView(false);
+    closeConversation();
+  }, [closeConversation]);
+  const openMemory = useCallback((): void => {
+    setMemoryView(true);
+    setLibraryView(false);
     setNewResearchView(false);
     setSelectedRunId(null);
     setStudyView(false);
@@ -377,8 +392,9 @@ export function App(): JSX.Element {
   const [routeTab, setRouteTab] = useState<string | null>(null);
   useEffect(() => {
     const route = parseHash(window.location.hash);
-    if (route.newResearch) { setNewResearchView(true); setLibraryView(false); }
-    if (route.library) { setLibraryView(true); setNewResearchView(false); }
+    if (route.newResearch) { setNewResearchView(true); setLibraryView(false); setMemoryView(false); }
+    if (route.library) { setLibraryView(true); setNewResearchView(false); setMemoryView(false); }
+    if (route.memory) { setMemoryView(true); setLibraryView(false); setNewResearchView(false); }
     if (route.prefilledQuestion !== null) setPrefilledQuestion(route.prefilledQuestion);
     if (route.runId !== null) { setSelectedRunId(route.runId); setStudyView(route.study); }
     if (route.convId !== null) {
@@ -392,6 +408,7 @@ export function App(): JSX.Element {
   useHashRoute(selectedRunId, routeTab, (route) => {
     setNewResearchView(route.newResearch);
     setLibraryView(route.library);
+    setMemoryView(route.memory);
     if (route.prefilledQuestion !== null) setPrefilledQuestion(route.prefilledQuestion);
     if (route.runId !== null && route.runId !== selectedRunId) { setSelectedRunId(route.runId); setStudyView(route.study); }
     else if (route.runId !== null) setStudyView(route.study);
@@ -399,7 +416,7 @@ export function App(): JSX.Element {
     if (route.convId !== null) { setSelectedConvId(route.convId); if (route.runId !== null) setConvDocked(true); }
     else if (routedConvId !== null) { setSelectedConvId(null); setConvDocked(false); } // back/forward to a no-conv URL closes the dialogue
     setRouteTab(route.tab);
-  }, routedConvId, studyView, newResearchView, libraryView);
+  }, routedConvId, studyView, newResearchView, libraryView, memoryView);
 
   // ---- command palette: every entry is a real capability ----
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -461,6 +478,13 @@ export function App(): JSX.Element {
         labelKey: 'palette.goHome',
         groupKey: 'palette.groupActions',
         run: openHome,
+      },
+      {
+        id: 'go-memory',
+        labelKey: 'palette.goMemory',
+        groupKey: 'palette.groupActions',
+        keywords: 'memory 记忆 管理 memory management archive',
+        run: openMemory,
       },
       ...navCmds,
       ...runCmds,
@@ -646,7 +670,9 @@ export function App(): JSX.Element {
     />
   );
 
-  const railSurface: RailSurface = libraryView
+  const railSurface: RailSurface = memoryView
+    ? 'memory'
+    : libraryView
     ? 'library'
     // The compose zone belongs to the workspace, not to a second surface:
     // `#lab/new` lights up 工作台 (the rail has exactly one work entry).
@@ -756,6 +782,7 @@ export function App(): JSX.Element {
           judgmentCount={judgmentCount}
           onHome={openHome}
           onLibrary={openLibrary}
+          onMemory={openMemory}
           onOpenStudy={selectStudy}
           onOpenConversation={openConversation}
           onDeleteConversation={removeConversation}
@@ -779,8 +806,10 @@ export function App(): JSX.Element {
               that remount silently discards a question typed into the still-
               pristine first frame (caught on Firefox's looser commit timing;
               spec optional-assets "survives the transition"). */}
-          {newResearchView || (!libraryView && selectedConvId === null && selectedRunId === null) ? (
+          {newResearchView || (!libraryView && !memoryView && selectedConvId === null && selectedRunId === null) ? (
             homeSurface
+          ) : memoryView ? (
+            <Memory />
           ) : libraryView ? (
             <Library runs={runs} onOpenStudy={selectStudy} />
           ) : selectedConvId !== null && selectedRunId === null ? (

@@ -77,6 +77,7 @@ import { importPlugin, PluginImportError, PluginImportInputSchema } from '../plu
 import type { FeedbackSourceKind as FeedbackSource } from '../domain/index.js';
 import { toProvJsonLd } from '../domain/prov-o.js';
 import { consolidateConversationProfile } from '../app/memory.js';
+import { archiveMemory, editMemory, MemoryOpError } from './memory-ops.js';
 import { EvidenceRelation, EvidenceRelationType } from '../domain/evidence.js';
 import { diagnosticityScores, removalSensitivity } from '../domain/ach.js';
 import { canonicalSha256, sha256Hex } from '../shared/crypto.js';
@@ -97,7 +98,7 @@ import { checkPlanExecutability } from '../pipeline/stages/plan.js';
  */
 
 export interface ApiServerError {
-  code: 'not_found' | 'validation' | 'already_running' | 'run_active' | 'not_started' | 'internal' | 'target_not_found' | 'question_required' | 'action_model_failed' | 'action_budget_exhausted' | 'invalid_action_request' | 'invalid_counter_search' | 'provider_unreachable' | 'conversation_model_failed' | 'conversation_full' | 'turn_in_flight' | 'turn_cancelled' | 'no_active_turn' | 'no_corpus' | 'session_stopped' | 'src_not_in_pool' | 'run_not_found' | 'already_launched' | 'scope_proposal_failed' | 'scope_proposal_unavailable' | 'lease_held' | 'feature_disabled' | 'terminal_limit' | 'terminal_not_writable';
+  code: 'not_found' | 'validation' | 'already_running' | 'run_active' | 'not_started' | 'internal' | 'target_not_found' | 'lifecycle' | 'question_required' | 'action_model_failed' | 'action_budget_exhausted' | 'invalid_action_request' | 'invalid_counter_search' | 'provider_unreachable' | 'conversation_model_failed' | 'conversation_full' | 'turn_in_flight' | 'turn_cancelled' | 'no_active_turn' | 'no_corpus' | 'session_stopped' | 'src_not_in_pool' | 'run_not_found' | 'already_launched' | 'scope_proposal_failed' | 'scope_proposal_unavailable' | 'lease_held' | 'feature_disabled' | 'terminal_limit' | 'terminal_not_writable';
   message: string;
   retryable: boolean;
   runId?: string;
@@ -3156,9 +3157,82 @@ function parseSeedSources(raw: unknown): string | {
       return search(res, url);
     }
 
+    // FA-HAR-06: the researcher memory-management surface (web #memory). The
+    // 2026-08-29 removal note below was true then (zero product callers); the
+    // management UI is now that caller. Reads are projections over the store;
+    // edit/archive go through memory-ops.ts (audited, append-only, trust-fenced).
+    // `far memory` CLI search keeps its own path unchanged.
+    if (segments[2] === 'memory') {
+      if (segments.length === 3 && method === 'GET') {
+        const kind = url.searchParams.get('kind');
+        const status = url.searchParams.get('status');
+        const runId = url.searchParams.get('runId');
+        const kindValues = ['episodic', 'semantic', 'experiment_outcome', 'profile'] as const;
+        const statusValues = ['active', 'superseded', 'archived'] as const;
+        let parsedKind: (typeof kindValues)[number] | undefined;
+        if (kind !== null) {
+          if (!(kindValues as readonly string[]).includes(kind)) throw validation(`kind must be one of ${kindValues.join('|')} (got ${kind})`);
+          parsedKind = kind as (typeof kindValues)[number];
+        }
+        let parsedStatus: (typeof statusValues)[number] | undefined;
+        if (status !== null) {
+          if (!(statusValues as readonly string[]).includes(status)) throw validation(`status must be one of ${statusValues.join('|')} (got ${status})`);
+          parsedStatus = status as (typeof statusValues)[number];
+        }
+        const items = app.store.listMemory({
+          ...(parsedKind !== undefined ? { kind: parsedKind } : {}),
+          ...(parsedStatus !== undefined ? { status: parsedStatus } : {}),
+          ...(runId !== null ? { runId } : {}),
+        });
+        return sendJson(res, 200, { items, total: items.length });
+      }
+      if (segments.length === 4 && segments[3] === 'export' && method === 'GET') {
+        // Honest enumeration cap (listMemory clamps at 500) is disclosed in the
+        // payload itself — an export never pretends to be exhaustive silently.
+        const items = app.store.listMemory({ limit: 500 });
+        const body = Buffer.from(JSON.stringify({
+          exportedAt: new Date().toISOString(),
+          count: items.length,
+          cap: 500,
+          complete: items.length < 500,
+          items,
+        }, null, 2), 'utf8');
+        res.writeHead(200, {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Content-Length': String(body.length),
+          'Content-Disposition': 'attachment; filename="farlab-memory.json"',
+        });
+        res.end(body);
+        return;
+      }
+      if (segments.length === 4 && method === 'GET') {
+        const id = segments[3]!;
+        if (!/^mem_[a-z0-9]+$/.test(id)) throw validation(`malformed memory id: ${id}`);
+        const item = app.store.getMemory(id);
+        if (item === null) throw notFound(`memory item ${id} not found`);
+        return sendJson(res, 200, { item });
+      }
+      if (segments.length === 5 && method === 'POST' && (segments[4] === 'edit' || segments[4] === 'archive')) {
+        const body = await readJsonObject(req);
+        try {
+          const result = segments[4] === 'edit'
+            ? editMemory(app, segments[3]!, body)
+            : archiveMemory(app, segments[3]!, body);
+          sendJson(res, 200, result);
+          return;
+        } catch (e) {
+          if (e instanceof MemoryOpError) {
+            throw new HttpError(e.status, { code: e.code, message: e.message, retryable: false });
+          }
+          throw e;
+        }
+      }
+      throw notFound(`no route: ${method} ${url.pathname}`);
+    }
+
     // (GET /api/v1/memory removed 2026-08-29: zero product callers across
-    // web/CLI/TUI — the researcher surface for memory search is `far memory`;
-    // the store API stays available for that CLI path.)
+    // web/CLI/TUI — superseded by the management block above, which now HAS a
+    // product caller; the store API stays available for the `far memory` CLI.)
 
     if (segments[2] === 'verify' && segments.length === 4 && method === 'GET') {
       return verify(res, segments[3]!);

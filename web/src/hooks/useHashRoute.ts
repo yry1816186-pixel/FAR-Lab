@@ -25,6 +25,8 @@ export interface HashRoute {
   newResearch: boolean;
   /** True on `#library`: the workspace literature library. */
   library: boolean;
+  /** True on `#memory`: the workspace memory management surface (FA-HAR-06). */
+  memory: boolean;
   /** Prefilled question text from `#lab/new?q=<encoded>` (welcome-box quick start). */
   prefilledQuestion: string | null;
 }
@@ -32,12 +34,16 @@ export interface HashRoute {
 const RUN_RE = /^run_[0-9a-z]{20,32}$/;
 const CONV_RE = /^conv_[0-9a-z]{20,32}$/;
 
-const EMPTY: HashRoute = { runId: null, tab: null, convId: null, study: false, newResearch: false, library: false, prefilledQuestion: null };
+const EMPTY: HashRoute = { runId: null, tab: null, convId: null, study: false, newResearch: false, library: false, memory: false, prefilledQuestion: null };
 
 /** Parse the route families above; anything malformed yields empty (never
  * throws on user-typed URLs). */
 export function parseHash(hash: string): HashRoute {
   if (hash === '#library' || hash.startsWith('#library?')) return { ...EMPTY, library: true };
+  // '#memory' canonical; '#/memory' accepted (typed-URL tolerance — #study/#run
+  // families carry a slash, so users type one here too).
+  if (hash === '#memory' || hash.startsWith('#memory?')
+    || hash === '#/memory' || hash.startsWith('#/memory?')) return { ...EMPTY, memory: true };
   if (hash === '#lab/new' || hash.startsWith('#lab/new?')) {
     // Optional ?q= carries a prefilled question (welcome box / quick tasks);
     // malformed encodings degrade to no prefill rather than throwing.
@@ -69,7 +75,8 @@ export function parseHash(hash: string): HashRoute {
   return { ...EMPTY, runId: m[1]!, tab: m[2] ?? null, convId };
 }
 
-export function buildHash(runId: string | null, tab: string | null, convId: string | null = null, study = false, newResearch = false, library = false): string {
+export function buildHash(runId: string | null, tab: string | null, convId: string | null = null, study = false, newResearch = false, library = false, memory = false): string {
+  if (memory) return '#memory';
   if (library) return '#library';
   if (newResearch) return '#lab/new';
   if (runId === null) return convId !== null ? `#conv/${convId}` : '';
@@ -87,6 +94,7 @@ export function useHashRoute(
   currentStudy = false,
   currentNewResearch = false,
   currentLibrary = false,
+  currentMemory = false,
 ): void {
   // Expose the latest handler to the listeners without re-subscribing on every render.
   const handlerRef = useRefLatest(onHashRoute);
@@ -104,11 +112,11 @@ export function useHashRoute(
   // App state -> URL. Suppress the echo of our own write (hashchange fires on
   // programmatic changes too in some browsers; guard by comparing intent).
   const write = useCallback((): void => {
-    const wanted = buildHash(currentRunId, currentTab, currentConvId, currentStudy, currentNewResearch, currentLibrary);
+    const wanted = buildHash(currentRunId, currentTab, currentConvId, currentStudy, currentNewResearch, currentLibrary, currentMemory);
     if (window.location.hash !== wanted) {
       window.history.replaceState(null, '', window.location.pathname + window.location.search + wanted);
     }
-  }, [currentRunId, currentTab, currentConvId, currentStudy, currentNewResearch, currentLibrary]);
+  }, [currentRunId, currentTab, currentConvId, currentStudy, currentNewResearch, currentLibrary, currentMemory]);
   useEffect(() => { write(); }, [write]);
 }
 

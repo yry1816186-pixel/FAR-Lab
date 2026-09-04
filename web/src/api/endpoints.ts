@@ -17,7 +17,7 @@ import {
   normalizeEvidence, normalizeEvents, normalizeHypotheses, normalizePlan, normalizeQuestion, normalizeScience,
   normalizeReceipts, normalizeRevisions, normalizeRun, normalizeRunSummaries, normalizeSearch, normalizeSources,
 } from './normalize';
-import type { Automation, BuiltinRouteSummary, ProviderTemplate as ProviderTemplateInfo, BuiltinRouteUpdateInput, BuiltinRoutesResponse, BundleSummary, Conversation, CorpusSnapshotInfo, FeedbackSourceKind, HealthReport, LibrarySource, ModelConfigsResponse, ModelConfigInput, ModelConfigSummary, ModelConfigTestInput, ModelConfigTestResult, ResearchActionResponse, ResearchRun, RunEvent, RunSummary, ScientificGoalType, ScreeningDecisionResult, ScreeningStopResult, ScreeningView, SearchResponse, ToolIntegrationView, ToolTestRecord, UsageAggregate, VerificationReport, ZoteroAnnotation, ZoteroAnnotationsResponse, ZoteroLibItem, ZoteroLibraryResponse } from './types';
+import type { Automation, BuiltinRouteSummary, ProviderTemplate as ProviderTemplateInfo, BuiltinRouteUpdateInput, BuiltinRoutesResponse, BundleSummary, Conversation, CorpusSnapshotInfo, FeedbackSourceKind, HealthReport, LibrarySource, MemoryItemView, ModelConfigsResponse, ModelConfigInput, ModelConfigSummary, ModelConfigTestInput, ModelConfigTestResult, ResearchActionResponse, ResearchRun, RunEvent, RunSummary, ScientificGoalType, ScreeningDecisionResult, ScreeningStopResult, ScreeningView, SearchResponse, ToolIntegrationView, ToolTestRecord, UsageAggregate, VerificationReport, ZoteroAnnotation, ZoteroAnnotationsResponse, ZoteroLibItem, ZoteroLibraryResponse } from './types';
 
 const BASE = '/api/v1';
 
@@ -51,6 +51,46 @@ export const getLibrarySources = async (signal?: AbortSignal): Promise<LibrarySo
   return list.filter((v): v is LibrarySource =>
     typeof v === 'object' && v !== null && typeof (v as { title?: unknown }).title === 'string' && Array.isArray((v as { runIds?: unknown }).runIds));
 };
+
+/* ---- workspace memory management (FA-HAR-06) ---- */
+
+const memoryItemOf = (v: unknown): v is MemoryItemView =>
+  typeof v === 'object' && v !== null
+  && typeof (v as { id?: unknown }).id === 'string'
+  && typeof (v as { title?: unknown }).title === 'string'
+  && typeof (v as { status?: unknown }).status === 'string';
+
+const memoryListErr = (): ApiError =>
+  new ApiError({ code: 'unexpected_schema', message: 'memory list response shape mismatch', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'memory' } });
+
+export const getMemoryItems = async (opts: { kind?: string; status?: string } = {}, signal?: AbortSignal): Promise<MemoryItemView[]> => {
+  const qs = new URLSearchParams();
+  if (opts.kind !== undefined) qs.set('kind', opts.kind);
+  if (opts.status !== undefined) qs.set('status', opts.status);
+  const q = qs.size > 0 ? `?${qs.toString()}` : '';
+  const data = await api.getJson(`${BASE}/memory${q}`, signal);
+  const list = (data as { items?: unknown }).items;
+  if (!Array.isArray(list)) throw memoryListErr();
+  return list.filter(memoryItemOf);
+};
+
+export interface MemoryMutationResponse {
+  memoryId: string;
+  newId?: string;
+  status: 'active' | 'superseded' | 'archived';
+  eventId: number | null;
+}
+
+const memoryMutationOf = (data: unknown): MemoryMutationResponse => {
+  if (typeof data !== 'object' || data === null || typeof (data as { memoryId?: unknown }).memoryId !== 'string') throw memoryListErr();
+  return data as MemoryMutationResponse;
+};
+
+export const editMemoryItem = async (id: string, body: { title?: string; body?: string; failureReason?: string; reason: string }, signal?: AbortSignal): Promise<MemoryMutationResponse> =>
+  memoryMutationOf(await api.post(`${BASE}/memory/${encodeURIComponent(id)}/edit`, body, signal));
+
+export const archiveMemoryItem = async (id: string, reason: string, signal?: AbortSignal): Promise<MemoryMutationResponse> =>
+  memoryMutationOf(await api.post(`${BASE}/memory/${encodeURIComponent(id)}/archive`, { reason }, signal));
 
 export const getEvidence = async (runId: string, signal?: AbortSignal) =>
   normalizeEvidence(await api.getJson(`${BASE}/runs/${encodeURIComponent(runId)}/evidence`, signal));
