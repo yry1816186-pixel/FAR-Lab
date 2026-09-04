@@ -242,7 +242,7 @@ describe('judgeRediscovery pipeline v2.1', () => {
     if (res.ok) {
       expect(res.counts.agentMatched).toBe(1); // majority yes
       expect(res.counts.gtMatched).toBe(1);
-      expect(res.matcher.version).toBe('v2.4-det-band-rules');
+      expect(res.matcher.version).toBe('v2.5-det-band-rules-negation');
       expect(res.matcher.detBandDecided).toBe(0); // this pair abstains — decided by the LLM vote
     }
   });
