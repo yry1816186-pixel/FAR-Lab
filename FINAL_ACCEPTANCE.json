@@ -536,14 +536,16 @@
       "id": "FA-PRF-03",
       "domain": "perf",
       "title": "Chaos matrix closed (TLS failure, server SIGKILL, SSE mid-stream reconnect, partial SSE)",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "self",
-      "gap": "10 of 14 chaos cases covered; 4 missing (see matrix)",
+      "gap": "closed: 14/14 chaos matrix scripted and green",
       "target": ">=90% coverage, each case scripted",
       "verify": "faults.json extended",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/06-perf-reliability.md CHAOS-4"
+        "FINAL_EVIDENCE/audit-2026-08-30/06-perf-reliability.md CHAOS-4",
+        "node spikes/reliability-faults.mjs -> evidence/reliability/faults.json: 14/14 PASS incl. the 4 previously-missing cases — tls-cert-failure (CERT_HAS_EXPIRED undici-cause shape through the real retry core; taxonomy network_error for expired/leaf/altname/selfsigned via observability.ts errno list), server-sigkill-mid-write (kill -9 of the real API server process during checkpoint churn + slow SSE turn: chain intact, 235 events, conversation objects zod-valid), sse-midstream-reconnect-e2e (tests/conversation-stream-reconnect.test.ts: client drop mid-turn + afterSeq reattach — zero dup, zero loss, terminal lands, reply persisted), sse-partial-frame-client (tests/web-sse-parser.test.ts on the SHIPPED web consumeSse: 1-byte tears incl. CJK boundaries, malformed frame fails visibly)",
+        "fixture drift repairs while closing: egress-guard-era baseUrls https; DNS case updated to the 2026-08-29 bounded-retry policy; disk-full injection seam moved to the FA-DAT-01 streaming write path"
       ]
     },
     {

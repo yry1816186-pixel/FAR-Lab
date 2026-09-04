@@ -99,7 +99,11 @@ export const classifyError = (e: unknown): ClassifiedError => {
     return { category: 'permission_denied', retryable: false, needsHuman: true, message };
   }
   if (errno === 'ECONNRESET' || errno === 'ECONNREFUSED' || errno === 'EAI_AGAIN' || errno === 'ENOTFOUND'
-    || errno === 'EHOSTUNREACH' || errno === 'ETIMEDOUT' || errno === 'EPIPE') {
+    || errno === 'EHOSTUNREACH' || errno === 'ETIMEDOUT' || errno === 'EPIPE'
+    // TLS handshake failures ride the same transport layer (undici cause-carried
+    // errno); they are network-shape, not provider misbehavior (FA-PRF-03 chaos).
+    || errno === 'CERT_HAS_EXPIRED' || errno === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE'
+    || errno === 'ERR_TLS_CERT_ALTNAME_INVALID' || errno === 'DEPTH_ZERO_SELF_SIGNED_CERT') {
     return { category: 'network_error', retryable: true, needsHuman: false, message };
   }
   if (errno === 'ENOENT') return { category: 'io_error', retryable: false, needsHuman: false, message };

@@ -3,6 +3,7 @@ import type { Conversation } from './types';
 
 export type ConversationPublicProgress =
   | { type: 'accepted' }
+  | { type: 'steered'; text: string }
   | { type: 'phase'; phase: 'starting' | 'working' | 'using_tools' | 'composing' | 'retrying'; turn?: number }
   | { type: 'tool'; tool: string; ok: boolean; summary?: string; durationMs: number }
   | { type: 'reply_reset' }
@@ -58,7 +59,10 @@ const waitForReconnect = (signal: AbortSignal, attempt: number): Promise<void> =
     }, { once: true });
   });
 
-const consumeSse = async (
+// Exported for the fault-injection suite (FA-PRF-03 partial-SSE case): the wire
+// parser is pure (Response + TextDecoder only) so torn-frame behavior is
+// verifiable outside the browser.
+export const consumeSse = async (
   response: Response,
   afterSeq: number,
   handlers: ConversationStreamHandlers,
