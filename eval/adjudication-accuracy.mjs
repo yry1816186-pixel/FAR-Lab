@@ -15,6 +15,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { loadLocalSecrets } from './load-secrets.mjs';
+import { deterministicBandVerdict } from './claim-match.mjs';
 loadLocalSecrets();
 
 const GOLD_FILES = ['eval/claim-pair-gold.jsonl', 'eval/claim-pair-gold-v21.jsonl'];
@@ -22,7 +23,11 @@ const BATCH = 10;
 const VOTES = 5;
 
 const rows = GOLD_FILES.flatMap((f) => readFileSync(resolve(process.cwd(), f), 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)));
-const band = rows.filter((r) => r.bestSim >= 0.10 && r.bestSim < 0.40 && r.claim && r.counterpart);
+const bandAll = rows.filter((r) => r.bestSim >= 0.10 && r.bestSim < 0.40 && r.claim && r.counterpart);
+// Mirrors production's S2 pre-layer exactly: pairs the deterministic rules
+// decide never reach the LLM (their verdict is false, source 'det-band').
+const detDecided = bandAll.filter((r) => deterministicBandVerdict(r.claim, r.counterpart) === false);
+const band = bandAll.filter((r) => deterministicBandVerdict(r.claim, r.counterpart) !== false);
 
 const PROVIDER = process.env.FARLAB_JUDGE_PROVIDER ?? 'zai';
 const { createZaiProvider } = await import('../dist/providers/zai.js');
@@ -60,7 +65,7 @@ const adjudicate = async (items) => {
   return items.map((_, k) => valid.filter((v) => v[k] === true).length >= majority);
 };
 
-const out = [];
+const out = detDecided.map((p) => ({ label: p.label, verdict: false, det: true, sim: p.bestSim, claim: p.claim.slice(0, 90), counterpart: p.counterpart.slice(0, 90) }));
 for (let i = 0; i < band.length; i += BATCH) {
   const batch = band.slice(i, i + BATCH);
   const verdicts = await adjudicate(batch);
@@ -76,6 +81,7 @@ const acc = (tp + tn) / out.length;
 const summary = {
   generatedAt: new Date().toISOString(), judge: provider.modelId, judgeRoute: PROVIDER,
   votes: VOTES, n: out.length, goldTrue: tp + fn, goldFalse: tn + fp,
+  detBandDecided: detDecided.length, llmBand: band.length,
   accuracy: Math.round(acc * 1000) / 1000,
   truePositiveRate: Math.round((tp / (tp + fn)) * 1000) / 1000,
   falsePositiveRate: Math.round((fp / (fp + tn)) * 1000) / 1000,

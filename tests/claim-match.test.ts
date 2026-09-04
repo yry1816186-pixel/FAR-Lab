@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { contentTokens, jaccard, tfidfCosine, thresholdMatch, finalizeCounts } from '../eval/claim-match.mjs';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { contentTokens, jaccard, tfidfCosine, thresholdMatch, finalizeCounts, deterministicBandVerdict } from '../eval/claim-match.mjs';
 
 /**
  * Judge-hardening unit tests (rediscovery eval v2): the deterministic matcher must be
@@ -72,5 +74,64 @@ describe('thresholdMatch + finalizeCounts', () => {
     const allYes = finalizeCounts(agent, gt, m, m.borderline.map(() => ({ matched: true })));
     expect(allYes.agentMatched).toBeGreaterThan(noVotes.agentMatched);
     expect(allYes.agentMatched).toBeLessThanOrEqual(agent.length);
+  });
+});
+
+describe('deterministic band pre-layer (S2: deterministicBandVerdict)', () => {
+  it('opposing directions decide different-finding (the recorded T790M leniency FP shape)', () => {
+    // live-measured 2026-08-29: the 5-vote judge blessed this pair (gold FALSE) —
+    // restore vs reduce are opposite directions about the same entity
+    expect(deterministicBandVerdict(
+      'T790M mutations restore EGFR signaling despite drug binding.',
+      'The T790M gatekeeper mutation sterically reduces inhibitor binding.',
+    )).toBe(false);
+  });
+  it('correlation vs mechanism decides different-finding (the other recorded FP family)', () => {
+    expect(deterministicBandVerdict(
+      'Secondary bile acid concentration is inversely correlated with C. difficile growth.',
+      'Loss of secondary bile acids inhibits C. difficile germination and growth.',
+    )).toBe(false);
+  });
+  it('same direction abstains — mechanism-layer mismatches stay the LLM band\'s job', () => {
+    // gold-FALSE pair the rules must NOT decide (both verbs point down)
+    expect(deterministicBandVerdict(
+      'Antibiotic depletion of taxa reduces secondary bile acids in the gut lumen.',
+      'Antibiotics disrupt the gut microbiota.',
+    )).toBeNull();
+  });
+  it('subject-negation guards the claim (loss-of/without/reduced abstain)', () => {
+    // gold-TRUE two-sides-of-one-fact shapes sit behind negated subjects — the
+    // effective polarity is not the verb\'s polarity, so the rule must abstain
+    expect(deterministicBandVerdict(
+      'Loss of secondary bile acids inhibits C. difficile germination and growth.',
+      'Reduced concentrations of inhibitory secondary bile acids remove a barrier to C. difficile.',
+    )).toBeNull();
+  });
+  it('mixed directions inside ONE claim abstain (ambiguous assertion)', () => {
+    expect(deterministicBandVerdict(
+      'The mutation increases affinity and decreases specificity.',
+      'The mutation reduces binding.',
+    )).toBeNull();
+  });
+  it('never asserts sameness — the return domain is {false, null}', () => {
+    expect(deterministicBandVerdict(
+      'Antibiotics disrupt the gut microbiota.',
+      'Antibiotic treatment disrupts the gut microbiome.',
+    )).toBeNull(); // near-paraphrase, same direction — still the LLM band decides
+  });
+  it('ZERO gold errors on all 157 pairs, and the fired set is non-trivial — mutation-locked', () => {
+    const files = ['eval/claim-pair-gold.jsonl', 'eval/claim-pair-gold-v21.jsonl'];
+    const rows = files.flatMap((f) =>
+      readFileSync(resolve(process.cwd(), f), 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l) as {
+        claim: string; counterpart: string | null; bestSim: number; label: boolean;
+      }));
+    const band = rows.filter((r) => r.bestSim >= 0.10 && r.bestSim < 0.40 && r.claim && r.counterpart);
+    const fired = band.filter((r) => deterministicBandVerdict(r.claim, r.counterpart!) === false);
+    // the rule only classifies pairs as DIFFERENT findings: every fired row must
+    // be gold-false, or the pre-layer is corrupting the zero-error contract
+    expect(fired.every((r) => !r.label)).toBe(true);
+    // regression guard on coverage: the shipped rules decide >= 6 band pairs
+    // (6/109 at 2026-09-05; shrinking below this means a lexicon/rule regressed)
+    expect(fired.length).toBeGreaterThanOrEqual(6);
   });
 });

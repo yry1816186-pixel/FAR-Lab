@@ -26,7 +26,7 @@
  *                          largest single variance lever on band decisions)
  */
 
-import { thresholdMatch, finalizeCounts, MATCH_DEFAULTS } from './claim-match.mjs';
+import { thresholdMatch, finalizeCounts, MATCH_DEFAULTS, deterministicBandVerdict } from './claim-match.mjs';
 import { atLeast } from './reducers.mjs';
 
 const DECOMPOSE_SCHEMA = {
@@ -172,14 +172,33 @@ export const judgeRediscovery = async ({ agentText, gtClaims, call, passes = 5, 
   const adjudications = [];
   let adjudicationVotes = [];
   let votesFailed = 0;
-  if (m.borderline.length > 0) {
-    const items = m.borderline.map((b) => ({
-      claim: b.side === 'agent' ? agentClaims[b.i] : gtClaims[b.i],
-      bestCounterpart:
-        b.side === 'agent'
-          ? gtClaims[b.bestIdx] ?? gtClaims[0]
-          : agentClaims[b.bestIdx] ?? agentClaims[0],
-    }));
+  // S2 deterministic band pre-layer: zero-gold-error rules (opposing directions,
+  // correlation-vs-mechanism) decide some borderline pairs outright. Decided
+  // pairs never reach the LLM — they cannot swing on re-judge, which is the
+  // judge-variance lever (recorded band: 6/109 decided, 3/16 leniency FPs killed).
+  const llmEntries = [];
+  m.borderline.forEach((b, k) => {
+    const det = deterministicBandVerdict(
+      b.side === 'agent' ? agentClaims[b.i] : gtClaims[b.i],
+      b.side === 'agent'
+        ? gtClaims[b.bestIdx] ?? gtClaims[0]
+        : agentClaims[b.bestIdx] ?? agentClaims[0],
+    );
+    if (det === false) adjudications[k] = { matched: false };
+    else llmEntries.push(k);
+  });
+  const detBandDecided = m.borderline.length - llmEntries.length;
+  if (llmEntries.length > 0) {
+    const items = llmEntries.map((k) => {
+      const b = m.borderline[k];
+      return {
+        claim: b.side === 'agent' ? agentClaims[b.i] : gtClaims[b.i],
+        bestCounterpart:
+          b.side === 'agent'
+            ? gtClaims[b.bestIdx] ?? gtClaims[0]
+            : agentClaims[b.bestIdx] ?? agentClaims[0],
+      };
+    });
     const voteRows = [];
     const validateAdjudicate = (raw) => {
       if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return new Error('not an object');
@@ -217,20 +236,20 @@ export const judgeRediscovery = async ({ agentText, gtClaims, call, passes = 5, 
     const valid = voteRows.filter((row) => row !== null);
     if (valid.length === 0) return { ok: false, error: { stage: 'adjudicate', message: 'all adjudication votes failed' } };
     const majorityThreshold = Math.floor(valid.length / 2) + 1;
-    m.borderline.forEach((_, k) => {
-      const perItem = valid.map((row) => row[k] === true);
+    llmEntries.forEach((k, n) => {
+      const perItem = valid.map((row) => row[n] === true);
       const matched = atLeast(perItem, majorityThreshold);
-      adjudications.push({ matched });
+      adjudications[k] = { matched };
       adjudicationVotes.push({ k, votesOk: valid.length, yes: perItem.filter(Boolean).length, matched, unanimous: perItem.every(Boolean) });
     });
   }
   const counts = finalizeCounts(agentClaims, gtClaims, m, adjudications);
-  const votesRequested = m.borderline.length * votes;
+  const votesRequested = llmEntries.length * votes;
   return {
     ok: true,
     agentClaims,
     decomposition: { passes: decPasses.map((p) => p.length), selected: agentClaims.length },
-    matcher: { version: 'v2.3-fixed-gt+tfidf+5p5v', ...MATCH, borderline: m.borderline.length },
+    matcher: { version: 'v2.4-det-band-rules', ...MATCH, borderline: m.borderline.length, detBandDecided },
     adjudications,
     adjudicationVotes,
     scoredUnscored: { votesRequested, votesOk: votesRequested - votesFailed, votesFailed, note: 'failed votes are excluded from the decision, never counted as no (inspect_ai unscored semantics)' },

@@ -4,7 +4,7 @@
  *  borderline pairs needing live 5-vote adjudication are counted, not guessed. */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { TASKS } from './rediscovery-tasks.mjs';
-import { thresholdMatch, finalizeCounts, MATCH_DEFAULTS } from './claim-match.mjs';
+import { thresholdMatch, finalizeCounts, MATCH_DEFAULTS, deterministicBandVerdict } from './claim-match.mjs';
 
 const rows = readFileSync('eval/results/rediscovery.jsonl', 'utf8').trim().split('\n').map((l) => JSON.parse(l));
 const byTask = new Map(rows.map((r) => [r.task, r]));
@@ -17,7 +17,14 @@ for (const t of TASKS) {
   const gtOld = prev.claims.gt;
   const gtChanged = JSON.stringify(gtOld) !== JSON.stringify(gtNow);
   const m = thresholdMatch(agentClaims, gtNow, MATCH_DEFAULTS);
-  const mk = (all) => finalizeCounts(agentClaims, gtNow, m, m.borderline.map(() => ({ matched: all })));
+  // S2 band pre-layer: decided pairs are unmatched in BOTH bounds (decided, not
+  // banded) — only the abstained residue awaits live 5-vote adjudication.
+  const det = m.borderline.map((b) => deterministicBandVerdict(
+    b.side === 'agent' ? agentClaims[b.i] : gtNow[b.i],
+    b.side === 'agent' ? gtNow[b.bestIdx] ?? gtNow[0] : agentClaims[b.bestIdx] ?? agentClaims[0],
+  ));
+  const detBandDecided = det.filter((v) => v === false).length;
+  const mk = (all) => finalizeCounts(agentClaims, gtNow, m, m.borderline.map((_, k) => (det[k] === false ? { matched: false } : { matched: all })));
   const upper = mk(true);
   const lower = mk(false);
   out.push({
@@ -27,14 +34,15 @@ for (const t of TASKS) {
     agentClaims: agentClaims.length,
     gtClaims: gtNow.length,
     borderline: m.borderline.length,
+    detBandDecided,
     prevF1: prev.f1,
     f1Lower: Number(lower.f1.toFixed(3)),
     f1Upper: Number(upper.f1.toFixed(3)),
     precisionBounds: [Number(lower.precision.toFixed(3)), Number(upper.precision.toFixed(3))],
     recallBounds: [Number(lower.recall.toFixed(3)), Number(upper.recall.toFixed(3))],
-    matcher: { version: 'v2.3-fixed-gt+tfidf+5p5v', ...MATCH_DEFAULTS },
+    matcher: { version: 'v2.4-det-band-rules', ...MATCH_DEFAULTS },
     rescoredAt: new Date().toISOString(),
-    note: 'deterministic re-score of stored decomposition vs current GT; borderline pairs await live 5-vote adjudication (bounds shown)',
+    note: `deterministic re-score of stored decomposition vs current GT; ${detBandDecided} band pairs decided by the S2 pre-layer (unmatched in both bounds), ${m.borderline.length - detBandDecided} await live 5-vote adjudication`,
   });
 }
 writeFileSync('eval/results/rediscovery-rescore.json', JSON.stringify({ gtRevAtRescore: 'post-0aeeb6d-fix', tasks: out }, null, 2) + '\n');

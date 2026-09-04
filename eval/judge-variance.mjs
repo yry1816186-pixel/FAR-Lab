@@ -24,7 +24,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { TASKS, GT_REV, renderTopHypothesis, waitForTerminal } from './rediscovery-tasks.mjs';
-import { thresholdMatch, finalizeCounts, MATCH_DEFAULTS } from './claim-match.mjs';
+import { thresholdMatch, finalizeCounts, MATCH_DEFAULTS, deterministicBandVerdict } from './claim-match.mjs';
 import { judgeRediscovery } from './rediscovery-judge.mjs';
 import { maxAbsSwing, variance } from './stats.mjs';
 import { loadLocalSecrets } from './load-secrets.mjs';
@@ -51,17 +51,24 @@ const loadRecorded = () => {
   return byTask;
 };
 
-/** Deterministic-layer bounds: F1 under borderline-all-unmatched / all-matched. */
+/** Deterministic-layer bounds: F1 under borderline-all-unmatched / all-matched.
+ *  The S2 band pre-layer keeps its decided pairs unmatched in BOTH bounds —
+ *  they are decided, not banded, so they cannot widen the swing envelope. */
 const scoreWithBounds = (agentClaims, gtClaims) => {
   const m = thresholdMatch(agentClaims, gtClaims, MATCH);
   const detTotal = agentClaims.length + gtClaims.length;
+  const det = m.borderline.map((b) => deterministicBandVerdict(
+    b.side === 'agent' ? agentClaims[b.i] : gtClaims[b.i],
+    b.side === 'agent' ? gtClaims[b.bestIdx] ?? gtClaims[0] : agentClaims[b.bestIdx] ?? agentClaims[0],
+  ));
+  const detBandDecided = det.filter((v) => v === false).length;
   const adjudNo = m.borderline.map(() => ({ matched: false }));
-  const adjudYes = m.borderline.map(() => ({ matched: true }));
+  const adjudYes = m.borderline.map((_, k) => (det[k] === false ? { matched: false } : { matched: true }));
   const cNo = finalizeCounts(agentClaims, gtClaims, m, adjudNo);
   const cYes = finalizeCounts(agentClaims, gtClaims, m, adjudYes);
   return {
-    matcher: { ...MATCH, borderline: m.borderline.length },
-    deterministicShare: detTotal > 0 ? 1 - m.borderline.length / detTotal : 1,
+    matcher: { ...MATCH, borderline: m.borderline.length, detBandDecided },
+    deterministicShare: detTotal > 0 ? 1 - (m.borderline.length - detBandDecided) / detTotal : 1,
     f1Lower: Math.round(cNo.f1 * 1000) / 1000,
     f1Upper: Math.round(cYes.f1 * 1000) / 1000,
     recordedF1: null,

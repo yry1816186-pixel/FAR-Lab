@@ -242,7 +242,33 @@ describe('judgeRediscovery pipeline v2.1', () => {
     if (res.ok) {
       expect(res.counts.agentMatched).toBe(1); // majority yes
       expect(res.counts.gtMatched).toBe(1);
-      expect(res.matcher.version).toBe('v2.3-fixed-gt+tfidf+5p5v');
+      expect(res.matcher.version).toBe('v2.4-det-band-rules');
+      expect(res.matcher.detBandDecided).toBe(0); // this pair abstains — decided by the LLM vote
+    }
+  });
+
+  it('S2 pre-layer: a direction-conflicting borderline pair is decided deterministically and NEVER sent to the LLM', async () => {
+    // The recorded leniency FP shape: same entity, opposite directions. The
+    // rules classify it as a different finding BEFORE any vote is cast.
+    const gt = ['The T790M gatekeeper mutation sterically reduces inhibitor binding.'];
+    const agentClaim = 'T790M mutations restore EGFR signaling despite drug binding.';
+    let adjudicateCalls = 0;
+    const call = async (req: { purpose: string }, validate: (raw: unknown) => unknown) => {
+      if (req.purpose === 'rediscovery:decompose-v21') {
+        const v = validate({ agentClaims: [agentClaim] });
+        return v instanceof Error ? { ok: false, error: { message: v.message } } : { ok: true, data: v };
+      }
+      adjudicateCalls += 1;
+      const v = validate({ verdicts: [true] });
+      return v instanceof Error ? { ok: false, error: { message: v.message } } : { ok: true, data: v };
+    };
+    const res = await judgeRediscovery({ agentText: 'text', gtClaims: gt, call });
+    expect(adjudicateCalls).toBe(0); // the det layer consumed the pair — zero LLM adjudication
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.matcher.detBandDecided).toBeGreaterThanOrEqual(1); // agent-side (and gt-side if banded) decided
+      expect(res.counts.agentMatched).toBe(0); // opposing directions = different finding, unconditionally
+      expect(res.scoredUnscored.votesRequested).toBe(0); // accounting: nothing was ever asked of the judge
     }
   });
 });
