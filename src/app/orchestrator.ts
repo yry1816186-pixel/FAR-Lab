@@ -4,7 +4,7 @@ import type { Store } from '../persistence/store.js';
 import type { StageHandler, StageContext } from '../pipeline/types.js';
 import { defaultWorkflow, nextWorkflowStep, type WorkflowPlan } from '../domain/workflow-plan.js';
 import type { KernelCapabilityPlane } from '../kernel/capability-plane.js';
-import { kernelPlanRevisionFor } from '../kernel/planner.js';
+import { kernelPlanRevisionFor, contestednessOf } from '../kernel/planner.js';
 import { canonicalJson } from '../shared/crypto.js';
 import { totalBudgetFromEnv } from '../providers/http.js';
 import type { ArtifactStore, ModelProvider, SourceAdapter } from '../shared/ports.js';
@@ -665,10 +665,20 @@ export class Orchestrator {
               // early, so this only runs on the settling pass).
               const revisedPlan = kernelPlanRevisionFor(this.deps.store, runId, activePlan);
               if (revisedPlan !== null) {
+                // Same deterministic store reads as the planner (cheap, rare path) —
+                // the audit event must name WHICH signal fired, not just that one did.
+                const cv = contestednessOf(this.deps.store, runId);
                 this.deps.store.putObject('workflow_plan', revisedPlan);
                 this.deps.store.appendEvent(runId, {
                   type: 'note', stage: 'rank',
-                  detail: { reason: 'workflow_plan_revised', by: 'kernel-planner-v1', origin: revisedPlan.origin, version: revisedPlan.version, inserted: 'counter-evidence-debate' },
+                  detail: {
+                    reason: 'workflow_plan_revised', by: 'kernel-planner-v1', origin: revisedPlan.origin, version: revisedPlan.version, inserted: 'counter-evidence-debate',
+                    signals: cv.signals,
+                    contestedness: {
+                      governingRelations: cv.governingRelations, causalClaims: cv.causalClaims,
+                      counterRelations: cv.counterRelations, counterTargets: cv.counterTargets,
+                    },
+                  },
                 });
                 activePlan = revisedPlan;
               }

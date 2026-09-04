@@ -6,7 +6,7 @@ import { openDb } from '../src/persistence/db.js';
 import { Store } from '../src/persistence/store.js';
 import { contestednessOf, kernelPlanRevisionFor } from '../src/kernel/planner.js';
 import { defaultWorkflow } from '../src/domain/workflow-plan.js';
-import { ScientificProblemModel, ResearchQuestion, newId, RunStageName } from '../src/domain/index.js';
+import { ScientificProblemModel, ResearchQuestion, newId, RunStageName, EvidenceRelation, type EvidenceRelationType } from '../src/domain/index.js';
 import { STAGE_ORDER } from '../src/domain/run.js';
 import { Orchestrator } from '../src/app/orchestrator.js';
 import type { StageHandler } from '../src/pipeline/types.js';
@@ -42,16 +42,77 @@ const seedProblemModel = (store: Store, runId: string, questionId: string, causa
   }));
 };
 
+const seedRelation = (
+  store: Store, runId: string, relation: EvidenceRelationType,
+  target: { targetHypothesisId?: string; targetClaimId?: string; claimId?: string } = {},
+) => {
+  store.putObject('evidence_relation', EvidenceRelation.parse({
+    id: newId('ev'), runId, relation, ...target,
+    rationale: 'seeded relation', createdAt: new Date().toISOString(),
+  }));
+};
+
 describe('kernel planner v1 (deterministic contestedness)', () => {
   it('contestednessOf: absent model / weak premises / contested premises', () => {
     const dir = tmp();
     const store = new Store(openDb(path.join(dir, 'far.db')));
     const { runId, questionId } = makeRun(store);
-    expect(contestednessOf(store, runId)).toEqual({ contested: false, hasProblemModel: false, governingRelations: 0, causalClaims: 0 });
+    expect(contestednessOf(store, runId)).toEqual({
+      contested: false, hasProblemModel: false, governingRelations: 0, causalClaims: 0,
+      counterRelations: 0, counterTargets: 0, signals: [],
+    });
     seedProblemModel(store, runId, questionId, ['A influences B']);
     expect(contestednessOf(store, runId).contested).toBe(false);
     seedProblemModel(store, runId, questionId, ['A influences B', 'C gates A->B']);
-    expect(contestednessOf(store, runId)).toMatchObject({ contested: true, causalClaims: 2 });
+    expect(contestednessOf(store, runId)).toMatchObject({
+      contested: true, causalClaims: 2, signals: ['problem_model.causal_claims'],
+    });
+  });
+
+  it('contestednessOf: corpus counter-evidence fires the kernel without a contested problem model (I-002 route-drift fix)', () => {
+    const dir = tmp();
+    const store = new Store(openDb(path.join(dir, 'far.db')));
+    const { runId, questionId } = makeRun(store);
+    // the exact I-002 failure shape: a route that enumerates only ONE causal claim
+    seedProblemModel(store, runId, questionId, ['A influences B']);
+    expect(contestednessOf(store, runId).contested).toBe(false);
+    // but the retrieved corpus itself contradicts two distinct hypotheses
+    seedRelation(store, runId, 'contradicts', { targetHypothesisId: newId('hyp') });
+    seedRelation(store, runId, 'alternative_explanation', { targetHypothesisId: newId('hyp') });
+    const v = contestednessOf(store, runId);
+    expect(v.contested).toBe(true);
+    expect(v.counterRelations).toBe(2);
+    expect(v.counterTargets).toBe(2);
+    expect(v.signals).toEqual(['evidence.counter_relations']);
+  });
+
+  it('contestednessOf: counter relations on ONE target are not corpus-wide contest; neutral polarity never counts', () => {
+    const dir = tmp();
+    const store = new Store(openDb(path.join(dir, 'far.db')));
+    const { runId, questionId } = makeRun(store);
+    seedProblemModel(store, runId, questionId, ['A influences B']);
+    const oneTarget = newId('clm');
+    seedRelation(store, runId, 'contradicts', { targetClaimId: oneTarget });
+    seedRelation(store, runId, 'weakens', { targetClaimId: oneTarget }); // same target
+    seedRelation(store, runId, 'qualifies', { targetHypothesisId: newId('hyp') }); // neutral
+    seedRelation(store, runId, 'supports', { targetHypothesisId: newId('hyp') }); // supporting
+    const v = contestednessOf(store, runId);
+    expect(v.contested).toBe(false);
+    expect(v.counterRelations).toBe(2);
+    expect(v.counterTargets).toBe(1);
+    expect(v.signals).toEqual([]);
+  });
+
+  it('kernelPlanRevisionFor: fires on the evidence signal alone', () => {
+    const dir = tmp();
+    const store = new Store(openDb(path.join(dir, 'far.db')));
+    const { runId, questionId } = makeRun(store);
+    const plan = defaultWorkflow(runId);
+    expect(kernelPlanRevisionFor(store, runId, plan)).toBeNull();
+    seedProblemModel(store, runId, questionId, []); // uncontested problem model
+    seedRelation(store, runId, 'fails_to_replicate', { targetHypothesisId: newId('hyp') });
+    seedRelation(store, runId, 'contradicts', { targetHypothesisId: newId('hyp') });
+    expect(kernelPlanRevisionFor(store, runId, plan)).not.toBeNull();
   });
 
   it('kernelPlanRevisionFor: null when not contested; revised chain when contested; idempotent', () => {
@@ -111,6 +172,10 @@ describe('orchestrator: kernel plan revision at rank', () => {
     const events = store.listEvents(runId);
     const reasons = events.map((e) => (e.detail as { reason?: unknown })?.reason);
     expect(reasons).toContain('workflow_plan_revised');
+    const revised = events.find((e) => (e.detail as { reason?: unknown })?.reason === 'workflow_plan_revised');
+    const revisedDetail = revised?.detail as { signals?: unknown; contestedness?: { governingRelations?: unknown } };
+    expect(revisedDetail.signals).toEqual(['problem_model.causal_claims']);
+    expect(revisedDetail.contestedness?.governingRelations).toBe(0);
     const rankDone = events.findIndex((e) => e.type === 'stage_done' && e.stage === 'rank');
     const agentDone = events.findIndex((e) => (e.detail as { reason?: unknown })?.reason === 'agent_step_done');
     const planStarted = events.findIndex((e) => e.type === 'stage_started' && e.stage === 'plan');

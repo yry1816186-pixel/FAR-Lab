@@ -1,5 +1,6 @@
 import { WorkflowPlanSchema, type WorkflowPlan } from '../domain/workflow-plan.js';
 import type { Store } from '../persistence/store.js';
+import { RELATION_POLARITY } from '../domain/evidence.js';
 
 /**
  * Kernel planner v1 (Ω ADR D4) — DETERMINISTIC policy, no LLM in the control logic
@@ -7,30 +8,58 @@ import type { Store } from '../persistence/store.js';
  * governing relations or >=2 presupposed causal claims) earns an adversarial
  * counter-evidence-debate step inserted after the ranked hypothesis set stabilizes.
  * The revision is a persisted plan object + audit event; nothing silent.
+ *
+ * v1.1 — multi-signal contestedness (I-002 finding: the problem-model counts are a
+ * single LLM extraction sample whose distribution drifts completely across model
+ * routes and problems, deciding whether the kernel runs at all). The predicate now
+ * ALSO reads the run's own persisted evidence layer: >=2 counter-polarity evidence
+ * relations (contradicts/weakens/fails_to_replicate/alternative_explanation) aimed
+ * at DISTINCT targets means the corpus itself is contested — a signal that does not
+ * depend on how generously one scope-stage sample enumerated formal relations.
  */
-
 export const CONTESTED_MIN_RELATIONS = 2;
 export const CONTESTED_MIN_CAUSAL_CLAIMS = 2;
+export const CONTESTED_MIN_COUNTER_TARGETS = 2;
+
+/** Which persisted object a counter-polarity relation is contesting. */
+const counterTargetKey = (r: { targetHypothesisId?: string; targetClaimId?: string; claimId?: string }): string | null =>
+  r.targetHypothesisId ?? r.targetClaimId ?? r.claimId ?? null;
 
 export interface ContestednessVerdict {
   contested: boolean;
   hasProblemModel: boolean;
   governingRelations: number;
   causalClaims: number;
+  counterRelations: number;
+  counterTargets: number;
+  /** Which signals fired — recorded verbatim in the plan-revision audit event. */
+  signals: string[];
 }
 
 export const contestednessOf = (store: Store, runId: string): ContestednessVerdict => {
   const pm = store.listObjects('problem_model', runId).at(-1);
-  if (pm === undefined) {
-    return { contested: false, hasProblemModel: false, governingRelations: 0, causalClaims: 0 };
-  }
-  const governingRelations = pm.formalization.governingRelations.length;
-  const causalClaims = pm.statisticalPremises.causalClaims.length;
+  const governingRelations = pm?.formalization.governingRelations.length ?? 0;
+  const causalClaims = pm?.statisticalPremises.causalClaims.length ?? 0;
+
+  const counterRelations = store
+    .listObjects('evidence_relation', runId)
+    .filter((r) => RELATION_POLARITY[r.relation] === 'counter');
+  const counterTargets = new Set(
+    counterRelations.map(counterTargetKey).filter((k): k is string => k !== null),
+  ).size;
+
+  const signals: string[] = [];
+  if (governingRelations >= CONTESTED_MIN_RELATIONS) signals.push('problem_model.governing_relations');
+  if (causalClaims >= CONTESTED_MIN_CAUSAL_CLAIMS) signals.push('problem_model.causal_claims');
+  if (counterTargets >= CONTESTED_MIN_COUNTER_TARGETS) signals.push('evidence.counter_relations');
   return {
-    contested: governingRelations >= CONTESTED_MIN_RELATIONS || causalClaims >= CONTESTED_MIN_CAUSAL_CLAIMS,
-    hasProblemModel: true,
+    contested: signals.length > 0,
+    hasProblemModel: pm !== undefined,
     governingRelations,
     causalClaims,
+    counterRelations: counterRelations.length,
+    counterTargets,
+    signals,
   };
 };
 
