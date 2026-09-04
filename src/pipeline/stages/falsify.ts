@@ -30,11 +30,47 @@ import { relationStrength } from '../../domain/evidence-strength.js';
 // model output schema
 // ---------------------------------------------------------------------------
 
-/** A critique link reason must be a substantive argument (>= 20 chars), never a template (W5/S2). */
+/**
+ * A critique link reason must be a substantive argument (>= 20 chars), never a template (W5/S2).
+ *
+ * sharedFocus (FA-SCI-03, T4 discipline): the mechanism/entity words the model asserts
+ * the link rests on, copied VERBATIM from both the claim and the hypothesis surface.
+ * The deterministic verifier below refuses a link whose focus tokens cannot be found
+ * in BOTH texts — the n=60 blind re-judging (2026-09-04, exact 0.450) showed the
+ * dominant residual miss class is claims topically KIN but mechanism-unrelated, which
+ * survive every prose rule; a verifiable focus assertion converts the model's
+ * relevance claim into a checkable fact.
+ */
 const LinkReason = z.object({
   claimId: z.string().min(1),
   linkReason: z.string().min(20),
+  sharedFocus: z.string().min(6),
 });
+
+/**
+ * Latin mechanism words (>=4 chars) and CJK substrings (>=2 chars) usable as verbatim
+ * focus evidence — hyphenated compounds stay whole ("off-target", "过继调节").
+ */
+const FOCUS_TOKEN_RE = /[A-Za-z][A-Za-z0-9-]{3,}|[一-鿿]{2,}/g;
+const FOCUS_VERIFIED_MIN = 2;
+
+/**
+ * Deterministic shared-focus verification: at least FOCUS_VERIFIED_MIN distinct focus
+ * tokens must occur verbatim in BOTH the claim text and the hypothesis surface
+ * (statement + mechanism + predictions, lowercased substring match). Pure; exported
+ * for direct testing.
+ */
+export const verifySharedFocus = (
+  focus: string,
+  claimText: string,
+  hypSurface: string,
+): { passes: boolean; verified: string[] } => {
+  const tokens = [...new Set(focus.match(FOCUS_TOKEN_RE) ?? [])];
+  const claimLower = claimText.toLowerCase();
+  const hypLower = hypSurface.toLowerCase();
+  const verified = tokens.filter((t) => claimLower.includes(t.toLowerCase()) && hypLower.includes(t.toLowerCase()));
+  return { passes: verified.length >= FOCUS_VERIFIED_MIN, verified };
+};
 
 /**
  * Counter link with an EXPLICIT relation label (Wave-3 relation-reliability fix, spec §5):
@@ -73,8 +109,16 @@ const FalsifyOut = z.object({
     .default([]),
   counterLinks: z.array(CounterLink).default([]),
   supportingClaimIds: z.array(z.string()).default([]),
-  /** W5/S2: why each linked supporting claim supports THIS hypothesis (>= 20 chars per reason). */
-  supportingLinks: z.array(LinkReason).default([]),
+  /**
+   * W5/S2 + FA-SCI-03: why each linked supporting claim supports THIS hypothesis
+   * (>= 20 chars per reason). The per-link relation distinguishes full support from
+   * a component/subgroup/condition-level one (blind re-judging's second-largest
+   * miss class was supports->qualifies) — unparseable labels stay 'supports'
+   * (never demote silently on a parse hiccup).
+   */
+  supportingLinks: z.array(LinkReason.extend({
+    relation: z.enum(['supports', 'qualifies']).catch('supports'),
+  })).default([]),
   /**
    * B6 binding-density enrichment: ids of provided claims the model EXPLICITLY evaluated
    * and rejected as bearing no real relation to THIS hypothesis — distinguishes
@@ -321,7 +365,11 @@ export const falsifyStage: StageHandler = {
           'do not link — never invent a conflict, and never pad the evidence base with topic-neighbors that do not ' +
           'actually bear on the mechanism. For EVERY linked claim give a specific ' +
           'linkReason of at least 20 characters naming the exact tension or support (generic template phrases are ' +
-          'invalid). State genuine uncertainties.',
+          'invalid), and give sharedFocus: the 2-4 mechanism/entity words the link rests on, copied VERBATIM from ' +
+          'both the claim text and the hypothesis (a link whose sharedFocus words cannot be found in both texts is ' +
+          'refused). On the supporting side, label the relation "qualifies" (not "supports") when the claim supports ' +
+          'only a component, subgroup, condition, or one premise of the hypothesis rather than the hypothesis as ' +
+          'stated. State genuine uncertainties.',
         payload: {
           hypothesis: {
             id: hyp.id,
@@ -404,6 +452,35 @@ export const falsifyStage: StageHandler = {
           );
         }
       }
+      // ---- FA-SCI-03 T4 shared-focus gate: verify the model's focus assertion ----
+      // The lexical gate above passes topically-kin claims; the model must now NAME
+      // the mechanism words the link rests on and those words must be found verbatim
+      // in BOTH texts. A link whose focus is unfindable is refused with the evidence
+      // kept visible — model proposes, determinism verifies (same T4 rule as figures).
+      const focusOfCounter = new Map(out.counterLinks.map((l) => [l.claimId, l.sharedFocus] as const));
+      const focusOfSupporting = new Map(out.supportingLinks.map((l) => [l.claimId, l.sharedFocus] as const));
+      const hypSurface = `${hyp.statement} ${hyp.mechanism} ${hyp.predictions.join(' ')}`;
+      const focusGate = (ids: readonly string[], focusOf: ReadonlyMap<string, string>): { kept: string[]; dropped: string[] } => {
+        const kept: string[] = [];
+        const dropped: string[] = [];
+        for (const id of ids) {
+          const focus = focusOf.get(id);
+          const claim = claimById.get(id);
+          if (focus === undefined || claim === undefined) { dropped.push(id); continue; }
+          const v = verifySharedFocus(focus, claim.text, hypSurface);
+          if (v.passes) kept.push(id); else dropped.push(id);
+        }
+        return { kept, dropped };
+      };
+      const focusGatedCounter = focusGate(gatedCounter.kept, focusOfCounter);
+      const focusGatedSupporting = focusGate(gatedSupporting.kept, focusOfSupporting);
+      for (const [label, gated] of [['counter', focusGatedCounter], ['supporting', focusGatedSupporting]] as const) {
+        if (gated.dropped.length > 0) {
+          warnings.push(
+            `${hyp.id}: refused ${gated.dropped.length} ${label} link(s) (${gated.dropped.join(', ')}) — sharedFocus tokens not found verbatim in both the claim and the hypothesis`,
+          );
+        }
+      }
       const now = new Date().toISOString();
       // ---- W5/S2: relation rationale must be auditable, never a constant template ----
       // Priority: the model's per-link linkReason (a specific argument, >= 20 chars).
@@ -413,6 +490,7 @@ export const falsifyStage: StageHandler = {
       const counterReasons = new Map(out.counterLinks.map((l) => [l.claimId, l.linkReason] as const));
       const supportingReasons = new Map(out.supportingLinks.map((l) => [l.claimId, l.linkReason] as const));
       const counterLinkByClaim = new Map(validCounter.map((l) => [l.claimId, l] as const));
+      const supportingLinkByClaim = new Map(out.supportingLinks.map((l) => [l.claimId, l] as const));
       const hypShort = hyp.id.slice(0, 8); // e.g. hyp_k57p — readable short code
       const linkRationale = (claimId: string, direction: 'counter' | 'supporting'): string => {
         const reason = (direction === 'counter' ? counterReasons : supportingReasons).get(claimId)?.trim();
@@ -467,14 +545,14 @@ export const falsifyStage: StageHandler = {
       // survive. Audit-call failure keeps the already-gated original links with a
       // visible warning — the audit is enrichment, never a silent drop path.
       const proposedLinks: { claimId: string; relation: CritiqueRelation; linkReason: string }[] = [
-        ...gatedCounter.kept.map((id) => ({
+        ...focusGatedCounter.kept.map((id) => ({
           claimId: id,
           relation: (counterLinkByClaim.get(id)?.relation ?? 'weakens') as CritiqueRelation,
           linkReason: linkRationale(id, 'counter'),
         })),
-        ...gatedSupporting.kept.map((id) => ({
+        ...focusGatedSupporting.kept.map((id) => ({
           claimId: id,
-          relation: 'supports' as const,
+          relation: (supportingLinkByClaim.get(id)?.relation ?? 'supports') as CritiqueRelation,
           linkReason: linkRationale(id, 'supporting'),
         })),
       ];
@@ -570,17 +648,17 @@ export const falsifyStage: StageHandler = {
         audit.get(id)?.relation ?? proposed;
       // proposal family = where the link was PROPOSED, independent of the audited label
       const proposalFamilyOf = new Map<string, 'counter' | 'supporting'>([
-        ...gatedCounter.kept.map((id) => [id, 'counter'] as const),
-        ...gatedSupporting.kept.map((id) => [id, 'supporting'] as const),
+        ...focusGatedCounter.kept.map((id) => [id, 'counter'] as const),
+        ...focusGatedSupporting.kept.map((id) => [id, 'supporting'] as const),
       ]);
-      for (const id of gatedCounter.kept) {
+      for (const id of focusGatedCounter.kept) {
         if (audit.get(id)?.dropped) continue;
         const proposed = (counterLinkByClaim.get(id)?.relation ?? 'weakens') as CritiqueRelation;
         (finalRelationOf(id, proposed) === 'supports' ? finalSupporting : finalCounter).push(id);
       }
-      for (const id of gatedSupporting.kept) {
+      for (const id of focusGatedSupporting.kept) {
         if (audit.get(id)?.dropped) continue;
-        (finalRelationOf(id, 'supports') === 'supports' ? finalSupporting : finalCounter).push(id);
+        (finalRelationOf(id, (supportingLinkByClaim.get(id)?.relation ?? 'supports') as CritiqueRelation) === 'supports' ? finalSupporting : finalCounter).push(id);
       }
       for (const id of finalCounter) {
         const decision = audit.get(id);

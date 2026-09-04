@@ -469,7 +469,20 @@ export function StudyMap({
             sources ← claims (support/counter) ← ranked hypotheses. Reuses the
             B7 landscape graph (real store objects only); claim clicks open the
             map inspector, hypothesis clicks land on the hypotheses band. */}
-        {!draftable && (claims.length > 0 || activeHyps.length > 0) && (
+        {!draftable && !scienceLoaded && settled && (
+          /* §21 CLS: the graph is a ~900px content-height insertion. Mounting
+             it above painted bands after first paint displaced the visible
+             state band ~950px (CLS 0.30, the hosted intermittent; deterministic
+             reproducer: web/e2e/map-slow-science.spec.ts). While evidence is
+             unsettled the slot carries a viewport-aware reserve so everything
+             below the question starts below the fold — no visible element can
+             be displaced by the reserve→content swap, on any viewport height. */
+          <section className="map-node map-node--graph" aria-hidden="true">
+            <p className="map-node-label">{t('map.graphLabel')}</p>
+            <div className="map-graph-frame map-graph-frame--reserving" />
+          </section>
+        )}
+        {!draftable && scienceLoaded && (claims.length > 0 || activeHyps.length > 0) && (
           <section className="map-node map-node--graph">
             <p className="map-node-label">{t('map.graphLabel')}</p>
             <div className="map-graph-frame">
@@ -516,7 +529,11 @@ export function StudyMap({
         )}
         {!draftable && (
           <>
-        {settled && science !== null && (<>
+        {/* Paint coupling (§21): the state band's DATA arrives on the independent
+            spine request, but its PAINT waits for evidence to settle — otherwise
+            it paints above the future graph slot and is displaced when the graph
+            mounts (the slow-evidence CLS window; see graph reserve above). */}
+        {settled && scienceLoaded && science !== null && (<>
           <ProblemModelBand science={science} runId={run.id} onMutated={onMutated} />
           <StateBand
             run={run}

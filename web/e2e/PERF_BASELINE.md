@@ -73,3 +73,15 @@ science-projection races that the earlier empty-workspace measurement missed.
   deterministic route exposes seven claims and no admissible hypothesis cards.
   Any generated stress corpus must remain explicitly labelled synthetic and
   cannot serve as evidence of scientific validity.
+
+## 2026-09-05: hosted map-CLS intermittent root-caused (deterministic reproducer)
+
+FINAL_GAPS' registered race (0.3011 vs 0.0298 hosted, same tree) reproduced
+deterministically by delaying `/evidence` past first paint
+(`map-slow-science.spec.ts`): the evidence-hypothesis graph node is a
+content-height (~900px) insertion above the painted state band, displacing it
+~950px (CLS 0.30). Fix: viewport-aware graph-slot reserve while evidence is
+unsettled + state-band paint coupled to evidence settle (data fetches stay
+independent). Slow-evidence 1200/2500ms, slow-spine 2500ms and the base perf
+map case all measure CLS 0.0296 (baseline app-shell shift only). The spine-side
+window (state-band reserve, 2ce3159) is covered by the slow-spine case.

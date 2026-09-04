@@ -402,15 +402,34 @@ const falsificationSpec: Handler = (p) => {
     const fromAvailable = idListOf(p.availableClaims);
     return fromAvailable.length > 0 ? fromAvailable : idListOf(p.claims);
   })();
+  // FA-SCI-03 shared-focus gate: emit a focus that ACTUALLY verifies — the tokens
+  // must occur verbatim in both a claim text and the hypothesis surface, or the
+  // deterministic gate refuses the link (and the offline journey loses relations).
+  const textOf = (id: unknown): string => {
+    const rec = Array.isArray(p.availableClaims)
+      ? p.availableClaims.find((c: unknown) => asRecord(c)?.id === id)
+      : undefined;
+    const r = asRecord(rec);
+    return asString(r?.text) ?? asString(r?.quote) ?? '';
+  };
+  const focusBetween = (id: unknown): string => {
+    const text = textOf(id).toLowerCase();
+    const words = statement.match(/[A-Za-z][A-Za-z0-9-]{3,}/g) ?? [];
+    const shared = [...new Set(words.filter((w) => text.includes(w.toLowerCase())))].slice(0, 3);
+    return shared.length >= 2 ? shared.join(' ') : 'mechanism evidence relation';
+  };
   const supportingLinks = claimIds.slice(0, 2).map((claimId) => ({
     claimId,
+    relation: 'supports' as const,
     linkReason: `offline deterministic link: the claim states the association this hypothesis predicts, taken as supporting on the development route`,
+    sharedFocus: focusBetween(claimId),
   }));
   const counterLinks = claimIds.length > 3
     ? [{
         claimId: claimIds[claimIds.length - 1]!,
         relation: 'weakens' as const,
         linkReason: 'offline deterministic counter link: the claim bounds the association to a subgroup, weakening the hypothesis in its general form (development route)',
+        sharedFocus: focusBetween(claimIds[claimIds.length - 1]),
       }]
     : [];
   return {

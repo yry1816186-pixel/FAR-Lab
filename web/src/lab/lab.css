@@ -976,6 +976,10 @@
   padding: var(--sp-3);
 }
 .map-graph-frame .graph-svg { border: none; border-radius: 0; background: transparent; }
+/* §21 CLS reserve: while evidence is unsettled this placeholder owns the graph
+   slot. Viewport-aware height so every band below the question starts below
+   the fold — the later reserve→content swap cannot displace a visible element. */
+.map-graph-frame--reserving { min-height: 56vh; }
 
 /* ---- Workspace navigation rail (Bohrium/Doubao parity shell) ---- */
 .app-rail {

@@ -57,8 +57,16 @@ export const extractPromptsRaw = (file) => {
     : raw.startsWith("'")
       ? normalize(raw.slice(1, -1)).replace(/\\'/g, "'").replace(/\\n/g, '\n').replace(/\\\\/g, '\\')
       : normalize(JSON.parse(raw));
-  const re = /const\s+([A-Z][A-Z0-9_]*PROMPT[A-Z0-9_]*)\s*(?::\s*string\s*)?=\s*(`(?:[^`\\]|\\.)*`|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")/g;
-  for (const m of src.matchAll(re)) out.push({ name: m[1], text: lit(m[2]) });
+  // `+`-continued literals (const P = 'seg' + 'seg' + …): the concatenation is the
+  // runtime prompt — anything after the first segment was previously invisible to
+  // the drift gate (live miss: the falsify INLINE prompt's tail segments). The
+  // LIT regex matches one literal; the CONTINUED regex consumes the whole chain.
+  const LIT = String.raw`(?:\`(?:[^\`\\]|\\.)*\`|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*)`;
+  const re = new RegExp(String.raw`const\s+([A-Z][A-Z0-9_]*PROMPT[A-Z0-9_]*)\s*(?::\s*string\s*)?=\s*(` + LIT + String.raw`(?:\s*\+\s*` + LIT + String.raw`)*)`, 'g');
+  for (const m of src.matchAll(re)) {
+    const parts = [...m[2].matchAll(new RegExp(LIT, 'g'))].map((p) => lit(p[0]));
+    out.push({ name: m[1], text: parts.join('') });
+  }
   // Array-joined prompt constants: const NAME...PROMPT... = [ 'elem', 'elem' ].join(...)
   // (the evidence/join pattern — the const regex cannot see the elements)
   const arrRe = /const\s+([A-Z][A-Z0-9_]*PROMPT[A-Z0-9_]*)[^=]*=\s*\[([\s\S]*?)\]\s*\.join/g;
@@ -70,9 +78,10 @@ export const extractPromptsRaw = (file) => {
   // Inline call-site prompts: systemPrompt: '...' / `...` — named by the nearby
   // purpose; position-independent fallback (content prefix) so edits elsewhere
   // in the file never shuffle identities.
-  const inline = /systemPrompt:\s*(`(?:[^`\\]|\\.)*`|'(?:[^'\\]|\\.)*')/g;
+  const inline = new RegExp(String.raw`systemPrompt:\s*(` + LIT + String.raw`(?:\s*\+\s*` + LIT + String.raw`)*)`, 'g');
   for (const m of src.matchAll(inline)) {
-    const text = lit(m[1]);
+    const parts = [...m[1].matchAll(new RegExp(LIT, 'g'))].map((p) => lit(p[0]));
+    const text = parts.join('');
     const after = src.slice(m.index, m.index + 400);
     const pm = /purpose:\s*'([^']{1,60})'/.exec(after);
     const fallback = text.slice(0, 24).replace(/[^A-Za-z0-9]/g, '').slice(0, 16);

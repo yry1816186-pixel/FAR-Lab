@@ -184,11 +184,14 @@
       "status": "PARTIAL",
       "priority": "P0",
       "owner": "self",
-      "gap": "REMEASURED 2026-09-04 (D-036 unblocked, funded route): cross-family blind re-judging n=60 (two disjoint stratified samples, glm-4.6 judging) — overall exact 0.450, supports 16/24=0.667, counter-family strict 14/26=0.538 (batch spread 0.462/0.615 disclosed); misses decompose inverted=4/empty=6/qualifies-only=2. The prior same-family 0.61 is reclassified as an upper-bound reference. Remaining gap to 0.8 is real: the empty(unrelated)=6 miss class and the qualifies-boundary are the next levers",
+      "gap": "OFFLINE LEVERS SHIPPED (2026-09-05): (1) T4 shared-focus gate — critique links must carry sharedFocus naming mechanism/entity words that occur VERBATIM in both the claim and hypothesis surface (verifySharedFocus, <2 verified tokens = link refused with visible warning; falsify.ts); calibration recorded: lexical containment cannot separate the miss classes (judge-unrelated containment 0.077-0.375 vs judge-related down to 0 — the pipeline links ON surface overlap, so only a verified mechanism-token assertion adds signal). (2) Supporting-side qualifies labeling (component/subgroup/condition support lands as qualifies, schema-enforced). Prompts re-gated (snapshot v-bump + gold anchors green; extractor widened to cover +-concatenated prompt tails). REMAINING: live cross-family re-judge on the funded route to measure exact-label movement (blocked on dashscope arrears).",
       "target": "exact-label>=0.7 on >=5 problems, cross-family judge",
       "verify": "spikes/relation-precision.mjs expanded sample",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md CAP-04"
+        "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md CAP-04",
+        "eval/omega/anchors/relation-precision-n30{,-b2}-20260904.jsonl miss decomposition (33 misses: ~12 topically-kin-but-unrelated, ~12 qualifies-boundary, 4 inverted)",
+        ".control calibration study: lexical containment ranges (unrelated 0.077-0.375, related 0-0.615) — gates must verify assertions, not measure overlap",
+        "src/pipeline/stages/falsify.ts verifySharedFocus + focus gate + supporting qualifies relation; tests/falsify-binding.test.ts 61/61 incl refusal + qualifies routing"
       ]
     },
     {
