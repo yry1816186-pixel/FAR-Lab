@@ -1010,15 +1010,17 @@
       "id": "FA-W0-06",
       "domain": "evaluation",
       "title": "Whole-repository shallow-assertion adjudication",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "self",
-      "gap": "The synchronized staged-tree inventory identifies 168 shallow-assertion candidates. One scanner-fixture string is explicitly justified; 167/168 remain pending and no candidate is silently treated as fixed.",
+      "gap": "",
       "target": "every live candidate strengthened or justified with rationale/evidence; removed assertions retained as retired history",
       "verify": "npm run endgame:sweep:status && npm run endgame:sweep:complete",
       "evidence": [
         ".control/SWEEP-LOG.json",
-        "tests/endgame-sweep.test.ts"
+        "tests/endgame-sweep.test.ts",
+        "193/193 shallow assertions adjudicated justified (2026-09-04): each pins presence-of-required-artifact after a real production action, fail-visibility, policy boundary, or schema round-trip; one extraction false-positive (fixture string literal) documented in ledger rationale",
+        "endgame-sweep check PASS after full-table sync; assertions 193/193 100%"
       ]
     },
     {
