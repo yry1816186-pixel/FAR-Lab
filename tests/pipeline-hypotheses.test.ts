@@ -775,19 +775,19 @@ describe('critique_falsify stage', () => {
         {
           claimId: c1.id,
           relation: 'weakens',
-          linkReason: 'the replication failure of the duration link directly contradicts this exposure mechanism',
+          linkReason: 'the replication failure of the duration link directly contradicts this exposure mechanism', sharedFocus: 'duration off-targeting',
         },
         {
           claimId: 'clm_bogus00000000000000000000aaa',
           relation: 'contradicts',
-          linkReason: 'a bogus claim reference that must be dropped with a visible warning',
+          linkReason: 'a bogus claim reference that must be dropped with a visible warning', sharedFocus: 'duration off-targeting',
         },
       ],
       supportingClaimIds: [c2.id],
       supportingLinks: [
         {
           claimId: c2.id,
-          linkReason: 'the observed dose-response is the exact monotonic pattern this hypothesis predicts',
+          linkReason: 'the observed dose-response is the exact monotonic pattern this hypothesis predicts', sharedFocus: 'duration off-targeting',
         },
       ],
       uncertainties: ['measurement noise at low edit frequencies'],
@@ -911,11 +911,18 @@ describe('critique_falsify stage', () => {
         {
           claimId: cCounter.id,
           relation: 'contradicts',
-          linkReason: 'explicit per-link reason passes through verbatim without fallback construction',
+          linkReason: 'explicit per-link reason passes through verbatim without fallback construction', sharedFocus: 'duration off-targeting',
         },
       ],
       supportingClaimIds: [cSupporting.id],
-      supportingLinks: [],
+      supportingLinks: [
+        {
+          claimId: cSupporting.id,
+          relation: 'supports',
+          linkReason: 'the duration-dependent off-targeting supporting correlation matches the predicted exposure gradient',
+          sharedFocus: 'duration off-targeting',
+        },
+      ],
       uncertainties: [],
       testability: 'testable_now',
     };
@@ -931,10 +938,9 @@ describe('critique_falsify stage', () => {
     // counter (schema v2): every counter link carries its own >=20-char reason — passes through verbatim
     expect(counterRel?.rationale).toBe('explicit per-link reason passes through verbatim without fallback construction');
     expect(counterRel?.rationale).not.toContain(hypShort);
-    // supporting fallback: a supportingClaimIds entry with no matching supportingLinks reason gets the
-    // deterministic claim-text construction — truncated to 120 chars, never a bare constant
-    expect(supportingRel?.rationale).toBe(`${longSupportingText.slice(0, 120)}…（与假设 ${hypShort} 的 critique 支持关联）`);
-    expect(supportingRel?.rationale).not.toContain('SUPPORTTAIL');
+    // supporting (schema v2 + focus): the link entry's own reason passes through verbatim
+    expect(supportingRel?.rationale).toBe('the duration-dependent off-targeting supporting correlation matches the predicted exposure gradient');
+    expect(supportingRel?.rationale).not.toContain(hypShort);
     // never the pre-W5 constant templates
     for (const r of rels) {
       expect(r.rationale).not.toBe('critique-linked counter evidence');
@@ -969,8 +975,8 @@ describe('critique_falsify stage', () => {
       failureInterpretation: 'duration mechanism unsupported; revisit the mechanism class',
       assumptionCritiques: [],
       counterLinks: [
-        { claimId: distant.id, relation: 'contradicts', linkReason: 'a specific-looking but topically hollow rationale that must not survive the gate' },
-        { claimId: near.id, relation: 'contradicts', linkReason: 'the duration-independent observation directly undermines the duration mechanism' },
+        { claimId: distant.id, relation: 'contradicts', linkReason: 'a specific-looking but topically hollow rationale that must not survive the gate', sharedFocus: 'quantum error correction' },
+        { claimId: near.id, relation: 'contradicts', linkReason: 'the duration-independent observation directly undermines the duration mechanism', sharedFocus: 'duration off-targeting' },
       ],
       supportingClaimIds: [],
       supportingLinks: [],
@@ -1018,10 +1024,10 @@ describe('critique_falsify stage', () => {
       failureInterpretation: 'duration mechanism unsupported; revisit the mechanism class',
       assumptionCritiques: [],
       counterLinks: [
-        { claimId: cExplicitContra.id, relation: 'contradicts', linkReason: 'explicitly asserted incompatibility with the duration mechanism prediction' },
-        { claimId: cExplicitQual.id, relation: 'qualifies', linkReason: 'scope condition limiting the duration effect to high-dose exposure only' },
-        { claimId: cUnlabeled.id, linkReason: 'weaker-than-predicted gradient reduces confidence in the duration mechanism' },
-        { claimId: cGarbageLabel.id, relation: 'DEFINITELY-CONTRADICTS!!', linkReason: 'an unparseable label must never surface as contradicts' },
+        { claimId: cExplicitContra.id, relation: 'contradicts', linkReason: 'explicitly asserted incompatibility with the duration mechanism prediction', sharedFocus: 'duration off-targeting' },
+        { claimId: cExplicitQual.id, relation: 'qualifies', linkReason: 'scope condition limiting the duration effect to high-dose exposure only', sharedFocus: 'duration off-targeting' },
+        { claimId: cUnlabeled.id, linkReason: 'weaker-than-predicted gradient reduces confidence in the duration mechanism', sharedFocus: 'off-targeting duration gradient' },
+        { claimId: cGarbageLabel.id, relation: 'DEFINITELY-CONTRADICTS!!', linkReason: 'an unparseable label must never surface as contradicts', sharedFocus: 'duration off-targeting' },
       ],
       supportingClaimIds: [],
       supportingLinks: [],
@@ -1096,7 +1102,7 @@ describe('critique_falsify stage', () => {
       failureInterpretation: 'duration mechanism unsupported; revisit the mechanism class',
       assumptionCritiques: [],
       counterLinks: [
-        { claimId: cCounterProposed.id, relation: 'weakens', linkReason: 'the proposer argued this weakens the duration mechanism claim' },
+        { claimId: cCounterProposed.id, relation: 'weakens', linkReason: 'the proposer argued this weakens the duration mechanism claim', sharedFocus: 'duration off-targeting' },
       ],
       supportingClaimIds: [],
       supportingLinks: [],
@@ -1153,11 +1159,11 @@ describe('critique_falsify stage', () => {
       failureInterpretation: 'duration mechanism unsupported; revisit the mechanism class',
       assumptionCritiques: [],
       counterLinks: [
-        { claimId: cStretch.id, relation: 'contradicts', linkReason: 'asserted incompatibility with the duration mechanism prediction' },
+        { claimId: cStretch.id, relation: 'contradicts', linkReason: 'asserted incompatibility with the duration mechanism prediction', sharedFocus: 'duration off-targeting' },
       ],
       supportingClaimIds: [cSup.id],
       supportingLinks: [
-        { claimId: cSup.id, linkReason: 'the dose-response evidence directly supports the duration mechanism' },
+        { claimId: cSup.id, linkReason: 'the dose-response evidence directly supports the duration mechanism', sharedFocus: 'duration off-targeting' },
       ],
       uncertainties: [],
       testability: 'testable_now',
@@ -1189,7 +1195,7 @@ describe('critique_falsify stage', () => {
     // audit-call failure keeps the originally gated links, visibly
     const h2 = makeHyp(run.id, 'dose magnitude drives off-targeting', { createdAt: ts(5) });
     store.putObject('hypothesis', h2);
-    const spec2 = { ...spec, counterLinks: [{ claimId: cSup.id, relation: 'weakens', linkReason: 'dose-response evidence weakens the dose-magnitude claim specifically' }], supportingClaimIds: [], supportingLinks: [] };
+    const spec2 = { ...spec, counterLinks: [{ claimId: cSup.id, relation: 'weakens', linkReason: 'dose-response evidence weakens the dose-magnitude claim specifically', sharedFocus: 'off-targeting dose' }], supportingClaimIds: [], supportingLinks: [] };
     const { ctx: ctx2 } = makeCtx(run, store, [
       { rawOutput: JSON.stringify(spec2) },
       { rawOutput: 'not json at all' }, // audit call fails schema -> failure path
@@ -1230,7 +1236,7 @@ describe('critique_falsify stage', () => {
       assumptionCritiques: [],
       counterClaimIds: [c1.id],
       weakeningClaimIds: [],
-      counterLinks: [{ claimId: c1.id, linkReason: 'too short' }], // < 20 chars -> schema rejection
+      counterLinks: [{ claimId: c1.id, linkReason: 'too short', sharedFocus: 'duration off-targeting' }], // < 20 chars -> schema rejection
       supportingClaimIds: [],
       supportingLinks: [],
       uncertainties: [],
