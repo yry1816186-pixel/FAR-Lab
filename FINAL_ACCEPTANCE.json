@@ -242,7 +242,8 @@
       "target": "AstaBench literature-understanding subset adapter + MLR re-run 30 tasks under new protocol",
       "verify": "eval scripts + archived raw artifacts",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md"
+        "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md",
+        "2026-09-04 AstaBench HF reachability probe: huggingface.co reachable (200) but candidate dataset ids (AstaLab/asta-bench etc.) return 401 gated/unavailable — needs the correct dataset org/id or access grant before integration"
       ]
     },
     {
@@ -888,7 +889,7 @@
       "status": "PARTIAL",
       "priority": "P2",
       "owner": "self",
-      "gap": "version field + CI gate DONE (2026-09-03: snapshot entries carry version/provenance/history; --snapshot refuses unannotated overwrites; ci.yml verify job runs the check; the 48-entry drift batch was audited zero-real-regression before re-anchor). Remaining: per-prompt gold corpus + taxonomy eval",
+      "gap": "version field + CI gate DONE; failure-taxonomy regression DONE (eval/taxonomy-regression.mjs 26/26 canonical shapes pinned incl. TLS family + cause-carried errno + message shapes, wired into CI). Remaining: per-prompt semantic gold corpus",
       "target": "version field + per-prompt gold corpus + taxonomy eval",
       "verify": "node eval/prompt-regression.mjs --check (exit 0 at HEAD; wired into .github/workflows/ci.yml)",
       "evidence": [

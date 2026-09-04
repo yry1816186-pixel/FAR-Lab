@@ -82,6 +82,9 @@ jobs:
       # the snapshot rotted 48 entries behind audited lane evolution; CI now fails
       # on drift so a prompt change without a versioned --snapshot --note bump
       # cannot land green. Requires dist/ (imports computeRequestHash).
+      # FA-EVAL-03: failure-taxonomy verdict matrix (operator-facing contract).
+      - name: Failure taxonomy regression
+        run: node eval/taxonomy-regression.mjs
       - name: Prompt drift gate (versioned snapshot)
         run: node eval/prompt-regression.mjs --check
       - name: TUI package tests
