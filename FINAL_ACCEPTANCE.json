@@ -364,14 +364,16 @@
       "id": "FA-DAT-01",
       "domain": "data",
       "title": "Streaming data plane (100MB/200MB full-buffer caps removed)",
-      "status": "FAIL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "self",
-      "gap": "CSV/NetCDF/artifacts/http-response all full-buffer; caps are guardrails not capability",
+      "gap": "CLOSED 2026-09-04: streaming plane landed (c3b8f3f, parallel session) — putStream streaming landing + stream sha256 + streaming CSV row analysis + column-view split + netcdf de-cap + http size cap; capacity benchmark at the acceptance's own target sizes RUNS GREEN through the real paths (54d8221): 1GB CSV acquire+split (24,004,000 rows, split 40.7s — the pre-DAT-01 path hard-threw at its 100MB buffer cap) and 500MB NetCDF streaming put+hash (previously threw at 200MB). Peak RSS 1958MB < the 2048MB limit, composition disclosed (includes uv sidecar residency)",
       "target": "streaming sha256 + chunked put + CSV row iterator; 500MB NetCDF + 1GB CSV e2e benchmark",
-      "verify": "capacity benchmark artifact",
+      "verify": "node scripts/capacity-benchmark.mjs (defaults = acceptance sizes); artifact eval/omega/anchors/capacity-benchmark-20260904.json",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/04-data.md CAP-07"
+        "FINAL_EVIDENCE/audit-2026-08-30/04-data.md CAP-07",
+        "src/persistence/artifacts.ts putStream + src/shared/crypto.ts sha256FileHex + src/experiment/csv.ts streaming analysis (c3b8f3f)",
+        "scripts/capacity-benchmark.mjs + eval/omega/anchors/capacity-benchmark-20260904.json (commit 54d8221)"
       ]
     },
     {
