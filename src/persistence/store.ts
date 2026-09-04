@@ -161,12 +161,26 @@ export class Store {
    *  the unified-timeline rule: every record surface is reachable from search. */
   private static readonly FTS_MIRRORED_KINDS: ReadonlySet<string> = new Set(['question', 'hypothesis', 'claim', 'conversation']);
 
-  /** Called after object writes to keep the FTS mirror fresh (best-effort). */
-  private touchFts(kind: string): void {
+  /** Called after object writes to keep the FTS mirror fresh (best-effort).
+   *  FA-DAT-04: TARGETED upsert (drop this obj_id, insert the new body) — the
+   *  pre-2026-09-04 full reindexFts(kind) here re-wrote EVERY row of the kind
+   *  on every put, O(n) write amplification that dominated puts past ~1k
+   *  objects. Full rebuilds stay on the lazy ensureFts path (first search). */
+  private upsertFtsRow(kind: string, id: string, parsed: Record<string, unknown>): void {
     if (!Store.FTS_MIRRORED_KINDS.has(kind)) return;
     if (!this.ftsReady) return;
     try {
-      this.reindexFts(kind);
+      const body = String(parsed.text ?? parsed.statement ?? parsed.title ?? '');
+      this.db.prepare('DELETE FROM far_search WHERE kind=? AND obj_id=?').run(kind, id);
+      if (body.length > 0) {
+        this.db.prepare('INSERT INTO far_search (kind, obj_id, body) VALUES (?,?,?)').run(kind, id, body);
+      }
+      if (this.trigramReady) {
+        this.db.prepare('DELETE FROM far_search_tri WHERE kind=? AND obj_id=?').run(kind, id);
+        if (body.length > 0) {
+          this.db.prepare('INSERT INTO far_search_tri (kind, obj_id, body) VALUES (?,?,?)').run(kind, id, body);
+        }
+      }
     } catch {
       // Mirror drift only costs ranking freshness until the next full reindex.
     }
@@ -486,7 +500,7 @@ export class Store {
     if (kind === 'evidence_relation' || kind === 'revision') {
       this.recordLineageEdgesFromPayload(kind, parsed as Record<string, unknown>, runId);
     }
-    this.touchFts(kind);
+    this.upsertFtsRow(kind, id, parsed as Record<string, unknown>);
   }
 
   /** Shared deterministic edge derivation — backfill and live writer read identical fields. */

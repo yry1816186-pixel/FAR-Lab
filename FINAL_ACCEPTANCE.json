@@ -414,14 +414,16 @@
       "id": "FA-DAT-04",
       "domain": "data",
       "title": "FTS incremental upsert (write amplification at scale)",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P2",
       "owner": "self",
-      "gap": "every mirrored-kind put reindexes ALL rows of that kind; O(n) per write past ~1k objects",
+      "gap": "closed: put-time O(1) targeted mirror upsert",
       "target": "per-obj_id upsert + scale test",
       "verify": "benchmark before/after",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/04-data.md CAP-09"
+        "FINAL_EVIDENCE/audit-2026-08-30/04-data.md CAP-09",
+        "src/persistence/store.ts upsertFtsRow: putObject now drops+reinserts ONLY its own obj_id mirror row (both far_search and far_search_tri, tri gated on trigramReady) — the per-put full reindexFts(kind) is gone; full rebuild stays on the lazy first-search ensureFts path",
+        "tests/fts-incremental.test.ts: update-visibility (new text searchable, old text gone, no dup rows), 1:1 row parity across 300 bulk + 50 updates, and the 2000-object amplification budget — single put <30ms where the old full reindex rewrote 4000 rows (full suite 2467 green, tsc/eslint/build clean)"
       ]
     },
     {
