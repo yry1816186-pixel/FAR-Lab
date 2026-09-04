@@ -24,7 +24,7 @@
  *    "version field" satisfied at the snapshot layer without relocating the 96
  *    inline prompt definitions.)
  */
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, renameSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
@@ -131,12 +131,27 @@ const main = () => {
     history: Array.isArray(p.history) ? p.history : [],
   });
   const snapshot = { generatedAt: new Date().toISOString(), prompts };
+  // TOCTOU-free snapshot IO: one ENOENT-tolerant read replaces existsSync+read,
+  // and writes go temp-then-rename so a concurrent reader never sees a torn file.
+  const readSnapshot = () => {
+    try {
+      return JSON.parse(readFileSync(SNAPSHOT_PATH, 'utf8'));
+    } catch (e) {
+      if (e.code === 'ENOENT') return null;
+      throw e;
+    }
+  };
+  const writeSnapshotAtomic = (obj) => {
+    const tmp = `${SNAPSHOT_PATH}.tmp`;
+    writeFileSync(tmp, JSON.stringify(obj, null, 2) + '\n');
+    renameSync(tmp, SNAPSHOT_PATH);
+  };
   if (mode === 'snapshot') {
-    if (!existsSync(SNAPSHOT_PATH)) {
-      writeFileSync(SNAPSHOT_PATH, JSON.stringify({ ...snapshot, prompts: prompts.map((p) => ({ ...p, version: 1, provenance: note ?? 'initial snapshot', history: [] })) }, null, 2) + '\n');
+    const prev = readSnapshot();
+    if (prev === null) {
+      writeSnapshotAtomic({ ...snapshot, prompts: prompts.map((p) => ({ ...p, version: 1, provenance: note ?? 'initial snapshot', history: [] })) });
       process.stdout.write(`prompt-regression: snapshot written (${prompts.length} prompts, total ${total} chars, all v1)\n`);
     } else {
-      const prev = JSON.parse(readFileSync(SNAPSHOT_PATH, 'utf8'));
       const prevBy = new Map(prev.prompts.map((p) => [`${p.file}:${p.name}`, norm(p)]));
       const merged = [];
       const removed = Array.isArray(prev.removed) ? [...prev.removed] : [];
@@ -170,17 +185,19 @@ const main = () => {
         }
       }
       if (failures.length === 0) {
-        writeFileSync(SNAPSHOT_PATH, JSON.stringify({ ...snapshot, prompts: merged, ...(removed.length > 0 ? { removed } : {}) }, null, 2) + '\n');
+        writeSnapshotAtomic({ ...snapshot, prompts: merged, ...(removed.length > 0 ? { removed } : {}) });
         process.stdout.write(`prompt-regression: snapshot written (${prompts.length} prompts, total ${total} chars)\n`);
         for (const b of bumps) process.stdout.write(`  ${b}\n`);
         if (bumps.length > 0 && note === null) process.stdout.write('  (note: new prompts without --note were annotated as unannotated — rerun with --note to give them provenance)\n');
       }
     }
-  } else if (existsSync(SNAPSHOT_PATH) || mode === 'check') {
-    if (!existsSync(SNAPSHOT_PATH)) {
+  } else {
+    // original guard was existsSync(...) || mode === 'check': diff whenever the
+    // snapshot exists; only --check treats a missing snapshot as a failure.
+    const prev = readSnapshot();
+    if (prev === null && mode === 'check') {
       failures.push('snapshot missing: run with --snapshot first');
-    } else {
-      const prev = JSON.parse(readFileSync(SNAPSHOT_PATH, 'utf8'));
+    } else if (prev !== null) {
       const prevBy = new Map(prev.prompts.map((p) => [`${p.file}:${p.name}`, p]));
       const curBy = new Map(snapshot.prompts.map((p) => [`${p.file}:${p.name}`, p]));
       for (const [k, p] of curBy) {
