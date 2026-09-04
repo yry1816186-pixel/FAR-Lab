@@ -43,7 +43,17 @@ for (const f of STAGE_FILES) {
   for (const p of extractPromptsRaw(f)) prompts.push({ file, name: p.name, text: p.text });
 }
 
-const gold = existsSync(GOLD_PATH) ? JSON.parse(readFileSync(GOLD_PATH, 'utf8')) : {};
+// TOCTOU-free read (same discipline as the snapshot IO): one ENOENT-tolerant
+// read replaces the existsSync guard.
+const readGold = () => {
+  try {
+    return JSON.parse(readFileSync(GOLD_PATH, 'utf8'));
+  } catch (e) {
+    if (e.code === 'ENOENT') return {};
+    throw e;
+  }
+};
+const gold = readGold();
 const failures = [];
 let covered = 0;
 
