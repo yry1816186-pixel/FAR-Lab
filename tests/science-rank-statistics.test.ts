@@ -227,10 +227,10 @@ describe('leaderBandOrder (CI-honest final ordering, 2026-09-03)', () => {
   const standing = (hid: string, btScore: number) =>
     ({ hypothesisId: hid, btScore, wins: 0, losses: 0, ties: 0, contested: 0 });
 
-  it('CI-overlapping leaders are ordered by composite substance, not raw BT (the noise-laundering fix)', () => {
+  it('CI-overlapping leaders are ordered by evidence grounding first (best-evidenced leads), not raw BT', () => {
     // live shape (egfr v3 run): BT max 10.26 but the top-8 CIs all overlap — raw BT
-    // put a 0.682-composite item above a 0.8105 one; the band rule must not.
-    const items = [item('hyp_a', 0.682), item('hyp_b', 0.7985), item('hyp_c', 0.8105), item('hyp_d', 0.65)];
+    // put a lower-grounding item above a better-evidenced one; the band rule must not.
+    const items = [item('hyp_a', 0.682, 0.55), item('hyp_b', 0.7985, 0.72), item('hyp_c', 0.8105, 0.81), item('hyp_d', 0.65, 0.6)];
     const standings = new Map([
       ['hyp_a', standing('hyp_a', 10.26)],
       ['hyp_b', standing('hyp_b', 0.88)],
@@ -248,21 +248,20 @@ describe('leaderBandOrder (CI-honest final ordering, 2026-09-03)', () => {
     expect(ordered.map((x) => x.hyp.id)).toEqual(['hyp_c', 'hyp_b', 'hyp_a', 'hyp_d']);
   });
 
-  it('disjoint CIs keep pure BT ordering (separable evidence still wins)', () => {
-    const items = [item('hyp_x', 0.4), item('hyp_y', 0.9)];
-    const standings = new Map([['hyp_x', standing('hyp_x', 5)], ['hyp_y', standing('hyp_y', 0.5)]]);
-    const cis = new Map([['hyp_x', { ciLow: 4, ciHigh: 6 }], ['hyp_y', { ciLow: 0.1, ciHigh: 1 }]]);
-    const { ordered, bandSize } = leaderBandOrder(items, standings, cis);
-    expect(bandSize).toBe(1);
-    expect(ordered.map((x) => x.hyp.id)).toEqual(['hyp_x', 'hyp_y']);
-  });
-
-  it('composite ties inside the band fall through to evidence grounding then id (deterministic)', () => {
-    const items = [item('hyp_z', 0.5, 0.2), item('hyp_y', 0.5, 0.9), item('hyp_x', 0.5, 0.9)];
+  it('grounding ties inside the band fall through to composite then id (deterministic)', () => {
+    const items = [item('hyp_z', 0.4, 0.5), item('hyp_y', 0.9, 0.5), item('hyp_x', 0.5, 0.5)];
     const standings = new Map(items.map((i) => [i.hyp.id, standing(i.hyp.id, 1)]));
     const cis = new Map(items.map((i) => [i.hyp.id, { ciLow: 0.5, ciHigh: 1.5 }]));
     const { ordered } = leaderBandOrder(items, standings, cis);
-    expect(ordered.map((x) => x.hyp.id)).toEqual(['hyp_x', 'hyp_y', 'hyp_z']); // grounding 0.9 tie -> id asc
+    expect(ordered.map((x) => x.hyp.id)).toEqual(['hyp_y', 'hyp_x', 'hyp_z']); // composite desc -> id asc
+  });
+
+  it('null grounding ranks below any measured grounding inside the band (never first by default)', () => {
+    const items = [item('hyp_null', 0.9, null), item('hyp_measured', 0.3, 0.2)];
+    const standings = new Map([['hyp_null', standing('hyp_null', 2)], ['hyp_measured', standing('hyp_measured', 1)]]);
+    const cis = new Map([['hyp_null', { ciLow: 0.5, ciHigh: 3 }], ['hyp_measured', { ciLow: 0.2, ciHigh: 2 }]]);
+    const { ordered } = leaderBandOrder(items, standings, cis);
+    expect(ordered.map((x) => x.hyp.id)).toEqual(['hyp_measured', 'hyp_null']);
   });
 
   it('missing CIs degrade to plain BT ordering (previous behavior, no laundering either way)', () => {
