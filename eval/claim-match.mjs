@@ -99,6 +99,109 @@ export const tfidfCosine = (docsTokens) => {
  */
 export const MATCH_DEFAULTS = Object.freeze({ high: 0.40, low: 0.10 });
 
+// ---- deterministic band pre-layer (S2, 2026-09-05) ----
+// The recorded band measurement (adjudication-accuracy.json 2026-08-29, glm-5.3
+// 5-vote, n=109) showed accuracy 0.826 with two systematic error families:
+// leniency FPs (16 — the judge blesses topical pairs as same-finding) and
+// strictness FNs (3 — complement/negation phrasings the judge splits on).
+// These rules move borderline pairs OUT of the LLM band when a GENERAL
+// scientific invariant already decides them, under the same ZERO-gold-error
+// constraint as the thresholds (validated on all 157 gold pairs: 6 fired,
+// 0 errors, 3 of the 16 recorded FPs killed — see tests/claim-match.test.ts
+// 'deterministic band pre-layer'). Rules only ever classify a pair as a
+// DIFFERENT finding (false); they never assert sameness, and they never fire
+// outside the [low, high) band (the extremes are already zero-error locked).
+
+// Directional verbs in post-contentTokens fold form (crude plural fold strips
+// a trailing 's'; tense variants stay distinct, so each is listed).
+const DIRECTION_UP = new Set([
+  'increase', 'increases', 'increased', 'promote', 'promotes', 'promoted',
+  'enhance', 'enhances', 'enhanced', 'activate', 'activates', 'activated',
+  'induce', 'induces', 'induced', 'restore', 'restores', 'restored',
+  'raise', 'raises', 'raised', 'stimulate', 'stimulates', 'stimulated',
+  'augment', 'augments', 'augmented', 'elevate', 'elevates', 'elevated',
+  'improve', 'improves', 'improved', 'boost', 'boosts', 'boosted',
+  'accelerate', 'accelerates', 'accelerated', 'upregulate', 'upregulates', 'upregulated',
+]);
+const DIRECTION_DOWN = new Set([
+  'reduce', 'reduces', 'reduced', 'decrease', 'decreases', 'decreased',
+  'inhibit', 'inhibits', 'inhibited', 'lower', 'lowers', 'lowered',
+  'suppress', 'suppresses', 'suppressed', 'disrupt', 'disrupts', 'disrupted',
+  'prevent', 'prevents', 'prevented', 'eliminate', 'eliminates', 'eliminated',
+  'deplete', 'depletes', 'depleted', 'block', 'blocks', 'blocked',
+  'remove', 'removes', 'removed', 'kill', 'kills', 'killed',
+  'impair', 'impairs', 'impaired', 'diminish', 'diminishes', 'diminished',
+  'attenuate', 'attenuates', 'attenuated', 'abolish', 'abolishes', 'abolished',
+  'abrogate', 'abrogates', 'abrogated',
+]);
+// When the operator's SUBJECT is a negated entity ("loss of X inhibits Y"),
+// the effective polarity is not the verb's polarity — abstain the whole claim.
+const SUBJECT_NEGATION = [
+  'loss of', 'depletion of', 'absence of', 'lack of', 'without',
+  'removal of', 'inhibition of', 'inhibitor of', 'inhibitors of',
+  'reduced', 'deficient in', 'deficiency of',
+];
+// Correlation-kind vs causal-kind assertion markers: an association phrased on
+// one side against a mechanism phrased on the other is a different KIND of
+// finding (the gold protocol: operationalized prediction/correlation = false).
+const CORRELATION_KIND = [
+  'correlates with', 'correlated with', 'correlation between', 'correlation with',
+  'associated with', 'association between', 'inversely correlated',
+  'positively correlated', 'negatively correlated', 'dose-response', 'monotonic',
+  'predicts', 'biomarker for',
+];
+const CAUSAL_KIND = [
+  'causes', 'caused by', 'due to', 'results in', 'resulted in', 'leads to', 'led to',
+  'driven by', 'drives', 'mediates', 'mediated by', 'promotes', 'promoted',
+  'inhibits', 'inhibited', 'restores', 'restored', 'prevents', 'prevented',
+  'induces', 'induced', 'reduces', 'reduced', 'increases', 'increased',
+  'disrupts', 'disrupted', 'depletes', 'depleted', 'eliminates', 'eliminated',
+  'is required for', 'are required for', 'depends on', 'dependent on',
+];
+
+const claimDirection = (text) => {
+  const low = String(text ?? '').toLowerCase();
+  if (SUBJECT_NEGATION.some((p) => low.includes(p))) return null;
+  const tokens = contentTokens(text);
+  let up = 0;
+  let down = 0;
+  for (const t of tokens) {
+    if (DIRECTION_UP.has(t)) up += 1;
+    else if (DIRECTION_DOWN.has(t)) down += 1;
+  }
+  if (up > 0 && down > 0) return null; // mixed directions inside one claim — ambiguous
+  if (up > 0) return 1;
+  if (down > 0) return -1;
+  return null; // no directional operator
+};
+
+const hasAny = (low, phrases) => phrases.some((p) => low.includes(p));
+
+/**
+ * Deterministic verdict for a BORDERLINE pair (S2 pre-layer).
+ * Returns false when a general scientific invariant proves the pair asserts
+ * DIFFERENT findings (opposing directions, or correlation vs mechanism);
+ * returns null to abstain (send to the LLM band unchanged). Never returns
+ * true — sameness stays the LLM band's job.
+ */
+export const deterministicBandVerdict = (claim, counterpart) => {
+  const da = claimDirection(claim);
+  if (da !== null) {
+    const db = claimDirection(counterpart);
+    if (db !== null && da !== db) return false; // "A restores X" vs "A reduces X"
+  }
+  const la = String(claim ?? '').toLowerCase();
+  const lb = String(counterpart ?? '').toLowerCase();
+  const aCorr = hasAny(la, CORRELATION_KIND);
+  const aCausal = hasAny(la, CAUSAL_KIND);
+  const bCorr = hasAny(lb, CORRELATION_KIND);
+  const bCausal = hasAny(lb, CAUSAL_KIND);
+  if ((aCorr && !aCausal && bCausal && !bCorr) || (aCausal && !aCorr && bCorr && !bCausal)) {
+    return false; // "X correlates with Y" vs "X causes Y" — different finding kinds
+  }
+  return null;
+};
+
 export const thresholdMatch = (agentClaims, gtClaims, { high = MATCH_DEFAULTS.high, low = MATCH_DEFAULTS.low } = {}) => {
   const agentTokens = agentClaims.map(contentTokens);
   const gtTokens = gtClaims.map(contentTokens);

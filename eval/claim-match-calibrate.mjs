@@ -20,6 +20,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { deterministicBandVerdict } from './claim-match.mjs';
 
 const GOLD_FILES = [
   'eval/claim-pair-gold.jsonl',
@@ -70,4 +71,12 @@ const nearMiss = all.filter((r) => r.totalErrors === 1).sort((a, b) => b.detShar
 console.log(`\nRECOMMENDED: high=${best.high.toFixed(2)} low=${best.low.toFixed(2)} (zero gold errors, detShare ${best.detShare}%)`);
 if (nearMiss) console.log(`1-error alternative: high=${nearMiss.high.toFixed(2)} low=${nearMiss.low.toFixed(2)} (detShare ${nearMiss.detShare}%) — rejected: deterministic layer is unreviewed by design`);
 console.log('\nSHIPPED: 0.40/0.10 (2026-08-29). high stays conservative (merged false-max 0.331 leaves detYes headroom); low is one rounding step below the grid optimum 0.11 — gold rows store 3-dp rounded sims, and the true pair at 0.110 has an unknown unrounded float that could sit below 0.11, so the margin guards the boundary rather than detShare.');
+
+// ---- S2 deterministic band pre-layer (2026-09-05): same zero-error lens on the rules ----
+const bandRows = rows.filter((r) => r.bestSim >= 0.10 && r.bestSim < 0.40 && r.claim && r.counterpart);
+const detFired = bandRows.filter((r) => deterministicBandVerdict(r.claim, r.counterpart) === false);
+const detErrors = detFired.filter((r) => r.label === true); // rule only classifies FALSE; gold-true rows are errors
+console.log(`\nband pre-layer (deterministicBandVerdict, 2026-09-05): band n=${bandRows.length}, rules decided ${detFired.length} (all as different-finding), gold errors ${detErrors.length}${detErrors.length === 0 ? ' (ZERO — shippable)' : ' (NOT shippable)'}`);
+console.log(`effective deterministic share on band pairs: ${detFired.length}/${bandRows.length} = ${Math.round((100 * detFired.length) / Math.max(bandRows.length, 1))}%; LLM-band residue ${bandRows.length - detFired.length}`);
+console.log('Note: rules fire only inside [low, high); the threshold extremes above stay untouched.');
 console.log('\nNote: gold N=157 (104 verbose-era 2026-08-22 + 53 v2.1-concise-era 2026-08-29 covering the below-floor zone), main-agent annotated; thresholds generalize modulo that sample (disclosed limitation). The overlap zone itself is the D-038 finding restated on clean labels: scientific-semantic matching needs the adjudication layer; determinism buys the extremes only.');
