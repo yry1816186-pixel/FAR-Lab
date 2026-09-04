@@ -14,7 +14,14 @@ import { expect, test, type APIRequestContext } from '@playwright/test';
 
 const QUESTION = 'Does moderate caffeine intake affect cognitive performance in healthy adults?';
 
+// ONE provisioned study serves every delay case: the study is static completed
+// data; each case builds its own page + routes. (Provisioning per-case added
+// four offline runs to the scratch workspace — suite footprint is part of the
+// perf contract for every spec that runs after this one.)
+let sharedRunId: string | null = null;
+
 async function provisionStudy(request: APIRequestContext): Promise<string> {
+  if (sharedRunId !== null) return sharedRunId;
   const res = await request.post('/api/v1/runs', { data: { text: QUESTION } });
   expect(res.ok()).toBeTruthy();
   const { runId } = await res.json() as { runId: string };
@@ -25,6 +32,7 @@ async function provisionStudy(request: APIRequestContext): Promise<string> {
       } catch { return 'conn-error'; }
     }, { timeout: 120_000 })
     .toBe('completed');
+  sharedRunId = runId;
   return runId;
 }
 
