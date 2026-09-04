@@ -363,3 +363,49 @@ describe('conversation turn HTTP/SSE production path', () => {
     expect(finalSnapshot.messages.at(-1)?.replyDraft).toBe(newPrefix);
   });
 });
+
+describe('mid-turn steering (FA-HAR-05)', () => {
+  it('queues a steer mid-flight; the loop injects it into the next model call and the stream shows it', async () => {
+    const useTool = JSON.stringify({ action: 'use_tool', tool: 'list_runs', args: { limit: 5 }, reason: '先看工作区' });
+    const reply = '已按新的指示重新聚焦。';
+    const finish = finishAction(reply);
+    const bodies: Array<Record<string, unknown>> = [];
+    let releaseFirstCall!: () => void;
+    const firstCallGate = new Promise<void>((resolve) => { releaseFirstCall = resolve; });
+    const server = await openApi(queuedFetch([
+      () => firstCallGate.then(() => completedResponse(useTool)),
+      () => completedResponse(finish),
+    ], bodies));
+    const conversationId = await createConversation(server.base);
+
+    const response = await fetch(`${server.base}/api/v1/conversations/${conversationId}/messages/stream`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: '检查工作区。' }),
+    });
+    expect(response.status).toBe(200);
+    const reader = new TurnSseReader(response);
+    await reader.waitFor((event) => event.payload.type === 'accepted');
+
+    const steerText = '重新聚焦：只关心可复现性。';
+    const steered = await postJson(server.base, `/api/v1/conversations/${conversationId}/steer`, { text: steerText });
+    expect(steered.status).toBe(202);
+    expect(steered.body.steered).toBe(true);
+
+    releaseFirstCall();
+    const steeredEvent = await reader.waitFor((event) => event.payload.type === 'steered');
+    expect((steeredEvent.payload as { text: string }).text).toBe(steerText);
+    await reader.readToEnd();
+    // the second model call (turn 2) carries the steering text in its transcript
+    expect(bodies.length).toBeGreaterThanOrEqual(2);
+    expect(JSON.stringify(bodies[1])).toContain(steerText);
+    const conv = await getConversation(server.base, conversationId);
+    expect(conv.messages.at(-1)?.content).toBe(reply);
+  });
+
+  it('steer without a running turn is 409 no_active_turn', async () => {
+    const server = await openApi(queuedFetch([]));
+    const conversationId = await createConversation(server.base);
+    const res = await postJson(server.base, `/api/v1/conversations/${conversationId}/steer`, { text: '没有在跑的回合' });
+    expect(res.status).toBe(409);
+    expect((res.body.error as { code: string }).code).toBe('no_active_turn');
+  });
+});

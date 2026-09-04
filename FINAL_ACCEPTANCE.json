@@ -324,14 +324,15 @@
       "id": "FA-HAR-05",
       "domain": "harness",
       "title": "Human steer queue wired in production",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P2",
       "owner": "self",
-      "gap": "cfg.steer exists with zero production callers; mid-run redirect only via cancel",
+      "gap": "closed: POST /conversations/:id/steer live queue + loop injection",
       "target": "one production path (conversation) feeds steer",
       "verify": "e2e steer test",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/02-harness.md CAP-08"
+        "FINAL_EVIDENCE/audit-2026-08-30/02-harness.md CAP-08",
+        "POST /api/v1/conversations/:id/steer (api.ts): ConversationTurnHub.steer() queues into the running turn; hub runtime exposes steer poll -> runAndLandTurn -> generateConversationTurn cfg.steer -> agent loop injects kind=steer transcript entry between turns (loop.ts steer poll); 409 no_active_turn when idle; tests/conversation-stream.test.ts mid-turn steering (FA-HAR-05): 202 + stream steered event + steer text present in 2nd model-call request body (46/46 suite green, tsc/eslint/build clean)"
       ]
     },
     {

@@ -42,9 +42,11 @@ export interface ConversationDeps {
 export interface ConversationTurnRuntime {
   signal?: AbortSignal;
   onProgress?: (event: ConversationTurnProgress) => void;
+  /** Hub-owned mid-turn steering queue (FA-HAR-05); injected between loop turns. */
+  steer?: () => string | null;
 }
 
-export type ConversationErrorCode = 'not_found' | 'validation' | 'conversation_model_failed' | 'conversation_full' | 'turn_in_flight' | 'turn_cancelled';
+export type ConversationErrorCode = 'not_found' | 'validation' | 'conversation_model_failed' | 'conversation_full' | 'turn_in_flight' | 'turn_cancelled' | 'no_active_turn';
 
 export class ConversationError extends Error {
   constructor(readonly status: number, readonly code: ConversationErrorCode, message: string) {
@@ -378,6 +380,7 @@ const runAndLandTurn = async (
       ...(resumePlan !== null ? { resumePlan } : {}),
       ...(turnReasoning !== null ? { reasoning: turnReasoning } : {}),
       ...(runtime.signal !== undefined ? { signal: runtime.signal } : {}),
+      ...(runtime.steer !== undefined ? { steer: runtime.steer } : {}),
       onProgress,
     });
   } finally {
