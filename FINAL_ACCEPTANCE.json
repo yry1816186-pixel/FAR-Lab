@@ -629,14 +629,15 @@
       "id": "FA-HCI-03",
       "domain": "hci",
       "title": "Standing gates as full-surface sweeps (axe EN/dark/all surfaces, 375px all, keyboard journey)",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "sibling-lane",
-      "gap": "axe covers home+map zh/light only; 375px home+map only; keyboard 3 keys only",
+      "gap": "closed: parameterized full-surface sweeps green",
       "target": "parameterized sweeps in surfaces.spec",
       "verify": "e2e green over expanded matrix",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/07-hci.md CAP-18/19/20"
+        "FINAL_EVIDENCE/audit-2026-08-30/07-hci.md CAP-18/19/20",
+        "web/e2e/surfaces.spec.ts FA-HCI-03 sweeps (chromium 11/11 green incl. all pre-existing surface tests): (1) axe critical/serious over FOUR surfaces (home/workspace/library/study-map) x FOUR combos (zh/en x light/dark, 16 scans, deterministic 3-cycle theme pinning + language restore); (2) 375px integrity on all four surfaces (scrollWidth-innerWidth <= 1); (3) real keyboard journey — rail Enter navigation into library+workspace, n-shortcut formation focus, palette Ctrl+K + typed filter (list narrows) + ArrowDown/Up + Esc close"
       ]
     },
     {
