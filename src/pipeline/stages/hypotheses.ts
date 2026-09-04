@@ -197,6 +197,19 @@ const DIVERSITY_DISCIPLINE =
   'Respond only with JSON matching the required schema.';
 
 /**
+ * Mechanism-mediator specificity (2026-09-04, live-diagnosed gap): fresh-corpus
+ * rediscovery F1 is dominated by hypotheses that frame their causal story through
+ * umbrella functional terms ("colonization resistance", "immune escape") while the
+ * established finding names the mediator chain. Requiring named mediators makes the
+ * mechanism falsifiable at the level the literature actually argues at.
+ */
+const MECHANISM_SPECIFICITY =
+  'Mechanism specificity: every mechanism is stated as a named causal chain of molecular/cellular/physical ' +
+  'mediators (subject -> mediator -> effect) grounded in the provided claims — never as an umbrella functional ' +
+  'term alone (e.g. "colonization resistance", "immune escape", "cellular fitness"): name the mediator and state ' +
+  'what it does to what.';
+
+/**
  * AOSSA: hypotheses are generated UNDER the run's Scientific Problem Model when one
  * exists (the scope stage forms it before this stage ever runs; pre-AOSSA runs carry
  * none — absent, never fabricated).
@@ -563,6 +576,7 @@ export const generateHypothesesStage: StageHandler = {
       relations: relations.map((r) => ({ id: r.id, relation: r.relation })),
       instructions: STRATEGY_DEFS.map((d) => d.instruction),
       discipline: DIVERSITY_DISCIPLINE,
+      mechanismSpecificity: MECHANISM_SPECIFICITY, // rides the fingerprint: prompt change invalidates strategy caches
       problemModelDiscipline: PROBLEM_MODEL_DISCIPLINE, // W2 audit: the prompt constant must ride the fingerprint
       ...(priorMemory.length > 0 ? { priorMemoryIds: priorMemory.map((m) => m.id) } : {}),
       ...(regeneration && critique !== null
@@ -578,7 +592,7 @@ export const generateHypothesesStage: StageHandler = {
           stage: 'generate_hypotheses',
           purpose: def.purpose,
           systemPrompt:
-            `${def.instruction}${antiRepetitionInstruction(raws.length)} ${DIVERSITY_DISCIPLINE} ${PROBLEM_MODEL_DISCIPLINE}` +
+            `${def.instruction}${antiRepetitionInstruction(raws.length)} ${DIVERSITY_DISCIPLINE} ${MECHANISM_SPECIFICITY} ${PROBLEM_MODEL_DISCIPLINE}` +
             (regeneration && critique !== null
               ? ' REGENERATION ROUND: a previous hypothesis set was judged WEAK by deterministic quality gates ' +
                 `(${critique.reasons.join('; ')}). Propose hypotheses that materially differ in mechanism from ` +

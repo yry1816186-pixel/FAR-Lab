@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-03T13:53:37.954Z",
+  "generatedAt": "2026-09-04T01:35:57.290Z",
   "prompts": [
     {
       "file": "src/pipeline/stages/scope.ts",
@@ -214,12 +214,19 @@
     {
       "file": "src/pipeline/stages/hypotheses.ts",
       "name": "INLINE:definstructionan",
-      "chars": 111,
-      "sha256": "9f5637d7f9f1890c",
+      "chars": 136,
+      "sha256": "d0558b459a464365",
       "sample": "${def.instruction}${antiRepetitionInstruction(raws.length)} ",
-      "version": 1,
-      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
-      "history": []
+      "version": 2,
+      "provenance": "mechanism-mediator specificity discipline added to hypothesis generation (live-diagnosed umbrella-term gap, fresh-corpus F1 lever 2026-09-04)",
+      "history": [
+        {
+          "sha256": "9f5637d7f9f1890c",
+          "chars": 111,
+          "version": 1,
+          "at": "2026-09-03T13:53:37.954Z"
+        }
+      ]
     },
     {
       "file": "src/pipeline/stages/hypotheses.ts",
