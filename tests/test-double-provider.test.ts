@@ -195,9 +195,9 @@ describe('test double provider: conversation turn and claim->hypothesis edges (2
   // edges for the web binding chips.
   it('falsification-spec proposes supporting links and a counter link when claims allow', async () => {
     const p = createTestDoubleProvider(doubleCfg());
-    const LinkReason = z.object({ claimId: z.string().min(1), linkReason: z.string().min(20) });
+    const LinkReason = z.object({ claimId: z.string().min(1), linkReason: z.string().min(20), sharedFocus: z.string().min(6) });
     const Out = z.object({
-      supportingLinks: z.array(LinkReason).min(1),
+      supportingLinks: z.array(LinkReason.extend({ relation: z.enum(['supports', 'qualifies']) })).min(1),
       counterLinks: z.array(LinkReason.extend({ relation: z.enum(['contradicts', 'weakens', 'qualifies']) })),
       supportingClaimIds: z.array(z.string()),
     });

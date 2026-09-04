@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-04T04:52:25.727Z",
+  "generatedAt": "2026-09-04T17:21:24.778Z",
   "prompts": [
     {
       "file": "src/pipeline/stages/scope.ts",
@@ -142,32 +142,53 @@
     {
       "file": "src/pipeline/stages/evidence.ts",
       "name": "INLINE:Youassesswhether",
-      "chars": 66,
-      "sha256": "d4c232605cdf601f",
+      "chars": 843,
+      "sha256": "5912a6b02e939b9d",
       "sample": "You assess whether the current verified evidence base can su",
-      "version": 1,
-      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
-      "history": []
+      "version": 2,
+      "provenance": "extractor widening: +-continued literals now merge into the full runtime prompt (identity = whole text); falsify spec prompt adds sharedFocus + supporting-qualifies rules (FA-SCI-03)",
+      "history": [
+        {
+          "sha256": "d4c232605cdf601f",
+          "chars": 66,
+          "version": 1,
+          "at": "2026-09-04T17:20:44.594Z"
+        }
+      ]
     },
     {
       "file": "src/pipeline/stages/evidence.ts",
       "name": "INLINE:Youareanindepend",
-      "chars": 84,
-      "sha256": "6eafad3d0d05b35a",
+      "chars": 599,
+      "sha256": "e65222ce4e6d364f",
       "sample": "You are an independent auditor. A reviewer claimed the verif",
-      "version": 1,
-      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
-      "history": []
+      "version": 2,
+      "provenance": "extractor widening: +-continued literals now merge into the full runtime prompt (identity = whole text); falsify spec prompt adds sharedFocus + supporting-qualifies rules (FA-SCI-03)",
+      "history": [
+        {
+          "sha256": "6eafad3d0d05b35a",
+          "chars": 84,
+          "version": 1,
+          "at": "2026-09-04T17:20:44.594Z"
+        }
+      ]
     },
     {
       "file": "src/pipeline/stages/evidence.ts",
       "name": "INLINE:Youadjudicatepai",
-      "chars": 83,
-      "sha256": "6c1c0d7fa7b73fff",
+      "chars": 1580,
+      "sha256": "fee53158eda5b508",
       "sample": "You adjudicate pairs of evidence claims extracted from DIFFE",
-      "version": 1,
-      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
-      "history": []
+      "version": 2,
+      "provenance": "extractor widening: +-continued literals now merge into the full runtime prompt (identity = whole text); falsify spec prompt adds sharedFocus + supporting-qualifies rules (FA-SCI-03)",
+      "history": [
+        {
+          "sha256": "6c1c0d7fa7b73fff",
+          "chars": 83,
+          "version": 1,
+          "at": "2026-09-04T17:20:44.594Z"
+        }
+      ]
     },
     {
       "file": "src/pipeline/stages/hypotheses.ts",
@@ -232,12 +253,19 @@
     {
       "file": "src/pipeline/stages/hypotheses.ts",
       "name": "INLINE:Yougroupparaphra",
-      "chars": 80,
-      "sha256": "df96511ff2b36d00",
+      "chars": 305,
+      "sha256": "503d45d089ec89eb",
       "sample": "You group paraphrase-equivalent scientific hypotheses. Candi",
-      "version": 1,
-      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
-      "history": []
+      "version": 2,
+      "provenance": "extractor widening: +-continued literals now merge into the full runtime prompt (identity = whole text); falsify spec prompt adds sharedFocus + supporting-qualifies rules (FA-SCI-03)",
+      "history": [
+        {
+          "sha256": "df96511ff2b36d00",
+          "chars": 80,
+          "version": 1,
+          "at": "2026-09-04T17:20:44.594Z"
+        }
+      ]
     },
     {
       "file": "src/pipeline/stages/hypotheses.ts",
@@ -259,72 +287,121 @@
     {
       "file": "src/pipeline/stages/hypotheses.ts",
       "name": "INLINE:Thecurrenthypoth",
-      "chars": 91,
-      "sha256": "c560dbf503502dfa",
+      "chars": 787,
+      "sha256": "ab132359b4c0e260",
       "sample": "The current hypothesis candidate set is too homogeneous. Gen",
-      "version": 1,
-      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
-      "history": []
+      "version": 2,
+      "provenance": "extractor widening: +-continued literals now merge into the full runtime prompt (identity = whole text); falsify spec prompt adds sharedFocus + supporting-qualifies rules (FA-SCI-03)",
+      "history": [
+        {
+          "sha256": "c560dbf503502dfa",
+          "chars": 91,
+          "version": 1,
+          "at": "2026-09-04T17:20:44.594Z"
+        }
+      ]
     },
     {
       "file": "src/pipeline/stages/hypotheses.ts",
       "name": "INLINE:Classifyeachhypo",
-      "chars": 99,
-      "sha256": "51af13d142970fde",
+      "chars": 284,
+      "sha256": "d74311e7eed85874",
       "sample": "Classify each hypothesis candidate against the provided veri",
-      "version": 1,
-      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
-      "history": []
+      "version": 2,
+      "provenance": "extractor widening: +-continued literals now merge into the full runtime prompt (identity = whole text); falsify spec prompt adds sharedFocus + supporting-qualifies rules (FA-SCI-03)",
+      "history": [
+        {
+          "sha256": "51af13d142970fde",
+          "chars": 99,
+          "version": 1,
+          "at": "2026-09-04T17:20:44.594Z"
+        }
+      ]
     },
     {
       "file": "src/pipeline/stages/hypotheses.ts",
       "name": "INLINE:Foreachhypothesi",
-      "chars": 102,
-      "sha256": "35309814a0f543ba",
+      "chars": 400,
+      "sha256": "e85cb8a6a69e6eba",
       "sample": "For each hypothesis, write exactly 2 English scholarly searc",
-      "version": 1,
-      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
-      "history": []
+      "version": 2,
+      "provenance": "extractor widening: +-continued literals now merge into the full runtime prompt (identity = whole text); falsify spec prompt adds sharedFocus + supporting-qualifies rules (FA-SCI-03)",
+      "history": [
+        {
+          "sha256": "35309814a0f543ba",
+          "chars": 102,
+          "version": 1,
+          "at": "2026-09-04T17:20:44.594Z"
+        }
+      ]
     },
     {
       "file": "src/pipeline/stages/hypotheses.ts",
       "name": "INLINE:Reranktheretriev",
-      "chars": 100,
-      "sha256": "47a8cfd633705b24",
+      "chars": 374,
+      "sha256": "87ecbb21c0237c56",
       "sample": "Rerank the retrieved papers by how close each is to the hypo",
-      "version": 1,
-      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
-      "history": []
+      "version": 2,
+      "provenance": "extractor widening: +-continued literals now merge into the full runtime prompt (identity = whole text); falsify spec prompt adds sharedFocus + supporting-qualifies rules (FA-SCI-03)",
+      "history": [
+        {
+          "sha256": "47a8cfd633705b24",
+          "chars": 100,
+          "version": 1,
+          "at": "2026-09-04T17:20:44.594Z"
+        }
+      ]
     },
     {
       "file": "src/pipeline/stages/hypotheses.ts",
       "name": "INLINE:Judgetheliteratu",
-      "chars": 104,
-      "sha256": "603653f952200612",
+      "chars": 492,
+      "sha256": "782f1c09934620d1",
       "sample": "Judge the literature novelty of each hypothesis STRICTLY aga",
-      "version": 1,
-      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
-      "history": []
+      "version": 2,
+      "provenance": "extractor widening: +-continued literals now merge into the full runtime prompt (identity = whole text); falsify spec prompt adds sharedFocus + supporting-qualifies rules (FA-SCI-03)",
+      "history": [
+        {
+          "sha256": "603653f952200612",
+          "chars": 104,
+          "version": 1,
+          "at": "2026-09-04T17:20:44.594Z"
+        }
+      ]
     },
     {
       "file": "src/pipeline/stages/falsify.ts",
       "name": "INLINE:Youareanadversar",
-      "chars": 100,
-      "sha256": "247334cf742c7541",
+      "chars": 3018,
+      "sha256": "eacfc8a98e6f1fb6",
       "sample": "You are an adversarial reviewer. Produce a COMPLETE falsific",
-      "version": 1,
-      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
-      "history": []
+      "version": 2,
+      "provenance": "extractor widening: +-continued literals now merge into the full runtime prompt (identity = whole text); falsify spec prompt adds sharedFocus + supporting-qualifies rules (FA-SCI-03)",
+      "history": [
+        {
+          "sha256": "247334cf742c7541",
+          "chars": 100,
+          "version": 1,
+          "at": "2026-09-04T17:20:44.594Z"
+        }
+      ]
     },
     {
       "file": "src/pipeline/stages/falsify.ts",
       "name": "INLINE:Youareaskeptical",
-      "chars": 98,
-      "sha256": "bb53018657cebb10",
+      "chars": 1777,
+      "sha256": "af4743409b936fab",
       "sample": "You are a skeptical auditor of evidence links proposed by a ",
-      "version": 1,
-      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
-      "history": []
+      "version": 2,
+      "provenance": "extractor widening: +-continued literals now merge into the full runtime prompt (identity = whole text); falsify spec prompt adds sharedFocus + supporting-qualifies rules (FA-SCI-03)",
+      "history": [
+        {
+          "sha256": "bb53018657cebb10",
+          "chars": 98,
+          "version": 1,
+          "at": "2026-09-04T17:20:44.594Z"
+        }
+      ]
     },
     {
       "file": "src/pipeline/stages/rank.ts",
@@ -346,12 +423,19 @@
     {
       "file": "src/pipeline/stages/plan.ts",
       "name": "PLAN_OBJECTIVE_ZH_PROMPT",
-      "chars": 95,
-      "sha256": "9829fde7f10c2514",
+      "chars": 182,
+      "sha256": "816cb4be1d87db22",
       "sample": "Translate one research-plan objective into Simplified Chines",
-      "version": 1,
-      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
-      "history": []
+      "version": 2,
+      "provenance": "extractor widening: +-continued literals now merge into the full runtime prompt (identity = whole text); falsify spec prompt adds sharedFocus + supporting-qualifies rules (FA-SCI-03)",
+      "history": [
+        {
+          "sha256": "9829fde7f10c2514",
+          "chars": 95,
+          "version": 1,
+          "at": "2026-09-04T17:20:44.594Z"
+        }
+      ]
     },
     {
       "file": "src/pipeline/stages/plan.ts",
