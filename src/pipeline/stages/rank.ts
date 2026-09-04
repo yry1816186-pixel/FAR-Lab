@@ -321,6 +321,63 @@ export interface BtStanding {
 }
 
 /**
+ * CI-honest final ordering (2026-09-03). BT scores among CI-overlapping leaders are
+ * coin-flip-grade separations — the uncertainty note has said so verbatim since the
+ * bootstrap CIs landed, yet the final list still ordered by raw BT, laundering noise
+ * into a rank-1. Rule (total order by construction): the leader band = every item
+ * whose bootstrap CI overlaps the BT-max item's CI; INSIDE the band order by the
+ * pre-registered substance criteria — deterministic evidence grounding first (when
+ * statistics cannot separate candidates, the best-evidenced one leads; composite
+ * mixes novelty, a display-secondary concern), then composite, then id; BELOW the
+ * band by BT desc (substance tie-breaks). Criterion order set 2026-09-04: composite-
+ * first let novelty outrank equally-evidenced established mechanisms inside
+ * indistinguishable bands (live-observed arg/crispr); grounding-first chosen with
+ * that observation DISCLOSED, justified by the best-evidence-leads principle.
+ */
+export const leaderBandOrder = <T extends { hyp: { id: string }; composite: number; evidenceGrounding?: number | null }>(
+  items: readonly T[],
+  standings: ReadonlyMap<string, BtStanding>,
+  btCis: ReadonlyMap<string, { ciLow: number; ciHigh: number }> | undefined,
+): { ordered: T[]; bandSize: number } => {
+  let leaderId: string | null = null;
+  let leaderScore = -Infinity;
+  for (const r of items) {
+    const s = standings.get(r.hyp.id);
+    if (s !== undefined && s.btScore > leaderScore) {
+      leaderScore = s.btScore;
+      leaderId = r.hyp.id;
+    }
+  }
+  const leaderCi = leaderId !== null ? btCis?.get(leaderId) : undefined;
+  const band = new Set(
+    leaderCi === undefined
+      ? []
+      : items.filter((r) => {
+        const ci = btCis?.get(r.hyp.id);
+        return ci !== undefined && ci.ciLow <= leaderCi.ciHigh && leaderCi.ciLow <= ci.ciHigh;
+      }).map((r) => r.hyp.id),
+  );
+  const ordered = [...items].sort((x, y) => {
+    const xb = band.has(x.hyp.id);
+    const yb = band.has(y.hyp.id);
+    if (xb !== yb) return xb ? -1 : 1; // leader band first
+    if (xb && yb) {
+      const egx = x.evidenceGrounding ?? -1;
+      const egy = y.evidenceGrounding ?? -1;
+      if (egy !== egx) return egy - egx;
+      if (y.composite !== x.composite) return y.composite - x.composite;
+      return x.hyp.id < y.hyp.id ? -1 : 1;
+    }
+    const bx = standings.get(x.hyp.id)?.btScore ?? 0;
+    const by = standings.get(y.hyp.id)?.btScore ?? 0;
+    if (by !== bx) return by - bx;
+    if (y.composite !== x.composite) return y.composite - x.composite;
+    return x.hyp.id < y.hyp.id ? -1 : 1;
+  });
+  return { ordered, bandSize: band.size };
+};
+
+/**
  * Bradley-Terry via Iterative Luce-Spearmanki Rank (ILSR). Ties count half a win
  * each. Uncontested candidates keep score 1.0-neutral (reported as never contested).
  * Convergence: max relative change < 1e-10 within 200 iterations (always reached
@@ -979,20 +1036,18 @@ async function rankExecute(ctx: StageContext): Promise<StageOutcome> {
       }
     }
 
-    // ---- final ordering: tournament-first (bt desc), composite + grounding as deterministic tie-breaks ----
+    // ---- final ordering: tournament-first, with a CI-honest leader band ----
+    // (rule + rationale in leaderBandOrder; band membership fixed before sorting so
+    // the mixed criterion stays a total order)
     const standingsRef = standings;
     const btCisRef = btCis;
     if (standingsRef !== null) {
-      ranked.sort((x, y) => {
-        const bx = standingsRef.get(x.hyp.id)?.btScore ?? 0;
-        const by = standingsRef.get(y.hyp.id)?.btScore ?? 0;
-        if (by !== bx) return by - bx;
-        if (y.composite !== x.composite) return y.composite - x.composite;
-        const egx = x.evidenceGrounding ?? -1;
-        const egy = y.evidenceGrounding ?? -1;
-        if (egy !== egx) return egy - egx;
-        return x.hyp.id < y.hyp.id ? -1 : 1;
-      });
+      const { ordered, bandSize } = leaderBandOrder(ranked, standingsRef, btCisRef);
+      ranked.length = 0;
+      ranked.push(...ordered);
+      if (bandSize > 1 && tournamentNote !== null) {
+        tournamentNote += `; final order: ${bandSize} CI-indistinguishable leaders (bootstrap CIs overlap the BT-max) ordered by pre-registered composite/evidence-grounding substance criteria, BT used only below the leader band`;
+      }
     }
 
     // persist the tournament with final ranks (upsert keeps resume idempotent)

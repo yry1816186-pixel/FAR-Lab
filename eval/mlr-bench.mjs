@@ -31,10 +31,21 @@ import { isRepresentative } from '../dist/pipeline/stages/shared.js';
 
 const SEED = 20260822;
 const SAMPLE_N = Number(process.env.MLR_SAMPLE_N ?? 5);
+// Sharding (FA-SCI-07 sprint 2026-09-04): a 30-task batch is calendar-infeasible
+// serially (~40min/run); MLR_SHARD=i/MLR_SHARDS=n restricts THIS process to the
+// i-th slice of the sampled list with per-shard runs/out files. Merge the runs
+// files and re-run --skip-runs (with MLR_RUNS_FILE on the merged file) for the
+// unified judge pass.
+const SHARD = Number(process.env.MLR_SHARD ?? 0);
+const SHARDS = Number(process.env.MLR_SHARDS ?? 0);
+if (!Number.isInteger(SHARD) || !Number.isInteger(SHARDS) || SHARDS < 0 || (SHARDS > 0 && (SHARD < 1 || SHARD > SHARDS))) {
+  console.error('FATAL: MLR_SHARD/MLR_SHARDS must be i/n with 1<=i<=n (or 0/0 = unsharded)');
+  process.exit(2);
+}
 const REPO = resolve(process.cwd(), process.env.MLRBENCH_REPO ?? '.cache/repos/mlrbench');
 const RESULTS_DIR = resolve(process.cwd(), 'eval/results');
-const OUT = join(RESULTS_DIR, 'mlr-bench.jsonl');
-const RUNS_FILE = join(RESULTS_DIR, 'mlr-bench-runs.jsonl');
+const OUT = resolve(process.cwd(), process.env.MLR_OUT ?? join(RESULTS_DIR, 'mlr-bench.jsonl'));
+const RUNS_FILE = resolve(process.cwd(), process.env.MLR_RUNS_FILE ?? join(RESULTS_DIR, 'mlr-bench-runs.jsonl'));
 const SKIP_RUNS = process.argv.includes('--skip-runs');
 const RENDER_ONLY = process.argv.includes('--render-only'); // deterministic render check, no judge calls, no API key needed
 const ANCHOR_AGENTS = ['o4-mini-2025-04-16', 'deepseek-r1'];
@@ -101,8 +112,8 @@ const farRun = (task, question) => {
   const stdout = execFileSync('node', [
     'dist/cli/main.js', 'research', 'start', question,
     '--domain', 'machine learning', '--goal', 'exploratory', '--json',
-  ], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 30 * 60_000 });
-  const line = stdout.split('\n').find((l) => l.trim().startsWith('{'));
+  ], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: Number(process.env.MLR_RUN_TIMEOUT_MIN ?? 45) * 60_000 });
+  const line = stdout.split('\n').filter((l) => l.trim().startsWith('{')).at(-1);
   return JSON.parse(line ?? '{}');
 };
 
@@ -293,8 +304,9 @@ for (let i = pool.length - 1; i > 0; i--) {
   const j = Math.floor(r() * (i + 1));
   [pool[i], pool[j]] = [pool[j], pool[i]];
 }
-const sampled = pool.slice(0, SAMPLE_N).sort();
-console.log(`[mlr-bench] eligible=${eligible.length} sampled(Seed ${SEED}, N=${SAMPLE_N}): ${sampled.join(', ')}`);
+const sampledAll = pool.slice(0, SAMPLE_N).sort();
+const sampled = SHARDS > 0 ? sampledAll.filter((_, i) => i % SHARDS === (SHARD - 1)) : sampledAll;
+console.log(`[mlr-bench] eligible=${eligible.length} sampled(Seed ${SEED}, N=${SAMPLE_N}${SHARDS > 0 ? `, shard ${SHARD}/${SHARDS}` : ''}): ${sampled.join(', ')}`);
 if (process.argv.includes('--dry-run')) {
   console.log(`[mlr-bench] rubrics extracted: idea=${IDEA_RUBRIC.length} chars, proposal=${PROPOSAL_RUBRIC.length} chars`);
   console.log(`[mlr-bench] idea-rubric-dims: CONSISTENCY=${IDEA_RUBRIC.includes('CONSISTENCY')} OverallAssessment=${IDEA_RUBRIC.includes('OverallAssessment')}; proposal SOUNDNESS=${PROPOSAL_RUBRIC.includes('SOUNDNESS')}`);

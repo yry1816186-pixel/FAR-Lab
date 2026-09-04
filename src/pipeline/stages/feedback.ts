@@ -19,7 +19,9 @@ export const feedbackStage: StageHandler = {
   stage: 'feedback',
 
   /** Applicable whenever the run has at least one stored feedback signal. */
-  applicable: async (ctx) => ctx.store.listObjects('feedback', ctx.run.id).length > 0,
+  applicable: async (ctx) => ctx.store.listObjects('feedback', ctx.run.id).length > 0
+    ? true
+    : { applicable: false as const, reason: 'no feedback signals stored for this run' },
 
   async execute(ctx: StageContext): Promise<StageOutcome> {
     const signals = ctx.store.listObjects('feedback', ctx.run.id);

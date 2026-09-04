@@ -596,7 +596,7 @@ describe('EEL executor end-to-end (real uv sidecar)', { timeout: 240_000 }, () =
       expect(revised.version).toBe(1);
       expect(store.listEvents(runId).map((e) => e.type)).toContain('revision_created');
       // Consumed signal closes the loop: revise becomes inapplicable until new evidence arrives.
-      expect(await reviseStage.applicable(ctx)).toBe(false);
+      expect(await reviseStage.applicable(ctx)).toMatchObject({ applicable: false });
     } finally {
       cleanup();
     }

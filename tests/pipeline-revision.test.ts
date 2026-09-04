@@ -237,7 +237,7 @@ describe('feedback stage', () => {
   it('flips applicable when a signal exists and records exactly one feedback_received event per signal', async () => {
     const { run } = seedRun();
     const empty = makeCtx(run, []);
-    expect(await feedbackStage.applicable(empty.ctx)).toBe(false);
+    expect(await feedbackStage.applicable(empty.ctx)).toMatchObject({ applicable: false });
 
     const signal = seedSignal(run.id, 'expert: the duration effect did not replicate');
     store.putObject('feedback', signal);
@@ -557,7 +557,11 @@ describe('revise stage', () => {
     expect(store.getObject('hypothesis', hyp.id)?.version).toBe(1);
 
     // second pass: nothing left to consume — no extra model call, no second version bump
-    expect(await reviseStage.applicable(ctx)).toBe(false);
+    // (contract: the false verdict carries the persisted skip reason — never silent)
+    expect(await reviseStage.applicable(ctx)).toStrictEqual({
+      applicable: false,
+      reason: 'no unconsumed feedback signals (every signal already has a revision)',
+    });
     const second = await reviseStage.execute(makeCtx(run, []).ctx);
     expect(second).toMatchObject({ kind: 'skipped' });
     expect(second.kind === 'skipped' ? second.reason : '').toMatch(/no unconsumed/);

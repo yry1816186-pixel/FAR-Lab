@@ -152,6 +152,30 @@ const RAW_CATALOG: Array<z.input<typeof ModelCapabilities>> = [
     sourceRefs: src(ALIYUN_MODELS),
   },
   {
+    // Catalog listing verified 2026-09-02 (help.aliyun.com models page, 文本生成);
+    // capability details NOT yet doc-verified — every live-observed fact below cites
+    // the B-QWEN/EV1 receipts. Unverified fields stay at schema defaults.
+    modelKey: 'qwen3.8-flash', provider: 'dashscope', family: 'qwen',
+    aliases: [],
+    text: true,
+    structuredOutput: 'json_object',
+    reasoning: true,
+    contextTokens: undefined,
+    streaming: true,
+    latencyClass: 'fast',
+    region: ['cn-beijing'],
+    knownLimitations: [
+      '默认开启思考（live 实测 2026-09-03：无思考字段时 34/35 调用返回 reasoning tokens，p50 65s / p90 188s——管线须显式 FARLAB_DASHSCOPE_THINKING=off）',
+      '不支持 json_schema strict（模型卡未核验；json_object 档 live 实测 plan-revision 前缀 id schema 三连矫正失败 2026-09-03）',
+      THINKING_JSON_OBJECT_MAY_FAIL,
+    ],
+    interfaceNotes: [NO_MAX_TOKENS_WITH_SO],
+    sourceRefs: [
+      { url: ALIYUN_MODELS, retrievedAt: '2026-09-02' },
+      { url: 'evidence/b-qwen/report.md', retrievedAt: '2026-09-03' },
+    ],
+  },
+  {
     modelKey: 'qwen3.7-max', provider: 'dashscope', family: 'qwen',
     aliases: ['qwen3.7-max-2026-05-20', 'qwen3.7-max-2026-06-08'],
     text: true, toolCalling: true,
@@ -161,7 +185,7 @@ const RAW_CATALOG: Array<z.input<typeof ModelCapabilities>> = [
     latencyClass: 'deep',
     priceRef: { currency: 'CNY', inputPerMTok: 0, outputPerMTok: 0, pricingNote: '见计费页（本 registry 不抄录未取到实价的数字）', url: ALIYUN_BILLING },
     region: ['cn-beijing'],
-    knownLimitations: [THINKING_NEEDS_STREAMING],
+    knownLimitations: [THINKING_NEEDS_STREAMING, 'rank 拒评（live 实测 2026-09-03：9 候选假设时三连返回空 assessments 触发 min(1) 校验失败——模型拒绝/无法产出排序，非 schema 死锁）'],
     interfaceNotes: ['仅文本接口（多模态接口不含此系列）', 'qwen3.7-max-2026-06-08 走多模态接口', NO_MAX_TOKENS_WITH_SO],
     sourceRefs: src(ALIYUN_MODELS),
   },

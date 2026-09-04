@@ -357,7 +357,7 @@ describe('protocol chain in the export plane (slice 4)', () => {
     expect(check1.detail).toContain('1 条 protocolEvidence');
 
     // ---- no re-export while the store matches the bundle (count-based applicable) ----
-    expect(await exportStage.applicable(ctx)).toBe(false);
+    expect(await exportStage.applicable(ctx)).toMatchObject({ applicable: false });
 
     // ---- paper: protocol_deviations limitation category with ledger counts ----
     const outline = buildPaperOutline(store, g.run.id, { now: '2026-08-29T00:00:00.000Z' });
@@ -426,3 +426,4 @@ describe('protocol chain in the export plane (slice 4)', () => {
     expect(check.detail).toContain('pre-protocol bundle');
   });
 });
+

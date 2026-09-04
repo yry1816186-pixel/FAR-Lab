@@ -1,0 +1,5 @@
+{"task":"egfr-tki-resistance","runId":"run_c9sqbssmb8wwxtkx785j885bps","status":"completed"}
+{"task":"antibiotic-cdiff","runId":"run_beebm81h2rd5aztgvafmt2z1tt","status":"completed"}
+{"task":"arg-plasmid-transfer","runId":"run_ddfhynpw8y2zw77hwc5tpemr0m","status":"completed"}
+{"task":"crispr-offtarget","runId":"run_1hwbzmyw7284j1g6gvqw275vjn","status":"completed"}
+{"task":"crc-ici-failure","runId":"run_ddes4kyj7mptg07drpaad1y72d","status":"partial"}

@@ -353,15 +353,13 @@ const citationValidity = async (record, crossref) => {
 // main
 // ---------------------------------------------------------------------------
 const readJsonl = (name) => {
+  let raw;
   try {
-    return readFileSync(RESULTS_DIR + name, 'utf8')
-      .trim()
-      .split('\n')
-      .filter(Boolean)
-      .map((l) => JSON.parse(l));
+    raw = readFileSync(RESULTS_DIR + name, 'utf8');
   } catch {
-    return [];
+    return []; // absent baseline = no baseline yet (legitimate); corruption must NOT be silent
   }
+  return raw.trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)); // a corrupt line fails loudly
 };
 
 // FARLAB_PROBLEMS resolves against the CURRENT WORKING DIRECTORY (a plain path),

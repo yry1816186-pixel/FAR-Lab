@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "kind": "debate-verdict-judge",
+  "judgedAt": "2026-09-03T13:22:17.257Z",
+  "runId": "run_a341q83vppycj8qbhem221abh4",
+  "runStatus": "completed",
+  "judge": {
+    "route": "dashscope",
+    "model": "qwen3.7-max",
+    "sameModelAsDebate": null
+  },
+  "disclosedLimitation": "same-family judge ceiling — defensibility audit, not ground truth",
+  "counts": {
+    "sound": 2,
+    "unsound": 2,
+    "partial": 1
+  },
+  "soundRate": 0.4,
+  "verdicts": [
+    {
+      "hypothesisId": "hyp_r3dbdddcygww103ryna5j7djv1",
+      "verdict": "insufficient_evidence",
+      "counterFindings": 0,
+      "ok": true,
+      "judgment": "sound",
+      "rationale": "The verdict 'insufficient_evidence' is defensible because the evidence layer, while confirming that USP7 stabilizes PD-L1 and that USP7 reshapes TAM polarization, does not explicitly verify the specific mechanistic link that USP7 stabilizes PD-L1 specifically within TAMs to suppress T-cells. The cited uncertainty correctly identifies this gap, noting that searches yielded no direct primary literature for this specific cell-type interaction and that other deubiquitinases are established in tumor cells, making the attribution to USP7 in TAMs currently unsupported by the provided verified claims.",
+      "wallMs": 4058
+    },
+    {
+      "hypothesisId": "hyp_g77x6tpr6jyb59xfrw1mn66m39",
+      "verdict": "mixed",
+      "counterFindings": 1,
+      "ok": true,
+      "judgment": "unsound",
+      "rationale": "The 'mixed' verdict is indefensible because the provided evidence layer explicitly verifies that SPP1+ TAMs suppress T-cell activity via lactate accumulation from upregulated glycolysis (verified/high), directly contradicting the review's counter-finding which claims this mechanism is not primarily glycolytic. Furthermore, the evidence layer contains no support for the hypothesized JAK2/STAT3-APOE/TREM2 lipid-associated mechanism in SPP1+ TAMs specifically; while STAT3 is mentioned regarding CD11b/CD18 and CALB2, there is no verified link connecting it to SPP1+ lipid phenotypes, rendering the alternative explanation unanchored to the available data.",
+      "wallMs": 5164
+    },
+    {
+      "hypothesisId": "hyp_4gmm39bv59va9fgck82m5szxfj",
+      "verdict": "contradicted",
+      "counterFindings": 1,
+      "ok": true,
+      "judgment": "unsound",
+      "rationale": "The verdict 'contradicted' is indefensible because the provided evidence layer explicitly contains a verified/high claim stating that 'SPP1+ TAMs contribute to an immunosuppressive environment via the production of immunosuppressive metabolites like kynurenine,' which directly affirms the mechanism proposed in the hypothesis. The counter-finding relies on external literature to assert a lack of specific linkage, but this ignores the run's own verified evidence that establishes said linkage, rendering the contradiction logically invalid within the context of this specific audit.",
+      "wallMs": 4273
+    },
+    {
+      "hypothesisId": "hyp_jry46qpgc7nw11hfdp25qp22sx",
+      "verdict": "supported",
+      "counterFindings": 0,
+      "ok": true,
+      "judgment": "sound",
+      "rationale": "The verdict 'supported' is defensible because the evidence layer explicitly verifies that M2 macrophages suppress T-cell activity via immunosuppressive cytokines and confirms STAT3 signaling involvement in polarization, directly aligning with the hypothesized mechanism. The cited uncertainty regarding SPP1+ TAMs is appropriately framed as a limitation on specificity rather than a refutation, and it is anchored in verified evidence showing SPP1+ TAMs utilize distinct metabolic mechanisms (lactate, kynurenine) for suppression, which validly nuances the general IL-10/TGF-beta claim without invalidating it.",
+      "wallMs": 3198
+    },
+    {
+      "hypothesisId": "hyp_sqsf9byke5r0vqc65tawap0w12",
+      "verdict": "mixed",
+      "counterFindings": 1,
+      "ok": true,
+      "judgment": "partial",
+      "rationale": "The 'mixed' verdict is directionally defensible because the evidence layer supports SPP1+ TAM immunosuppression via glycolysis/lactate and kynurenine rather than ARG1, aligning with the hypothesis's rejection of arginase dominance; however, the review fails to address the hypothesis's specific positive claims regarding lipid metabolism and osteomimicry, for which no supporting or refuting evidence appears in the provided layer. The cited counter-finding relies on an external preprint source not present in the verified evidence layer to assert the lipid/osteomimicry association, making the defense of the hypothesis's specific alternative mechanisms unanchored to the run's actual findings.",
+      "wallMs": 4817
+    }
+  ]
+}

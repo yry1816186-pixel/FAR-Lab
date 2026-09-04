@@ -78,6 +78,20 @@ jobs:
         run: npm run lint
       - name: Full test suite (deterministic; real uv sidecar for experiments)
         run: npm test
+      # FA-EVAL-03: prompt drift gate. Was manual-only from 2026-08-23 to 09-03 and
+      # the snapshot rotted 48 entries behind audited lane evolution; CI now fails
+      # on drift so a prompt change without a versioned --snapshot --note bump
+      # cannot land green. Requires dist/ (imports computeRequestHash).
+      # FA-EVAL-03: failure-taxonomy verdict matrix (operator-facing contract).
+      - name: Failure taxonomy regression
+        run: node eval/taxonomy-regression.mjs
+      - name: Prompt drift gate (versioned snapshot)
+        run: node eval/prompt-regression.mjs --check
+      # FA-EVAL-03: per-prompt semantic gold corpus — hash drift (above) says a
+      # prompt CHANGED; this says the load-bearing instructions survived the
+      # change. An anchor lost = semantic drift = red, even with a --note bump.
+      - name: Prompt semantic gold gate
+        run: node eval/prompt-gold.mjs --check
       - name: TUI package tests
         working-directory: packages/tui
         run: npm test

@@ -6,8 +6,7 @@ import { useI18n } from '../i18n/LanguageContext';
 import type { DictKey } from '../i18n/dict';
 import {
   cancelRun, deleteRun, dispatchAction, editHypothesis, forkHypothesis, getEvidence, getHypotheses,
-  getQuestion, getScience, getSources, promoteHypothesis, rejectHypothesis, resumeRun,
-} from '../api/endpoints';
+  getQuestion, getScience, getSources, promoteHypothesis, rejectHypothesis, resumeRun, overrideMethodSelection } from '../api/endpoints';
 import { DISPATCHABLE_ACTIONS, type DispatchableAction } from '../api/endpoints';
 import type {
   AchResearcherAdjusted, EvidenceRelation, HypothesisCandidate, HypothesisScorecard, ResearchQuestion, ResearchRun, RunEvent, ScienceBundle, ScientificClaim, SourceDocument,
@@ -22,6 +21,9 @@ import { getProtocolState, type ProtocolStateView } from '../api/protocol';
 import { zhFirst, markerZh, dimensionLabel, decodeEntities } from './bilingual';
 import { ellipsize } from './text';
 import { useRunTruth } from '../components/detail/ResearchStatePanel';
+import { StreamStatusChip } from '../components/detail/StreamStatusChip';
+import type { StreamSnapshot } from '../hooks/eventStreamTracker';
+
 import { ScopeReview } from './ScopeReview';
 import { runLabel, type StudyGroup } from '../studies';
 import './lab.css';
@@ -80,10 +82,12 @@ const versionLabelDisplay = (label: string, t: ReturnType<typeof useI18n>['t']):
 };
 
 export function StudyMap({
-  run, events, studies, focusClaimId, onClaimFocused, onMutated,
+  run, events, studies, focusClaimId, onClaimFocused, onMutated, stream,
 }: {
   run: ResearchRun;
   events: RunEvent[];
+  /** Realtime stream health (FA-HCI-01): drives the visible reconnect/fallback chip on the live band. */
+  stream: StreamSnapshot;
   studies: StudyGroup[];
   /** Palette claim hit -> open that claim in the inspector once claims load. */
   focusClaimId?: string | null;
@@ -355,9 +359,11 @@ export function StudyMap({
         {science?.nextActions[0]?.researcherDecisionRequired === true && (
           <span className="lab-status lab-status--decision" title={science.nextActions[0].objective}>{t('map.pendingDecision')}</span>
         )}
-        {truth !== null && truth.klass !== 'live' && truth.klass !== 'empty' && (
-          <span className={`lab-status lab-truth--${truth.klass}`} title={t('map.truthHint', { n: truth.totalReceipts })}>
-            {t('map.truthBadge')}
+        {/* FA-HCI-01: the badge is ALWAYS visible (RunHeader parity) — live is a
+            positive claim, empty is the only silent case. */}
+        {truth !== null && truth.klass !== 'empty' && (
+          <span className={`lab-status lab-truth--${truth.klass}`} title={truth.klass === 'live' ? t('map.truthHintLive', { n: truth.totalReceipts }) : t('map.truthHint', { n: truth.totalReceipts })}>
+            {truth.klass === 'live' ? t('map.truthBadgeLive') : t('map.truthBadge')}
           </span>
         )}
         <span className="lab-spacer" />
@@ -429,6 +435,7 @@ export function StudyMap({
             onCancel={() => { void lifecycle('cancel'); }}
             cancelArmed={cancelArmed}
             onArmCancel={() => setCancelArmed((v) => !v)}
+            stream={stream}
             busy={lifecycleBusy}
             elapsedMin={elapsedMin}
             cancelRequested={cancelRequested}
@@ -487,10 +494,13 @@ export function StudyMap({
           />
         )}
 
-        {!draftable && settled && science === null && !spineLoaded && (
+        {!draftable && settled && science === null && !(spineLoaded && spineUnavailable) && (
           /* Same §21 CLS contract as the claims/hyps bands: the state band is the
              tallest top-of-map block — inserting it unreserved shifts everything
-             below (measured 0.228 vs 0.1 budget). */
+             below (measured 0.228 vs 0.1 budget). The reserve must persist for
+             the WHOLE science===null window: unmounting it when the spine gate
+             resolves (but /science is still in flight) removes a ~354px block
+             with no replacement — the 0.301 CLS CI flake. */
           <section className="map-node" aria-hidden="true">
             <p className="map-node-label">{t('map.stateLabel')}</p>
             <div className="map-band map-band--reserving map-band--state" />
@@ -507,7 +517,7 @@ export function StudyMap({
         {!draftable && (
           <>
         {settled && science !== null && (<>
-          <ProblemModelBand science={science} />
+          <ProblemModelBand science={science} runId={run.id} onMutated={onMutated} />
           <StateBand
             run={run}
             science={science}
@@ -632,6 +642,14 @@ export function StudyMap({
             )}
         </section>
 
+        {/* FA-HCI-01: an absent protocol band was silent — a settled reader could
+            not tell 'computed, nothing to preregister' from 'missing'. Say it. */}
+        {settled && protocol === null && protocolError === null && (
+          <section className="map-node">
+            <p className="map-node-label">{t('map.protocolNoneTitle')}</p>
+            <p className="small muted">{t('map.protocolNoneBody')}</p>
+          </section>
+        )}
         {(protocol !== null || protocolError !== null) && (
           <ProtocolPanel
             runId={run.id}
@@ -697,9 +715,10 @@ export function StudyMap({
 }
 
 /** Live execution narrative — six questions answered from real state, no fake progress. */
-function LiveBand({ run, events, onCancel, cancelArmed, onArmCancel, busy, elapsedMin, cancelRequested }: {
+function LiveBand({ run, events, onCancel, cancelArmed, onArmCancel, busy, elapsedMin, cancelRequested, stream }: {
   run: ResearchRun;
   events: RunEvent[];
+  stream: StreamSnapshot;
   onCancel: () => void;
   cancelArmed: boolean;
   onArmCancel: () => void;
@@ -724,6 +743,8 @@ function LiveBand({ run, events, onCancel, cancelArmed, onArmCancel, busy, elaps
         {t('map.liveElapsed', { min: elapsedMin })}
       </p>
       <p className="mb-line">{t('map.liveWhy', { stage: stageLabel })}</p>
+      {/* FA-HCI-01: a dropped realtime feed is never silent on the map either */}
+      <StreamStatusChip snapshot={stream} />
       {cancelRequested && (
         <p className="mb-line" role="status">{t('map.cancelPending')}</p>
       )}
@@ -909,12 +930,39 @@ function Inspector({ insp, run, liveClaim, liveHyp, hyps, balances, sourceById, 
   );
 }
 
-function ProblemModelBand({ science }: { science: ScienceBundle }): JSX.Element | null {
+function ProblemModelBand({ science, runId, onMutated }: { science: ScienceBundle; runId: string; onMutated: () => void }): JSX.Element | null {
   const { t } = useI18n();
   const pm = science.problemModel;
+  const [openObjective, setOpenObjective] = useState<string | null>(null);
+  const [checked, setChecked] = useState<string[]>([]);
+  const [reason, setReason] = useState('');
+  const [plan, setPlan] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
   if (pm === null) return null;
-  const sel = (objId: string): string[] =>
-    pm.methodSelections.find((s) => s.forObjectiveId === objId)?.selectedFamilies ?? [];
+  const sel = (objId: string) => pm.methodSelections.find((s) => s.forObjectiveId === objId);
+  const submit = async (): Promise<void> => {
+    const selection = openObjective !== null ? sel(openObjective) : undefined;
+    if (selection === undefined || checked.length === 0 || checked.length > 2) return;
+    setBusy(true);
+    setError(null);
+    setDone(null);
+    try {
+      const plans: Record<string, string> = plan.trim().length >= 10 && checked.length === 1 ? { [checked[0] ?? '']: plan.trim() } : {};
+      const r = await overrideMethodSelection(runId, selection.id, checked, reason.trim(), plans);
+      setDone(r.revisionId);
+      setChecked([]);
+      setReason('');
+      setPlan('');
+      setOpenObjective(null);
+      onMutated();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <section className="map-node">
       <p className="map-node-label">{t('map.pm.title')}<span className="map-node-hint">{t('map.pm.hint')}</span></p>
@@ -924,8 +972,9 @@ function ProblemModelBand({ science }: { science: ScienceBundle }): JSX.Element 
       </p>
       <ul className="pm-objectives">
         {pm.objectives.map((o) => {
-          const families = sel(o.id);
-          const undecided = pm.methodSelections.find((s) => s.forObjectiveId === o.id)?.undecidedReason ?? null;
+          const selection = sel(o.id);
+          const families = selection?.selectedFamilies ?? [];
+          const undecided = selection?.undecidedReason ?? null;
           return (
             <li key={o.id}>
               <span>{o.statement}</span>{' '}
@@ -933,6 +982,32 @@ function ProblemModelBand({ science }: { science: ScienceBundle }): JSX.Element 
                 ? <Badge tone="ok">{families.join(' / ')}</Badge>
                 : <Badge tone="muted">{t('map.pm.undecided')}</Badge>}
               {undecided !== null && <span className="muted small"> {undecided}</span>}
+              {selection !== undefined && (
+                <button type="button" className="link" onClick={() => { setOpenObjective(openObjective === o.id ? null : o.id); setChecked(families); setError(null); setDone(null); }}>
+                  {t('map.pm.override')}
+                </button>
+              )}
+              {openObjective === o.id && selection !== undefined && (
+                <div className="pm-override">
+                  <p className="muted small">{t('map.pm.overrideHint')}</p>
+                  {selection.candidates.map((cand) => (
+                    <label key={cand.family} className="small">
+                      <input
+                        type="checkbox"
+                        checked={checked.includes(cand.family)}
+                        onChange={(e) => { setChecked(e.target.checked ? [...checked, cand.family].slice(-2) : checked.filter((f) => f !== cand.family)); }}
+                      /> {cand.family}{cand.hasValidationPlan ? '' : ' *'}
+                    </label>
+                  ))}
+                  <input type="text" placeholder={t('map.pm.overrideReason')} value={reason} onChange={(e) => { setReason(e.target.value); }} />
+                  <input type="text" placeholder={t('map.pm.overridePlan')} value={plan} onChange={(e) => { setPlan(e.target.value); }} />
+                  <button type="button" disabled={busy || reason.trim().length < 10 || checked.length === 0} onClick={() => { void submit(); }}>
+                    {busy ? t('map.pm.overrideBusy') : t('map.pm.overrideSubmit')}
+                  </button>
+                  {error !== null && <p className="map-error small">{error}</p>}
+                  {done !== null && <p className="small">{t('map.pm.overrideDone', { rev: done })}</p>}
+                </div>
+              )}
             </li>
           );
         })}

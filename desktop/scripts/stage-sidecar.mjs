@@ -99,17 +99,25 @@ writeFileSync(join(stage, 'package.json'), JSON.stringify({
   dependencies: { zod: zodVersion },
 }, undefined, 2) + '\n');
 
-// Smoke the staged server once (random port, health probe, kill).
+// Smoke the staged server once (random port, health probe, kill). The smoke
+// server's workspace goes to a THROWAWAY dir: letting it create .far-run inside
+// the stage both pollutes the payload and races dirSize() — SQLite deletes the
+// -wal asynchronously after the kill while the walk below stats it (live CI
+// ENOENT on .far-run/far.db-wal).
 const port = 33000 + Math.floor(Math.random() * 2000);
+const { mkdtempSync } = await import('node:fs');
+const { tmpdir } = await import('node:os');
+const smokeDataDir = mkdtempSync(join(tmpdir(), 'far-sidecar-smoke-'));
 const smoke = (await import('node:child_process')).spawnSync(process.execPath, ['--input-type=module', '-e',
   `const { spawn } = await import('node:child_process');
-   const child = spawn(process.execPath, ['scripts/serve.mjs'], { cwd: ${JSON.stringify(stage)}, env: { ...process.env, PORT: '${port}' }, stdio: 'ignore' });
+   const child = spawn(process.execPath, ['scripts/serve.mjs'], { cwd: ${JSON.stringify(stage)}, env: { ...process.env, PORT: '${port}', FARLAB_DATA_DIR: ${JSON.stringify(smokeDataDir)} }, stdio: 'ignore' });
    const deadline = Date.now() + 20000;
    while (Date.now() < deadline) {
      try { const r = await fetch('http://127.0.0.1:${port}/api/v1/health'); if (r.ok) { child.kill(); process.exit(0); } } catch {}
      await new Promise((r) => setTimeout(r, 400));
    }
    child.kill(); process.exit(1);`], { encoding: 'utf8' });
+rmSync(smokeDataDir, { recursive: true, force: true });
 if (smoke.status !== 0) fail(`staged server smoke failed (status ${String(smoke.status)}): ${(smoke.stderr ?? '').slice(0, 300)}`);
 
 console.log(`stage-sidecar: staged ${(dirSize(stage) / 1e6).toFixed(1)} MB to desktop/sidecar/ (smoke: health OK on port ${port})`);

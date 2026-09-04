@@ -7,6 +7,7 @@ import { ConversationError, type ConversationTurnRuntime } from './conversations
  * private model reasoning. */
 export type ConversationStreamPayload =
   | { type: 'accepted' }
+  | { type: 'steered'; text: string }
   | ConversationTurnProgress
   | { type: 'completed'; conversation: Conversation }
   | { type: 'cancelled'; conversation: Conversation | null; preservedReply: string }
@@ -33,6 +34,7 @@ interface ActiveTurn {
 
 export class ConversationTurnHub {
   private readonly turns = new Map<string, ActiveTurn>();
+  private readonly steers = new Map<string, string[]>();
 
   constructor(
     private readonly snapshot: (conversationId: string) => Conversation | null,
@@ -65,6 +67,7 @@ export class ConversationTurnHub {
     void Promise.resolve()
       .then(() => work({
         signal: turn.controller.signal,
+        steer: () => this.takeSteer(conversationId),
         onProgress: (progress) => {
           if (progress.type === 'reply_reset') turn.reply = '';
           else if (progress.type === 'reply_delta') turn.reply = `${turn.reply}${progress.text}`.slice(0, 40_000);
@@ -117,6 +120,31 @@ export class ConversationTurnHub {
     };
   }
 
+  /** Queue a mid-turn steering message (FA-HAR-05): the running turn's
+   * loop polls it between turns and injects it into the session transcript.
+   * False when no turn is running (the researcher should post a message). */
+  steer(conversationId: string, text: string): boolean {
+    const turn = this.turns.get(conversationId);
+    if (turn === undefined || turn.status !== 'running') return false;
+    const queued = text.slice(0, 20_000);
+    const queue = this.steers.get(conversationId) ?? [];
+    // 8 pending steers is already pathological researcher behavior; drop the
+    // oldest so the queue stays bounded and the newest intent wins.
+    if (queue.length >= 8) queue.shift();
+    queue.push(queued);
+    this.steers.set(conversationId, queue);
+    this.emit(turn, { type: 'steered', text: queued });
+    return true;
+  }
+
+  private takeSteer(conversationId: string): string | null {
+    const queue = this.steers.get(conversationId);
+    if (queue === undefined || queue.length === 0) return null;
+    const text = queue.shift();
+    if (queue.length === 0) this.steers.delete(conversationId);
+    return text ?? null;
+  }
+
   cancel(conversationId: string): boolean {
     const turn = this.turns.get(conversationId);
     if (turn === undefined || turn.status !== 'running') return false;
@@ -131,6 +159,7 @@ export class ConversationTurnHub {
       turn.listeners.clear();
     }
     this.turns.clear();
+    this.steers.clear();
   }
 
   private emit(turn: ActiveTurn, payload: ConversationStreamPayload): void {
@@ -150,7 +179,10 @@ export class ConversationTurnHub {
 
   private scheduleCleanup(turn: ActiveTurn): void {
     turn.cleanupTimer = setTimeout(() => {
-      if (this.turns.get(turn.conversationId) === turn) this.turns.delete(turn.conversationId);
+      if (this.turns.get(turn.conversationId) === turn) {
+        this.turns.delete(turn.conversationId);
+        this.steers.delete(turn.conversationId);
+      }
     }, this.retainMs);
     turn.cleanupTimer.unref();
   }

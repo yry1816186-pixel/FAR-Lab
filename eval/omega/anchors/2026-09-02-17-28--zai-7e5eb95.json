@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "harnessVersion": 1,
+  "leg": "REBUILT-candidate",
+  "pinnedAt": "2026-09-02T18:25:37.608Z",
+  "gitCommit": "7e5eb95",
+  "gitTag": null,
+  "route": "zai",
+  "problemsFile": "eval/problems.json",
+  "cli": {
+    "path": "dist/cli/main.js",
+    "argv": [
+      "research",
+      "start",
+      "<q>",
+      "--domain",
+      "<d>",
+      "--goal",
+      "<g>",
+      "--route",
+      "zai",
+      "--json"
+    ]
+  },
+  "results": [
+    {
+      "problemId": "P2",
+      "ok": true,
+      "snapshot": {
+        "runId": "run_yv2ebq3afz5ypenf4bs01xy246",
+        "status": "partial",
+        "stages": [
+          {
+            "stage": "scope",
+            "state": "done"
+          },
+          {
+            "stage": "retrieve",
+            "state": "done"
+          },
+          {
+            "stage": "verify_sources",
+            "state": "done"
+          },
+          {
+            "stage": "build_evidence",
+            "state": "done"
+          },
+          {
+            "stage": "generate_hypotheses",
+            "state": "done"
+          },
+          {
+            "stage": "critique_falsify",
+            "state": "done"
+          },
+          {
+            "stage": "rank",
+            "state": "done"
+          },
+          {
+            "stage": "plan",
+            "state": "done"
+          },
+          {
+            "stage": "execute",
+            "state": "skipped",
+            "reason": "tabular: routed out by method selection; literature-pool: The plan requires collecting new prospective longitudinal clinical data (serial stool sampling, LC-MS/MS metabolomics, flow/mass cytometry immune phenotyping) and performing mediation/attenuation analyses on patient-level data. No exposure-vs-outcome contrast reported as a poolable published effect estimate (OR/RR/SMD) exists for the specific metabolite-mediated causal mechanism or reverse-causation hypothesis; published taxa–response associations alone cannot adjudicate between the two causal explanations.; theory: routed out by method selection; protocol: protocol drafting failed: model call failed (invalid_output) in execute/protocol-draft: zai: structured output rejected even after 3 corrective re-asks: schema validation failed: variables.4.qcRule.allowed:"
+          },
+          {
+            "stage": "feedback",
+            "state": "done"
+          },
+          {
+            "stage": "revise",
+            "state": "failed",
+            "reason": "model call failed (timeout) in revise/plan-revision:pln_j8y7ykzt1xy4yavv1d0881whhs: zai: total budget 300000ms (incl. retries) exhausted before next attempt"
+          },
+          {
+            "stage": "export",
+            "state": "pending"
+          }
+        ],
+        "metrics": {
+          "source_total": 12,
+          "source_verification_rate": 1,
+          "claim_total": 5,
+          "claim_binding_rate": 1,
+          "counter_evidence_relations": 7,
+          "hypothesis_candidates": 10,
+          "hypothesis_representatives": 10,
+          "falsification_completeness_rate": 1,
+          "plan_present": true,
+          "receipts": 160,
+          "model_calls": 113,
+          "receipt_modes": {
+            "live": 160
+          },
+          "agent_reports": 1,
+          "debate_counter_findings": 11,
+          "feedback_signals": 11,
+          "debate_verdict_counts": {
+            "mixed": 2,
+            "insufficient_evidence": 3
+          }
+        },
+        "modelVersions": []
+      },
+      "wallMs": 3437811
+    }
+  ]
+}

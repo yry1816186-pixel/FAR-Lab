@@ -311,6 +311,18 @@ describe('scope stage', () => {
     expect(env.store.listObjects('problem_model', env.run.id)).toHaveLength(0);
   });
 
+  it('refuses umlaut-bearing objectives for an ASCII question — language discipline (ΩF-004)', async () => {
+    const germanSlip = structuredClone(problemModelDraft);
+    germanSlip.objectives = [{ statement: 'Bestimmen, wie intermittierendes Fasten die Insulinsensitivität verändert' }];
+    const env = makeEnv([
+      { rawOutput: JSON.stringify(refinement) },
+      { rawOutput: JSON.stringify(germanSlip) },
+    ], {});
+    await expect(scopeStage.execute(env.ctx)).rejects.toThrow(/language discipline violated/);
+    // nothing scientific was stored from the slip — visible failure, not silent storage
+    expect(env.store.listObjects('problem_model', env.run.id)).toHaveLength(0);
+  });
+
   it('fails visibly when the provider fails — never a silent empty scope', async () => {
     const env = makeEnv([{ fail: { kind: 'provider_error', message: 'fixture provider outage' } }], {});
     await expect(scopeStage.execute(env.ctx)).rejects.toThrow(/model call failed \(provider_error\)/);

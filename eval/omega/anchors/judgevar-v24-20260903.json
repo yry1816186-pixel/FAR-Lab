@@ -1,0 +1,344 @@
+{
+  "mode": "live",
+  "gtRev": "gt-fixed-2026-08-22",
+  "repeats": 3,
+  "judgeProtocol": "v2.4 (passes 7, votes 9, medoid decomposition selection — 2026-09-03 stabilization)",
+  "judgeRoute": {
+    "provider": "dashscope",
+    "modelId": "qwen3.7-max"
+  },
+  "generated": "2026-09-03T14:18:57.688Z",
+  "tasks": [
+    {
+      "task": "arg-plasmid-transfer",
+      "gtClaims": 9,
+      "repeatsOk": 3,
+      "f1s": [
+        0,
+        0,
+        0
+      ],
+      "maxAbsSwing": 0,
+      "variance": 0,
+      "detail": [
+        {
+          "repeat": 1,
+          "f1": 0,
+          "decomposition": {
+            "passes": [
+              9,
+              9,
+              9,
+              9,
+              9,
+              9,
+              9
+            ],
+            "selected": 9
+          },
+          "borderline": 4
+        },
+        {
+          "repeat": 2,
+          "f1": 0,
+          "decomposition": {
+            "passes": [
+              9,
+              9,
+              9,
+              9,
+              9,
+              9,
+              9
+            ],
+            "selected": 9
+          },
+          "borderline": 9
+        },
+        {
+          "repeat": 3,
+          "f1": 0,
+          "decomposition": {
+            "passes": [
+              9,
+              9,
+              9,
+              9,
+              9,
+              9,
+              9
+            ],
+            "selected": 9
+          },
+          "borderline": 4
+        }
+      ]
+    },
+    {
+      "task": "crc-ici-failure",
+      "gtClaims": 8,
+      "repeatsOk": 3,
+      "f1s": [
+        0.682,
+        0.625,
+        0.625
+      ],
+      "maxAbsSwing": 0.057,
+      "variance": 0.000722,
+      "detail": [
+        {
+          "repeat": 1,
+          "f1": 0.682,
+          "decomposition": {
+            "passes": [
+              8,
+              8,
+              8,
+              8,
+              8,
+              8,
+              8
+            ],
+            "selected": 8
+          },
+          "borderline": 10
+        },
+        {
+          "repeat": 2,
+          "f1": 0.625,
+          "decomposition": {
+            "passes": [
+              8,
+              8,
+              8,
+              8,
+              8,
+              8,
+              8
+            ],
+            "selected": 8
+          },
+          "borderline": 10
+        },
+        {
+          "repeat": 3,
+          "f1": 0.625,
+          "decomposition": {
+            "passes": [
+              8,
+              8,
+              8,
+              8,
+              8,
+              8,
+              8
+            ],
+            "selected": 8
+          },
+          "borderline": 10
+        }
+      ]
+    },
+    {
+      "task": "egfr-tki-resistance",
+      "gtClaims": 8,
+      "repeatsOk": 3,
+      "f1s": [
+        0.125,
+        0.125,
+        0.125
+      ],
+      "maxAbsSwing": 0,
+      "variance": 0,
+      "detail": [
+        {
+          "repeat": 1,
+          "f1": 0.125,
+          "decomposition": {
+            "passes": [
+              8,
+              8,
+              8,
+              8,
+              8,
+              8,
+              8
+            ],
+            "selected": 8
+          },
+          "borderline": 2
+        },
+        {
+          "repeat": 2,
+          "f1": 0.125,
+          "decomposition": {
+            "passes": [
+              8,
+              8,
+              8,
+              8,
+              8,
+              8,
+              8
+            ],
+            "selected": 8
+          },
+          "borderline": 2
+        },
+        {
+          "repeat": 3,
+          "f1": 0.125,
+          "decomposition": {
+            "passes": [
+              8,
+              8,
+              8,
+              8,
+              8,
+              8,
+              8
+            ],
+            "selected": 8
+          },
+          "borderline": 2
+        }
+      ]
+    },
+    {
+      "task": "antibiotic-cdiff",
+      "gtClaims": 6,
+      "repeatsOk": 3,
+      "f1s": [
+        0,
+        0,
+        0
+      ],
+      "maxAbsSwing": 0,
+      "variance": 0,
+      "detail": [
+        {
+          "repeat": 1,
+          "f1": 0,
+          "decomposition": {
+            "passes": [
+              6,
+              6,
+              6,
+              6,
+              6,
+              6,
+              6
+            ],
+            "selected": 6
+          },
+          "borderline": 6
+        },
+        {
+          "repeat": 2,
+          "f1": 0,
+          "decomposition": {
+            "passes": [
+              6,
+              6,
+              6,
+              6,
+              6,
+              6,
+              6
+            ],
+            "selected": 6
+          },
+          "borderline": 7
+        },
+        {
+          "repeat": 3,
+          "f1": 0,
+          "decomposition": {
+            "passes": [
+              6,
+              6,
+              6,
+              6,
+              6,
+              6,
+              6
+            ],
+            "selected": 6
+          },
+          "borderline": 7
+        }
+      ]
+    },
+    {
+      "task": "crispr-offtarget",
+      "gtClaims": 5,
+      "repeatsOk": 3,
+      "f1s": [
+        0.267,
+        0.267,
+        0.267
+      ],
+      "maxAbsSwing": 0,
+      "variance": 0,
+      "detail": [
+        {
+          "repeat": 1,
+          "f1": 0.267,
+          "decomposition": {
+            "passes": [
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5
+            ],
+            "selected": 5
+          },
+          "borderline": 5
+        },
+        {
+          "repeat": 2,
+          "f1": 0.267,
+          "decomposition": {
+            "passes": [
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5
+            ],
+            "selected": 5
+          },
+          "borderline": 5
+        },
+        {
+          "repeat": 3,
+          "f1": 0.267,
+          "decomposition": {
+            "passes": [
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5
+            ],
+            "selected": 5
+          },
+          "borderline": 5
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "tasksMeasured": 5,
+    "worstTaskSwing": 0.057,
+    "allUnderTarget015": true,
+    "allUnderStretch008": true
+  }
+}

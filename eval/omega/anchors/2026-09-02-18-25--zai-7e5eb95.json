@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "harnessVersion": 1,
+  "leg": "REBUILT-candidate",
+  "pinnedAt": "2026-09-02T19:04:59.658Z",
+  "gitCommit": "7e5eb95",
+  "gitTag": null,
+  "route": "zai",
+  "problemsFile": "eval/problems.json",
+  "cli": {
+    "path": "dist/cli/main.js",
+    "argv": [
+      "research",
+      "start",
+      "<q>",
+      "--domain",
+      "<d>",
+      "--goal",
+      "<g>",
+      "--route",
+      "zai",
+      "--json"
+    ]
+  },
+  "results": [
+    {
+      "problemId": "P2",
+      "ok": true,
+      "snapshot": {
+        "runId": "run_nmnax2899fe00j0mk7ax5fh8w2",
+        "status": "partial",
+        "stages": [
+          {
+            "stage": "scope",
+            "state": "done"
+          },
+          {
+            "stage": "retrieve",
+            "state": "done"
+          },
+          {
+            "stage": "verify_sources",
+            "state": "done"
+          },
+          {
+            "stage": "build_evidence",
+            "state": "done"
+          },
+          {
+            "stage": "generate_hypotheses",
+            "state": "done"
+          },
+          {
+            "stage": "critique_falsify",
+            "state": "done"
+          },
+          {
+            "stage": "rank",
+            "state": "done"
+          },
+          {
+            "stage": "plan",
+            "state": "done"
+          },
+          {
+            "stage": "execute",
+            "state": "skipped",
+            "reason": "tabular: Requires a patient-level ICI cohort with baseline stool microbiome sequencing, medication/antibiotic records, RECIST outcomes, and baseline blood ISG/monocyte activation assays; such clinical sequencing and assay data are not available as a public tabular OpenML classification dataset, and blood assays must be collected (wet-lab).; literature-pool: The hypotheses require discriminating causal mechanism (TLR/type-I IFN licensing vs antibiotic confounding) via mediation and interaction analyses on individual patient data — baseline serum ISG scores that must be newly collected, requested patient-level cohort data with microbiome, medication and RECIST records, and adjusted/attenuation estimates (taxon coefficient attenuation, ISG-response RR, interaction tests) that are not reported as pooled effect estimates in the literature. No published exposure-vs-outcome contrast exists that can test the innate-licensing hypothesis or the mediation/interaction decision rules by pooling published ORs/RRs/HRs alone.; theory: The plan's falsifiable content is statistical (HRs, risk ratios, coefficient attenuation, interaction significance) to be estimated from existing cohort datasets with physical/biological measurements; it contains no closed-form mathematical identity or bound checkable numerically on a small grid.; protocol: protocol drafting failed: model call failed (invalid_output) in execute/protocol-draft: zai: structured output rejected even after 3 corrective re-asks: schema validation failed: variables.3.role:Invalid en"
+          },
+          {
+            "stage": "feedback",
+            "state": "done"
+          },
+          {
+            "stage": "revise",
+            "state": "failed",
+            "reason": "model call failed (provider_error) in revise/hypothesis-revision:hyp_j9absg69whjnqexekfa23mgr4y: zai: HTTP 500 code 1234: [1234][网络错误，错误id 20260903030359caf63fda5e5b43a3 ，请稍后重试。][20260903030359caf63fda5e5b43a3] (transient 500; eligible for bounded retry) (retry budget of 2 exhausted)"
+          },
+          {
+            "stage": "export",
+            "state": "pending"
+          }
+        ],
+        "metrics": {
+          "source_total": 12,
+          "source_verification_rate": 1,
+          "claim_total": 11,
+          "claim_binding_rate": 1,
+          "counter_evidence_relations": 8,
+          "hypothesis_candidates": 10,
+          "hypothesis_representatives": 10,
+          "falsification_completeness_rate": 1,
+          "plan_present": true,
+          "receipts": 156,
+          "model_calls": 106,
+          "receipt_modes": {
+            "live": 156
+          },
+          "agent_reports": 1,
+          "debate_counter_findings": 8,
+          "feedback_signals": 8,
+          "debate_verdict_counts": {
+            "mixed": 3,
+            "insufficient_evidence": 2
+          }
+        },
+        "modelVersions": []
+      },
+      "wallMs": 2361937
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "schema": "farlab-capacity-benchmark/1",
+  "asOf": "2026-09-04T02:55:49.494Z",
+  "node": "v24.14.0",
+  "platform": "win32/x64",
+  "targets": {
+    "csvBytes": 1073741824,
+    "netcdfBytes": 524288000
+  },
+  "memoryLimitBytes": 2147483648,
+  "phases": [
+    {
+      "name": "gen 1024MB synthetic csv (setup, not measured capability)",
+      "ok": true,
+      "ms": 11621,
+      "peakRssBytes": 270872576,
+      "fileBytes": 1073762075
+    },
+    {
+      "name": "acquire + split 1024MB csv through the real path",
+      "ok": true,
+      "ms": 40813,
+      "peakRssBytes": 1152212992,
+      "splitMs": 40676,
+      "nRows": 24004000,
+      "train": 16802800,
+      "test": 7201200,
+      "contentRef": "sha256:45319e1aa4b05af09702b0201c9f4176feb8ad6938124d82409c46cc223feedc",
+      "verdict": "PASS",
+      "baselineNote": "pre-FA-DAT-01 this path read the whole file into one Buffer (100MB hard cap) — 1GB would throw before any work"
+    },
+    {
+      "name": "gen 500MB netcdf (real netCDF4 via sidecar)",
+      "ok": true,
+      "ms": 1986,
+      "peakRssBytes": 2052726784,
+      "fileBytes": 524294144
+    },
+    {
+      "name": "streaming put + hash 500MB netcdf",
+      "ok": true,
+      "ms": 1050,
+      "peakRssBytes": 2048651264,
+      "hash": "7e3a60e36cea3267",
+      "size": 524294144,
+      "verdict": "PASS",
+      "baselineNote": "pre-FA-DAT-01 this path readFileSync-ed the whole file (200MB hard cap) — 500MB would throw immediately"
+    }
+  ],
+  "verdict": "PASS — peak RSS 1958MB across 1024MB CSV + 500MB NetCDF legs"
+}

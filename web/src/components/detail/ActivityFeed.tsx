@@ -21,6 +21,11 @@ const NOTE_MILESTONES: ReadonlySet<string> = new Set([
 ]);
 /** Research iteration controller decisions — rounds and why they ended. */
 const ITERATION_REASONS: ReadonlySet<string> = new Set(['iteration_round_started', 'iteration_decided']);
+/** Kernel capability actions (Ω ADR D4/D5): plan revisions and agent-step outcomes a
+ *  researcher must see — the debate's findings entering the science layer, or failing visibly. */
+const KERNEL_REASONS: ReadonlySet<string> = new Set([
+  'workflow_plan_revised', 'agent_step_done', 'agent_step_failed', 'agent_step_unavailable', 'agent_step_skipped',
+]);
 /** L3 telemetry: real receipts that belong under the disclosure, not the story. */
 const TELEMETRY: ReadonlySet<string> = new Set([
   'receipt_recorded', 'agent_started', 'agent_tool_used', 'agent_finished',
@@ -55,12 +60,13 @@ function emptyAgg(key: string): AggMilestone {
 }
 
 /** Latest transition per stage wins; milestones aggregate onto their own stage. */
-function deriveTimeline(events: RunEvent[], run: ResearchRun): { stages: StageRow[]; telemetry: RunEvent[]; iterations: RunEvent[] } {
+function deriveTimeline(events: RunEvent[], run: ResearchRun): { stages: StageRow[]; telemetry: RunEvent[]; iterations: RunEvent[]; kernel: RunEvent[] } {
   const byStage = new Map<string, StageRow>();
   const aggByStage = new Map<string, Map<string, AggMilestone>>();
   const milestones: RunEvent[] = [];
   const telemetry: RunEvent[] = [];
   const iterations: RunEvent[] = [];
+  const kernel: RunEvent[] = [];
   for (const e of events) {
     if (STAGE_TRANSITIONS.has(e.type)) {
       const stage = e.stage;
@@ -75,6 +81,8 @@ function deriveTimeline(events: RunEvent[], run: ResearchRun): { stages: StageRo
       });
     } else if (e.type === 'note' && typeof e.detail?.reason === 'string' && ITERATION_REASONS.has(e.detail.reason)) {
       iterations.push(e);
+    } else if (e.type === 'note' && typeof e.detail?.reason === 'string' && KERNEL_REASONS.has(e.detail.reason)) {
+      kernel.push(e);
     } else if (e.type === 'note' && typeof e.detail?.reason === 'string' && NOTE_MILESTONES.has(e.detail.reason)) {
       milestones.push(e);
     } else if (TELEMETRY.has(e.type)) {
@@ -108,7 +116,7 @@ function deriveTimeline(events: RunEvent[], run: ResearchRun): { stages: StageRo
     const row = byStage.get(cur);
     if (row !== undefined && row.status !== 'done' && row.status !== 'failed') row.status = 'running';
   }
-  return { stages: [...byStage.values()], telemetry, iterations };
+  return { stages: [...byStage.values()], telemetry, iterations, kernel };
 }
 
 function StageIcon({ status }: { status: StageRow['status'] }): JSX.Element {
@@ -121,7 +129,7 @@ function StageIcon({ status }: { status: StageRow['status'] }): JSX.Element {
 
 export function ActivityFeed({ run, events }: { run: ResearchRun; events: RunEvent[] }): JSX.Element {
   const { t, formatTime } = useI18n();
-  const { stages, telemetry, iterations } = deriveTimeline(events, run);
+  const { stages, telemetry, iterations, kernel } = deriveTimeline(events, run);
   const active = run.status === 'running' || run.status === 'queued';
   const currentDesc: string | null = active ? t(`activity.stageDesc.${run.currentStage}` as DictKey) : null;
   const ordered = [...stages].reverse(); // newest first, matching the live-feed reading direction
@@ -155,6 +163,27 @@ export function ActivityFeed({ run, events }: { run: ResearchRun; events: RunEve
       return t('activity.mDocumentsAgg', { sources: m.count, claims: m.claims });
     }
     return t('activity.mQueryPlan', { n: m.plannedQueries, c: m.counterQueries });
+  };
+
+  /** Kernel action event → one researcher-readable line (defensive: detail is untrusted). */
+  const kernelText = (e: RunEvent): string => {
+    const d = e.detail ?? {};
+    const capability = typeof d.capability === 'string' ? d.capability : '';
+    if (d.reason === 'workflow_plan_revised') {
+      return t('kernel.planRevised', { capability: typeof d.inserted === 'string' ? d.inserted : '', v: typeof d.version === 'number' ? d.version : 2 });
+    }
+    if (d.reason === 'agent_step_done') {
+      return typeof d.materialized === 'number' && d.materialized > 0
+        ? t('kernel.stepFindings', { capability, n: d.materialized })
+        : t('kernel.stepDone', { capability, turns: typeof d.turns === 'number' ? d.turns : 0 });
+    }
+    if (d.reason === 'agent_step_failed') {
+      return t('kernel.stepFailed', { capability, error: typeof d.error === 'string' ? d.error.slice(0, 120) : '' });
+    }
+    if (d.reason === 'agent_step_unavailable') {
+      return t('kernel.stepUnavailable', { capability, cause: typeof d.cause === 'string' ? d.cause : '' });
+    }
+    return t('kernel.stepSkipped', { capability });
   };
 
   return (
@@ -204,6 +233,17 @@ export function ActivityFeed({ run, events }: { run: ResearchRun; events: RunEve
             <p key={e.seq} className="tl-iteration small">
               <time className="mono muted" dateTime={e.at}>{formatTime(e.at).split(' ').pop()}</time>
               <span>{iterationText(e)}</span>
+            </p>
+          ))}
+        </div>
+      )}
+
+      {kernel.length > 0 && (
+        <div className="tl-iterations" aria-label={t('kernel.section')}>
+          {kernel.slice(-6).reverse().map((e) => (
+            <p key={e.seq} className="tl-iteration small">
+              <time className="mono muted" dateTime={e.at}>{formatTime(e.at).split(' ').pop()}</time>
+              <span>{kernelText(e)}</span>
             </p>
           ))}
         </div>

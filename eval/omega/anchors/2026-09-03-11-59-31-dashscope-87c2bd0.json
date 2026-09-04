@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "harnessVersion": 1,
+  "leg": "REBUILT-candidate",
+  "pinnedAt": "2026-09-03T12:20:53.212Z",
+  "gitCommit": "87c2bd0b3e63aa34e3b5043b3c3921ca5c33c918",
+  "gitTag": null,
+  "route": "dashscope",
+  "problemsFile": "eval/problems.json",
+  "cli": {
+    "path": "dist/cli/main.js",
+    "argv": [
+      "research",
+      "start",
+      "<q>",
+      "--domain",
+      "<d>",
+      "--goal",
+      "<g>",
+      "--route",
+      "dashscope",
+      "--json"
+    ]
+  },
+  "results": [
+    {
+      "problemId": "P3",
+      "ok": true,
+      "snapshot": {
+        "runId": "run_a341q83vppycj8qbhem221abh4",
+        "status": "completed",
+        "stages": [
+          {
+            "stage": "scope",
+            "state": "done"
+          },
+          {
+            "stage": "retrieve",
+            "state": "done"
+          },
+          {
+            "stage": "verify_sources",
+            "state": "done"
+          },
+          {
+            "stage": "build_evidence",
+            "state": "done"
+          },
+          {
+            "stage": "generate_hypotheses",
+            "state": "done"
+          },
+          {
+            "stage": "critique_falsify",
+            "state": "done"
+          },
+          {
+            "stage": "rank",
+            "state": "done"
+          },
+          {
+            "stage": "plan",
+            "state": "done"
+          },
+          {
+            "stage": "execute",
+            "state": "skipped",
+            "reason": "tabular: routed out by method selection; literature-pool: The research question seeks to discriminate between molecular mechanisms (USP7-mediated PD-L1 stabilization vs SPP1+-mediated lactate accumulation) using experimental decision rules based on primary data collection (patient-derived tissue) and specific functional assays (knockdown effects, marker reduction thresholds). This requires wet-lab work or analysis of raw experimental datasets rather than pooling published effect estimates (OR, RR, SMD) from the literature.; theory: theory spec drafting failed: model call failed (invalid_output) in execute/theory-spec-draft: dashscope: structured output rejected even after 3 corrective re-asks: schema validation failed: variables:Array mu; protocol: protocol draft failed schema validation: : step ps1 produces unknown measurement 'List of validated inhibitors'; : step ps1 produces unknown measurement 'Mechanistic pathway map'; : step ps2 produces unknown measurement 'IFN-gamma concentration'; : step ps3 produces unknown measurement 'pSTAT3 levels'"
+          },
+          {
+            "stage": "feedback",
+            "state": "done"
+          },
+          {
+            "stage": "revise",
+            "state": "skipped"
+          },
+          {
+            "stage": "export",
+            "state": "skipped"
+          }
+        ],
+        "metrics": {
+          "source_total": 12,
+          "source_verification_rate": 1,
+          "claim_total": 23,
+          "claim_binding_rate": 1,
+          "counter_evidence_relations": 3,
+          "hypothesis_candidates": 10,
+          "hypothesis_representatives": 9,
+          "falsification_completeness_rate": 1,
+          "plan_present": true,
+          "receipts": 155,
+          "model_calls": 95,
+          "receipt_modes": {
+            "live": 155
+          },
+          "agent_reports": 1,
+          "debate_counter_findings": 3,
+          "feedback_signals": 3,
+          "debate_verdict_counts": {
+            "insufficient_evidence": 1,
+            "mixed": 2,
+            "contradicted": 1,
+            "supported": 1
+          }
+        },
+        "modelVersions": []
+      },
+      "wallMs": 1281365
+    }
+  ]
+}

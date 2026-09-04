@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "harnessVersion": 1,
+  "leg": "REBUILT-candidate",
+  "pinnedAt": "2026-09-03T13:20:50.602Z",
+  "gitCommit": "ba6b759ce7b7ecd671d297764b6dd74a56b006fd",
+  "gitTag": null,
+  "route": "dashscope",
+  "problemsFile": "eval/problems.json",
+  "cli": {
+    "path": "dist/cli/main.js",
+    "argv": [
+      "research",
+      "start",
+      "<q>",
+      "--domain",
+      "<d>",
+      "--goal",
+      "<g>",
+      "--route",
+      "dashscope",
+      "--json"
+    ]
+  },
+  "results": [
+    {
+      "problemId": "P3",
+      "ok": false,
+      "error": {
+        "kind": "launch_failed",
+        "exitCode": 3,
+        "signal": null,
+        "stdout": "",
+        "stderr": ""
+      },
+      "wallMs": 238
+    }
+  ]
+}

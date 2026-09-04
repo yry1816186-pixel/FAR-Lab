@@ -1152,3 +1152,26 @@ describe('W4-F3 credential redaction (source-fused: openai/codex secrets sanitiz
     expect(sleeps).toEqual([]);
   });
 });
+
+describe('unattended-run config defaults (FA-HAR-02)', () => {
+  it('gentle provider pacing is ON by default (600ms) — an unattended automation fire is rate-safe out of the box', async () => {
+    const { minCallIntervalMs } = await import('../src/providers/http.js');
+    const prev = process.env.FARLAB_MIN_CALL_INTERVAL_MS;
+    delete process.env.FARLAB_MIN_CALL_INTERVAL_MS;
+    expect(minCallIntervalMs()).toBe(600);
+    process.env.FARLAB_MIN_CALL_INTERVAL_MS = '0';
+    expect(minCallIntervalMs()).toBe(0); // explicit opt-out honored
+    if (prev !== undefined) process.env.FARLAB_MIN_CALL_INTERVAL_MS = prev;
+    else delete process.env.FARLAB_MIN_CALL_INTERVAL_MS;
+  });
+  it('run token budget stays opt-in (null = unlimited) — automation fires inherit the same budget view', async () => {
+    const { runTokenBudgetCap } = await import('../src/app/run-budget.js');
+    const prev = process.env.FARLAB_RUN_TOKEN_BUDGET;
+    delete process.env.FARLAB_RUN_TOKEN_BUDGET;
+    expect(runTokenBudgetCap()).toBeNull();
+    process.env.FARLAB_RUN_TOKEN_BUDGET = '12345';
+    expect(runTokenBudgetCap()).toBe(12345);
+    if (prev !== undefined) process.env.FARLAB_RUN_TOKEN_BUDGET = prev;
+    else delete process.env.FARLAB_RUN_TOKEN_BUDGET;
+  });
+});

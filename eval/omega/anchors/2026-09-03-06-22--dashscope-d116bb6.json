@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "harnessVersion": 1,
+  "leg": "REBUILT-candidate",
+  "pinnedAt": "2026-09-03T06:47:45.206Z",
+  "gitCommit": "d116bb6",
+  "gitTag": null,
+  "route": "dashscope",
+  "problemsFile": "eval/problems.json",
+  "cli": {
+    "path": "dist/cli/main.js",
+    "argv": [
+      "research",
+      "start",
+      "<q>",
+      "--domain",
+      "<d>",
+      "--goal",
+      "<g>",
+      "--route",
+      "dashscope",
+      "--json"
+    ]
+  },
+  "results": [
+    {
+      "problemId": "P2",
+      "ok": true,
+      "snapshot": {
+        "runId": "run_dmmn5wkfmk5x11kfebzyashaj7",
+        "status": "partial",
+        "stages": [
+          {
+            "stage": "scope",
+            "state": "done"
+          },
+          {
+            "stage": "retrieve",
+            "state": "done"
+          },
+          {
+            "stage": "verify_sources",
+            "state": "done"
+          },
+          {
+            "stage": "build_evidence",
+            "state": "done"
+          },
+          {
+            "stage": "generate_hypotheses",
+            "state": "done"
+          },
+          {
+            "stage": "critique_falsify",
+            "state": "done"
+          },
+          {
+            "stage": "rank",
+            "state": "done"
+          },
+          {
+            "stage": "plan",
+            "state": "done"
+          },
+          {
+            "stage": "execute",
+            "state": "skipped",
+            "reason": "tabular: The research plan requires paired microbiome-clinical datasets (16S/shotgun metagenomics sequences) and FMT trial data with longitudinal strain engraftment rates. These are specialized biomedical datasets not available as public tabular OpenML benchmarks for standard classification tasks.; literature-pool: The research plan requires collecting new primary data (paired microbiome-clinical datasets and FMT trial data) which are marked as 'request_required' or 'must_collect'. It involves complex causal modeling, correlation analysis of raw sequencing data, and specific subgroup analyses that cannot be performed by simply pooling published effect estimates (ORs/RRs/SMDs) from existing literature. There is no clear, single intervention-vs-outcome contrast with reported summary statistics suitable for meta-analysis.; theory: routed out by method selection; protocol: protocol draft failed schema validation: : step ps1 produces unknown measurement 'baseline_stool_sample_id'; : step ps1 produces unknown measurement 'clinical_metadata'; : step ps2 produces unknown measurement 'treatment_assignment'; : step ps2 produces unknown measurement 'fmt_administration_log'"
+          },
+          {
+            "stage": "feedback",
+            "state": "done"
+          },
+          {
+            "stage": "revise",
+            "state": "failed",
+            "reason": "model call failed (invalid_output) in revise/plan-revision:pln_dfdmwk3yzrp54wmkp05j62g4m4: dashscope: structured output rejected even after 3 corrective re-asks: schema validation failed: steps.4.id:must be task_; last raw output head: {\n  \"steps\": [\n    {\n      \"id\": \"task_s30p2zfrtrkfc64prz81r5351a\",\n      \"title\": \"Stratified Correlation Analysis of Baseline Microbiome and ICI Outcomes\",\n      \"kind\": \"data_analysis\",\n      \"meth…[truncated]"
+          },
+          {
+            "stage": "export",
+            "state": "pending"
+          }
+        ],
+        "metrics": {
+          "source_total": 12,
+          "source_verification_rate": 1,
+          "claim_total": 24,
+          "claim_binding_rate": 1,
+          "counter_evidence_relations": 5,
+          "hypothesis_candidates": 10,
+          "hypothesis_representatives": 3,
+          "falsification_completeness_rate": 1,
+          "plan_present": true,
+          "receipts": 167,
+          "model_calls": 95,
+          "receipt_modes": {
+            "live": 167
+          },
+          "agent_reports": 3,
+          "debate_counter_findings": 11,
+          "feedback_signals": 11,
+          "debate_verdict_counts": {
+            "mixed": 4,
+            "supported": 4,
+            "contradicted": 1
+          }
+        },
+        "modelVersions": []
+      },
+      "wallMs": 1502288
+    }
+  ]
+}

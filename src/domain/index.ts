@@ -1,6 +1,7 @@
 export * from './ids.js';
 export * from './question.js';
 export * from './run.js';
+export * from './workflow-plan.js';
 export * from './source.js';
 export * from './claim.js';
 export * from './evidence.js';

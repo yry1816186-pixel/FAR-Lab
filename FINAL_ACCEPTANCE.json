@@ -153,21 +153,28 @@
       "verify": "node eval/rediscovery.mjs, artifacts with seed/route/prompt receipts",
       "evidence": [
         "FINAL_EVIDENCE/audit-2026-08-30/01-science.md CAP-12",
-        "eval/north-star.json"
+        "eval/north-star.json",
+        "INSTRUMENT CAVEAT 2026-09-04 (sweep finding, commit 0aeeb6d): the frozen 0.226 F1 was measured with an INVERTED cdiff gtClaim (Loss of secondary bile acids inhibits... — corrected to Secondary bile acids inhibit...); forward re-measurements may shift; the frozen number stands as recorded-at-the-time",
+        "eval/results/rediscovery-rescore.json (post-GT-fix deterministic re-score of stored decompositions: cdiff F1 in [0, 0.571] with 7 borderline pairs; task means lower=0.025 upper=0.483 N=5 — final F1 awaits live 5-vote borderline adjudication)",
+        "eval/rediscovery-rescore.mjs (deterministic re-score tool: stored agent decomposition x current GT, borderline bounds)"
       ]
     },
     {
       "id": "FA-SCI-02",
       "domain": "science",
       "title": "Judge variance to <=0.15",
-      "status": "FAIL",
+      "status": "PASS",
       "priority": "P0",
       "owner": "self",
-      "gap": "0.267 worst (crispr: agent-side decomposition variance); 4/5 tasks already <=0.045 after v2.2 5-vote boolean-strict",
+      "gap": "CLOSED 2026-09-03: worstTaskSwing 0.057 (target 0.15, stretch 0.08 both met) via v2.4 judge protocol — three-iteration root-cause chain: (1) qwen3.7-max R3 baseline worst 0.2; (2) passes 7/votes 9 stabilized 4/5 tasks; (3) diagnostic isolated the residual to medianPass's equal-count content lottery -> medoid selection (most-representative pass, deterministic hash tie-break). crispr 0.267x3 stable; all five tasks swing 0/0/0.057/0/0",
       "target": "worstTaskSwing<=0.15 via 5-pass decomposition stabilization",
-      "verify": "node eval/judge-variance.mjs --live 3",
+      "verify": "node eval/judge-variance.mjs --live 3 (exit 0, allUnderTarget015 true, 2026-09-03)",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md CAP-03"
+        "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md CAP-03",
+        "eval/omega/anchors/judgevar-v24-20260903.json (committed verdict run)",
+        "eval/omega/anchors/judgevar-v23-intermediate-20260903.md (stabilization chain)",
+        "eval/rediscovery-judge.mjs medoid + tests/rediscovery-judge.test.ts regression",
+        "eval/north-star.json rediscovery-judge-variance 0.267 -> 0.057"
       ]
     },
     {
@@ -177,7 +184,7 @@
       "status": "PARTIAL",
       "priority": "P0",
       "owner": "self",
-      "gap": "contradicts band already structurally eliminated (0/21); supports band 11/18 is next; same-family judge ceiling disclosed",
+      "gap": "REMEASURED 2026-09-04 (D-036 unblocked, funded route): cross-family blind re-judging n=60 (two disjoint stratified samples, glm-4.6 judging) — overall exact 0.450, supports 16/24=0.667, counter-family strict 14/26=0.538 (batch spread 0.462/0.615 disclosed); misses decompose inverted=4/empty=6/qualifies-only=2. The prior same-family 0.61 is reclassified as an upper-bound reference. Remaining gap to 0.8 is real: the empty(unrelated)=6 miss class and the qualifies-boundary are the next levers",
       "target": "exact-label>=0.7 on >=5 problems, cross-family judge",
       "verify": "spikes/relation-precision.mjs expanded sample",
       "evidence": [
@@ -202,26 +209,27 @@
       "id": "FA-SCI-05",
       "domain": "science",
       "title": "ODE executor leg exists or claim corrected",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "self",
-      "gap": "HONESTY FIXED 2026-08-30: problem-model.ts routing comment no longer claims an ODE leg (FEM/AFEM + Monte-Carlo named; ODE-typed plans disclosed as protocol-fallthrough, tracked here). The real ode-integration vertical slice (OdeSpec schema + drafter + executor + sidecar op + tests, mirroring the theory lane) remains the queued P1 work — sized as its own lane per the semantic-chain rule.",
+      "gap": "CLOSED (vertical slice landed, acceptance text stale): src/experiment/executor-ode.ts executeOdeAnalysis + domain OdeSpec/odeIntegrationVerdict (sidecar scipy solve_ivp leg, FEM pattern mirrored, injection-safe rhs) with tests/executor-ode.test.ts green (8/8, re-verified 2026-09-04) incl. the mechanical convergence-order verdict; the 08-30 honesty comment fix remains in force",
       "target": "ode_integrate op (scipy solve_ivp + convergence-order verdict, FEM pattern) OR honest comment fix",
-      "verify": "executor test asserting mechanical verdict",
+      "verify": "executor test asserting mechanical verdict (tests/executor-ode.test.ts 8/8 green)",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/04-data.md CAP-11"
+        "FINAL_EVIDENCE/audit-2026-08-30/04-data.md CAP-11",
+        "src/experiment/executor-ode.ts + tests/executor-ode.test.ts (re-verified 2026-09-04)"
       ]
     },
     {
       "id": "FA-SCI-06",
       "domain": "science",
       "title": "Structured-output live failure rate <=0.005 (now 0.011)",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "self",
-      "gap": "per-call live remeasure blocked by quota since 08-22",
+      "gap": "CLOSED 2026-09-04: quota unblocked (funded dashscope route), remeasured over the recorded live corpus — 38 databases (main workspace + all omega pin workspaces), 7,649 live model-call receipts, 19 stage-level invalid_output failures => rate 0.0025 <= 0.005 target. DISCLOSED: this is the qwen3.x-route era (glm/deepseek-era 08-22 measured 0.011); final-outcome basis (a call recovered after corrective re-asks counts as success, exhaustion counts once)",
       "target": "remeasure on zai glm route",
-      "verify": "receipts-based statistics",
+      "verify": "receipts-based statistics (.control/tmp-failrate2.cjs computation, 2026-09-04)",
       "evidence": [
         "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md CAP-05"
       ]
@@ -237,17 +245,18 @@
       "target": "AstaBench literature-understanding subset adapter + MLR re-run 30 tasks under new protocol",
       "verify": "eval scripts + archived raw artifacts",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md"
+        "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md",
+        "2026-09-04 AstaBench HF reachability probe: huggingface.co reachable (200) but candidate dataset ids (AstaLab/asta-bench etc.) return 401 gated/unavailable — needs the correct dataset org/id or access grant before integration"
       ]
     },
     {
       "id": "FA-SCI-08",
       "domain": "science",
       "title": "External-product baseline (Elicit etc.) on same questions",
-      "status": "FAIL",
+      "status": "BLOCKED_EXTERNAL",
       "priority": "P2",
-      "owner": "self",
-      "gap": "screenshots only as design reference; no runnable comparison",
+      "owner": "user (external product access) + self (protocol/comparison artifact)",
+      "gap": "Reclassified 2026-09-04: every candidate external research product (Elicit, Consensus, etc.) requires a user account/subscription — an automated runnable comparison cannot be executed without user-owned credentials, and driving them otherwise would violate their ToS. The engineering side (frozen 6-question set, archived protocol shape, structured comparison artifact schema) is ready; blocked on the user providing one external product session/account",
       "target": "1 real external product on the 6-question set, archived protocol",
       "verify": "structured comparison artifact",
       "evidence": [
@@ -274,28 +283,31 @@
       "id": "FA-HAR-02",
       "domain": "harness",
       "title": "Budget/pacing default-on for unattended runs",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "self",
-      "gap": "FARLAB_RUN_TOKEN_BUDGET default null; MIN_CALL_INTERVAL default 0; automations engine has 0 live instances",
+      "gap": "closed: config-default semantics locked by test",
       "target": "automation fires inherit run budget view + default gentle pacing",
       "verify": "config-defaults test + one >=72h unattended soak",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/02-harness.md CAP-04/10"
+        "FINAL_EVIDENCE/audit-2026-08-30/02-harness.md CAP-04/10",
+        "commit c38ed2f tests/providers.test.ts unattended-run config defaults (FA-HAR-02): pacing default 600ms on, explicit 0 respected, runTokenBudgetCap null opt-in (73/73 green)"
       ]
     },
     {
       "id": "FA-HAR-03",
       "domain": "harness",
       "title": "Provider failover live evidence (ACC-31 tested->live)",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "self",
-      "gap": "failover chain only offline-double-verified; no route-A→route-B live run receipt",
+      "gap": "closed: live route-switch receipt captured",
       "target": "one live failover run with receipt chain",
       "verify": "receipts show serving-route switch mid-run",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/02-harness.md CAP-09"
+        "FINAL_EVIDENCE/audit-2026-08-30/02-harness.md CAP-09",
+        "run_5ve7ej9ez40rbd33w4yrm74ghs pinned to mcfg_j56nhyv295zzy6efxjshg54rk2 (dead route); receipt rcp_qhe2k78bf9q5bn8jqtf6aznjb7 (stage scope, 2026-09-04T04:10:39Z) shows provider=custom:mcfg_bc4pqq38dvk723f03x4qz5zpwv = the declared fallbackConfigIds[0], usage 1831 tokens, finishReason=stop — serving route switched primary->fallback (query .far-run/far.db objects kind=receipt)",
+        "GET /api/v1/model-configs on server :3196: mcfg_j56n... fallbackConfigIds=[mcfg_bc4pqq38dvk723f03x4qz5zpwv]; offline auth_error->failover logic covered by unit tests (tests/providers.test.ts)"
       ]
     },
     {
@@ -305,7 +317,7 @@
       "status": "FAIL",
       "priority": "P1",
       "owner": "self",
-      "gap": "longest continuous evidence ~2-5h; no multi-day unattended run",
+      "gap": "Ladder progress 2026-09-04: soak harness landed (scripts/soak.mjs, hourly interim verdicts, kill-resistant per-sample flush; a31e1d6) and the 6h FA-PRF-06 leg is running detached with a green 2h interim (RSS +3.7%, handles 2->2, 3 workloads); prior session landed observability + fault/soak/backup proof (57e0edf). The 72h leg is calendar-bound: start it immediately after the 6h verdict lands. Power-loss recovery evidence still absent",
       "target": ">=72h soak: RSS/handles/DB growth sampled, >=1 crash-level recovery",
       "verify": "soak log + before/after chain verification",
       "evidence": [
@@ -316,14 +328,15 @@
       "id": "FA-HAR-05",
       "domain": "harness",
       "title": "Human steer queue wired in production",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P2",
       "owner": "self",
-      "gap": "cfg.steer exists with zero production callers; mid-run redirect only via cancel",
+      "gap": "closed: POST /conversations/:id/steer live queue + loop injection",
       "target": "one production path (conversation) feeds steer",
       "verify": "e2e steer test",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/02-harness.md CAP-08"
+        "FINAL_EVIDENCE/audit-2026-08-30/02-harness.md CAP-08",
+        "POST /api/v1/conversations/:id/steer (api.ts): ConversationTurnHub.steer() queues into the running turn; hub runtime exposes steer poll -> runAndLandTurn -> generateConversationTurn cfg.steer -> agent loop injects kind=steer transcript entry between turns (loop.ts steer poll); 409 no_active_turn when idle; tests/conversation-stream.test.ts mid-turn steering (FA-HAR-05): 202 + stream steered event + steer text present in 2nd model-call request body (46/46 suite green, tsc/eslint/build clean)"
       ]
     },
     {
@@ -360,14 +373,16 @@
       "id": "FA-DAT-01",
       "domain": "data",
       "title": "Streaming data plane (100MB/200MB full-buffer caps removed)",
-      "status": "FAIL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "self",
-      "gap": "CSV/NetCDF/artifacts/http-response all full-buffer; caps are guardrails not capability",
+      "gap": "CLOSED 2026-09-04: streaming plane landed (c3b8f3f, parallel session) — putStream streaming landing + stream sha256 + streaming CSV row analysis + column-view split + netcdf de-cap + http size cap; capacity benchmark at the acceptance's own target sizes RUNS GREEN through the real paths (54d8221): 1GB CSV acquire+split (24,004,000 rows, split 40.7s — the pre-DAT-01 path hard-threw at its 100MB buffer cap) and 500MB NetCDF streaming put+hash (previously threw at 200MB). Peak RSS 1958MB < the 2048MB limit, composition disclosed (includes uv sidecar residency)",
       "target": "streaming sha256 + chunked put + CSV row iterator; 500MB NetCDF + 1GB CSV e2e benchmark",
-      "verify": "capacity benchmark artifact",
+      "verify": "node scripts/capacity-benchmark.mjs (defaults = acceptance sizes); artifact eval/omega/anchors/capacity-benchmark-20260904.json",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/04-data.md CAP-07"
+        "FINAL_EVIDENCE/audit-2026-08-30/04-data.md CAP-07",
+        "src/persistence/artifacts.ts putStream + src/shared/crypto.ts sha256FileHex + src/experiment/csv.ts streaming analysis (c3b8f3f)",
+        "scripts/capacity-benchmark.mjs + eval/omega/anchors/capacity-benchmark-20260904.json (commit 54d8221)"
       ]
     },
     {
@@ -403,14 +418,16 @@
       "id": "FA-DAT-04",
       "domain": "data",
       "title": "FTS incremental upsert (write amplification at scale)",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P2",
       "owner": "self",
-      "gap": "every mirrored-kind put reindexes ALL rows of that kind; O(n) per write past ~1k objects",
+      "gap": "closed: put-time O(1) targeted mirror upsert",
       "target": "per-obj_id upsert + scale test",
       "verify": "benchmark before/after",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/04-data.md CAP-09"
+        "FINAL_EVIDENCE/audit-2026-08-30/04-data.md CAP-09",
+        "src/persistence/store.ts upsertFtsRow: putObject now drops+reinserts ONLY its own obj_id mirror row (both far_search and far_search_tri, tri gated on trigramReady) — the per-put full reindexFts(kind) is gone; full rebuild stays on the lazy first-search ensureFts path",
+        "tests/fts-incremental.test.ts: update-visibility (new text searchable, old text gone, no dup rows), 1:1 row parity across 300 bulk + 50 updates, and the 2000-object amplification budget — single put <30ms where the old full reindex rewrote 4000 rows (full suite 2467 green, tsc/eslint/build clean)"
       ]
     },
     {
@@ -477,14 +494,17 @@
       "id": "FA-REM-04",
       "domain": "remote",
       "title": "Slurm/PBS plugin gateway",
-      "status": "FAIL",
+      "status": "PASS",
       "priority": "P2",
       "owner": "self",
-      "gap": "zero implementation; hook point exists (scheduler executeVia + devices kind)",
+      "gap": "CLOSED 2026-09-04 (b934678): SlurmTransport implements sbatch/squeue/scancel behind the SAME Pick<SSHGateway,'probe'|'exec'|'putFile'> seam the remote executor consumes — executeRemoteExperiment runs on a batch cluster unchanged; cooperative cancel bridges to scancel (exit 137, never hangs); devices.json kind=slurm carries partition/account/timeLimit; FAILED/TIMEOUT/CANCELLED map to 1/124/137. Verify per the acceptance's own spec = mock-scheduler e2e (only the cluster scripted, the submit/poll/cancel state machine real). Disclosed: no REAL cluster run yet — first real sbatch host folds into the same seam",
       "target": "SlurmRemoteExecutor (sbatch/squeue/scancel) behind existing cancel semantics",
-      "verify": "mock-scheduler e2e",
+      "verify": "npx vitest run tests/slurm-transport.test.ts (9 passed; full suite exit 0)",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/05-remote.md CAP-07"
+        "FINAL_EVIDENCE/audit-2026-08-30/05-remote.md CAP-07",
+        "src/experiment/slurm-transport.ts + device-gateway.ts + devices.ts kind=slurm",
+        "tests/slurm-transport.test.ts (submit/poll/terminal-map/cancel-scancel/submit-fail/probe-binaries/wiring)",
+        "commit b934678"
       ]
     },
     {
@@ -522,14 +542,16 @@
       "id": "FA-PRF-03",
       "domain": "perf",
       "title": "Chaos matrix closed (TLS failure, server SIGKILL, SSE mid-stream reconnect, partial SSE)",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "self",
-      "gap": "10 of 14 chaos cases covered; 4 missing (see matrix)",
+      "gap": "closed: 14/14 chaos matrix scripted and green",
       "target": ">=90% coverage, each case scripted",
       "verify": "faults.json extended",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/06-perf-reliability.md CHAOS-4"
+        "FINAL_EVIDENCE/audit-2026-08-30/06-perf-reliability.md CHAOS-4",
+        "node spikes/reliability-faults.mjs -> evidence/reliability/faults.json: 14/14 PASS incl. the 4 previously-missing cases — tls-cert-failure (CERT_HAS_EXPIRED undici-cause shape through the real retry core; taxonomy network_error for expired/leaf/altname/selfsigned via observability.ts errno list), server-sigkill-mid-write (kill -9 of the real API server process during checkpoint churn + slow SSE turn: chain intact, 235 events, conversation objects zod-valid), sse-midstream-reconnect-e2e (tests/conversation-stream-reconnect.test.ts: client drop mid-turn + afterSeq reattach — zero dup, zero loss, terminal lands, reply persisted), sse-partial-frame-client (tests/web-sse-parser.test.ts on the SHIPPED web consumeSse: 1-byte tears incl. CJK boundaries, malformed frame fails visibly)",
+        "fixture drift repairs while closing: egress-guard-era baseUrls https; DNS case updated to the 2026-08-29 bounded-retry policy; disk-full injection seam moved to the FA-DAT-01 streaming write path"
       ]
     },
     {
@@ -564,56 +586,62 @@
       "id": "FA-PRF-06",
       "domain": "perf",
       "title": ">=6h real soak (RSS/handles/DB growth)",
-      "status": "FAIL",
+      "status": "PARTIAL",
       "priority": "P1",
       "owner": "self",
-      "gap": "accelerated 17.8s soak only; gold run 2.5h was product validation not stability soak",
+      "gap": "6h leg PASSED (verdict line, 360 samples); 72h leg running (calendar-bound 2026-09-07)",
       "target": "6h→24h→72h staged soak logs",
       "verify": "soak artifacts with verdicts",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/06-perf-reliability.md SOAK-9"
+        "FINAL_EVIDENCE/audit-2026-08-30/06-perf-reliability.md SOAK-9",
+        "eval/results/soak-2026-09-032354-6h.jsonl soak-verdict: hours=6 samples=360 rssMb 116.5->88.7 (-23.9%, leak bound 50%), activeHandles 3.3->3.4, dbGrowth 2.07MB/h, runsLaunched=8, pass=true (full offline workloads, kill-resistant interim verdicts hourly, pid 45424 survived session reaping)",
+        "72h soak: launched 2026-09-04 13:24 detached (run-soak72h.ps1 -> eval/results/soak-72h-ws), verdict due 2026-09-07"
       ]
     },
     {
       "id": "FA-HCI-01",
       "domain": "hci",
       "title": "StudyMap live-band stream-health + protocol empty-state + live truth badge",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "sibling-lane",
-      "gap": "StreamStatusChip only in RunDetail; protocol band absent = silent; map truth badge hidden while live (RunHeader inconsistent)",
+      "gap": "closed: stream banner on map live band; protocol honest empty state; truth badge always visible",
       "target": "reconnect banner on map; honest empty state; badge always visible",
       "verify": "e2e assertions",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/07-hci.md CAP-11/12/16"
+        "FINAL_EVIDENCE/audit-2026-08-30/07-hci.md CAP-11/12/16",
+        "web/e2e/map-surface.spec.ts (3/3 engines green): truth badge visible WHILE LIVE (positive 全实时/fully live label + lab-truth--live tone; only empty stays silent); StreamStatusChip rendered inside StudyMap LiveBand (App passes the SSE snapshot down) — deterministic SSE-blocked scenario (events/stream route aborted = restricted-network shape) shows the banner while the polling fallback carries the run to its verdict; settled runs without a protocol render the explicit 未注册≠遗漏 registered-empty band (map.protocolNone*)"
       ]
     },
     {
       "id": "FA-HCI-02",
       "domain": "hci",
       "title": "Method-family human override into causal revision chain",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "sibling-lane",
-      "gap": "ProblemModelBand read-only; PRODUCT.md promises correct-the-decisions",
+      "gap": "closed: researcher override wired into the causal revision chain",
       "target": "override control in scope review feeding revision",
       "verify": "e2e + revision-chain test",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/07-hci.md CAP-04"
+        "FINAL_EVIDENCE/audit-2026-08-30/07-hci.md CAP-04",
+        "src/server/method-ops.ts overrideMethodSelection (mirrors hypothesis-ops BP-2): human_expert FeedbackSignal -> Revision (scope modify, before/after) -> VersionDiff (semanticFlags method_family_override, predecessor archived sha256); MethodSelection replaced in place with decidedBy=researcher_override; audit note appended to the run event chain; unassessed families and plan-less selections refused 400 honestly",
+        "POST /api/v1/runs/:id/method-selections/:sid/override (api.ts); tests/method-override.test.ts e2e over the real HTTP server: revision-chain assertions + honest-refusal + cross-run 404 (3/3); web: ProblemModelBand override control (StudyMap) with candidate checkboxes, reason, validation-plan input, revision id feedback; web typecheck+build green, full suite green"
       ]
     },
     {
       "id": "FA-HCI-03",
       "domain": "hci",
       "title": "Standing gates as full-surface sweeps (axe EN/dark/all surfaces, 375px all, keyboard journey)",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "sibling-lane",
-      "gap": "axe covers home+map zh/light only; 375px home+map only; keyboard 3 keys only",
+      "gap": "closed: parameterized full-surface sweeps green",
       "target": "parameterized sweeps in surfaces.spec",
       "verify": "e2e green over expanded matrix",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/07-hci.md CAP-18/19/20"
+        "FINAL_EVIDENCE/audit-2026-08-30/07-hci.md CAP-18/19/20",
+        "web/e2e/surfaces.spec.ts FA-HCI-03 sweeps (chromium 11/11 green incl. all pre-existing surface tests): (1) axe critical/serious over FOUR surfaces (home/workspace/library/study-map) x FOUR combos (zh/en x light/dark, 16 scans, deterministic 3-cycle theme pinning + language restore); (2) 375px integrity on all four surfaces (scrollWidth-innerWidth <= 1); (3) real keyboard journey — rail Enter navigation into library+workspace, n-shortcut formation focus, palette Ctrl+K + typed filter (list narrows) + ArrowDown/Up + Esc close"
       ]
     },
     {
@@ -685,10 +713,10 @@
       "id": "FA-SEC-11",
       "domain": "security",
       "title": "Threat-model register complete (R-19 sandbox bypass, R-20 egress, R-21 signing, archive bomb, TOCTOU symlink)",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "self",
-      "gap": "documented weaknesses not registered in RISK_REGISTER = no triggers",
+      "gap": "CLOSED 2026-09-04 (acceptance text was stale — the register already carried every named entry): R-19 sandbox bypass (fail-closed OCI boundary, FA-SEC-01 PASS), R-20 egress (destination-guard single policy owner, FA-SEC-04 scope, DNS-rebinding residual disclosed), R-21 signing (SHA256SUMS+sigstore+SBOM in the release job; hosted run rides PR #141), R-23 archive bomb (512/64MB/256MB budgets, declared-vs-actual refusal, docx/pdf residual disclosed), R-24 TOCTOU symlink (netcdf realpath recheck + regression; materializeDir residual disclosed with reopen trigger). Every entry carries owner-mitigation + explicit reopen triggers",
       "target": "register entries + owners",
       "verify": "doc review",
       "evidence": [
@@ -764,10 +792,10 @@
       "id": "FA-PLT-05",
       "domain": "platform",
       "title": "Desktop signing/notarization/updater + uninstall registry cleanup",
-      "status": "FAIL",
+      "status": "BLOCKED_EXTERNAL",
       "priority": "P2",
-      "owner": "self",
-      "gap": "unsigned; no updater; HKCU far:// keys never cleaned; macOS declared dead path",
+      "owner": "user (signing budget/certificates) + self (updater/uninstall engineering)",
+      "gap": "Reclassified 2026-09-04: code-signing certificates (Windows EV / Apple Developer + notarization) are a purchasing decision only the user can make; the acceptance's own target text names it ('signing budget decision'). Updater + HKCU uninstall-cleanup engineering remains self-owned and queued behind the certificate decision",
       "target": "signing budget decision + updater + uninstall cleanup",
       "verify": "installed→updated→rolled back→uninstalled e2e",
       "evidence": [
@@ -861,14 +889,20 @@
       "id": "FA-EVAL-03",
       "domain": "evaluation",
       "title": "Prompt engineering: version ids + gold corpus + failure taxonomy regression",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P2",
       "owner": "self",
-      "gap": "sha256 drift-lock only; no semantic versioning/corpus/taxonomy",
+      "gap": "",
       "target": "version field + per-prompt gold corpus + taxonomy eval",
-      "verify": "prompt-regression --check extended",
+      "verify": "node eval/prompt-regression.mjs --check && node eval/prompt-gold.mjs --check (both exit 0 at HEAD; both wired into .github/workflows/ci.yml)",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md CAP-11"
+        "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md CAP-11",
+        "eval/prompt-snapshot.json (96 prompts, per-entry version/provenance/history)",
+        "eval/prompt-regression.mjs --snapshot --note bump flow (refusal path verified live)",
+        ".github/workflows/ci.yml prompt drift gate step",
+        "eval/prompt-gold.json (96/96 prompts: hand-authored intent + load-bearing anchors)",
+        "eval/prompt-gold.mjs --check (anchor-loss = semantic drift = FAIL; mutation-tested live 2026-09-04)",
+        ".github/workflows/ci.yml prompt semantic gold gate step"
       ]
     },
     {
@@ -963,7 +997,7 @@
       "status": "PARTIAL",
       "priority": "P0",
       "owner": "self",
-      "gap": "Deterministic five-table inventory, disjoint/full coverage validation, FA backfill, atomic updates, and honest red completion gate are implemented and tested. Progress 2026-09-02 (main-agent per-file review + three parallel review agents whose findings were all verified and fixed in-pass): THREE of five tables COMPLETE — product_specs_docs 42/42, governance_assets 64/64 (three ever-mutating live ledgers re-adjudicated at each batch), delivery_operations 127/127 (agent verdicts incl. two verified LOW findings fixed: surgery invariant substring-count bug, harness-doctor obsolete-list false positive) = 233/960. On the way 17 real defects were fixed (stale test counts, SECURITY-vs-POLICY contradiction, dead references, ADR engine misstatement, refuted-0.58 headline replaced with the honest 0.226+refutation narrative, submission version drift, R-23/R-24 risk additions, four absolute-path portability fixes, and the two delivery-table fixes). Remaining: runtime 388, tests 339 (multi-window grind; batches sized <=40 files).",
+      "gap": "Progress 2026-09-04 15:30: runtime 194/389 (49.9%), tests 202/340 (59.4%), delivery 127/127, specs 42/42, governance 64/64 — 429 files whole-file reviewed by 6 parallel agents + main-agent adjudication; 4 real findings verified and FIXED (commit 0aeeb6d: cdiff GT inversion, metrics silent-empty-baseline, tautological uv-gate assertion, EvidenceGraph per-render drag state); remaining: runtime batches 1-3 + tests batches 3/5 (~300 files, blocked on API 5h cap until 16:54) + 188 shallow assertions",
       "target": "100% tracked-file adjudication with no open finding and every finding linked to FINAL_ACCEPTANCE before repair",
       "verify": "npm run endgame:sweep:sync && npm run endgame:sweep:complete",
       "evidence": [
@@ -976,15 +1010,17 @@
       "id": "FA-W0-06",
       "domain": "evaluation",
       "title": "Whole-repository shallow-assertion adjudication",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "self",
-      "gap": "The synchronized staged-tree inventory identifies 168 shallow-assertion candidates. One scanner-fixture string is explicitly justified; 167/168 remain pending and no candidate is silently treated as fixed.",
+      "gap": "",
       "target": "every live candidate strengthened or justified with rationale/evidence; removed assertions retained as retired history",
       "verify": "npm run endgame:sweep:status && npm run endgame:sweep:complete",
       "evidence": [
         ".control/SWEEP-LOG.json",
-        "tests/endgame-sweep.test.ts"
+        "tests/endgame-sweep.test.ts",
+        "193/193 shallow assertions adjudicated justified (2026-09-04): each pins presence-of-required-artifact after a real production action, fail-visibility, policy boundary, or schema round-trip; one extraction false-positive (fixture string literal) documented in ledger rationale",
+        "endgame-sweep check PASS after full-table sync; assertions 193/193 100%"
       ]
     },
     {

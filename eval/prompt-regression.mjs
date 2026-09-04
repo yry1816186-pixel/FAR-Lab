@@ -16,13 +16,17 @@
  *      through the production computeRequestHash (dist build) with a fixed
  *      payload — identical input must produce identical bytes.
  *
- * Usage: node eval/prompt-regression.mjs [--snapshot] [--check]
- *   (default: verify-only, no file writes; --snapshot writes/refreshes
- *    eval/prompt-snapshot.json; --check diffs against it, exit 1 on drift)
+ * Usage: node eval/prompt-regression.mjs [--snapshot [--note "rationale"]] [--check]
+ *   (default: verify-only, no file writes; --check diffs against it, exit 1 on drift;
+ *    --snapshot merges drift into the snapshot as VERSIONED bumps: a changed prompt
+ *    gains version+1, the old hash is archived in entry.history, and a --note
+ *    (provenance) is REQUIRED — silent overwrites are refused. FA-EVAL-03 target
+ *    "version field" satisfied at the snapshot layer without relocating the 96
+ *    inline prompt definitions.)
  */
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, renameSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { computeRequestHash } from '../dist/providers/http.js';
 
@@ -31,38 +35,37 @@ const SNAPSHOT_PATH = resolve(ROOT, 'eval/prompt-snapshot.json');
 const MAX_PROMPT_CHARS = 20_000;
 const MAX_TOTAL_CHARS = 120_000;
 
-const STAGE_FILES = [
+export const STAGE_FILES = [
   ...['scope', 'retrieve', 'evidence', 'hypotheses', 'falsify', 'rank', 'plan', 'revise', 'align']
     .map((s) => `src/pipeline/stages/${s}.ts`),
   'src/pipeline/llm.ts',
   'src/agent/loop.ts',
 ].map((p) => resolve(ROOT, p));
 
-/** Extract `const NAME = '...';` / template-literal prompt constants (bounded, textual). */
-const extractPrompts = (file) => {
+/** Extract `const NAME = '...';` / template-literal prompt constants WITH full
+ *  text (gold-anchor checks need the text, not just hashes). Single owner of
+ *  the extraction grammar — prompt-gold.mjs reuses this, never re-implements. */
+export const extractPromptsRaw = (file) => {
   const src = readFileSync(file, 'utf8');
   const out = [];
+  // Platform invariance (CI drift gate): a Windows checkout stores CRLF inside
+  // multi-line template literals while Linux/macOS store LF — identical
+  // committed prompts would hash differently. Normalize before hashing.
+  const normalize = (text) => text.replace(/\r\n/g, '\n');
   const lit = (raw) => raw.startsWith('`')
-    ? raw.slice(1, -1).replace(/\\`/g, '`').replace(/\\\$\{/g, '${').replace(/\\n/g, '\n')
+    ? normalize(raw.slice(1, -1)).replace(/\\`/g, '`').replace(/\\\$\{/g, '${').replace(/\\n/g, '\n')
     : raw.startsWith("'")
-      ? raw.slice(1, -1).replace(/\\'/g, "'").replace(/\\n/g, '\n').replace(/\\\\/g, '\\')
-      : JSON.parse(raw);
+      ? normalize(raw.slice(1, -1)).replace(/\\'/g, "'").replace(/\\n/g, '\n').replace(/\\\\/g, '\\')
+      : normalize(JSON.parse(raw));
   const re = /const\s+([A-Z][A-Z0-9_]*PROMPT[A-Z0-9_]*)\s*(?::\s*string\s*)?=\s*(`(?:[^`\\]|\\.)*`|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")/g;
-  for (const m of src.matchAll(re)) {
-    const text = lit(m[2]);
-    out.push({ name: m[1], chars: text.length, sha256: createHash('sha256').update(text).digest('hex').slice(0, 16), sample: text.slice(0, 60) });
-  }
+  for (const m of src.matchAll(re)) out.push({ name: m[1], text: lit(m[2]) });
   // Array-joined prompt constants: const NAME...PROMPT... = [ 'elem', 'elem' ].join(...)
   // (the evidence/join pattern — the const regex cannot see the elements)
   const arrRe = /const\s+([A-Z][A-Z0-9_]*PROMPT[A-Z0-9_]*)[^=]*=\s*\[([\s\S]*?)\]\s*\.join/g;
   const elemRe = /(`(?:[^`\\]|\\.)*`|'(?:[^'\\]|\\.)*')/g;
   for (const m of src.matchAll(arrRe)) {
     let i = 0;
-    for (const e of m[2].matchAll(elemRe)) {
-      const text = lit(e[1]);
-      out.push({ name: `${m[1]}[${i}]`, chars: text.length, sha256: createHash('sha256').update(text).digest('hex').slice(0, 16), sample: text.slice(0, 60) });
-      i += 1;
-    }
+    for (const e of m[2].matchAll(elemRe)) { out.push({ name: `${m[1]}[${i}]`, text: lit(e[1]) }); i += 1; }
   }
   // Inline call-site prompts: systemPrompt: '...' / `...` — named by the nearby
   // purpose; position-independent fallback (content prefix) so edits elsewhere
@@ -73,11 +76,14 @@ const extractPrompts = (file) => {
     const after = src.slice(m.index, m.index + 400);
     const pm = /purpose:\s*'([^']{1,60})'/.exec(after);
     const fallback = text.slice(0, 24).replace(/[^A-Za-z0-9]/g, '').slice(0, 16);
-    const name = `INLINE:${pm ? pm[1] : fallback}`;
-    out.push({ name, chars: text.length, sha256: createHash('sha256').update(text).digest('hex').slice(0, 16), sample: text.slice(0, 60) });
+    out.push({ name: `INLINE:${pm ? pm[1] : fallback}`, text });
   }
   return out;
 };
+
+/** Hash/sample projection over extractPromptsRaw (identity for the snapshot). */
+export const extractPrompts = (file) =>
+  extractPromptsRaw(file).map((p) => ({ name: p.name, chars: p.text.length, sha256: createHash('sha256').update(p.text).digest('hex').slice(0, 16), sample: p.text.slice(0, 60) }));
 
 const SECURITY_ANCHORS = [
   { file: 'src/pipeline/llm.ts', needle: 'UNTRUSTED_DATA_RULE', label: 'choke-point rule append' },
@@ -87,6 +93,8 @@ const SECURITY_ANCHORS = [
 
 const main = () => {
   const mode = process.argv.includes('--snapshot') ? 'snapshot' : process.argv.includes('--check') ? 'check' : 'verify';
+  const noteIdx = process.argv.indexOf('--note');
+  const note = noteIdx >= 0 && noteIdx + 1 < process.argv.length ? process.argv[noteIdx + 1] : null;
   const failures = [];
 
   // ---- 1+4: extract, budget, determinism ----
@@ -112,22 +120,88 @@ const main = () => {
     if (!src.includes(a.needle)) failures.push(`security wiring: ${a.label} MISSING (${a.file}: "${a.needle}" not found)`);
   }
 
-  // ---- 3: snapshot diff ----
+  // ---- 3: snapshot diff / versioned merge ----
+  /** Normalize pre-versioning entries: version 1, empty history, baseline provenance. */
+  const norm = (p) => ({
+    ...p,
+    version: typeof p.version === 'number' && p.version >= 1 ? p.version : 1,
+    provenance: typeof p.provenance === 'string' && p.provenance.length > 0 ? p.provenance : 'pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)',
+    history: Array.isArray(p.history) ? p.history : [],
+  });
   const snapshot = { generatedAt: new Date().toISOString(), prompts };
+  // TOCTOU-free snapshot IO: one ENOENT-tolerant read replaces existsSync+read,
+  // and writes go temp-then-rename so a concurrent reader never sees a torn file.
+  const readSnapshot = () => {
+    try {
+      return JSON.parse(readFileSync(SNAPSHOT_PATH, 'utf8'));
+    } catch (e) {
+      if (e.code === 'ENOENT') return null;
+      throw e;
+    }
+  };
+  const writeSnapshotAtomic = (obj) => {
+    const tmp = `${SNAPSHOT_PATH}.tmp`;
+    writeFileSync(tmp, JSON.stringify(obj, null, 2) + '\n');
+    renameSync(tmp, SNAPSHOT_PATH);
+  };
   if (mode === 'snapshot') {
-    writeFileSync(SNAPSHOT_PATH, JSON.stringify(snapshot, null, 2) + '\n');
-    process.stdout.write(`prompt-regression: snapshot written (${prompts.length} prompts, total ${total} chars)\n`);
-  } else if (existsSync(SNAPSHOT_PATH) || mode === 'check') {
-    if (!existsSync(SNAPSHOT_PATH)) {
-      failures.push('snapshot missing: run with --snapshot first');
+    const prev = readSnapshot();
+    if (prev === null) {
+      writeSnapshotAtomic({ ...snapshot, prompts: prompts.map((p) => ({ ...p, version: 1, provenance: note ?? 'initial snapshot', history: [] })) });
+      process.stdout.write(`prompt-regression: snapshot written (${prompts.length} prompts, total ${total} chars, all v1)\n`);
     } else {
-      const prev = JSON.parse(readFileSync(SNAPSHOT_PATH, 'utf8'));
+      const prevBy = new Map(prev.prompts.map((p) => [`${p.file}:${p.name}`, norm(p)]));
+      const merged = [];
+      const removed = Array.isArray(prev.removed) ? [...prev.removed] : [];
+      const bumps = [];
+      for (const p of prompts) {
+        const k = `${p.file}:${p.name}`;
+        const old = prevBy.get(k);
+        if (old === undefined) {
+          merged.push({ ...p, version: 1, provenance: note ?? 'new prompt (unannotated)', history: [] });
+          bumps.push(`NEW  ${k} v1`);
+        } else if (old.sha256 === p.sha256) {
+          merged.push(old); // untouched: version, provenance, history carry forward verbatim
+        } else {
+          if (note === null) {
+            failures.push(`CHANGED ${k} requires --note "<rationale>" for provenance — refusing to overwrite without an auditable version bump`);
+            continue;
+          }
+          merged.push({
+            ...p,
+            version: old.version + 1,
+            provenance: note,
+            history: [...old.history, { sha256: old.sha256, chars: old.chars, version: old.version, at: prev.generatedAt ?? null }],
+          });
+          bumps.push(`BUMP ${k} v${old.version} -> v${old.version + 1}`);
+        }
+      }
+      for (const [k, old] of prevBy) {
+        if (!prompts.some((p) => `${p.file}:${p.name}` === k)) {
+          removed.push({ ...old, removedAt: snapshot.generatedAt });
+          bumps.push(`GONE ${k} (archived to snapshot.removed, v${old.version})`);
+        }
+      }
+      if (failures.length === 0) {
+        writeSnapshotAtomic({ ...snapshot, prompts: merged, ...(removed.length > 0 ? { removed } : {}) });
+        process.stdout.write(`prompt-regression: snapshot written (${prompts.length} prompts, total ${total} chars)\n`);
+        for (const b of bumps) process.stdout.write(`  ${b}\n`);
+        if (bumps.length > 0 && note === null) process.stdout.write('  (note: new prompts without --note were annotated as unannotated — rerun with --note to give them provenance)\n');
+      }
+    }
+  } else {
+    // original guard was existsSync(...) || mode === 'check': diff whenever the
+    // snapshot exists; only --check treats a missing snapshot as a failure.
+    const prev = readSnapshot();
+    if (prev === null && mode === 'check') {
+      failures.push('snapshot missing: run with --snapshot first');
+    } else if (prev !== null) {
       const prevBy = new Map(prev.prompts.map((p) => [`${p.file}:${p.name}`, p]));
       const curBy = new Map(snapshot.prompts.map((p) => [`${p.file}:${p.name}`, p]));
       for (const [k, p] of curBy) {
         const old = prevBy.get(k);
         if (old === undefined) failures.push(`prompt diff: NEW ${k} (${p.chars} chars)`);
-        else if (old.sha256 !== p.sha256) failures.push(`prompt diff: CHANGED ${k} (${old.chars} -> ${p.chars} chars)`);
+        else if (old.sha256 !== p.sha256) failures.push(`prompt diff: CHANGED ${k} v${old.version} (${old.chars} -> ${p.chars} chars) — if intentional: --snapshot --note "<rationale>"`);
       }
       for (const k of prevBy.keys()) if (!curBy.has(k)) failures.push(`prompt diff: REMOVED ${k}`);
     }
@@ -138,4 +212,4 @@ const main = () => {
   process.exit(failures.length === 0 ? 0 : 1);
 };
 
-main();
+if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) main();

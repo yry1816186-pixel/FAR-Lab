@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "harnessVersion": 1,
+  "leg": "CURRENT",
+  "pinnedAt": "2026-09-03T08:52:56.916Z",
+  "gitCommit": "4780fc63ba0817109cd340a5516bf8197ef66ce0",
+  "gitTag": "omega-baseline-w0",
+  "route": "dashscope",
+  "problemsFile": "eval/problems.json",
+  "cli": {
+    "path": "work/omega-baseline-w0/dist/cli/main.js",
+    "argv": [
+      "research",
+      "start",
+      "<q>",
+      "--domain",
+      "<d>",
+      "--goal",
+      "<g>",
+      "--route",
+      "dashscope",
+      "--json"
+    ]
+  },
+  "results": [
+    {
+      "problemId": "P2",
+      "ok": true,
+      "snapshot": {
+        "runId": "run_r6jx9zfmpdst864j5jjggsw5my",
+        "status": "completed",
+        "stages": [
+          {
+            "stage": "scope",
+            "state": "done"
+          },
+          {
+            "stage": "retrieve",
+            "state": "done"
+          },
+          {
+            "stage": "verify_sources",
+            "state": "done"
+          },
+          {
+            "stage": "build_evidence",
+            "state": "done"
+          },
+          {
+            "stage": "generate_hypotheses",
+            "state": "done"
+          },
+          {
+            "stage": "critique_falsify",
+            "state": "done"
+          },
+          {
+            "stage": "rank",
+            "state": "done"
+          },
+          {
+            "stage": "plan",
+            "state": "done"
+          },
+          {
+            "stage": "execute",
+            "state": "skipped",
+            "reason": "tabular: routed out by method selection; literature-pool: The research plan requires collecting new primary data (paired stool-serum-PBMC biospecimens, metagenomic profiles, metabolite concentrations, PBMC glycolytic flux assays) and running causal mediation models (ACME) on tabular datasets. It does not pose a question answerable by pooling published effect estimates (OR, RR, SMD) for a single intervention vs. outcome contrast from the literature.; theory: The research plan concerns biological mechanisms (gut microbiome influence on immune checkpoint inhibitor efficacy) requiring clinical datasets, patient cohorts, and statistical analyses (Spearman correlations, ACME mediation, odds ratios). It does not state any closed-form mathematical identity or analytic bound that can be verified numerically on a small grid.; protocol: protocol draft failed schema validation: : step ps1 produces unknown measurement 'ranked_candidate_taxa'; : step ps1 produces unknown measurement 'ranked_candidate_pathways'; : step ps1 produces unknown measurement 'meta_analysis_effect_sizes'; : step ps2 produces unknown measurement 'stool_secondary_bile_acids'"
+          },
+          {
+            "stage": "feedback",
+            "state": "skipped"
+          },
+          {
+            "stage": "revise",
+            "state": "skipped"
+          },
+          {
+            "stage": "export",
+            "state": "done"
+          }
+        ],
+        "metrics": {
+          "source_total": 12,
+          "source_verification_rate": 1,
+          "claim_total": 26,
+          "claim_binding_rate": 1,
+          "counter_evidence_relations": 0,
+          "hypothesis_candidates": 12,
+          "hypothesis_representatives": 12,
+          "falsification_completeness_rate": 1,
+          "plan_present": true,
+          "receipts": 131,
+          "model_calls": 80,
+          "receipt_modes": {
+            "live": 131
+          },
+          "agent_reports": 0,
+          "debate_counter_findings": 0,
+          "feedback_signals": 0,
+          "debate_verdict_counts": {}
+        },
+        "modelVersions": []
+      },
+      "wallMs": 3535992
+    }
+  ]
+}

@@ -5,6 +5,7 @@ import type { ArtifactStore, ModelProvider, SourceAdapter } from '../shared/port
 import type { SourceFamily, SourceDocument } from '../domain/source.js';
 import type { FullTextFetchResult } from '../sources/fulltext.js';
 import type { RunBudgetView } from '../app/run-budget.js';
+import type { KernelCapabilityPlane } from '../kernel/capability-plane.js';
 
 /** What a stage may touch. Stage handlers stay pure of infrastructure wiring. */
 export interface StageContext {
@@ -60,6 +61,13 @@ export interface StageContext {
    */
   budget?: RunBudgetView;
   /**
+   * Ω ADR D5 capability plane: stages and future kernel-authored workflow steps
+   * may invoke agent-kernel capabilities (runCapability) through this seam. Absent
+   * (tests/minimal harnesses) = no kernel in this execution; consumers must degrade
+   * honestly, never fabricate agent work.
+   */
+  kernel?: KernelCapabilityPlane;
+  /**
    * W-C bilingual display layer: when true, generation stages additionally produce
    * Simplified-Chinese renderings of primary display fields (hypothesis statements,
    * plan objective) via one batched, temperature-0 call each — enrichment semantics,
@@ -103,9 +111,22 @@ export type StageOutcome =
   | { kind: 'done'; summary: string; artifacts?: string[] }
   | { kind: 'skipped'; reason: string };
 
+/**
+ * Not-applicable verdict carrying the branch-local reason. Persisted verbatim on the
+ * skipped stage record + stage_skipped event — an applicable=false must never be a
+ * silent skip (live finding 2026-09-03: revise/export second-pass skips recorded an
+ * empty reason and the anchor's stage view could not say why).
+ */
+export interface NotApplicable {
+  applicable: false;
+  reason: string;
+}
+
+export type Applicability = boolean | NotApplicable;
+
 export interface StageHandler {
   readonly stage: RunStageName;
-  /** True when the stage legitimately has nothing to do for this run (e.g. no feedback yet). */
-  applicable(ctx: StageContext): Promise<boolean>;
+  /** True when the stage legitimately has nothing to do for this run (e.g. no feedback yet). The object form explains WHY. */
+  applicable(ctx: StageContext): Promise<Applicability>;
   execute(ctx: StageContext): Promise<StageOutcome>;
 }

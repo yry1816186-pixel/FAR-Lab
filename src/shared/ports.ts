@@ -47,6 +47,15 @@ export interface StructuredCallRequest {
    * reasoningBodyFields; the gear→budget map in domain/model-config.ts.
    */
   reasoning?: { style: ReasoningStyle; gear: ReasoningGear };
+  /**
+   * Explicitly DISABLE thinking on models whose endpoint default is thinking-ON
+   * (live-observed 2026-09-03: qwen3.8-flash via compatible-mode returns
+   * reasoning_tokens on ~every call when no thinking field is sent — p50 65s /
+   * p90 188s latencies blow the structured-call budget). Maps to qwen-family
+   * `enable_thinking:false`; wins over any `reasoning` gear on the same request.
+   * Undefined = zero thinking fields (endpoint default, exact legacy wire).
+   */
+  disableThinking?: boolean;
   /** Retry budget owned by the plane (bounded, classified). */
   purpose: string; // e.g. 'claim-extraction', recorded in provenance
   /**

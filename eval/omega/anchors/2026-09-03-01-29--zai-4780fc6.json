@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "harnessVersion": 1,
+  "leg": "CURRENT",
+  "pinnedAt": "2026-09-03T01:33:32.069Z",
+  "gitCommit": "4780fc63ba0817109cd340a5516bf8197ef66ce0",
+  "gitTag": "omega-baseline-w0",
+  "route": "zai",
+  "problemsFile": "eval/problems.json",
+  "cli": {
+    "path": "work/omega-baseline-w0/dist/cli/main.js",
+    "argv": [
+      "research",
+      "start",
+      "<q>",
+      "--domain",
+      "<d>",
+      "--goal",
+      "<g>",
+      "--route",
+      "zai",
+      "--json"
+    ]
+  },
+  "results": [
+    {
+      "problemId": "P2",
+      "ok": true,
+      "snapshot": {
+        "runId": "run_f135e1wt0xdt6gbkqezc9n6m14",
+        "status": "partial",
+        "stages": [
+          {
+            "stage": "scope",
+            "state": "done"
+          },
+          {
+            "stage": "retrieve",
+            "state": "done"
+          },
+          {
+            "stage": "verify_sources",
+            "state": "done"
+          },
+          {
+            "stage": "build_evidence",
+            "state": "failed",
+            "reason": "model call failed (provider_error) in build_evidence/claim-extraction: zai: HTTP 500 code 1234: [1234][网络错误，错误id 20260903093326b50a19436ac24c0d ，请稍后重试。][20260903093326b50a19436ac24c0d] (transient 500; eligible for bounded retry) (retry budget of 2 exhausted)"
+          },
+          {
+            "stage": "generate_hypotheses",
+            "state": "pending"
+          },
+          {
+            "stage": "critique_falsify",
+            "state": "pending"
+          },
+          {
+            "stage": "rank",
+            "state": "pending"
+          },
+          {
+            "stage": "plan",
+            "state": "pending"
+          },
+          {
+            "stage": "execute",
+            "state": "pending"
+          },
+          {
+            "stage": "feedback",
+            "state": "pending"
+          },
+          {
+            "stage": "revise",
+            "state": "pending"
+          },
+          {
+            "stage": "export",
+            "state": "pending"
+          }
+        ],
+        "metrics": {
+          "source_total": 12,
+          "source_verification_rate": 1,
+          "claim_total": 13,
+          "claim_binding_rate": 1,
+          "counter_evidence_relations": 0,
+          "hypothesis_candidates": 0,
+          "hypothesis_representatives": 0,
+          "falsification_completeness_rate": null,
+          "plan_present": false,
+          "receipts": 41,
+          "model_calls": 11,
+          "receipt_modes": {
+            "live": 41
+          },
+          "agent_reports": 0,
+          "debate_counter_findings": 0,
+          "feedback_signals": 0,
+          "debate_verdict_counts": {}
+        },
+        "modelVersions": []
+      },
+      "wallMs": 231770
+    }
+  ]
+}

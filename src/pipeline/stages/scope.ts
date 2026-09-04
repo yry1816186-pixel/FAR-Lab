@@ -56,7 +56,7 @@ Rules:
 - Candidates you do NOT select must OMIT validationPlan entirely (short placeholders like "n/a" are rejected).
 - Match the family to the problem: a well-posed PDE/ODE question selects numerical_simulation with a convergence/discretization-error validation plan; a question about a natural phenomenon with no formal structure selects retrieval_synthesis and/or physical_experiment; a closed-form identity claim selects analytic_symbolic with a grid-check plan.
 - Prefer empty arrays over fabricating variables, data, premises or unknowns.
-- Preserve the question's own language for descriptive fields.`;
+- LANGUAGE (hard rule): every generated text field MUST be in the question's own language — never translate, never switch languages mid-model. An English question yields an entirely English problem model.`;
 export const scopeStage: StageHandler = {
   stage: 'scope',
   applicable: async () => true,
@@ -162,6 +162,18 @@ export const scopeStage: StageHandler = {
     }
 
     const d = pm.data;
+    // ΩF-004 language discipline (high-precision guard only): a pure-ASCII question
+    // yielding umlaut-bearing objectives is a model language slip (observed live:
+    // English question → German objectives). Refuse to store — the stage failure is
+    // visible and the attempt machinery retries. Non-ASCII questions skip the guard
+    // (their objectives legitimately carry diacritics); umlaut-free wrong languages
+    // are out of scope for this heuristic.
+    const questionIsPureAscii = [...question.text].every((ch) => (ch.codePointAt(0) ?? 0) <= 0x7f);
+    if (questionIsPureAscii && d.objectives.some((o) => /[äöüßÄÖÜ]/.test(o.statement))) {
+      throw new Error(
+        'language discipline violated: an ASCII-only question produced umlaut-bearing objectives — refusing to store; the model must match the question\'s language',
+      );
+    }
     const now = new Date().toISOString();
     const model = ScientificProblemModel.parse({
       id: newId('pmod'),

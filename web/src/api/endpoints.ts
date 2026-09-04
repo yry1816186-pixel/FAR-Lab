@@ -137,6 +137,37 @@ export const stopScreening = async (runId: string, signal?: AbortSignal): Promis
   };
 };
 
+export interface MethodOverrideResult {
+  selectionId: string;
+  decidedBy: string;
+  feedbackId: string;
+  revisionId: string;
+}
+
+/** FA-HCI-02: researcher method-family override — feeds the causal revision chain. */
+export const overrideMethodSelection = async (
+  runId: string,
+  selectionId: string,
+  selectedFamilies: string[],
+  reason: string,
+  validationPlans: Record<string, string>,
+  signal?: AbortSignal,
+): Promise<MethodOverrideResult> => {
+  const data = await api.post(
+    `${BASE}/runs/${encodeURIComponent(runId)}/method-selections/${encodeURIComponent(selectionId)}/override`,
+    { selectedFamilies, reason, ...(Object.keys(validationPlans).length > 0 ? { validationPlans } : {}) },
+    signal,
+  );
+  if (typeof data !== 'object' || data === null) {
+    throw new ApiError({ code: 'unexpected_schema', message: '方法族覆盖响应结构与预期不符', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'method override' } });
+  }
+  const r = data as Record<string, unknown>;
+  if (typeof r.feedbackId !== 'string' || typeof r.revisionId !== 'string' || typeof r.selection !== 'object') {
+    throw new ApiError({ code: 'unexpected_schema', message: '方法族覆盖响应缺少修订链字段', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'method override' } });
+  }
+  const sel = r.selection as Record<string, unknown>;
+  return { selectionId: typeof sel.id === 'string' ? sel.id : selectionId, decidedBy: typeof sel.decidedBy === 'string' ? sel.decidedBy : '', feedbackId: r.feedbackId, revisionId: r.revisionId };
+};
 export const getHypotheses = async (runId: string, signal?: AbortSignal) =>
   normalizeHypotheses(await api.getJson(`${BASE}/runs/${encodeURIComponent(runId)}/hypotheses`, signal));
 

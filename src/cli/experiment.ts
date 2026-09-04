@@ -128,8 +128,9 @@ const executeViaFor = async (dataDir: string, device: string) => {
     o: { allowLocalDatasets?: boolean; existingRunId: { toString(): string }; shouldCancel: () => boolean },
   ) => {
     const { executeRemoteExperiment } = await import('../experiment/remote-executor.js');
+    const { gatewayForDevice } = await import('../experiment/device-gateway.js');
     await executeRemoteExperiment(store, artifacts, spec, {
-      gateway: registry.gatewayFor(device), deviceId: device,
+      gateway: gatewayForDevice(registry, device, o.shouldCancel), deviceId: device,
       allowLocalDatasets: o.allowLocalDatasets,
       existingRunId: o.existingRunId as never,
       shouldCancel: o.shouldCancel,
@@ -205,8 +206,9 @@ const dispatch = async (sub: string | undefined, a: Args, usage: string): Promis
         o: { allowLocalDatasets?: boolean; existingRunId: { toString(): string }; shouldCancel: () => boolean },
       ) => {
         const { executeRemoteExperiment } = await import('../experiment/remote-executor.js');
+        const { gatewayForDevice } = await import('../experiment/device-gateway.js');
         await executeRemoteExperiment(store, artifacts, spec, {
-          gateway: registry.gatewayFor(device), deviceId: device,
+          gateway: gatewayForDevice(registry, device, o.shouldCancel), deviceId: device,
           allowLocalDatasets: o.allowLocalDatasets,
           existingRunId: o.existingRunId as never,
           shouldCancel: o.shouldCancel,

@@ -1,551 +1,1014 @@
 {
-  "generatedAt": "2026-08-23T22:05:08.072Z",
+  "generatedAt": "2026-09-04T04:52:25.727Z",
   "prompts": [
     {
       "file": "src/pipeline/stages/scope.ts",
       "name": "SYSTEM_PROMPT",
       "chars": 922,
       "sha256": "bba9c4e0b91d1dfa",
-      "sample": "You refine a user's research question into a structured, fal"
+      "sample": "You refine a user's research question into a structured, fal",
+      "version": 2,
+      "provenance": "line-ending normalization: extracted literals are platform-invariant (CRLF working trees hash identically to LF checkouts); no prompt content changed",
+      "history": [
+        {
+          "sha256": "fc7ebc0d166b0d5f",
+          "chars": 933,
+          "version": 1,
+          "at": "2026-09-04T01:35:57.290Z"
+        }
+      ]
+    },
+    {
+      "file": "src/pipeline/stages/scope.ts",
+      "name": "PROBLEM_MODEL_PROMPT",
+      "chars": 3550,
+      "sha256": "479bdb7323271942",
+      "sample": "You formalize a research question into a Scientific Problem ",
+      "version": 2,
+      "provenance": "line-ending normalization: extracted literals are platform-invariant (CRLF working trees hash identically to LF checkouts); no prompt content changed",
+      "history": [
+        {
+          "sha256": "53b392bc2edc0074",
+          "chars": 3568,
+          "version": 1,
+          "at": "2026-09-04T01:35:57.290Z"
+        }
+      ]
     },
     {
       "file": "src/pipeline/stages/retrieve.ts",
       "name": "SYSTEM_PROMPT",
       "chars": 1336,
       "sha256": "751ae08f8167328c",
-      "sample": "You plan the evidence retrieval for one scientific research "
+      "sample": "You plan the evidence retrieval for one scientific research ",
+      "version": 2,
+      "provenance": "line-ending normalization: extracted literals are platform-invariant (CRLF working trees hash identically to LF checkouts); no prompt content changed",
+      "history": [
+        {
+          "sha256": "f98e127916e52ede",
+          "chars": 1345,
+          "version": 1,
+          "at": "2026-09-04T01:35:57.290Z"
+        }
+      ]
     },
     {
       "file": "src/pipeline/stages/retrieve.ts",
       "name": "RERANK_SYSTEM_PROMPT",
       "chars": 653,
       "sha256": "497257d74c8fb43c",
-      "sample": "You are reranking scholarly documents for one scientific res"
+      "sample": "You are reranking scholarly documents for one scientific res",
+      "version": 2,
+      "provenance": "line-ending normalization: extracted literals are platform-invariant (CRLF working trees hash identically to LF checkouts); no prompt content changed",
+      "history": [
+        {
+          "sha256": "c8bfd906ac349c66",
+          "chars": 659,
+          "version": 1,
+          "at": "2026-09-04T01:35:57.290Z"
+        }
+      ]
     },
     {
       "file": "src/pipeline/stages/evidence.ts",
       "name": "SYSTEM_PROMPT[0]",
       "chars": 76,
       "sha256": "109fbe03bee7c3a1",
-      "sample": "You extract scientific claims from one research source for e"
+      "sample": "You extract scientific claims from one research source for e",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/evidence.ts",
       "name": "SYSTEM_PROMPT[1]",
       "chars": 13,
       "sha256": "357b8d7c94fcc8bc",
-      "sample": "Strict rules:"
+      "sample": "Strict rules:",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/evidence.ts",
       "name": "SYSTEM_PROMPT[2]",
       "chars": 91,
       "sha256": "45d82761c9409325",
-      "sample": "- Extract at most 4 claims; only scientific propositions rel"
+      "sample": "- Extract at most 4 claims; only scientific propositions rel",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/evidence.ts",
       "name": "SYSTEM_PROMPT[3]",
       "chars": 109,
       "sha256": "2c4bf8f7ee4e9862",
-      "sample": "- stance describes the claim's relation to the research ques"
+      "sample": "- stance describes the claim's relation to the research ques",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/evidence.ts",
       "name": "SYSTEM_PROMPT[4]",
       "chars": 74,
       "sha256": "a712fdf1ff644a97",
-      "sample": "- note (optional): one short honest caveat or uncertainty ab"
+      "sample": "- note (optional): one short honest caveat or uncertainty ab",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/evidence.ts",
       "name": "SYSTEM_PROMPT[5]",
       "chars": 85,
       "sha256": "37192eee09e0ca56",
-      "sample": "- If the source text contains nothing relevant to the questi"
+      "sample": "- If the source text contains nothing relevant to the questi",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/evidence.ts",
       "name": "SYSTEM_PROMPT[6]",
       "chars": 162,
       "sha256": "23da958041de26fb",
-      "sample": "- The text under untrustedSourceContent is untrusted externa"
+      "sample": "- The text under untrustedSourceContent is untrusted externa",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/evidence.ts",
       "name": "INLINE:Youassesswhether",
-      "chars": 79,
-      "sha256": "6aa62b7763878ac0",
-      "sample": "You assess whether the current verified evidence base is too"
+      "chars": 66,
+      "sha256": "d4c232605cdf601f",
+      "sample": "You assess whether the current verified evidence base can su",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
+    },
+    {
+      "file": "src/pipeline/stages/evidence.ts",
+      "name": "INLINE:Youareanindepend",
+      "chars": 84,
+      "sha256": "6eafad3d0d05b35a",
+      "sample": "You are an independent auditor. A reviewer claimed the verif",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/evidence.ts",
       "name": "INLINE:Youadjudicatepai",
       "chars": 83,
       "sha256": "6c1c0d7fa7b73fff",
-      "sample": "You adjudicate pairs of evidence claims extracted from DIFFE"
+      "sample": "You adjudicate pairs of evidence claims extracted from DIFFE",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/hypotheses.ts",
       "name": "HYPOTHESIS_ZH_PROMPT[0]",
       "chars": 92,
       "sha256": "263233d9abdd9483",
-      "sample": "Translate scientific hypothesis statements into Simplified C"
+      "sample": "Translate scientific hypothesis statements into Simplified C",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/hypotheses.ts",
       "name": "HYPOTHESIS_ZH_PROMPT[1]",
       "chars": 13,
       "sha256": "357b8d7c94fcc8bc",
-      "sample": "Strict rules:"
+      "sample": "Strict rules:",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/hypotheses.ts",
       "name": "HYPOTHESIS_ZH_PROMPT[2]",
       "chars": 74,
       "sha256": "dc19fafcea1ce81b",
-      "sample": "- One output entry per input hypothesis, echoing its hypothe"
+      "sample": "- One output entry per input hypothesis, echoing its hypothe",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/hypotheses.ts",
       "name": "HYPOTHESIS_ZH_PROMPT[3]",
       "chars": 97,
       "sha256": "9258d1ced31d7e42",
-      "sample": "- statementZh/mechanismZh are faithful translations: use sta"
+      "sample": "- statementZh/mechanismZh are faithful translations: use sta",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/hypotheses.ts",
       "name": "HYPOTHESIS_ZH_PROMPT[4]",
       "chars": 79,
       "sha256": "6495e3253787a82a",
-      "sample": " never add interpretation, hedging, or new claims; never mer"
+      "sample": " never add interpretation, hedging, or new claims; never mer",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/hypotheses.ts",
       "name": "HYPOTHESIS_ZH_PROMPT[5]",
       "chars": 70,
       "sha256": "c061e8a228dc4a0f",
-      "sample": "- If the mechanism is empty in the input, return an empty me"
+      "sample": "- If the mechanism is empty in the input, return an empty me",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/hypotheses.ts",
       "name": "INLINE:Yougroupparaphra",
       "chars": 80,
       "sha256": "df96511ff2b36d00",
-      "sample": "You group paraphrase-equivalent scientific hypotheses. Candi"
+      "sample": "You group paraphrase-equivalent scientific hypotheses. Candi",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/hypotheses.ts",
       "name": "INLINE:definstructionan",
-      "chars": 83,
-      "sha256": "88f5d9b99c3ab774",
-      "sample": "${def.instruction}${antiRepetitionInstruction(raws.length)} "
+      "chars": 136,
+      "sha256": "d0558b459a464365",
+      "sample": "${def.instruction}${antiRepetitionInstruction(raws.length)} ",
+      "version": 2,
+      "provenance": "mechanism-mediator specificity discipline added to hypothesis generation (live-diagnosed umbrella-term gap, fresh-corpus F1 lever 2026-09-04)",
+      "history": [
+        {
+          "sha256": "9f5637d7f9f1890c",
+          "chars": 111,
+          "version": 1,
+          "at": "2026-09-03T13:53:37.954Z"
+        }
+      ]
     },
     {
       "file": "src/pipeline/stages/hypotheses.ts",
       "name": "INLINE:Thecurrenthypoth",
       "chars": 91,
       "sha256": "c560dbf503502dfa",
-      "sample": "The current hypothesis candidate set is too homogeneous. Gen"
+      "sample": "The current hypothesis candidate set is too homogeneous. Gen",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/hypotheses.ts",
       "name": "INLINE:Classifyeachhypo",
       "chars": 99,
       "sha256": "51af13d142970fde",
-      "sample": "Classify each hypothesis candidate against the provided veri"
+      "sample": "Classify each hypothesis candidate against the provided veri",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/hypotheses.ts",
       "name": "INLINE:Foreachhypothesi",
       "chars": 102,
       "sha256": "35309814a0f543ba",
-      "sample": "For each hypothesis, write exactly 2 English scholarly searc"
+      "sample": "For each hypothesis, write exactly 2 English scholarly searc",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/hypotheses.ts",
       "name": "INLINE:Reranktheretriev",
       "chars": 100,
       "sha256": "47a8cfd633705b24",
-      "sample": "Rerank the retrieved papers by how close each is to the hypo"
+      "sample": "Rerank the retrieved papers by how close each is to the hypo",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/hypotheses.ts",
       "name": "INLINE:Judgetheliteratu",
       "chars": 104,
       "sha256": "603653f952200612",
-      "sample": "Judge the literature novelty of each hypothesis STRICTLY aga"
+      "sample": "Judge the literature novelty of each hypothesis STRICTLY aga",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/falsify.ts",
       "name": "INLINE:Youareanadversar",
       "chars": 100,
       "sha256": "247334cf742c7541",
-      "sample": "You are an adversarial reviewer. Produce a COMPLETE falsific"
+      "sample": "You are an adversarial reviewer. Produce a COMPLETE falsific",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/falsify.ts",
       "name": "INLINE:Youareaskeptical",
       "chars": 98,
       "sha256": "bb53018657cebb10",
-      "sample": "You are a skeptical auditor of evidence links proposed by a "
+      "sample": "You are a skeptical auditor of evidence links proposed by a ",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/rank.ts",
       "name": "PAIR_JUDGE_SYSTEM_PROMPT",
       "chars": 1020,
       "sha256": "55a40bca793d2477",
-      "sample": "You are a rigorous research supervisor comparing exactly two"
+      "sample": "You are a rigorous research supervisor comparing exactly two",
+      "version": 2,
+      "provenance": "line-ending normalization: extracted literals are platform-invariant (CRLF working trees hash identically to LF checkouts); no prompt content changed",
+      "history": [
+        {
+          "sha256": "21bf05a3cc1be732",
+          "chars": 1031,
+          "version": 1,
+          "at": "2026-09-04T01:35:57.290Z"
+        }
+      ]
     },
     {
       "file": "src/pipeline/stages/plan.ts",
       "name": "PLAN_OBJECTIVE_ZH_PROMPT",
       "chars": 95,
       "sha256": "9829fde7f10c2514",
-      "sample": "Translate one research-plan objective into Simplified Chines"
+      "sample": "Translate one research-plan objective into Simplified Chines",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/plan.ts",
       "name": "PLAN_SYSTEM_PROMPT[0]",
       "chars": 85,
       "sha256": "e7a2fa2b0dbfc65a",
-      "sample": "You design executable research plans for an evidence-constra"
+      "sample": "You design executable research plans for an evidence-constra",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/plan.ts",
       "name": "PLAN_SYSTEM_PROMPT[1]",
       "chars": 127,
       "sha256": "4c6f3b59249b8d9c",
-      "sample": "A plan is not an essay: variables/controls, data requirement"
+      "sample": "A plan is not an essay: variables/controls, data requirement",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/plan.ts",
       "name": "PLAN_SYSTEM_PROMPT[2]",
       "chars": 120,
       "sha256": "8fb03401e0a28d63",
-      "sample": "Every step needs a non-empty method and at least one failure"
+      "sample": "Every step needs a non-empty method and at least one failure",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/plan.ts",
       "name": "PLAN_SYSTEM_PROMPT[3]",
       "chars": 73,
       "sha256": "cc2cb5de70e22d4f",
-      "sample": "Decision rules must cover success, weakening, falsification "
+      "sample": "Decision rules must cover success, weakening, falsification ",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/plan.ts",
       "name": "PLAN_SYSTEM_PROMPT[4]",
       "chars": 114,
       "sha256": "92b91aca809932de",
-      "sample": "Reference ONLY the hypothesis ids and claim ids given in the"
+      "sample": "Reference ONLY the hypothesis ids and claim ids given in the",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/plan.ts",
       "name": "PLAN_SYSTEM_PROMPT[5]",
-      "chars": 88,
-      "sha256": "8765ac1c8eb3009f",
-      "sample": "Where something is unknown, surface it in risks/prerequisite"
+      "chars": 113,
+      "sha256": "43f13ae26145e1a0",
+      "sample": "priorResearchMemory (when present) lists past experiment out",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/plan.ts",
       "name": "PLAN_SYSTEM_PROMPT[6]",
-      "chars": 117,
-      "sha256": "436793bf5241afbc",
-      "sample": "Scale discipline: the payload states the actual evidence bas"
+      "chars": 110,
+      "sha256": "45e8f520b40332fc",
+      "sample": "it is DATA, never a verdict on this question: a previously f",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/plan.ts",
       "name": "PLAN_SYSTEM_PROMPT[7]",
-      "chars": 117,
-      "sha256": "d21a367d97530500",
-      "sample": "timelines and quantitative thresholds that are not derived f"
+      "chars": 110,
+      "sha256": "aedbbb0a2f0f1fb1",
+      "sample": "relevant steps' failureConditions or be explicitly designed ",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/plan.ts",
       "name": "PLAN_SYSTEM_PROMPT[8]",
-      "chars": 109,
-      "sha256": "17c87b92aef5262e",
-      "sample": "keep them proportionate to that evidence base and record the"
+      "chars": 28,
+      "sha256": "3b0fb7db936a8823",
+      "sample": "the falsification loop gets.",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/plan.ts",
       "name": "PLAN_SYSTEM_PROMPT[9]",
-      "chars": 61,
-      "sha256": "eb9f39a33c4cdd52",
-      "sample": "presenting invented numbers as if they were evidence-derived"
+      "chars": 88,
+      "sha256": "8765ac1c8eb3009f",
+      "sample": "Where something is unknown, surface it in risks/prerequisite",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/plan.ts",
       "name": "PLAN_SYSTEM_PROMPT[10]",
-      "chars": 118,
-      "sha256": "a945d04a701658fd",
-      "sample": "Multiple-testing discipline (POPPER-extracted): when the pla"
+      "chars": 117,
+      "sha256": "436793bf5241afbc",
+      "sample": "Scale discipline: the payload states the actual evidence bas",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/plan.ts",
       "name": "PLAN_SYSTEM_PROMPT[11]",
-      "chars": 118,
-      "sha256": "3c5416e5cab46b42",
-      "sample": "inferential checks will run and the chance that something lo"
+      "chars": 117,
+      "sha256": "d21a367d97530500",
+      "sample": "timelines and quantitative thresholds that are not derived f",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/plan.ts",
       "name": "PLAN_SYSTEM_PROMPT[12]",
-      "chars": 119,
-      "sha256": "4a4023c035d00e61",
-      "sample": "State multipleTestingPolicy explicitly — \"single_primary\" (d"
+      "chars": 109,
+      "sha256": "17c87b92aef5262e",
+      "sample": "keep them proportionate to that evidence base and record the",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/plan.ts",
       "name": "PLAN_SYSTEM_PROMPT[13]",
-      "chars": 118,
-      "sha256": "1445e189dc1781e2",
-      "sample": "everything else is secondary/descriptive), \"alpha_spending\" "
+      "chars": 61,
+      "sha256": "eb9f39a33c4cdd52",
+      "sample": "presenting invented numbers as if they were evidence-derived",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/plan.ts",
       "name": "PLAN_SYSTEM_PROMPT[14]",
-      "chars": 108,
-      "sha256": "0736f9621b473bab",
-      "sample": "or \"e_value_accumulation\" (anytime-valid e-values aggregated"
+      "chars": 118,
+      "sha256": "a945d04a701658fd",
+      "sample": "Multiple-testing discipline (POPPER-extracted): when the pla",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/plan.ts",
       "name": "PLAN_SYSTEM_PROMPT[15]",
-      "chars": 98,
-      "sha256": "741a27baa55dbb84",
-      "sample": "multipleTestingNote. Single-hypothesis plans may omit it (on"
+      "chars": 118,
+      "sha256": "3c5416e5cab46b42",
+      "sample": "inferential checks will run and the chance that something lo",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/plan.ts",
       "name": "PLAN_SYSTEM_PROMPT[16]",
-      "chars": 125,
-      "sha256": "db5da094455eac01",
-      "sample": "Structured preregistration (Wave-S): alongside the prose fie"
+      "chars": 119,
+      "sha256": "4a4023c035d00e61",
+      "sample": "State multipleTestingPolicy explicitly — \"single_primary\" (d",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/plan.ts",
       "name": "PLAN_SYSTEM_PROMPT[17]",
-      "chars": 125,
-      "sha256": "e4e8132e188dd7ab",
-      "sample": "direction higher_better|lower_better|two_sided), testSpecs ("
+      "chars": 121,
+      "sha256": "e24277cee89c2ae2",
+      "sample": "everything else is secondary/descriptive) or \"alpha_spending",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/plan.ts",
       "name": "PLAN_SYSTEM_PROMPT[18]",
-      "chars": 125,
-      "sha256": "7a75e51976b2feaf",
-      "sample": "mde_gate|descriptive + predicted effect supports|weakens|exc"
+      "chars": 114,
+      "sha256": "250f862db99216d8",
+      "sample": "and justify the allocation in multipleTestingNote. Do NOT de",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/plan.ts",
       "name": "PLAN_SYSTEM_PROMPT[19]",
-      "chars": 126,
-      "sha256": "8ce2249dc91ab76f",
-      "sample": "{observable, condition, expectedRelation} — two hypotheses g"
+      "chars": 118,
+      "sha256": "34196c7b58d97cd9",
+      "sample": "implemented, such plans fail validation. Single-hypothesis p",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/plan.ts",
       "name": "PLAN_SYSTEM_PROMPT[20]",
-      "chars": 129,
-      "sha256": "2423b82aa36be3ce",
-      "sample": "same observable+condition. Provide expectedInfoGain {decisio"
+      "chars": 125,
+      "sha256": "db5da094455eac01",
+      "sample": "Structured preregistration (Wave-S): alongside the prose fie",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/plan.ts",
       "name": "PLAN_SYSTEM_PROMPT[21]",
-      "chars": 124,
-      "sha256": "2852d51acd96932d",
-      "sample": "when the plan discriminates >1 hypothesis or has branches; s"
+      "chars": 125,
+      "sha256": "29ddf12da18aff60",
+      "sample": "direction higher_better|lower_better|two_sided), testSpecs (",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/plan.ts",
       "name": "PLAN_SYSTEM_PROMPT[22]",
-      "chars": 123,
-      "sha256": "bc3b7d03e908daea",
-      "sample": "{type} when a step repeats prior work; targetTrialProtocol ("
+      "chars": 125,
+      "sha256": "4e4c3eddeaf6afee",
+      "sample": "have executors today, do NOT promise permutation/wilson/kapp",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/plan.ts",
       "name": "PLAN_SYSTEM_PROMPT[23]",
-      "chars": 124,
-      "sha256": "37198840b2144743",
-      "sample": "and measurable/estimand/controlRun one-liners when applicabl"
+      "chars": 104,
+      "sha256": "98df5be6fb6ef246",
+      "sample": "+ predicted effect supports|weakens|excludes + threshold + t",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/plan.ts",
       "name": "PLAN_SYSTEM_PROMPT[24]",
-      "chars": 125,
-      "sha256": "2e1015aec5dae139",
-      "sample": "metric succeeds at \">= threshold\" and weakens/excludes at \"<"
+      "chars": 126,
+      "sha256": "8ce2249dc91ab76f",
+      "sample": "{observable, condition, expectedRelation} — two hypotheses g",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/plan.ts",
       "name": "PLAN_SYSTEM_PROMPT[25]",
+      "chars": 129,
+      "sha256": "2423b82aa36be3ce",
+      "sample": "same observable+condition. Provide expectedInfoGain {decisio",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
+    },
+    {
+      "file": "src/pipeline/stages/plan.ts",
+      "name": "PLAN_SYSTEM_PROMPT[26]",
+      "chars": 124,
+      "sha256": "2852d51acd96932d",
+      "sample": "when the plan discriminates >1 hypothesis or has branches; s",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
+    },
+    {
+      "file": "src/pipeline/stages/plan.ts",
+      "name": "PLAN_SYSTEM_PROMPT[27]",
+      "chars": 123,
+      "sha256": "bc3b7d03e908daea",
+      "sample": "{type} when a step repeats prior work; targetTrialProtocol (",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
+    },
+    {
+      "file": "src/pipeline/stages/plan.ts",
+      "name": "PLAN_SYSTEM_PROMPT[28]",
+      "chars": 124,
+      "sha256": "37198840b2144743",
+      "sample": "and measurable/estimand/controlRun one-liners when applicabl",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
+    },
+    {
+      "file": "src/pipeline/stages/plan.ts",
+      "name": "PLAN_SYSTEM_PROMPT[29]",
+      "chars": 125,
+      "sha256": "2e1015aec5dae139",
+      "sample": "metric succeeds at \">= threshold\" and weakens/excludes at \"<",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
+    },
+    {
+      "file": "src/pipeline/stages/plan.ts",
+      "name": "PLAN_SYSTEM_PROMPT[30]",
       "chars": 51,
       "sha256": "3ca3f80aa449c4eb",
-      "sample": "absence is disclosed, fabrication is not tolerated."
+      "sample": "absence is disclosed, fabrication is not tolerated.",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
+    },
+    {
+      "file": "src/pipeline/stages/plan.ts",
+      "name": "PLAN_SYSTEM_PROMPT[31]",
+      "chars": 102,
+      "sha256": "e9ffee241fa21c36",
+      "sample": "Problem-model alignment (AOSSA): when the payload carries pr",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
+    },
+    {
+      "file": "src/pipeline/stages/plan.ts",
+      "name": "PLAN_SYSTEM_PROMPT[32]",
+      "chars": 106,
+      "sha256": "ffebe4049ca6be31",
+      "sample": "truth for what the plan must discriminate and its selectedMe",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
+    },
+    {
+      "file": "src/pipeline/stages/plan.ts",
+      "name": "PLAN_SYSTEM_PROMPT[33]",
+      "chars": 105,
+      "sha256": "d3b528d37eb68562",
+      "sample": "objective — plan steps must operate INSIDE those families (a",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
+    },
+    {
+      "file": "src/pipeline/stages/plan.ts",
+      "name": "PLAN_SYSTEM_PROMPT[34]",
+      "chars": 104,
+      "sha256": "6d4149f2fb1ae656",
+      "sample": "steps with discretization-error analysis, not a literature s",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
+    },
+    {
+      "file": "src/pipeline/stages/plan.ts",
+      "name": "PLAN_SYSTEM_PROMPT[35]",
+      "chars": 72,
+      "sha256": "1dded7365defe9b9",
+      "sample": "legal only as an explicitly justified additional lane record",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/revise.ts",
       "name": "CAUSAL_ANALYSIS_PROMPT[0]",
       "chars": 81,
       "sha256": "61f256d9bcbe5162",
-      "sample": "You are the causal-revision analyst of an evidence-constrain"
+      "sample": "You are the causal-revision analyst of an evidence-constrain",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/revise.ts",
       "name": "CAUSAL_ANALYSIS_PROMPT[1]",
       "chars": 113,
       "sha256": "9847b9a739c78f01",
-      "sample": "Given one feedback signal and the CURRENT object graph (repr"
+      "sample": "Given one feedback signal and the CURRENT object graph (repr",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/revise.ts",
       "name": "CAUSAL_ANALYSIS_PROMPT[2]",
       "chars": 111,
       "sha256": "70262601d1aaef26",
-      "sample": "decide WHICH persisted objects this feedback FORCES to chang"
+      "sample": "decide WHICH persisted objects this feedback FORCES to chang",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/revise.ts",
       "name": "CAUSAL_ANALYSIS_PROMPT[3]",
       "chars": 105,
       "sha256": "cc422edd49850bc2",
-      "sample": "from the payload (hypothesis/plan/claim ids; the question id"
+      "sample": "from the payload (hypothesis/plan/claim ids; the question id",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/revise.ts",
       "name": "CAUSAL_ANALYSIS_PROMPT[4]",
       "chars": 98,
       "sha256": "78b0bfe7777f20da",
-      "sample": "Each affected entry needs a reason stating the causal pressu"
+      "sample": "Each affected entry needs a reason stating the causal pressu",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/revise.ts",
       "name": "CAUSAL_ANALYSIS_PROMPT[5]",
       "chars": 99,
       "sha256": "ceaa7e6685e2fcd4",
-      "sample": "causalChain explains HOW the feedback propagates from its en"
+      "sample": "causalChain explains HOW the feedback propagates from its en",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/revise.ts",
       "name": "CAUSAL_ANALYSIS_PROMPT[6]",
+      "chars": 104,
+      "sha256": "db6b8fa81d1dad19",
+      "sample": "When the payload carries registeredDatasets and the feedback",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
+    },
+    {
+      "file": "src/pipeline/stages/revise.ts",
+      "name": "CAUSAL_ANALYSIS_PROMPT[7]",
+      "chars": 109,
+      "sha256": "10047fa7a073ee47",
+      "sample": "response is usually a PLAN revision binding that data (data ",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
+    },
+    {
+      "file": "src/pipeline/stages/revise.ts",
+      "name": "CAUSAL_ANALYSIS_PROMPT[8]",
+      "chars": 24,
+      "sha256": "80e600bfff2da3cd",
+      "sample": "not only the hypotheses.",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
+    },
+    {
+      "file": "src/pipeline/stages/revise.ts",
+      "name": "CAUSAL_ANALYSIS_PROMPT[9]",
       "chars": 126,
       "sha256": "71f4710b6f006a17",
-      "sample": "expectedQualityDelta is your honest expectation: \"inconclusi"
+      "sample": "expectedQualityDelta is your honest expectation: \"inconclusi",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/revise.ts",
       "name": "HYPOTHESIS_REVISION_PROMPT[0]",
       "chars": 94,
       "sha256": "dca288e7df9c28de",
-      "sample": "You revise one scientific hypothesis under incoming feedback"
+      "sample": "You revise one scientific hypothesis under incoming feedback",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/revise.ts",
       "name": "HYPOTHESIS_REVISION_PROMPT[1]",
       "chars": 97,
       "sha256": "0dc797d473d5f04a",
-      "sample": "statement and mechanism rewritten where the feedback demands"
+      "sample": "statement and mechanism rewritten where the feedback demands",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/revise.ts",
       "name": "HYPOTHESIS_REVISION_PROMPT[2]",
       "chars": 105,
       "sha256": "5422b005cc5bff4b",
-      "sample": "(keep unchanged assumptions verbatim so identity is preserve"
+      "sample": "(keep unchanged assumptions verbatim so identity is preserve",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/revise.ts",
       "name": "HYPOTHESIS_REVISION_PROMPT[3]",
       "chars": 89,
       "sha256": "5fc2bf43ba6e4247",
-      "sample": "add new ones where needed); updated predictions; addedUncert"
+      "sample": "add new ones where needed); updated predictions; addedUncert",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/revise.ts",
       "name": "HYPOTHESIS_REVISION_PROMPT[4]",
+      "chars": 104,
+      "sha256": "b71cd00c356079ec",
+      "sample": "When the payload carries registeredDatasets (operator-acquir",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
+    },
+    {
+      "file": "src/pipeline/stages/revise.ts",
+      "name": "HYPOTHESIS_REVISION_PROMPT[5]",
+      "chars": 106,
+      "sha256": "22b93bfb012883f5",
+      "sample": "dataRequirements (availability public, name the dataset by i",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
+    },
+    {
+      "file": "src/pipeline/stages/revise.ts",
+      "name": "HYPOTHESIS_REVISION_PROMPT[6]",
+      "chars": 79,
+      "sha256": "4cdeb10a2df5d807",
+      "sample": "that data — a plan that can now execute beats one that still",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
+    },
+    {
+      "file": "src/pipeline/stages/revise.ts",
+      "name": "HYPOTHESIS_REVISION_PROMPT[7]",
       "chars": 124,
       "sha256": "c36289ffd4ec0160",
-      "sample": "Never erase existing uncertainties — only add. revisionRatio"
+      "sample": "Never erase existing uncertainties — only add. revisionRatio",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/revise.ts",
       "name": "PLAN_REVISION_PROMPT[0]",
       "chars": 99,
       "sha256": "02014b558bbcf057",
-      "sample": "You revise one executable research plan under incoming feedb"
+      "sample": "You revise one executable research plan under incoming feedb",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/revise.ts",
       "name": "PLAN_REVISION_PROMPT[1]",
       "chars": 107,
       "sha256": "3ddea1db6ab6cbfe",
-      "sample": "metrics and decisionRules. Keep existing step ids (format ta"
+      "sample": "metrics and decisionRules. Keep existing step ids (format ta",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/revise.ts",
       "name": "PLAN_REVISION_PROMPT[2]",
       "chars": 108,
       "sha256": "caa6f3b58d5cc2d7",
-      "sample": "survive; give new steps fresh ids of the same format; depend"
+      "sample": "survive; give new steps fresh ids of the same format; depend",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/revise.ts",
       "name": "PLAN_REVISION_PROMPT[3]",
       "chars": 87,
       "sha256": "f9dfbb8d0f6e421f",
-      "sample": "returned steps. Every step keeps a non-empty method and at l"
+      "sample": "returned steps. Every step keeps a non-empty method and at l",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/revise.ts",
       "name": "PLAN_REVISION_PROMPT[4]",
       "chars": 86,
       "sha256": "b4722cbbbd66ac75",
-      "sample": "When the plan discriminates more than one hypothesis, also s"
+      "sample": "When the plan discriminates more than one hypothesis, also s",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/revise.ts",
       "name": "PLAN_REVISION_PROMPT[5]",
       "chars": 96,
       "sha256": "b34a128394abce3b",
-      "sample": "(single_primary / alpha_spending / e_value_accumulation) and"
+      "sample": "(single_primary / alpha_spending / e_value_accumulation) and",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/revise.ts",
       "name": "PLAN_REVISION_PROMPT[6]",
       "chars": 89,
       "sha256": "1bdba976554e44ab",
-      "sample": "the deterministic gate rejects multi-hypothesis revisions wi"
+      "sample": "the deterministic gate rejects multi-hypothesis revisions wi",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/stages/revise.ts",
       "name": "PLAN_REVISION_PROMPT[7]",
       "chars": 77,
       "sha256": "dadbfacac0cc522e",
-      "sample": "revisionRationale states what changed and why, causally tied"
+      "sample": "revisionRationale states what changed and why, causally tied",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/pipeline/llm.ts",
       "name": "INLINE:optssystemPrompt",
       "chars": 44,
       "sha256": "cf69dd1b45eaa611",
-      "sample": "${opts.systemPrompt}\n\n${UNTRUSTED_DATA_RULE}"
+      "sample": "${opts.systemPrompt}\n\n${UNTRUSTED_DATA_RULE}",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     },
     {
       "file": "src/agent/loop.ts",
       "name": "PROTOCOL_PROMPT",
       "chars": 1248,
       "sha256": "12a31faf160793dc",
-      "sample": "You act inside a tool-using agent loop. Each turn you MUST a"
+      "sample": "You act inside a tool-using agent loop. Each turn you MUST a",
+      "version": 2,
+      "provenance": "line-ending normalization: extracted literals are platform-invariant (CRLF working trees hash identically to LF checkouts); no prompt content changed",
+      "history": [
+        {
+          "sha256": "e55f57b9a2ed1534",
+          "chars": 1257,
+          "version": 1,
+          "at": "2026-09-04T01:35:57.290Z"
+        }
+      ]
     },
     {
       "file": "src/agent/loop.ts",
       "name": "INLINE:cfgsystemPromptP",
       "chars": 219,
       "sha256": "7a10cf8fec4af794",
-      "sample": "${cfg.systemPrompt}\n\n${PROTOCOL_PROMPT}\n\nSession marker ${se"
+      "sample": "${cfg.systemPrompt}\n\n${PROTOCOL_PROMPT}\n\nSession marker ${se",
+      "version": 1,
+      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
+      "history": []
     }
   ]
 }

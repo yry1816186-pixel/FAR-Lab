@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "harnessVersion": 1,
+  "leg": "REBUILT-candidate",
+  "pinnedAt": "2026-09-03T01:29:40.210Z",
+  "gitCommit": "7e5eb95",
+  "gitTag": null,
+  "route": "zai",
+  "problemsFile": "eval/problems.json",
+  "cli": {
+    "path": "dist/cli/main.js",
+    "argv": [
+      "research",
+      "start",
+      "<q>",
+      "--domain",
+      "<d>",
+      "--goal",
+      "<g>",
+      "--route",
+      "zai",
+      "--json"
+    ]
+  },
+  "results": [
+    {
+      "problemId": "P2",
+      "ok": true,
+      "snapshot": {
+        "runId": "run_b5hycyz1gngmnwreb805pq62xz",
+        "status": "partial",
+        "stages": [
+          {
+            "stage": "scope",
+            "state": "done"
+          },
+          {
+            "stage": "retrieve",
+            "state": "done"
+          },
+          {
+            "stage": "verify_sources",
+            "state": "done"
+          },
+          {
+            "stage": "build_evidence",
+            "state": "done"
+          },
+          {
+            "stage": "generate_hypotheses",
+            "state": "done"
+          },
+          {
+            "stage": "critique_falsify",
+            "state": "done"
+          },
+          {
+            "stage": "rank",
+            "state": "done"
+          },
+          {
+            "stage": "plan",
+            "state": "done"
+          },
+          {
+            "stage": "execute",
+            "state": "done"
+          },
+          {
+            "stage": "feedback",
+            "state": "done"
+          },
+          {
+            "stage": "revise",
+            "state": "failed",
+            "reason": "model call failed (provider_error) in revise/plan-revision:pln_8d2b7h68axhgfz326801kvwp35: zai: HTTP 500 code 1234: [1234][网络错误，错误id 20260903092937416b29eb38e34896 ，请稍后重试。][20260903092937416b29eb38e34896] (transient 500; eligible for bounded retry) (retry budget of 2 exhausted)"
+          },
+          {
+            "stage": "export",
+            "state": "pending"
+          }
+        ],
+        "metrics": {
+          "source_total": 12,
+          "source_verification_rate": 1,
+          "claim_total": 28,
+          "claim_binding_rate": 1,
+          "counter_evidence_relations": 13,
+          "hypothesis_candidates": 12,
+          "hypothesis_representatives": 12,
+          "falsification_completeness_rate": 1,
+          "plan_present": true,
+          "receipts": 145,
+          "model_calls": 104,
+          "receipt_modes": {
+            "live": 145
+          },
+          "agent_reports": 1,
+          "debate_counter_findings": 10,
+          "feedback_signals": 10,
+          "debate_verdict_counts": {
+            "mixed": 2,
+            "insufficient_evidence": 3,
+            "contradicted": 1
+          }
+        },
+        "modelVersions": []
+      },
+      "wallMs": 2359968
+    }
+  ]
+}

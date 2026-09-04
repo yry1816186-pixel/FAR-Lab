@@ -23,7 +23,14 @@ export type RolloutLine =
   | { type: 'tool_lifecycle'; at: string; turn: number; tool: string; phase: 'started' | 'finished' }
   /** Durable effect ledger: survives transcript compaction and seeds resume deduplication. */
   | { type: 'effect_committed'; at: string; entry: Extract<TranscriptEntry, { kind: 'tool_result' }> }
-  | { type: 'compacted'; at: string; summary: string; keptEntries?: TranscriptEntry[] }
+  /**
+   * Condensation-as-event (ADR D2): the compacted line is the new-history baseline.
+   * `forgotten` names what the condensation dropped (count + turn ids) so the event is
+   * self-describing; the pre-baseline transcript_items above it are NEVER rewritten or
+   * removed — the durable log stays append-only and the compacted view stays a pure
+   * read-time projection over it.
+   */
+  | { type: 'compacted'; at: string; summary: string; keptEntries?: TranscriptEntry[]; forgotten?: { entries: number; turns: number[] } }
   | { type: 'turn_record'; at: string; record: AgentTurnRecord }
   | { type: 'session_end'; at: string; status: string };
 

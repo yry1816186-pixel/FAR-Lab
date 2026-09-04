@@ -264,8 +264,10 @@ describe('R2-10 regression executor end-to-end (real uv sidecar)', () => {
 
 it('uv gate is honest: suites skip with a reason when uv is absent', () => {
   // Documents the gate contract; the assertion itself is environment-neutral.
-  expect(uvAvailable() ? 'runs' : 'skips').toBe(uvAvailable() ? 'runs' : 'skips');
+  // Falsifiable and environment-neutral: the skip reason is the user-facing contract
+  // of every it.runIf(uvAvailable()) gate — its copy (diagnosis + remedy) is pinned here.
   expect(UV_SKIP_REASON).toContain('uv toolchain not available');
+  expect(UV_SKIP_REASON).toContain('uv sync'); // the remedy ships with the diagnosis
 });
 
 describe('ablation expansion (14-10 wiring)', () => {

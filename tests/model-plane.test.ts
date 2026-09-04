@@ -53,7 +53,8 @@ describe('capability registry', () => {
   it('every curated entry carries source refs; prices are reference-only CNY for bailian', () => {
     for (const entry of listRegistry()) {
       expect(entry.sourceRefs.length).toBeGreaterThan(0);
-      expect(entry.sourceRefs[0]!.retrievedAt).toBe('2026-08-24');
+      // dated retrieval, not the original curation day (qwen3.8-flash joined 2026-09-02)
+      expect(entry.sourceRefs[0]!.retrievedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     }
     const qwen = capabilitiesForModel('dashscope', 'qwen3.8-max')!.priceRef!;
     expect(qwen.currency).toBe('CNY');

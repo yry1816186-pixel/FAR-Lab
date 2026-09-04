@@ -22,6 +22,7 @@ import { runEvaluators } from '../app/evaluators.js';
 import { runResearchAction, ActionError } from './actions.js';
 import { getProtocolState, recordProtocolEvent, ProtocolOpError } from './protocol-ops.js';
 import { connectClaim, editHypothesis, forkHypothesis, HypothesisOpError, promoteHypothesis, rejectHypothesis } from './hypothesis-ops.js';
+import { MethodOpError, overrideMethodSelection } from './method-ops.js';
 import {
   annotateClaim, ClaimOpError, excludeClaim, excludedClaimIdsOf, pinClaim, reclassifyClaim, reinstateClaim,
 } from './claim-ops.js';
@@ -96,7 +97,7 @@ import { checkPlanExecutability } from '../pipeline/stages/plan.js';
  */
 
 export interface ApiServerError {
-  code: 'not_found' | 'validation' | 'already_running' | 'run_active' | 'not_started' | 'internal' | 'target_not_found' | 'question_required' | 'action_model_failed' | 'action_budget_exhausted' | 'invalid_action_request' | 'invalid_counter_search' | 'provider_unreachable' | 'conversation_model_failed' | 'conversation_full' | 'turn_in_flight' | 'turn_cancelled' | 'no_corpus' | 'session_stopped' | 'src_not_in_pool' | 'run_not_found' | 'already_launched' | 'scope_proposal_failed' | 'scope_proposal_unavailable' | 'lease_held' | 'feature_disabled' | 'terminal_limit' | 'terminal_not_writable';
+  code: 'not_found' | 'validation' | 'already_running' | 'run_active' | 'not_started' | 'internal' | 'target_not_found' | 'question_required' | 'action_model_failed' | 'action_budget_exhausted' | 'invalid_action_request' | 'invalid_counter_search' | 'provider_unreachable' | 'conversation_model_failed' | 'conversation_full' | 'turn_in_flight' | 'turn_cancelled' | 'no_active_turn' | 'no_corpus' | 'session_stopped' | 'src_not_in_pool' | 'run_not_found' | 'already_launched' | 'scope_proposal_failed' | 'scope_proposal_unavailable' | 'lease_held' | 'feature_disabled' | 'terminal_limit' | 'terminal_not_writable';
   message: string;
   retryable: boolean;
   runId?: string;
@@ -2358,6 +2359,21 @@ function parseSeedSources(raw: unknown): string | {
         }
         return;
       }
+      // FA-HCI-02: researcher method-family override feeds the causal revision chain
+      // (feedback -> scope-modify Revision -> VersionDiff, selection replaced in place).
+      if (segments.length === 7 && segments[4] === 'method-selections' && segments[6] === 'override' && method === 'POST') {
+        const body = await readJsonObject(req);
+        try {
+          const result = await overrideMethodSelection(app, runId, segments[5] ?? '', body);
+          sendJson(res, 200, result);
+          return;
+        } catch (e) {
+          if (e instanceof MethodOpError) {
+            throw new HttpError(e.status, { code: e.code, message: e.message, retryable: false, runId });
+          }
+          throw e;
+        }
+      }
       if (segments.length === 7 && segments[4] === 'hypotheses') {
         const hypId = segments[5]!;
         const op = segments[6]!;
@@ -2899,6 +2915,21 @@ function parseSeedSources(raw: unknown): string | {
         return convRoute(() => {
           getConversation(app, convId);
           sendJson(res, 202, { requested: conversationTurns.cancel(convId) });
+        });
+      }
+      // FA-HAR-05 production steer path: queue a mid-turn redirect for the
+      // running turn (consumed by the kernel loop between turns). Posting a
+      // NEW message stays 409 turn_in_flight — steering is an explicit act.
+      if (segments[4] === 'steer' && segments.length === 5 && method === 'POST') {
+        return convRoute(async () => {
+          const body = await readJsonObject(req);
+          if (typeof body.text !== 'string' || body.text.trim().length === 0) {
+            throw new ConversationError(400, 'validation', 'field "text" is required (non-empty)');
+          }
+          getConversation(app, convId);
+          const queued = conversationTurns.steer(convId, body.text.trim().slice(0, 20_000));
+          if (!queued) throw new ConversationError(409, 'no_active_turn', 'no turn is running for this conversation — post a message instead');
+          sendJson(res, 202, { steered: true });
         });
       }
       if (segments[4] === 'messages' && segments[5] === 'stream' && segments.length === 6 && method === 'POST') {

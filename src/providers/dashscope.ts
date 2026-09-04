@@ -19,6 +19,8 @@ export const DASHSCOPE_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mod
 export const DASHSCOPE_DEFAULT_MODEL = 'qwen-plus';
 const ENV_API_KEY = 'DASHSCOPE_API_KEY';
 const ENV_MODEL = 'FARLAB_DASHSCOPE_MODEL';
+/** Thinking control ('off' → explicit enable_thinking:false; see options.thinkingMode). */
+const ENV_THINKING = 'FARLAB_DASHSCOPE_THINKING';
 /** Registry-informed (research/reference/models-dev-catalog.json, alibaba entry): the
  * international endpoint serves accounts provisioned outside mainland China with its
  * own key; mainland remains the default. 2026-08-24: current Bailian docs document the
@@ -33,6 +35,13 @@ export interface DashScopeProviderOptions {
   /** Overrides model selection (default qwen-plus; env override: FARLAB_DASHSCOPE_MODEL). */
   model?: string;
   baseUrl?: string;
+  /**
+   * Thinking control for models whose endpoint default is thinking-ON (live-observed
+   * on qwen3.8-flash: reasoning tokens on ~every call when no thinking field is sent).
+   * 'off' sends enable_thinking:false explicitly; 'default' sends nothing (endpoint
+   * default). Env override: FARLAB_DASHSCOPE_THINKING=off.
+   */
+  thinkingMode?: 'default' | 'off';
   fetchImpl?: typeof fetch;
   sleep?: (ms: number) => Promise<void>;
   totalTimeoutMs?: number;
@@ -49,6 +58,9 @@ export function createDashScopeProvider(opts: DashScopeProviderOptions = {}): Da
   const apiKey = opts.apiKey ?? process.env[ENV_API_KEY] ?? '';
   const modelId = opts.model ?? process.env[ENV_MODEL] ?? DASHSCOPE_DEFAULT_MODEL;
   const baseUrl = opts.baseUrl ?? process.env[ENV_BASE_URL] ?? DASHSCOPE_BASE_URL;
+  const thinkingOff = (opts.thinkingMode ?? (process.env[ENV_THINKING] === 'off' ? 'off' : 'default')) === 'off';
+  const withThinkingOff = <T extends StructuredCallRequest>(req: T): T =>
+    thinkingOff ? { ...req, disableThinking: true } : req;
   return {
     name: 'dashscope',
     liveReady: apiKey.length > 0,
@@ -75,13 +87,15 @@ export function createDashScopeProvider(opts: DashScopeProviderOptions = {}): Da
       );
       return runOpenAICompatStructuredCall(
         { providerName: 'dashscope', baseUrl, apiKey, modelId, executionMode: 'live' },
-        negotiation.mode === 'json_schema_strict'
-          ? { ...req, jsonSchema: undefined, responseJsonSchema: negotiation.schema, maxTokens: undefined }
-          : {
-              ...req,
-              jsonSchema: undefined,
-              maxTokens: undefined,
-            },
+        withThinkingOff(
+          negotiation.mode === 'json_schema_strict'
+            ? { ...req, jsonSchema: undefined, responseJsonSchema: negotiation.schema, maxTokens: undefined }
+            : {
+                ...req,
+                jsonSchema: undefined,
+                maxTokens: undefined,
+              },
+        ),
         parse,
         { fetchImpl: opts.fetchImpl, sleep: opts.sleep, totalTimeoutMs: opts.totalTimeoutMs, random: opts.random },
       );

@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "harnessVersion": 1,
+  "leg": "CURRENT",
+  "pinnedAt": "2026-09-02T11:48:38.588Z",
+  "derivedFrom": {
+    "dbPath": "eval\\results\\omega\\pin-2026-09-02-10-38--zai\\ws-P5\\far.db",
+    "note": "snapshot of a completed run workspace (post-hoc bundle derivation)"
+  },
+  "gitCommit": "4780fc63ba0817109cd340a5516bf8197ef66ce0",
+  "gitTag": "omega-baseline-w0",
+  "route": "zai",
+  "problemsFile": "eval/problems.json",
+  "results": [
+    {
+      "problemId": "P5",
+      "ok": true,
+      "snapshot": {
+        "runId": "run_4zmy0e09rar69cp6t5txnqpm3j",
+        "status": "completed",
+        "stages": [
+          {
+            "stage": "scope",
+            "state": "done"
+          },
+          {
+            "stage": "retrieve",
+            "state": "done"
+          },
+          {
+            "stage": "verify_sources",
+            "state": "done"
+          },
+          {
+            "stage": "build_evidence",
+            "state": "done"
+          },
+          {
+            "stage": "generate_hypotheses",
+            "state": "skipped",
+            "reason": "evidence flagged insufficient for the question's subject (run tag evidence-insufficient) — the verified claims do not measure or observe the question's central subject; refusing to generate hypotheses about an uncovered subject"
+          },
+          {
+            "stage": "critique_falsify",
+            "state": "skipped"
+          },
+          {
+            "stage": "rank",
+            "state": "skipped"
+          },
+          {
+            "stage": "plan",
+            "state": "skipped",
+            "reason": "no defensible hypotheses were produced from the verified evidence — an honest plan is impossible; inspect the evidence tab for what was (in)sufficient"
+          },
+          {
+            "stage": "execute",
+            "state": "skipped"
+          },
+          {
+            "stage": "feedback",
+            "state": "skipped"
+          },
+          {
+            "stage": "revise",
+            "state": "skipped"
+          },
+          {
+            "stage": "export",
+            "state": "done"
+          }
+        ],
+        "metrics": {
+          "source_total": 12,
+          "source_verification_rate": 0.9166666666666666,
+          "claim_total": 3,
+          "claim_binding_rate": 1,
+          "counter_evidence_relations": 0,
+          "hypothesis_candidates": 0,
+          "hypothesis_representatives": 0,
+          "falsification_completeness_rate": null,
+          "plan_present": false,
+          "receipts": 55,
+          "model_calls": 13,
+          "receipt_modes": {
+            "live": 55
+          },
+          "agent_reports": 0,
+          "debate_counter_findings": 0,
+          "debate_verdict_counts": {}
+        },
+        "modelVersions": []
+      },
+      "wallMs": null
+    }
+  ]
+}

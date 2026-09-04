@@ -46,7 +46,7 @@ export const TASKS = [
     gtClaims: [
       'Antibiotics disrupt the gut microbiota.',
       'Antibiotics deplete bacteria that convert primary bile acids to secondary bile acids.',
-      'Loss of secondary bile acids inhibits C. difficile germination and growth.',
+      'Secondary bile acids inhibit C. difficile germination and growth.',
       'Accumulation of taurocholate-like germinants enables C. difficile spore germination and outgrowth.',
       'C. difficile infection is a dysbiosis-driven loss of colonization resistance.',
       'C. difficile infection is not a direct antibiotic effect on the pathogen.',

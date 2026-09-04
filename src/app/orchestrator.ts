@@ -2,7 +2,9 @@ import { ResearchRun, RunStatus, RunStageName, ProvenanceReceipt, newId } from '
 import { randomBytes } from 'node:crypto';
 import type { Store } from '../persistence/store.js';
 import type { StageHandler, StageContext } from '../pipeline/types.js';
-import { STAGE_ORDER } from '../domain/run.js';
+import { defaultWorkflow, nextWorkflowStep, type WorkflowPlan } from '../domain/workflow-plan.js';
+import type { KernelCapabilityPlane } from '../kernel/capability-plane.js';
+import { kernelPlanRevisionFor } from '../kernel/planner.js';
 import { canonicalJson } from '../shared/crypto.js';
 import { totalBudgetFromEnv } from '../providers/http.js';
 import type { ArtifactStore, ModelProvider, SourceAdapter } from '../shared/ports.js';
@@ -34,6 +36,16 @@ export interface OrchestratorDeps {
   signals: Map<string, { cancelled: boolean }>;
   /** Retrieval response cache (composition-wired; absent = legacy uncached behavior). */
   responseCache?: ResponseCacheStore;
+  /**
+   * Ω ADR D5 capability plane factory: one plane per execution, bound to the run's
+   * provider/budget/receipt governance. Absent (tests/minimal harnesses) = agent-kind
+   * workflow steps are skipped honestly with an audit event, never silently faked.
+   */
+  kernelPlane?: (args: {
+    run: ResearchRun;
+    budget: RunBudgetView;
+    recordReceipt: StageContext['recordReceipt'];
+  }) => KernelCapabilityPlane;
 }
 
 /** Cross-process execution ownership refused (another live executor holds the lease). */
@@ -108,6 +120,17 @@ export class Orchestrator {
     return run.stages.find((s) => s.stage === stage);
   }
 
+  /** Persist and announce the canonical linear plan when a run has none yet (first execution). */
+  private adoptDefaultPlan(runId: string): WorkflowPlan {
+    const plan = defaultWorkflow(runId);
+    this.deps.store.putObject('workflow_plan', plan);
+    this.deps.store.appendEvent(runId, {
+      type: 'note',
+      detail: { reason: 'workflow_plan_adopted', origin: 'default', version: plan.version, steps: plan.steps.length },
+    });
+    return plan;
+  }
+
   private async transition(runId: string, fn: (run: ResearchRun) => Promise<ResearchRun> | ResearchRun, lease?: string): Promise<ResearchRun> {
     if (lease !== undefined) {
       const row = this.deps.store.getRunLease(runId);
@@ -142,7 +165,26 @@ export class Orchestrator {
     return run;
   }
 
-  private makeContext(run: ResearchRun, lease?: string, budget?: RunBudgetView): StageContext {
+  /** Shared receipt sink (stage machine + kernel capability plane ride the same governance). */
+  private receiptSink(run: ResearchRun, lease?: string): StageContext['recordReceipt'] {
+    const store = this.deps.store;
+    return (partial) => {
+      const receipt = ProvenanceReceipt.parse({
+        ...partial, id: newId('rcp'), runId: run.id, at: partial.at ?? new Date().toISOString(),
+      });
+      store.putObject('receipt', receipt);
+      // every persisted write is a lease heartbeat (W8 S1): a live worker keeps its lease warm
+      if (lease !== undefined) store.renewLease(run.id, lease, new Date(Date.now() + LEASE_TTL_MS).toISOString());
+      // B3: the event carries the facts the wait-time narrative renders — one shared
+      // detail shape with the store-backed recorder (src/pipeline/llm.ts receiptEventDetail).
+      store.appendEvent(run.id, {
+        type: 'receipt_recorded', stage: partial.stage,
+        detail: receiptEventDetail(receipt), receiptId: receipt.id,
+      });
+    };
+  }
+
+  private makeContext(run: ResearchRun, lease?: string, budget?: RunBudgetView, kernel?: KernelCapabilityPlane): StageContext {
     const { store, signals } = this.deps;
     const signal = signals.get(run.id) ?? { cancelled: false };
     signals.set(run.id, signal);
@@ -169,22 +211,10 @@ export class Orchestrator {
       // (table + model clamps) inside invokeStructured; absent = legacy zero-field.
       ...(resolveRunReasoningRoute(store, run) ?? {}),
       budget,
+      ...(kernel !== undefined ? { kernel } : {}),
       sourceFor: this.deps.sourceFor,
       ...(this.deps.responseCache !== undefined ? { responseCache: this.deps.responseCache } : {}),
-      recordReceipt: (partial) => {
-        const receipt = ProvenanceReceipt.parse({
-          ...partial, id: newId('rcp'), runId: run.id, at: partial.at ?? new Date().toISOString(),
-        });
-        store.putObject('receipt', receipt);
-        // every persisted write is a lease heartbeat (W8 S1): a live worker keeps its lease warm
-        if (lease !== undefined) store.renewLease(run.id, lease, new Date(Date.now() + LEASE_TTL_MS).toISOString());
-        // B3: the event carries the facts the wait-time narrative renders — one shared
-        // detail shape with the store-backed recorder (src/pipeline/llm.ts receiptEventDetail).
-        store.appendEvent(run.id, {
-          type: 'receipt_recorded', stage: partial.stage,
-          detail: receiptEventDetail(receipt), receiptId: receipt.id,
-        });
-      },
+      recordReceipt: this.receiptSink(run, lease),
       progress: (done, total, note) => {
         // B3 sub-stage granularity: update the CURRENT stage record's subtasks
         // (known totals only — callers pass real domain counts) and append the
@@ -417,15 +447,109 @@ export class Orchestrator {
       });
     }
 
-    // Index-based cursor (not for-of): the BP-1 quality gate may jump the cursor BACK to
-    // generate_hypotheses for one bounded regeneration round — adaptive sequencing, still
-    // fully auditable through stage attempts + events.
-    let cursor = 0;
-    while (cursor < STAGE_ORDER.length) {
-      const stage = STAGE_ORDER[cursor]!;
-      if (opts?.stopAfter && stage === opts.stopAfter) break;
+    // Workflow-as-data (ADR D4): the stage walk is driven by the persisted plan
+    // (defaultWorkflow ≡ STAGE_ORDER order and deps), so plan revisions and
+    // kernel-authored plans compose without touching the durable stage machine.
+    // Equivalence with the previous index-cursor loop: the full suite plus the
+    // omega-baseline-w0 pin comparison are the parity harness.
+    const plan = this.deps.store.listObjects('workflow_plan', runId).at(-1)
+      ?? this.adoptDefaultPlan(runId);
+    let activePlan = plan;
+    const stopAfterIdx = opts?.stopAfter === undefined
+      ? undefined
+      : plan.steps.findIndex((s) => s.target === opts.stopAfter);
+    const noHandler = new Set<string>();
+    // Agent-step terminal set (this execution): an agent step has no stage record;
+    // its outcome lives in agent_session/agent_report objects + these events.
+    // ΩF-005: completion ALSO persists to store meta — executeOwned re-entries
+    // (iteration reopen, resume) must not re-run an already-completed agent step
+    // (stage steps get this for free from their persisted stage records).
+    const doneAgentSteps = new Set<string>();
+    const agentStepDone = (stepId: string): boolean =>
+      doneAgentSteps.has(stepId) || this.deps.store.getMeta(`wfp:agent-done:${runId}:${stepId}`) === '1';
+    const markAgentStepDone = (stepId: string): void => {
+      doneAgentSteps.add(stepId);
+      this.deps.store.setMeta(`wfp:agent-done:${runId}:${stepId}`, '1');
+    };
+    const kernelPlane = this.deps.kernelPlane?.({ run, budget, recordReceipt: this.receiptSink(run, lease) });
+    for (;;) {
+      const step = nextWorkflowStep(activePlan, (s) => {
+        if (s.kind === 'agent') return agentStepDone(s.id) ? 'terminal' : 'pending';
+        const rec = this.stageRecord(run, s.target);
+        return rec !== undefined && (rec.state === 'done' || rec.state === 'skipped') ? 'terminal' : 'pending';
+      }, noHandler);
+      if (step === undefined) break;
+      // stop-after parks BEFORE the named stage runs — plan-position comparison keeps
+      // the original "break at stopAfter even when its record is already done" semantics.
+      if (stopAfterIdx !== undefined && activePlan.steps.indexOf(step) >= stopAfterIdx) break;
+
+      if (step.kind === 'agent') {
+        if (!budget.hasRemaining()) {
+          this.deps.store.appendEvent(runId, {
+            type: 'note',
+            detail: { reason: 'agent_step_skipped', capability: step.target, stepId: step.id, cause: BUDGET_EXHAUSTED_REASON, spent: budget.spent, cap: budget.cap },
+          });
+          markAgentStepDone(step.id); // terminal for this pass; a resume with a raised budget re-plans it
+          continue;
+        }
+        if (kernelPlane === undefined) {
+          noHandler.add(step.target);
+          this.deps.store.appendEvent(runId, {
+            type: 'note',
+            detail: { reason: 'agent_step_unavailable', capability: step.target, stepId: step.id, cause: 'kernel capability plane not wired in this build' },
+          });
+          continue;
+        }
+        // attemptCap is ENFORCED for agent steps via a persisted counter (plan semantics:
+        // a bounded capability budget, immune to in-memory Set resets across re-entries).
+        const attemptKey = `wfp:agent-attempts:${runId}:${step.id}`;
+        const attempts = Number(this.deps.store.getMeta(attemptKey) ?? '0');
+        if (attempts >= step.attemptCap) {
+          markAgentStepDone(step.id);
+          this.deps.store.appendEvent(runId, {
+            type: 'note',
+            detail: { reason: 'agent_step_skipped', capability: step.target, stepId: step.id, cause: `attempt_cap (${attempts}/${step.attemptCap})` },
+          });
+          continue;
+        }
+        this.deps.store.setMeta(attemptKey, String(attempts + 1));
+        const wireCancel = this.wireCancels.get(runId);
+        this.deps.store.appendEvent(runId, { type: 'note', detail: { reason: 'agent_step_started', capability: step.target, stepId: step.id } });
+        try {
+          const res = await kernelPlane.runCapability(step.target, ...(wireCancel !== undefined ? [{ signal: wireCancel.signal }] : []));
+          markAgentStepDone(step.id);
+          this.deps.store.appendEvent(runId, {
+            type: 'note',
+            detail: {
+              reason: 'agent_step_done', capability: step.target, stepId: step.id,
+              ok: res.ok, status: res.status, turns: res.turns,
+              ...(res.reportId !== null ? { reportId: res.reportId } : {}),
+              ...(res.materialized !== undefined ? { materialized: res.materialized } : {}),
+              ...(res.error !== undefined ? { error: res.error } : {}),
+            },
+          });
+          if (res.status === 'aborted') {
+            const msg = `agent step ${step.id} (${step.target}) aborted`;
+            run = await this.transition(runId, (r) => {
+              r.status = 'cancelled' satisfies RunStatus;
+              r.lastError = msg;
+              r.cancelRequested = false;
+              return r;
+            }, lease);
+            this.deps.store.appendEvent(runId, { type: 'run_cancelled', stage: step.target, status: run.status, detail: { error: msg } });
+            return run;
+          }
+        } catch (e) {
+          markAgentStepDone(step.id);
+          this.deps.store.appendEvent(runId, {
+            type: 'note',
+            detail: { reason: 'agent_step_failed', capability: step.target, stepId: step.id, error: e instanceof Error ? e.message : String(e) },
+          });
+        }
+        continue;
+      }
+      const stage = step.target;
       const rec = this.stageRecord(run, stage);
-      if (rec?.state === 'done' || rec?.state === 'skipped') { cursor += 1; continue; }
 
       // Budget boundary: once the cap is spent, remaining model/retrieval stages are
       // skipped with the marker reason (resume with a raised cap reopens them). export
@@ -436,12 +560,11 @@ export class Orchestrator {
           return r;
         }, lease);
         this.deps.store.appendEvent(runId, { type: 'stage_skipped', stage, detail: { reason: BUDGET_EXHAUSTED_REASON, spent: budget.spent, cap: budget.cap } });
-        cursor += 1;
         continue;
       }
 
       const handler = this.deps.stages.get(stage);
-      if (!handler) { cursor += 1; continue; } // not implemented in this build — stays pending and visible
+      if (!handler) { noHandler.add(stage); continue; } // not implemented in this build — stays pending and visible
 
       // Cumulative 1-based attempt counting: a stage that has never started (no startedAt,
       // e.g. fresh pending records whose zod default attempt=1 must not act as a prior try)
@@ -454,9 +577,16 @@ export class Orchestrator {
       }, lease);
       this.deps.store.appendEvent(runId, { type: 'stage_started', stage, detail: { attempt: nextAttempt } });
 
-      const ctx = this.makeContext(run, lease, budget);
+      const ctx = this.makeContext(run, lease, budget, kernelPlane);
       try {
-        if (await handler.applicable(ctx)) {
+        const applicability = await handler.applicable(ctx);
+        // applicable=false must never be silent: the object form carries the
+        // stage's branch-local reason; the bare boolean form still names its
+        // cause class so the skipped record is always self-explaining.
+        const skipReason = typeof applicability === 'object'
+          ? applicability.reason
+          : 'not applicable (stage predicate returned false)';
+        if (applicability === true) {
           if (signal.cancelled || (this.deps.store.getRun(run.id)?.cancelRequested ?? false)) throw new Error('cancelled by user');
           const outcome = await handler.execute(ctx);
           if (outcome.kind === 'skipped') {
@@ -518,7 +648,9 @@ export class Orchestrator {
                   }
                   return r;
                 }, lease);
-                cursor = STAGE_ORDER.indexOf('generate_hypotheses');
+                // The re-marked pending stages are picked up by nextWorkflowStage in
+                // plan order (generate_hypotheses first) — the plan-order equivalent
+                // of the old cursor back-jump.
                 continue;
               }
               if (signalQg.weak && (round >= MAX_QUALITY_ROUNDS || !budget.hasRemaining())) {
@@ -526,6 +658,19 @@ export class Orchestrator {
                   type: 'note', stage: 'rank',
                   detail: { reason: 'quality_gate_weak_proceeding', round, budgetRemaining: budget.hasRemaining(), metrics: signalQg.metrics, reasons: signalQg.reasons },
                 });
+              }
+              // Ω ADR D4 kernel planner v1 (deterministic): a contested-mechanism
+              // problem earns an adversarial counter-evidence debate step once the
+              // ranked set is final (the QG regeneration loop above `continue`s
+              // early, so this only runs on the settling pass).
+              const revisedPlan = kernelPlanRevisionFor(this.deps.store, runId, activePlan);
+              if (revisedPlan !== null) {
+                this.deps.store.putObject('workflow_plan', revisedPlan);
+                this.deps.store.appendEvent(runId, {
+                  type: 'note', stage: 'rank',
+                  detail: { reason: 'workflow_plan_revised', by: 'kernel-planner-v1', origin: revisedPlan.origin, version: revisedPlan.version, inserted: 'counter-evidence-debate' },
+                });
+                activePlan = revisedPlan;
               }
             }
           }
@@ -540,10 +685,10 @@ export class Orchestrator {
         } else {
           run = await this.transition(runId, (r) => {
             // no attempt arg: keep the attempt count persisted by the running transition
-            this.setStage(r, stage, { state: 'skipped', endedAt: new Date().toISOString() });
+            this.setStage(r, stage, { state: 'skipped', endedAt: new Date().toISOString(), error: skipReason });
             return r;
           }, lease);
-          this.deps.store.appendEvent(runId, { type: 'stage_skipped', stage, detail: {} });
+          this.deps.store.appendEvent(runId, { type: 'stage_skipped', stage, detail: { reason: skipReason } });
         }
       } catch (e) {
         if (e instanceof RunBudgetExhaustedError) {
@@ -555,7 +700,6 @@ export class Orchestrator {
             return r;
           }, lease);
           this.deps.store.appendEvent(runId, { type: 'stage_skipped', stage, detail: { reason: BUDGET_EXHAUSTED_REASON, midStage: true } });
-          cursor += 1;
           continue;
         }
         if (e instanceof RunLeaseLostError || /^run lease lost/i.test(e instanceof Error ? e.message : String(e))) {
@@ -580,7 +724,6 @@ export class Orchestrator {
         });
         return run; // stop pipeline on failure — resume continues from this stage
       }
-      cursor += 1;
     }
 
     // stopAfter exit: park the run BEFORE the lease releases (execute()'s finally).

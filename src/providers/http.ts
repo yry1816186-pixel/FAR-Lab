@@ -119,7 +119,7 @@ const RATE_LIMIT_INITIAL_DELAY_MS = 20_000;
  * added wall time well under a minute while staying far below common RPM walls.
  */
 const DEFAULT_MIN_CALL_INTERVAL_MS = 600;
-const minCallIntervalMs = (): number => {
+export const minCallIntervalMs = (): number => {
   const raw = process.env.FARLAB_MIN_CALL_INTERVAL_MS;
   if (raw === undefined) return DEFAULT_MIN_CALL_INTERVAL_MS;
   const v = Number(raw);
@@ -475,6 +475,12 @@ const buildRequestBody = (modelId: string, messages: ChatMessage[], req: Structu
   if (req.temperature !== undefined) body.temperature = req.temperature;
   if (req.maxTokens !== undefined) body.max_tokens = req.maxTokens;
   if (req.reasoning !== undefined) Object.assign(body, reasoningBodyFields('openai', req.reasoning));
+  if (req.disableThinking === true) {
+    // Explicit off wins over any gear (documented contract on StructuredCallRequest):
+    // qwen-family endpoints default some models to thinking-ON when the field is absent.
+    body.enable_thinking = false;
+    delete body.thinking_budget;
+  }
   if (stream) {
     body.stream = true;
     // OpenAI-compatible providers that implement the standard return the final

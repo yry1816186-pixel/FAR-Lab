@@ -154,6 +154,13 @@ export interface ConversationTurnInput {
   reasoning?: { style: ReasoningStyle; gear: ReasoningGear };
   /** Explicit user cancellation, wired into the in-flight provider request. */
   signal?: AbortSignal;
+  /**
+   * Mid-turn steering queue (FA-HAR-05): polled by the kernel loop between
+   * turns; a non-null string is injected into the session transcript as a
+   * steer entry before the next model call. The conversation hub owns the
+   * queue (POST /conversations/:id/steer); absent = no steering on this path.
+   */
+  steer?: () => string | null;
   /** Public progress only: tool summaries and validated reply text projection.
    * Raw action JSON and private reasoning never cross this callback. */
   onProgress?: (event: ConversationTurnProgress) => void;
@@ -718,6 +725,7 @@ export async function generateConversationTurn(
       task,
       maxTurns: input.maxTurns ?? 8,
       ...(input.signal !== undefined ? { signal: input.signal } : {}),
+      ...(input.steer !== undefined ? { steer: input.steer } : {}),
       resultSchema: ConversationAgentReplySchema,
       // Resume continues the interrupted session's transcript + turn budget;
       // a fresh turn packs its own context entries (runAgentLoop picks by
