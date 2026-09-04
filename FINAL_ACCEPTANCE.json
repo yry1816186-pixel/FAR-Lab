@@ -582,14 +582,16 @@
       "id": "FA-PRF-06",
       "domain": "perf",
       "title": ">=6h real soak (RSS/handles/DB growth)",
-      "status": "FAIL",
+      "status": "PARTIAL",
       "priority": "P1",
       "owner": "self",
-      "gap": "accelerated 17.8s soak only; gold run 2.5h was product validation not stability soak",
+      "gap": "6h leg PASSED (verdict line, 360 samples); 72h leg running (calendar-bound 2026-09-07)",
       "target": "6h→24h→72h staged soak logs",
       "verify": "soak artifacts with verdicts",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/06-perf-reliability.md SOAK-9"
+        "FINAL_EVIDENCE/audit-2026-08-30/06-perf-reliability.md SOAK-9",
+        "eval/results/soak-2026-09-032354-6h.jsonl soak-verdict: hours=6 samples=360 rssMb 116.5->88.7 (-23.9%, leak bound 50%), activeHandles 3.3->3.4, dbGrowth 2.07MB/h, runsLaunched=8, pass=true (full offline workloads, kill-resistant interim verdicts hourly, pid 45424 survived session reaping)",
+        "72h soak: launched 2026-09-04 13:24 detached (run-soak72h.ps1 -> eval/results/soak-72h-ws), verdict due 2026-09-07"
       ]
     },
     {
