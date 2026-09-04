@@ -154,7 +154,9 @@
       "evidence": [
         "FINAL_EVIDENCE/audit-2026-08-30/01-science.md CAP-12",
         "eval/north-star.json",
-        "INSTRUMENT CAVEAT 2026-09-04 (sweep finding, commit 0aeeb6d): the frozen 0.226 F1 was measured with an INVERTED cdiff gtClaim (Loss of secondary bile acids inhibits... — corrected to Secondary bile acids inhibit...); forward re-measurements may shift; the frozen number stands as recorded-at-the-time"
+        "INSTRUMENT CAVEAT 2026-09-04 (sweep finding, commit 0aeeb6d): the frozen 0.226 F1 was measured with an INVERTED cdiff gtClaim (Loss of secondary bile acids inhibits... — corrected to Secondary bile acids inhibit...); forward re-measurements may shift; the frozen number stands as recorded-at-the-time",
+        "eval/results/rediscovery-rescore.json (post-GT-fix deterministic re-score of stored decompositions: cdiff F1 in [0, 0.571] with 7 borderline pairs; task means lower=0.025 upper=0.483 N=5 — final F1 awaits live 5-vote borderline adjudication)",
+        "eval/rediscovery-rescore.mjs (deterministic re-score tool: stored agent decomposition x current GT, borderline bounds)"
       ]
     },
     {
