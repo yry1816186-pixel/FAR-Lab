@@ -46,11 +46,15 @@ const STAGE_FILES = [
 const extractPrompts = (file) => {
   const src = readFileSync(file, 'utf8');
   const out = [];
+  // Platform invariance (CI drift gate): a Windows checkout stores CRLF inside
+  // multi-line template literals while Linux/macOS store LF — identical
+  // committed prompts would hash differently. Normalize before hashing.
+  const normalize = (text) => text.replace(/\r\n/g, '\n');
   const lit = (raw) => raw.startsWith('`')
-    ? raw.slice(1, -1).replace(/\\`/g, '`').replace(/\\\$\{/g, '${').replace(/\\n/g, '\n')
+    ? normalize(raw.slice(1, -1)).replace(/\\`/g, '`').replace(/\\\$\{/g, '${').replace(/\\n/g, '\n')
     : raw.startsWith("'")
-      ? raw.slice(1, -1).replace(/\\'/g, "'").replace(/\\n/g, '\n').replace(/\\\\/g, '\\')
-      : JSON.parse(raw);
+      ? normalize(raw.slice(1, -1)).replace(/\\'/g, "'").replace(/\\n/g, '\n').replace(/\\\\/g, '\\')
+      : normalize(JSON.parse(raw));
   const re = /const\s+([A-Z][A-Z0-9_]*PROMPT[A-Z0-9_]*)\s*(?::\s*string\s*)?=\s*(`(?:[^`\\]|\\.)*`|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")/g;
   for (const m of src.matchAll(re)) {
     const text = lit(m[2]);

@@ -1,45 +1,73 @@
 {
-  "generatedAt": "2026-09-04T01:35:57.290Z",
+  "generatedAt": "2026-09-04T04:52:25.727Z",
   "prompts": [
     {
       "file": "src/pipeline/stages/scope.ts",
       "name": "SYSTEM_PROMPT",
-      "chars": 933,
-      "sha256": "fc7ebc0d166b0d5f",
+      "chars": 922,
+      "sha256": "bba9c4e0b91d1dfa",
       "sample": "You refine a user's research question into a structured, fal",
-      "version": 1,
-      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
-      "history": []
+      "version": 2,
+      "provenance": "line-ending normalization: extracted literals are platform-invariant (CRLF working trees hash identically to LF checkouts); no prompt content changed",
+      "history": [
+        {
+          "sha256": "fc7ebc0d166b0d5f",
+          "chars": 933,
+          "version": 1,
+          "at": "2026-09-04T01:35:57.290Z"
+        }
+      ]
     },
     {
       "file": "src/pipeline/stages/scope.ts",
       "name": "PROBLEM_MODEL_PROMPT",
-      "chars": 3568,
-      "sha256": "53b392bc2edc0074",
+      "chars": 3550,
+      "sha256": "479bdb7323271942",
       "sample": "You formalize a research question into a Scientific Problem ",
-      "version": 1,
-      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
-      "history": []
+      "version": 2,
+      "provenance": "line-ending normalization: extracted literals are platform-invariant (CRLF working trees hash identically to LF checkouts); no prompt content changed",
+      "history": [
+        {
+          "sha256": "53b392bc2edc0074",
+          "chars": 3568,
+          "version": 1,
+          "at": "2026-09-04T01:35:57.290Z"
+        }
+      ]
     },
     {
       "file": "src/pipeline/stages/retrieve.ts",
       "name": "SYSTEM_PROMPT",
-      "chars": 1345,
-      "sha256": "f98e127916e52ede",
+      "chars": 1336,
+      "sha256": "751ae08f8167328c",
       "sample": "You plan the evidence retrieval for one scientific research ",
-      "version": 1,
-      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
-      "history": []
+      "version": 2,
+      "provenance": "line-ending normalization: extracted literals are platform-invariant (CRLF working trees hash identically to LF checkouts); no prompt content changed",
+      "history": [
+        {
+          "sha256": "f98e127916e52ede",
+          "chars": 1345,
+          "version": 1,
+          "at": "2026-09-04T01:35:57.290Z"
+        }
+      ]
     },
     {
       "file": "src/pipeline/stages/retrieve.ts",
       "name": "RERANK_SYSTEM_PROMPT",
-      "chars": 659,
-      "sha256": "c8bfd906ac349c66",
+      "chars": 653,
+      "sha256": "497257d74c8fb43c",
       "sample": "You are reranking scholarly documents for one scientific res",
-      "version": 1,
-      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
-      "history": []
+      "version": 2,
+      "provenance": "line-ending normalization: extracted literals are platform-invariant (CRLF working trees hash identically to LF checkouts); no prompt content changed",
+      "history": [
+        {
+          "sha256": "c8bfd906ac349c66",
+          "chars": 659,
+          "version": 1,
+          "at": "2026-09-04T01:35:57.290Z"
+        }
+      ]
     },
     {
       "file": "src/pipeline/stages/evidence.ts",
@@ -301,12 +329,19 @@
     {
       "file": "src/pipeline/stages/rank.ts",
       "name": "PAIR_JUDGE_SYSTEM_PROMPT",
-      "chars": 1031,
-      "sha256": "21bf05a3cc1be732",
+      "chars": 1020,
+      "sha256": "55a40bca793d2477",
       "sample": "You are a rigorous research supervisor comparing exactly two",
-      "version": 1,
-      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
-      "history": []
+      "version": 2,
+      "provenance": "line-ending normalization: extracted literals are platform-invariant (CRLF working trees hash identically to LF checkouts); no prompt content changed",
+      "history": [
+        {
+          "sha256": "21bf05a3cc1be732",
+          "chars": 1031,
+          "version": 1,
+          "at": "2026-09-04T01:35:57.290Z"
+        }
+      ]
     },
     {
       "file": "src/pipeline/stages/plan.ts",
@@ -951,12 +986,19 @@
     {
       "file": "src/agent/loop.ts",
       "name": "PROTOCOL_PROMPT",
-      "chars": 1257,
-      "sha256": "e55f57b9a2ed1534",
+      "chars": 1248,
+      "sha256": "12a31faf160793dc",
       "sample": "You act inside a tool-using agent loop. Each turn you MUST a",
-      "version": 1,
-      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
-      "history": []
+      "version": 2,
+      "provenance": "line-ending normalization: extracted literals are platform-invariant (CRLF working trees hash identically to LF checkouts); no prompt content changed",
+      "history": [
+        {
+          "sha256": "e55f57b9a2ed1534",
+          "chars": 1257,
+          "version": 1,
+          "at": "2026-09-04T01:35:57.290Z"
+        }
+      ]
     },
     {
       "file": "src/agent/loop.ts",
