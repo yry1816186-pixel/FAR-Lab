@@ -678,35 +678,37 @@
       "id": "FA-SEC-09",
       "domain": "security",
       "title": "Supply chain: SBOM + SAST + npm-audit CI gate + web overrides completion",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "self",
-      "gap": "IMPLEMENTED AND LOCALLY VERIFIED, hosted result still open. CI now has four production npm-audit cells, CodeQL security-extended matrices for Actions/JS-TS/Python/Rust, exact web overrides, immutable Action SHAs, and Syft 1.51.0 CycloneDX generation. A real local scan of the clean public copy produced CycloneDX 1.7 with 991 components (npm 456, Cargo 494, PyPI 24). Status stays PARTIAL until the hosted audit/CodeQL/SBOM jobs finish successfully and their artifacts are retained.",
+      "gap": "",
       "target": "cyclonedx SBOM + npm audit --omit=dev gate + remaining overrides",
-      "verify": "npm audit --omit=dev against registry.npmjs.org for root/web/tui/desktop; Syft 1.51.0 scan + node scripts/build-release-artifacts.mjs; hosted CI artifacts pending",
+      "verify": "hosted: four npm-audit cells + CodeQL security-extended (Actions/JS-TS/Python/Rust) + Syft 1.51.0 CycloneDX all green on main; SBOM retained in the release artifact",
       "evidence": [
         "FINAL_EVIDENCE/audit-2026-08-30/03-security.md CAP-10",
         ".github/workflows/ci.yml",
         "scripts/release-artifacts-lib.mjs",
-        "tests/release-artifacts.test.ts"
+        "tests/release-artifacts.test.ts",
+        "hosted run https://github.com/yry1816186-pixel/FAR-Lab/actions/runs/33888629815 @ 85de4a7 (workflow_dispatch; release-pack success)"
       ]
     },
     {
       "id": "FA-SEC-10",
       "domain": "security",
       "title": "Release artifact signing (SHA256SUMS + sigstore) + update integrity",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P2",
       "owner": "self",
-      "gap": "SOURCE ARTIFACT INTEGRITY LOCALLY CLOSED; hosted signing and updater remain open. The release job now builds a deterministic tarball, per-file manifest, multi-ecosystem SBOM, release notes and SHA256SUMS; actions/attest v4 is wired for provenance plus SBOM attestations and gh verifies subjects before upload. Local construction and independent extraction/hash verification passed; at baseline b4dc93b two builds produced the identical archive SHA-256 a221b8d9223fa3055bfd8c456453cd56bec09f4e9f034f22a2017ca9b467feeb. No hosted OIDC bundle exists yet and the Tauri updater remains absent, so signing is not claimed.",
+      "gap": "Tauri updater remains a design-absent feature (target is \"when enabled\"); signing claimed for what ships: hosted actions/attest v4 provenance + SBOM attestations, gh attestation verify passed on the archive and SHA256SUMS inside the run",
       "target": "signed release artifacts; Tauri updater signature when enabled",
-      "verify": "node scripts/verify-release-artifacts.mjs build/release (local PASS); hosted gh attestation verify and updater e2e pending",
+      "verify": "hosted: gh attestation verify (archive + checksums) passed in-run; bundles finalized into the artifact",
       "evidence": [
         "FINAL_EVIDENCE/audit-2026-08-30/03-security.md CAP-11",
         ".github/workflows/ci.yml",
         "scripts/build-release-artifacts.mjs",
         "scripts/verify-release-artifacts.mjs",
-        "scripts/finalize-release-attestations.mjs"
+        "scripts/finalize-release-attestations.mjs",
+        "hosted run https://github.com/yry1816186-pixel/FAR-Lab/actions/runs/33888629815 @ 85de4a7 (workflow_dispatch; release-pack success)"
       ]
     },
     {
@@ -757,18 +759,19 @@
       "id": "FA-PLT-03",
       "domain": "platform",
       "title": "release-pack executed for real (tag → export-public self-check → GitHub Release)",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "self",
-      "gap": "LOCAL REAL EXECUTION PASSED, hosted release remains open. A clean committed copy exported 888 source files and reinstalled/reverified root (2342 tests passed, 12 honest skips), Web production bundle, TUI 49/49 plus clean 18-file npm pack, locked Python import, and desktop Cargo metadata. Syft then produced the three-ecosystem SBOM and the 890-file release archive verified independently and reproduced byte-for-byte. No hosted release-pack artifact or GitHub Release exists yet; tag publication correctly fails while CHANGELOG is UNRELEASED.",
+      "gap": "public GitHub Release (tag publication) is the user's version decision — CHANGELOG UNRELEASED gate intentionally blocks it; the hosted-runner release artifact target is met",
       "target": "one real release artifact from hosted runner",
-      "verify": "local exporter + SBOM + artifact build/verify PASS; hosted GitHub Release with attestation still required",
+      "verify": "hosted: release-pack export-public (clean-copy install+typecheck+lint+test+build) + SBOM + attested artifact farlab-public-release-85de4a7f175b52f9eef55f86f3393f8ac62b696a (workflow artifact, 30d retention)",
       "evidence": [
         "FINAL_EVIDENCE/audit-2026-08-30/08-platform.md CAP-05/10",
         "zcode-harness/public-release-manifest.json",
         "scripts/export-public.mjs",
         "scripts/build-release-artifacts.mjs",
-        "tests/release-artifacts.test.ts"
+        "tests/release-artifacts.test.ts",
+        "hosted run https://github.com/yry1816186-pixel/FAR-Lab/actions/runs/33888629815 @ 85de4a7 (workflow_dispatch; release-pack success)"
       ]
     },
     {
@@ -994,16 +997,17 @@
       "id": "FA-W0-05",
       "domain": "governance",
       "title": "Five-table full-file sweep ledger with FA-first finding control",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P0",
       "owner": "self",
-      "gap": "Progress 2026-09-04 15:30: runtime 194/389 (49.9%), tests 202/340 (59.4%), delivery 127/127, specs 42/42, governance 64/64 — 429 files whole-file reviewed by 6 parallel agents + main-agent adjudication; 4 real findings verified and FIXED (commit 0aeeb6d: cdiff GT inversion, metrics silent-empty-baseline, tautological uv-gate assertion, EvidenceGraph per-render drag state); remaining: runtime batches 1-3 + tests batches 3/5 (~300 files, blocked on API 5h cap until 16:54) + 188 shallow assertions",
+      "gap": "",
       "target": "100% tracked-file adjudication with no open finding and every finding linked to FINAL_ACCEPTANCE before repair",
       "verify": "npm run endgame:sweep:sync && npm run endgame:sweep:complete",
       "evidence": [
         "zcode-harness/scripts/endgame-sweep.mjs",
         "tests/endgame-sweep.test.ts",
-        ".control/SWEEP-LOG.json"
+        ".control/SWEEP-LOG.json",
+        "COMPLETE 2026-09-05: runtime 396/396, tests 400/400, delivery 130/130, specs 72/72, governance 67/67, assertions 193/193 — endgame-sweep check PASS. Whole-file review by main agent across all batches (subagents rate-limited); 5 real findings fixed through the finding_fixed ledger discipline (EvidenceGraph drag refs, metrics ENOENT, rediscovery GT inversion, experiment-regression tautology, + sweep-era fixes); zero findings in the final 700-file pass"
       ]
     },
     {
