@@ -206,14 +206,15 @@
       "id": "FA-SCI-05",
       "domain": "science",
       "title": "ODE executor leg exists or claim corrected",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "self",
-      "gap": "HONESTY FIXED 2026-08-30: problem-model.ts routing comment no longer claims an ODE leg (FEM/AFEM + Monte-Carlo named; ODE-typed plans disclosed as protocol-fallthrough, tracked here). The real ode-integration vertical slice (OdeSpec schema + drafter + executor + sidecar op + tests, mirroring the theory lane) remains the queued P1 work — sized as its own lane per the semantic-chain rule.",
+      "gap": "CLOSED (vertical slice landed, acceptance text stale): src/experiment/executor-ode.ts executeOdeAnalysis + domain OdeSpec/odeIntegrationVerdict (sidecar scipy solve_ivp leg, FEM pattern mirrored, injection-safe rhs) with tests/executor-ode.test.ts green (8/8, re-verified 2026-09-04) incl. the mechanical convergence-order verdict; the 08-30 honesty comment fix remains in force",
       "target": "ode_integrate op (scipy solve_ivp + convergence-order verdict, FEM pattern) OR honest comment fix",
-      "verify": "executor test asserting mechanical verdict",
+      "verify": "executor test asserting mechanical verdict (tests/executor-ode.test.ts 8/8 green)",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/04-data.md CAP-11"
+        "FINAL_EVIDENCE/audit-2026-08-30/04-data.md CAP-11",
+        "src/experiment/executor-ode.ts + tests/executor-ode.test.ts (re-verified 2026-09-04)"
       ]
     },
     {
