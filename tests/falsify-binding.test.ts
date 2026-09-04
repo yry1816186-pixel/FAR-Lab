@@ -13,7 +13,7 @@ import type { StageContext } from '../src/pipeline/types.js';
 import { createTestStubProvider, type StubStep } from '../src/providers/test-stub.js';
 import type { ArtifactStore } from '../src/shared/ports.js';
 import { canonicalSha256 } from '../src/shared/crypto.js';
-import { falsifyStage, gateCritiqueLinks } from '../src/pipeline/stages/falsify.js';
+import { falsifyStage, gateCritiqueLinks, verifySharedFocus } from '../src/pipeline/stages/falsify.js';
 
 /**
  * B6 binding-density enrichment (PLAN-reuse-adoption §R4) — *** TEST FIXTURES ONLY ***
@@ -191,6 +191,39 @@ const auditConfirm = (hypId: string, ...claimIds: string[]): StubStep => ({
 });
 
 // ---------------------------------------------------------------------------
+// pure gate: verifySharedFocus (FA-SCI-03 T4 — model proposes, determinism verifies)
+// ---------------------------------------------------------------------------
+
+describe('verifySharedFocus', () => {
+  const claim = 'Operando Raman spectroscopy tracks overpotential growth as anion redistribution proceeds';
+  const surface = 'Anion redistribution raises cell overpotential during discharge cycling';
+
+  it('passes when >=2 focus tokens occur verbatim in BOTH texts (case-insensitive)', () => {
+    const v = verifySharedFocus('overpotential redistribution raman', claim, surface);
+    expect(v.passes).toBe(true);
+    expect(v.verified).toEqual(['overpotential', 'redistribution']);
+  });
+
+  it('refuses when only one token verifies (topically-kin but mechanism-hollow)', () => {
+    const v = verifySharedFocus('raman spectroscopy overpotential', claim, surface);
+    expect(v.verified).toEqual(['overpotential']);
+    expect(v.passes).toBe(false);
+  });
+
+  it('CJK focus substrings verify via containment; hyphenated compounds stay whole', () => {
+    const cjkClaim = '维生素D补充降低急性呼吸道感染风险的荟萃分析证据';
+    const cjkSurface = '规律维生素D补充与呼吸道感染风险下降相关';
+    const v = verifySharedFocus('维生素D 呼吸道感染', cjkClaim, cjkSurface);
+    expect(v.passes).toBe(true);
+  });
+
+  it('empty/no-token focus never passes', () => {
+    expect(verifySharedFocus('ab cd', claim, surface).passes).toBe(false);
+    expect(verifySharedFocus('', claim, surface).passes).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // pure gate: gateCritiqueLinks (exported helper — no LLM, no store)
 // ---------------------------------------------------------------------------
 
@@ -260,18 +293,22 @@ describe('falsifyStage B6 binding-density enrichment (integration)', () => {
           claimId: clmP1.id,
           relation: 'weakens',
           linkReason: 'the accelerated redistribution-overpotential coupling directly undermines the predicted suppression pathway',
+          sharedFocus: 'overpotential redistribution discharge',
         },
         {
           claimId: clmDistant.id,
           relation: 'contradicts',
           linkReason: 'a topically hollow rationale that must not survive the widened vocabulary gate',
+          sharedFocus: 'surface code decoding schedules',
         },
       ],
       supportingClaimIds: [clmP2.id],
       supportingLinks: [
         {
           claimId: clmP2.id,
-          linkReason: 'the redistribution-overpotential correlation matches the predicted discharge-cycle signature',
+          relation: 'supports',
+          linkReason: 'the redistribution-overpotential correlation matches the predicted discharge-cycle signature only within the cycled window',
+          sharedFocus: 'overpotential redistribution cycles',
         },
       ],
       // one hallucinated id must be filtered from the considered-nolink count
@@ -317,6 +354,83 @@ describe('falsifyStage B6 binding-density enrichment (integration)', () => {
 
     // h1 has links — no zero-binding warning for it
     expect(summary).not.toContain(`${h1.id}: 0 supporting and 0 counter critique links`);
+  });
+
+  it('shared-focus gate: a topically-passing link whose focus tokens are unfindable is refused with a visible warning', async () => {
+    const { store, run } = setup();
+    const clmKin = makeClaim(run.id, P1_TEXT); // passes the lexical gate…
+    store.putObject('claim', clmKin);
+    const h1 = makeHyp(run.id);
+    store.putObject('hypothesis', h1);
+
+    const spec = {
+      ...baseSpec,
+      assumptionCritiques: [],
+      counterLinks: [
+        {
+          claimId: clmKin.id,
+          relation: 'weakens',
+          linkReason: 'a lexically-overlapping rationale whose asserted focus is not actually in both texts',
+          // tokens exist in the CLAIM but not in the hypothesis surface — the model's
+          // relevance assertion does not verify
+          sharedFocus: 'tracks growth proceeds',
+        },
+      ],
+      supportingClaimIds: [],
+      supportingLinks: [],
+      consideredClaimIds: [],
+      uncertainties: [],
+    };
+    const steps: StubStep[] = [{ forPurpose: `falsification-spec:${h1.id}`, rawOutput: JSON.stringify(spec) }];
+    const { ctx, logs } = makeCtx(run, store, steps);
+    const outcome = await falsifyStage.execute(ctx);
+    expect(outcome.kind).toBe('done');
+    const summary = outcome.kind === 'done' ? outcome.summary : '';
+    expect(summary).toContain('refused 1 counter link(s)');
+    expect(summary).toContain('sharedFocus tokens not found verbatim');
+    // no relation minted, no binding
+    expect(store.listObjects('evidence_relation', run.id)).toHaveLength(0);
+    expect(store.getObject('hypothesis', h1.id)?.counterClaimIds).toEqual([]);
+    expect(logs).toContain(`critique bindings: hyp=${h1.id} support=0 counter=0 considered-nolink=0 of 1`);
+  });
+
+  it('supporting-side qualifies: a component/subgroup-level support lands as a qualifies relation on the counter-family array', async () => {
+    const { store, run } = setup();
+    const clmP2 = makeClaim(run.id, P2_TEXT);
+    store.putObject('claim', clmP2);
+    const h1 = makeHyp(run.id);
+    store.putObject('hypothesis', h1);
+
+    const spec = {
+      ...baseSpec,
+      assumptionCritiques: [],
+      counterLinks: [],
+      supportingClaimIds: [clmP2.id],
+      supportingLinks: [
+        {
+          claimId: clmP2.id,
+          relation: 'qualifies',
+          linkReason: 'the redistribution-overpotential correlation holds only for the cycled subgroup, bounding the hypothesis conditions',
+          sharedFocus: 'overpotential redistribution',
+        },
+      ],
+      consideredClaimIds: [],
+      uncertainties: [],
+    };
+    const steps: StubStep[] = [
+      { forPurpose: `falsification-spec:${h1.id}`, rawOutput: JSON.stringify(spec) },
+      auditConfirm(h1.id, clmP2.id),
+    ];
+    const { ctx } = makeCtx(run, store, steps);
+    const outcome = await falsifyStage.execute(ctx);
+    expect(outcome.kind).toBe('done');
+    const rels = store.listObjects('evidence_relation', run.id);
+    expect(rels).toHaveLength(1);
+    expect(rels[0]).toMatchObject({ relation: 'qualifies', claimId: clmP2.id, targetHypothesisId: h1.id });
+    // qualifies rides the counter-family id array (existing routing convention)
+    const h1After = store.getObject('hypothesis', h1.id);
+    expect(h1After?.counterClaimIds).toEqual([clmP2.id]);
+    expect(h1After?.supportingClaimIds).toEqual([]);
   });
 
   it('zero-binding warning fires when a representative hypothesis ends with 0+0 links while >= 3 verified claims exist; density line reports the no-link mass', async () => {
