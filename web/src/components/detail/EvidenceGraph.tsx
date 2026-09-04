@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useRef, useCallback, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { getHypotheses } from '../../api/endpoints';
 import type { EvidenceRelation, ResearchRun, ScientificClaim, SourceDocument } from '../../api/types';
@@ -200,8 +200,10 @@ export function EvidenceGraph({
   /** VIZ V5: per-node drag offsets (reset with the view); honest full render is opt-in. */
   const [offsets, setOffsets] = useState<Map<string, { dx: number; dy: number }>>(new Map());
   const [showAll, setShowAll] = useState(false);
-  const dragRef = { active: false, x: 0, y: 0, nodeId: null as string | null };
-  const svgPointRef = { k: 1, tx: 0, ty: 0 };
+  // Stable across renders: the mousemove closure mutates this while dragging — a
+  // per-render plain object lost the drag after the FIRST re-render (V5 sweep finding).
+  const dragRef = useRef({ active: false, x: 0, y: 0, nodeId: null as string | null });
+  const svgPointRef = useRef({ k: 1, tx: 0, ty: 0 });
 
   const hypFetcher = useCallback((signal: AbortSignal) => getHypotheses(run.id, signal), [run.id]);
   const hypRes = useResource(hypFetcher, [run.id], `${run.updatedAt}:${run.status}`);
@@ -387,26 +389,26 @@ export function EvidenceGraph({
   const onWheel = (e: React.WheelEvent<SVGSVGElement>): void => {
     e.preventDefault();
     setView((v) => ({ ...v, k: Math.min(2.5, Math.max(0.4, v.k * (e.deltaY < 0 ? 1.1 : 0.9))) }));
-    svgPointRef.k = Math.min(2.5, Math.max(0.4, view.k * (e.deltaY < 0 ? 1.1 : 0.9)));
+    svgPointRef.current.k = Math.min(2.5, Math.max(0.4, view.k * (e.deltaY < 0 ? 1.1 : 0.9)));
   };
 
   const beginNodeDrag = (e: React.MouseEvent, id: string): void => {
     e.stopPropagation();
-    dragRef.active = true;
-    dragRef.nodeId = id;
-    dragRef.x = e.clientX;
-    dragRef.y = e.clientY;
+    dragRef.current.active = true;
+    dragRef.current.nodeId = id;
+    dragRef.current.x = e.clientX;
+    dragRef.current.y = e.clientY;
   };
 
   const onSvgMouseMove = (e: React.MouseEvent<SVGSVGElement>): void => {
-    if (!dragRef.active) return;
-    const dx = e.clientX - dragRef.x;
-    const dy = e.clientY - dragRef.y;
-    dragRef.x = e.clientX;
-    dragRef.y = e.clientY;
-    if (dragRef.nodeId !== null) {
+    if (!dragRef.current.active) return;
+    const dx = e.clientX - dragRef.current.x;
+    const dy = e.clientY - dragRef.current.y;
+    dragRef.current.x = e.clientX;
+    dragRef.current.y = e.clientY;
+    if (dragRef.current.nodeId !== null) {
       // Node drag: deltas are screen px; undo the view transform to stay 1:1 with the cursor.
-      const id = dragRef.nodeId;
+      const id = dragRef.current.nodeId;
       setOffsets((prev) => {
         const cur = prev.get(id) ?? { dx: 0, dy: 0 };
         const next = new Map(prev);
@@ -419,8 +421,8 @@ export function EvidenceGraph({
   };
 
   const endDrag = (): void => {
-    dragRef.active = false;
-    dragRef.nodeId = null;
+    dragRef.current.active = false;
+    dragRef.current.nodeId = null;
   };
 
   const FILTERS: { key: Filter; labelKey: DictKey }[] = [
@@ -472,7 +474,7 @@ export function EvidenceGraph({
         role="img"
         aria-label={t('graph.aria', { s: sources.length, c: claims.length, h: hypotheses.length })}
         onWheel={onWheel}
-        onMouseDown={(e) => { dragRef.active = true; dragRef.nodeId = null; dragRef.x = e.clientX; dragRef.y = e.clientY; }}
+        onMouseDown={(e) => { dragRef.current.active = true; dragRef.current.nodeId = null; dragRef.current.x = e.clientX; dragRef.current.y = e.clientY; }}
         onMouseMove={onSvgMouseMove}
         onMouseUp={endDrag}
         onMouseLeave={endDrag}
