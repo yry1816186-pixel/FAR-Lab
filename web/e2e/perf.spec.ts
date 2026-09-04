@@ -152,8 +152,18 @@ test('perf: loaded home first paint and layout stability within "good" budgets',
   const unexpectedOptional = [...coldAssetRequests].filter((pathname) =>
     /\/(?:InlineMathFragment|RadarCompare|pdf(?:\.worker\.min)?-|xlsx-|transformers\.web-|asr-worker-)/.test(pathname));
   expect(unexpectedOptional, 'optional research tools stay off the cold shell').toEqual([]);
-  const cancel = await request.post(`/api/v1/runs/${activeRunId}/cancel`, { data: {} });
-  expect(cancel.ok()).toBeTruthy();
+  // Cancel with transport resilience: the offline run can block the server
+  // event loop long enough for Windows to RST the keep-alive connection — the
+  // same documented shape the poll helpers above tolerate. A lost cancel
+  // RESPONSE must not fail a passing measurement: the terminal-state gate
+  // below is the real correctness check (a cancel that truly never landed
+  // leaves the run running and times this test out).
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      if ((await request.post(`/api/v1/runs/${activeRunId}/cancel`, { data: {} })).ok()) break;
+    } catch { /* transport blip — pending, retry */ }
+    await page.waitForTimeout(500);
+  }
   // Test isolation is part of the performance contract: a cancel request is
   // not cleanup until the worker reaches a terminal state. Leaving this run
   // active made later resilience cases contend with an invisible predecessor.
