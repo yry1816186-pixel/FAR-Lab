@@ -112,8 +112,8 @@ const farRun = (task, question) => {
   const stdout = execFileSync('node', [
     'dist/cli/main.js', 'research', 'start', question,
     '--domain', 'machine learning', '--goal', 'exploratory', '--json',
-  ], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 30 * 60_000 });
-  const line = stdout.split('\n').find((l) => l.trim().startsWith('{'));
+  ], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: Number(process.env.MLR_RUN_TIMEOUT_MIN ?? 45) * 60_000 });
+  const line = stdout.split('\n').filter((l) => l.trim().startsWith('{')).at(-1);
   return JSON.parse(line ?? '{}');
 };
 

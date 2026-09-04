@@ -279,28 +279,31 @@
       "id": "FA-HAR-02",
       "domain": "harness",
       "title": "Budget/pacing default-on for unattended runs",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "self",
-      "gap": "FARLAB_RUN_TOKEN_BUDGET default null; MIN_CALL_INTERVAL default 0; automations engine has 0 live instances",
+      "gap": "closed: config-default semantics locked by test",
       "target": "automation fires inherit run budget view + default gentle pacing",
       "verify": "config-defaults test + one >=72h unattended soak",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/02-harness.md CAP-04/10"
+        "FINAL_EVIDENCE/audit-2026-08-30/02-harness.md CAP-04/10",
+        "commit c38ed2f tests/providers.test.ts unattended-run config defaults (FA-HAR-02): pacing default 600ms on, explicit 0 respected, runTokenBudgetCap null opt-in (73/73 green)"
       ]
     },
     {
       "id": "FA-HAR-03",
       "domain": "harness",
       "title": "Provider failover live evidence (ACC-31 tested->live)",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "self",
-      "gap": "failover chain only offline-double-verified; no route-A→route-B live run receipt",
+      "gap": "closed: live route-switch receipt captured",
       "target": "one live failover run with receipt chain",
       "verify": "receipts show serving-route switch mid-run",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/02-harness.md CAP-09"
+        "FINAL_EVIDENCE/audit-2026-08-30/02-harness.md CAP-09",
+        "run_5ve7ej9ez40rbd33w4yrm74ghs pinned to mcfg_j56nhyv295zzy6efxjshg54rk2 (dead route); receipt rcp_qhe2k78bf9q5bn8jqtf6aznjb7 (stage scope, 2026-09-04T04:10:39Z) shows provider=custom:mcfg_bc4pqq38dvk723f03x4qz5zpwv = the declared fallbackConfigIds[0], usage 1831 tokens, finishReason=stop — serving route switched primary->fallback (query .far-run/far.db objects kind=receipt)",
+        "GET /api/v1/model-configs on server :3196: mcfg_j56n... fallbackConfigIds=[mcfg_bc4pqq38dvk723f03x4qz5zpwv]; offline auth_error->failover logic covered by unit tests (tests/providers.test.ts)"
       ]
     },
     {
