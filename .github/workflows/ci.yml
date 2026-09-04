@@ -87,6 +87,11 @@ jobs:
         run: node eval/taxonomy-regression.mjs
       - name: Prompt drift gate (versioned snapshot)
         run: node eval/prompt-regression.mjs --check
+      # FA-EVAL-03: per-prompt semantic gold corpus — hash drift (above) says a
+      # prompt CHANGED; this says the load-bearing instructions survived the
+      # change. An anchor lost = semantic drift = red, even with a --note bump.
+      - name: Prompt semantic gold gate
+        run: node eval/prompt-gold.mjs --check
       - name: TUI package tests
         working-directory: packages/tui
         run: npm test

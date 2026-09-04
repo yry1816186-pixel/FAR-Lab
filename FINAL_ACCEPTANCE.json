@@ -887,17 +887,20 @@
       "id": "FA-EVAL-03",
       "domain": "evaluation",
       "title": "Prompt engineering: version ids + gold corpus + failure taxonomy regression",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P2",
       "owner": "self",
-      "gap": "version field + CI gate DONE; failure-taxonomy regression DONE (eval/taxonomy-regression.mjs 26/26 canonical shapes pinned incl. TLS family + cause-carried errno + message shapes, wired into CI). Remaining: per-prompt semantic gold corpus",
+      "gap": "",
       "target": "version field + per-prompt gold corpus + taxonomy eval",
-      "verify": "node eval/prompt-regression.mjs --check (exit 0 at HEAD; wired into .github/workflows/ci.yml)",
+      "verify": "node eval/prompt-regression.mjs --check && node eval/prompt-gold.mjs --check (both exit 0 at HEAD; both wired into .github/workflows/ci.yml)",
       "evidence": [
         "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md CAP-11",
         "eval/prompt-snapshot.json (96 prompts, per-entry version/provenance/history)",
         "eval/prompt-regression.mjs --snapshot --note bump flow (refusal path verified live)",
-        ".github/workflows/ci.yml prompt drift gate step"
+        ".github/workflows/ci.yml prompt drift gate step",
+        "eval/prompt-gold.json (96/96 prompts: hand-authored intent + load-bearing anchors)",
+        "eval/prompt-gold.mjs --check (anchor-loss = semantic drift = FAIL; mutation-tested live 2026-09-04)",
+        ".github/workflows/ci.yml prompt semantic gold gate step"
       ]
     },
     {

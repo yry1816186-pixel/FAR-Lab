@@ -26,7 +26,7 @@
  */
 import { readFileSync, writeFileSync, existsSync, renameSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { computeRequestHash } from '../dist/providers/http.js';
 
@@ -35,15 +35,17 @@ const SNAPSHOT_PATH = resolve(ROOT, 'eval/prompt-snapshot.json');
 const MAX_PROMPT_CHARS = 20_000;
 const MAX_TOTAL_CHARS = 120_000;
 
-const STAGE_FILES = [
+export const STAGE_FILES = [
   ...['scope', 'retrieve', 'evidence', 'hypotheses', 'falsify', 'rank', 'plan', 'revise', 'align']
     .map((s) => `src/pipeline/stages/${s}.ts`),
   'src/pipeline/llm.ts',
   'src/agent/loop.ts',
 ].map((p) => resolve(ROOT, p));
 
-/** Extract `const NAME = '...';` / template-literal prompt constants (bounded, textual). */
-const extractPrompts = (file) => {
+/** Extract `const NAME = '...';` / template-literal prompt constants WITH full
+ *  text (gold-anchor checks need the text, not just hashes). Single owner of
+ *  the extraction grammar — prompt-gold.mjs reuses this, never re-implements. */
+export const extractPromptsRaw = (file) => {
   const src = readFileSync(file, 'utf8');
   const out = [];
   // Platform invariance (CI drift gate): a Windows checkout stores CRLF inside
@@ -56,21 +58,14 @@ const extractPrompts = (file) => {
       ? normalize(raw.slice(1, -1)).replace(/\\'/g, "'").replace(/\\n/g, '\n').replace(/\\\\/g, '\\')
       : normalize(JSON.parse(raw));
   const re = /const\s+([A-Z][A-Z0-9_]*PROMPT[A-Z0-9_]*)\s*(?::\s*string\s*)?=\s*(`(?:[^`\\]|\\.)*`|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")/g;
-  for (const m of src.matchAll(re)) {
-    const text = lit(m[2]);
-    out.push({ name: m[1], chars: text.length, sha256: createHash('sha256').update(text).digest('hex').slice(0, 16), sample: text.slice(0, 60) });
-  }
+  for (const m of src.matchAll(re)) out.push({ name: m[1], text: lit(m[2]) });
   // Array-joined prompt constants: const NAME...PROMPT... = [ 'elem', 'elem' ].join(...)
   // (the evidence/join pattern — the const regex cannot see the elements)
   const arrRe = /const\s+([A-Z][A-Z0-9_]*PROMPT[A-Z0-9_]*)[^=]*=\s*\[([\s\S]*?)\]\s*\.join/g;
   const elemRe = /(`(?:[^`\\]|\\.)*`|'(?:[^'\\]|\\.)*')/g;
   for (const m of src.matchAll(arrRe)) {
     let i = 0;
-    for (const e of m[2].matchAll(elemRe)) {
-      const text = lit(e[1]);
-      out.push({ name: `${m[1]}[${i}]`, chars: text.length, sha256: createHash('sha256').update(text).digest('hex').slice(0, 16), sample: text.slice(0, 60) });
-      i += 1;
-    }
+    for (const e of m[2].matchAll(elemRe)) { out.push({ name: `${m[1]}[${i}]`, text: lit(e[1]) }); i += 1; }
   }
   // Inline call-site prompts: systemPrompt: '...' / `...` — named by the nearby
   // purpose; position-independent fallback (content prefix) so edits elsewhere
@@ -81,11 +76,14 @@ const extractPrompts = (file) => {
     const after = src.slice(m.index, m.index + 400);
     const pm = /purpose:\s*'([^']{1,60})'/.exec(after);
     const fallback = text.slice(0, 24).replace(/[^A-Za-z0-9]/g, '').slice(0, 16);
-    const name = `INLINE:${pm ? pm[1] : fallback}`;
-    out.push({ name, chars: text.length, sha256: createHash('sha256').update(text).digest('hex').slice(0, 16), sample: text.slice(0, 60) });
+    out.push({ name: `INLINE:${pm ? pm[1] : fallback}`, text });
   }
   return out;
 };
+
+/** Hash/sample projection over extractPromptsRaw (identity for the snapshot). */
+export const extractPrompts = (file) =>
+  extractPromptsRaw(file).map((p) => ({ name: p.name, chars: p.text.length, sha256: createHash('sha256').update(p.text).digest('hex').slice(0, 16), sample: p.text.slice(0, 60) }));
 
 const SECURITY_ANCHORS = [
   { file: 'src/pipeline/llm.ts', needle: 'UNTRUSTED_DATA_RULE', label: 'choke-point rule append' },
@@ -214,4 +212,4 @@ const main = () => {
   process.exit(failures.length === 0 ? 0 : 1);
 };
 
-main();
+if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) main();
