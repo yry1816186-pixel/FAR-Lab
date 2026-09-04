@@ -47,7 +47,9 @@ export interface PackageResult {
   };
 }
 
-const isPandocFormat = (v: string): v is PandocFormat => (PANDOC_FORMATS as readonly string[]).includes(v);
+/** Package-layer runtime guard: only members of the closed PandocFormat union pass
+ *  (drives the `unknown pandoc format` rejection below; exported for its test). */
+export const isPandocFormat = (v: string): v is PandocFormat => (PANDOC_FORMATS as readonly string[]).includes(v);
 
 export const buildReproducibilityPackage = async (
   deps: { store: Store; artifacts: ArtifactStore },

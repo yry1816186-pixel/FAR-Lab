@@ -84,49 +84,6 @@ describe('retractionStatusFrom (OpenAlex is_retracted fallback, RU-R frontier ca
   });
 });
 
-describe('retractionStatusFrom (OpenAlex is_retracted fallback, RU-R frontier cand.1)', () => {
-  const oaRecord = (isRetracted: unknown): RawSourceRecord => ({
-    identifiers: [{ kind: 'openalex', value: 'W1' }],
-    title: 't',
-    contentDepth: 'metadata_only',
-    accessState: 'unknown',
-    normalized: { id: 'https://openalex.org/W1', is_retracted: isRetracted } as Record<string, unknown>,
-  });
-
-  it('strict boolean true classifies retracted (the primary-family coverage win)', () => {
-    expect(retractionStatusFrom(oaRecord(true))).toBe('retracted');
-  });
-
-  it('never coerces truthy-but-not-boolean shapes', () => {
-    expect(retractionStatusFrom(oaRecord(false))).toBeUndefined();
-    expect(retractionStatusFrom(oaRecord(undefined))).toBeUndefined();
-    expect(retractionStatusFrom(oaRecord('true'))).toBeUndefined();
-    expect(retractionStatusFrom(oaRecord(1))).toBeUndefined();
-  });
-
-  it('update-to classification outranks the flag (richer signal wins, flag is a hint)', () => {
-    const both: RawSourceRecord = {
-      ...oaRecord(true),
-      normalized: {
-        is_retracted: true,
-        'update-to': [{ type: 'correction' }],
-      } as Record<string, unknown>,
-    };
-    expect(retractionStatusFrom(both)).toBe('corrected');
-  });
-
-  it('a non-classifying update-to does not suppress a true flag', () => {
-    const both: RawSourceRecord = {
-      ...oaRecord(true),
-      normalized: {
-        is_retracted: true,
-        'update-to': [{ type: 'new edition' }],
-      } as Record<string, unknown>,
-    };
-    expect(retractionStatusFrom(both)).toBe('retracted');
-  });
-});
-
 describe('claim demotion carries the retraction uncertainty (RU-6 GO1)', () => {
   it('the uncertainty note parses into the claim schema (schema-level contract)', () => {
     const claim = ScientificClaim.parse({
@@ -168,15 +125,34 @@ describe('forensics GATE on gradeCertainty (re-audit fix: not advisory)', () => 
 });
 
 describe('RU-10 zh fuzzy-key fix (CJK titles merge)', () => {
-  it('a Chinese title produces a non-empty fuzzy key identical across whitespace/punct variants', async () => {
-    const { default: mod } = await import('../src/pipeline/stages/retrieve.js').then(m => ({ default: m })) as { default: typeof import('../src/pipeline/stages/retrieve.js') };
-    // fuzzyTitleKey is module-private; verify through the exported pool merge instead:
-    // two records with the same CJK title (different punctuation) must collapse to one pool key.
-    const mk = (title: string, doi: string): { identifiers: Array<{ kind: 'doi'; value: string }>; title: string; publicationYear: number; contentDepth: 'abstract'; accessState: 'unknown'; abstractText: string; normalized: Record<string, unknown> } => ({
-      identifiers: [{ kind: 'doi', value: doi }], title, publicationYear: 2024,
-      contentDepth: 'abstract', accessState: 'unknown', abstractText: '', normalized: {},
-    });
-    void mod; void mk; // shape check only if exports allow; the fix is covered by normalizeTitle behavior below
-    expect('维生素D与抑郁症').toMatch(/[\u4e00-\u9fff]/);
+  // fuzzyTitleKey is the pool-merge identity: same title (modulo punctuation) +
+  // same year -> one pool entry. Under the pre-fix normalization CJK titles
+  // collapsed to EMPTY and could never merge — these assertions fail if the
+  // Han-run preservation in normalizeTitle regresses.
+  const rec = (title: string, publicationYear = 2024): RawSourceRecord => ({
+    identifiers: [{ kind: 'doi', value: '10.1/x' }],
+    title,
+    publicationYear,
+    contentDepth: 'abstract',
+    accessState: 'unknown',
+    abstractText: '',
+    normalized: {},
+  });
+
+  it('a CJK title produces a non-empty key, stable across punctuation variants', async () => {
+    const { fuzzyTitleKey } = await import('../src/pipeline/stages/retrieve.js');
+    const a = fuzzyTitleKey(rec('维生素D与抑郁症：一项随机对照试验的荟萃分析'));
+    const b = fuzzyTitleKey(rec('维生素D与抑郁症，一项随机对照试验的荟萃分析'));
+    expect(a).not.toBeNull();
+    expect(b).toBe(a);
+  });
+
+  it('different CJK titles and different years produce different keys; short titles are null', async () => {
+    const { fuzzyTitleKey } = await import('../src/pipeline/stages/retrieve.js');
+    const base = '维生素D与抑郁症：一项随机对照试验的荟萃分析';
+    const other = '另一种完全不同的中文研究标题用于区分检验';
+    expect(fuzzyTitleKey(rec(other))).not.toBe(fuzzyTitleKey(rec(base)));
+    expect(fuzzyTitleKey(rec(base, 2025))).not.toBe(fuzzyTitleKey(rec(base, 2024)));
+    expect(fuzzyTitleKey(rec('短标题'))).toBeNull(); // below FUZZY_MIN_TITLE_LEN
   });
 });

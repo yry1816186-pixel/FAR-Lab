@@ -243,7 +243,7 @@ export const normalizeTitle = (t: string): string =>
   t.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9一-鿿]+/g, ' ').trim().replace(/\s+/g, ' ');
 
-const fuzzyTitleKey = (rec: RawSourceRecord): string | null => {
+export const fuzzyTitleKey = (rec: RawSourceRecord): string | null => {
   const norm = normalizeTitle(rec.title);
   if (norm.length < FUZZY_MIN_TITLE_LEN) return null;
   return `fz:${norm}|${rec.publicationYear ?? ''}`;
