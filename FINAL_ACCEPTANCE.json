@@ -610,14 +610,16 @@
       "id": "FA-HCI-02",
       "domain": "hci",
       "title": "Method-family human override into causal revision chain",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "sibling-lane",
-      "gap": "ProblemModelBand read-only; PRODUCT.md promises correct-the-decisions",
+      "gap": "closed: researcher override wired into the causal revision chain",
       "target": "override control in scope review feeding revision",
       "verify": "e2e + revision-chain test",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/07-hci.md CAP-04"
+        "FINAL_EVIDENCE/audit-2026-08-30/07-hci.md CAP-04",
+        "src/server/method-ops.ts overrideMethodSelection (mirrors hypothesis-ops BP-2): human_expert FeedbackSignal -> Revision (scope modify, before/after) -> VersionDiff (semanticFlags method_family_override, predecessor archived sha256); MethodSelection replaced in place with decidedBy=researcher_override; audit note appended to the run event chain; unassessed families and plan-less selections refused 400 honestly",
+        "POST /api/v1/runs/:id/method-selections/:sid/override (api.ts); tests/method-override.test.ts e2e over the real HTTP server: revision-chain assertions + honest-refusal + cross-run 404 (3/3); web: ProblemModelBand override control (StudyMap) with candidate checkboxes, reason, validation-plan input, revision id feedback; web typecheck+build green, full suite green"
       ]
     },
     {

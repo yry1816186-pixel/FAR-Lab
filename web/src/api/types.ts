@@ -1236,6 +1236,8 @@ export interface ProblemModelSelectionView {
   forObjectiveId: string;
   selectedFamilies: string[];
   undecidedReason: string | null;
+  /** FA-HCI-02: the assessed candidate families (override may only choose among these). */
+  candidates: Array<{ family: string; assessment: string; hasValidationPlan: boolean }>;
 }
 export interface ProblemModelView {
   id: string;

@@ -6,8 +6,7 @@ import { useI18n } from '../i18n/LanguageContext';
 import type { DictKey } from '../i18n/dict';
 import {
   cancelRun, deleteRun, dispatchAction, editHypothesis, forkHypothesis, getEvidence, getHypotheses,
-  getQuestion, getScience, getSources, promoteHypothesis, rejectHypothesis, resumeRun,
-} from '../api/endpoints';
+  getQuestion, getScience, getSources, promoteHypothesis, rejectHypothesis, resumeRun, overrideMethodSelection } from '../api/endpoints';
 import { DISPATCHABLE_ACTIONS, type DispatchableAction } from '../api/endpoints';
 import type {
   AchResearcherAdjusted, EvidenceRelation, HypothesisCandidate, HypothesisScorecard, ResearchQuestion, ResearchRun, RunEvent, ScienceBundle, ScientificClaim, SourceDocument,
@@ -507,7 +506,7 @@ export function StudyMap({
         {!draftable && (
           <>
         {settled && science !== null && (<>
-          <ProblemModelBand science={science} />
+          <ProblemModelBand science={science} runId={run.id} onMutated={onMutated} />
           <StateBand
             run={run}
             science={science}
@@ -909,12 +908,39 @@ function Inspector({ insp, run, liveClaim, liveHyp, hyps, balances, sourceById, 
   );
 }
 
-function ProblemModelBand({ science }: { science: ScienceBundle }): JSX.Element | null {
+function ProblemModelBand({ science, runId, onMutated }: { science: ScienceBundle; runId: string; onMutated: () => void }): JSX.Element | null {
   const { t } = useI18n();
   const pm = science.problemModel;
+  const [openObjective, setOpenObjective] = useState<string | null>(null);
+  const [checked, setChecked] = useState<string[]>([]);
+  const [reason, setReason] = useState('');
+  const [plan, setPlan] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
   if (pm === null) return null;
-  const sel = (objId: string): string[] =>
-    pm.methodSelections.find((s) => s.forObjectiveId === objId)?.selectedFamilies ?? [];
+  const sel = (objId: string) => pm.methodSelections.find((s) => s.forObjectiveId === objId);
+  const submit = async (): Promise<void> => {
+    const selection = openObjective !== null ? sel(openObjective) : undefined;
+    if (selection === undefined || checked.length === 0 || checked.length > 2) return;
+    setBusy(true);
+    setError(null);
+    setDone(null);
+    try {
+      const plans: Record<string, string> = plan.trim().length >= 10 && checked.length === 1 ? { [checked[0] ?? '']: plan.trim() } : {};
+      const r = await overrideMethodSelection(runId, selection.id, checked, reason.trim(), plans);
+      setDone(r.revisionId);
+      setChecked([]);
+      setReason('');
+      setPlan('');
+      setOpenObjective(null);
+      onMutated();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <section className="map-node">
       <p className="map-node-label">{t('map.pm.title')}<span className="map-node-hint">{t('map.pm.hint')}</span></p>
@@ -924,8 +950,9 @@ function ProblemModelBand({ science }: { science: ScienceBundle }): JSX.Element 
       </p>
       <ul className="pm-objectives">
         {pm.objectives.map((o) => {
-          const families = sel(o.id);
-          const undecided = pm.methodSelections.find((s) => s.forObjectiveId === o.id)?.undecidedReason ?? null;
+          const selection = sel(o.id);
+          const families = selection?.selectedFamilies ?? [];
+          const undecided = selection?.undecidedReason ?? null;
           return (
             <li key={o.id}>
               <span>{o.statement}</span>{' '}
@@ -933,6 +960,32 @@ function ProblemModelBand({ science }: { science: ScienceBundle }): JSX.Element 
                 ? <Badge tone="ok">{families.join(' / ')}</Badge>
                 : <Badge tone="muted">{t('map.pm.undecided')}</Badge>}
               {undecided !== null && <span className="muted small"> {undecided}</span>}
+              {selection !== undefined && (
+                <button type="button" className="link" onClick={() => { setOpenObjective(openObjective === o.id ? null : o.id); setChecked(families); setError(null); setDone(null); }}>
+                  {t('map.pm.override')}
+                </button>
+              )}
+              {openObjective === o.id && selection !== undefined && (
+                <div className="pm-override">
+                  <p className="muted small">{t('map.pm.overrideHint')}</p>
+                  {selection.candidates.map((cand) => (
+                    <label key={cand.family} className="small">
+                      <input
+                        type="checkbox"
+                        checked={checked.includes(cand.family)}
+                        onChange={(e) => { setChecked(e.target.checked ? [...checked, cand.family].slice(-2) : checked.filter((f) => f !== cand.family)); }}
+                      /> {cand.family}{cand.hasValidationPlan ? '' : ' *'}
+                    </label>
+                  ))}
+                  <input type="text" placeholder={t('map.pm.overrideReason')} value={reason} onChange={(e) => { setReason(e.target.value); }} />
+                  <input type="text" placeholder={t('map.pm.overridePlan')} value={plan} onChange={(e) => { setPlan(e.target.value); }} />
+                  <button type="button" disabled={busy || reason.trim().length < 10 || checked.length === 0} onClick={() => { void submit(); }}>
+                    {busy ? t('map.pm.overrideBusy') : t('map.pm.overrideSubmit')}
+                  </button>
+                  {error !== null && <p className="map-error small">{error}</p>}
+                  {done !== null && <p className="small">{t('map.pm.overrideDone', { rev: done })}</p>}
+                </div>
+              )}
             </li>
           );
         })}

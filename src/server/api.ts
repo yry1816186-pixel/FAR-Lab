@@ -22,6 +22,7 @@ import { runEvaluators } from '../app/evaluators.js';
 import { runResearchAction, ActionError } from './actions.js';
 import { getProtocolState, recordProtocolEvent, ProtocolOpError } from './protocol-ops.js';
 import { connectClaim, editHypothesis, forkHypothesis, HypothesisOpError, promoteHypothesis, rejectHypothesis } from './hypothesis-ops.js';
+import { MethodOpError, overrideMethodSelection } from './method-ops.js';
 import {
   annotateClaim, ClaimOpError, excludeClaim, excludedClaimIdsOf, pinClaim, reclassifyClaim, reinstateClaim,
 } from './claim-ops.js';
@@ -2357,6 +2358,21 @@ function parseSeedSources(raw: unknown): string | {
           throw e;
         }
         return;
+      }
+      // FA-HCI-02: researcher method-family override feeds the causal revision chain
+      // (feedback -> scope-modify Revision -> VersionDiff, selection replaced in place).
+      if (segments.length === 7 && segments[4] === 'method-selections' && segments[6] === 'override' && method === 'POST') {
+        const body = await readJsonObject(req);
+        try {
+          const result = await overrideMethodSelection(app, runId, segments[5] ?? '', body);
+          sendJson(res, 200, result);
+          return;
+        } catch (e) {
+          if (e instanceof MethodOpError) {
+            throw new HttpError(e.status, { code: e.code, message: e.message, retryable: false, runId });
+          }
+          throw e;
+        }
       }
       if (segments.length === 7 && segments[4] === 'hypotheses') {
         const hypId = segments[5]!;

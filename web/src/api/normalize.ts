@@ -345,6 +345,14 @@ function normalizeProblemModel(data: unknown): ProblemModelView | null {
         .map((c) => str(c.family))
         .filter((f) => f.length > 0),
       undecidedReason: typeof s.undecidedReason === 'string' ? s.undecidedReason : null,
+      candidates: (Array.isArray(s.candidates) ? s.candidates : [])
+        .filter(isRecord)
+        .map((cand) => ({
+          family: str(cand.family),
+          assessment: str(cand.assessment),
+          hasValidationPlan: typeof cand.validationPlan === 'string' && cand.validationPlan.length >= 10,
+        }))
+        .filter((cand) => cand.family.length > 0),
     })),
   };
 }
