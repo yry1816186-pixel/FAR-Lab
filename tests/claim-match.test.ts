@@ -113,6 +113,26 @@ describe('deterministic band pre-layer (S2: deterministicBandVerdict)', () => {
       'The mutation reduces binding.',
     )).toBeNull();
   });
+  it('negated vs asserted SAME direction decides different-finding (S1: STOPWORDS erase not/no before cosine)', () => {
+    expect(deterministicBandVerdict(
+      'Taurocholate does not inhibit C. difficile spore germination.',
+      'Taurocholate inhibits C. difficile spore germination.',
+    )).toBe(false);
+  });
+  it('negation on BOTH sides abstains (both assert the same negated finding)', () => {
+    expect(deterministicBandVerdict(
+      'Rifaximin does not reduce toxin production.',
+      'Rifaximin failed to reduce toxin production.',
+    )).toBeNull();
+  });
+  it('complement phrasings of one fact are untouched by the negation arm (gold-TRUE hazard)', () => {
+    // the two-sides-of-one-fact shape the naive negation-parity rule broke on:
+    // no explicit predicate negation — the arm must not fire
+    expect(deterministicBandVerdict(
+      'Patients with low MSS stability show high microsatellite instability at repeat loci.',
+      'MSS-low tumors exhibit elevated MSI-high phenotype markers.',
+    )).toBeNull();
+  });
   it('never asserts sameness — the return domain is {false, null}', () => {
     expect(deterministicBandVerdict(
       'Antibiotics disrupt the gut microbiota.',
@@ -130,8 +150,8 @@ describe('deterministic band pre-layer (S2: deterministicBandVerdict)', () => {
     // the rule only classifies pairs as DIFFERENT findings: every fired row must
     // be gold-false, or the pre-layer is corrupting the zero-error contract
     expect(fired.every((r) => !r.label)).toBe(true);
-    // regression guard on coverage: the shipped rules decide >= 6 band pairs
-    // (6/109 at 2026-09-05; shrinking below this means a lexicon/rule regressed)
-    expect(fired.length).toBeGreaterThanOrEqual(6);
+    // regression guard on coverage: the shipped rules decide >= 7 band pairs
+    // (6/109 at 2026-09-05 S2; 7/109 with the S1 negation arm — zero gold errors)
+    expect(fired.length).toBeGreaterThanOrEqual(7);
   });
 });

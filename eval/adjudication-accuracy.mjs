@@ -46,7 +46,7 @@ const adjudicate = async (items) => {
       userPayload: {
         pairs: items.map((x, k) => ({ k, claim: x.claim, candidate: x.counterpart })),
         instruction:
-          'For each pair decide: does the CLAIM assert substantially the same scientific finding (same entity/mechanism/direction) as the CANDIDATE? Synonyms count; vague-but-covering counts; unrelated or fabricated does not. Return verdicts array aligned with k order, each element a bare JSON boolean (true/false) — NOT an object or string.',
+          'For each pair decide: does the CLAIM assert substantially the same scientific finding (same entity/mechanism/DIRECTION) as the CANDIDATE? Synonyms count. Direction discipline: opposite direction (promotes vs inhibits) => false; one side negates what the other asserts ("does not inhibit" vs "inhibits") => false; merely covering the candidate\'s topic without asserting its direction => false; complementary phrasings of ONE fact ("low X" alongside "high Y" where X inhibits Y) => true. Unrelated or fabricated => false. Return verdicts array aligned with k order, each element a bare JSON boolean (true/false) — NOT an object or string.',
       },
       outputKind: 'json', temperature: 0, maxTokens: 2000, purpose: 'rediscovery:adjudicate',
       jsonSchema: { type: 'object', properties: { verdicts: { type: 'array', items: { type: 'boolean' } } }, required: ['verdicts'], additionalProperties: false },
