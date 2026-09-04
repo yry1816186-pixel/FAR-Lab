@@ -65,6 +65,11 @@ describe('GET /api/v1/memory', () => {
     const items = (all.body?.items as Json[]) ?? [];
     expect(items.length).toBeGreaterThanOrEqual(2);
     expect(items.every((i) => typeof i.trustClass === 'string')).toBe(true);
+    // honest-enumeration contract: the payload states its cap and completeness
+    // instead of dressing a capped subset up as the workspace total
+    expect(all.body?.cap).toBe(500);
+    expect(all.body?.complete).toBe(true);
+    expect(all.body?.count).toBe(items.length);
     const semantic = await request('GET', '/api/v1/memory?kind=semantic');
     expect(((semantic.body?.items as Json[]) ?? []).every((i) => i.kind === 'semantic')).toBe(true);
     const bad = await request('GET', '/api/v1/memory?kind=nope');

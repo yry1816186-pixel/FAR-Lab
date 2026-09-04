@@ -3179,12 +3179,16 @@ function parseSeedSources(raw: unknown): string | {
           if (!(statusValues as readonly string[]).includes(status)) throw validation(`status must be one of ${statusValues.join('|')} (got ${status})`);
           parsedStatus = status as (typeof statusValues)[number];
         }
+        // Same honest-cap contract as /export below: the list enumerates up to
+        // 500 items and says so in the payload — `total: items.length` would
+        // dress a capped subset up as the workspace total.
         const items = app.store.listMemory({
           ...(parsedKind !== undefined ? { kind: parsedKind } : {}),
           ...(parsedStatus !== undefined ? { status: parsedStatus } : {}),
           ...(runId !== null ? { runId } : {}),
+          limit: 500,
         });
-        return sendJson(res, 200, { items, total: items.length });
+        return sendJson(res, 200, { items, count: items.length, cap: 500, complete: items.length < 500 });
       }
       if (segments.length === 4 && segments[3] === 'export' && method === 'GET') {
         // Honest enumeration cap (listMemory clamps at 500) is disclosed in the

@@ -34,6 +34,7 @@ const STATUS_VALUES: MemoryStatus[] = ['active', 'superseded', 'archived'];
 export function Memory(): JSX.Element {
   const { t } = useI18n();
   const [items, setItems] = useState<MemoryItemView[] | null>(null);
+  const [complete, setComplete] = useState(true);
   const [error, setError] = useState<ApiError | null>(null);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<MemoryStatus | 'all'>('all');
@@ -47,7 +48,7 @@ export function Memory(): JSX.Element {
 
   const load = (signal?: AbortSignal): void => {
     getMemoryItems({}, signal)
-      .then((v) => { setItems(v); setError(null); })
+      .then((v) => { setItems(v.items); setComplete(v.complete); setError(null); })
       .catch((e: unknown) => { if (e instanceof ApiError) setError(e); setItems([]); });
   };
   useEffect(() => {
@@ -90,7 +91,9 @@ export function Memory(): JSX.Element {
         <span className="lab-title">{t('memory.title')}</span>
         <span className="lab-spacer" />
         {items !== null && items.length > 0 && (
-          <span className="lib-stats">{t('memory.stats', { n: items.length, m: activeCount })}</span>
+          complete
+            ? <span className="lib-stats">{t('memory.stats', { n: items.length, m: activeCount })}</span>
+            : <span className="lib-stats">{t('memory.statsCapped', { n: items.length })}</span>
         )}
         <a
           className="btn btn--small"
@@ -188,13 +191,13 @@ export function Memory(): JSX.Element {
                         <p className="mem-meta-line">{t('memory.failureReason')}: {m.failureReason}</p>
                       )}
                       <dl className="mem-meta-list">
-                        <div><dt>id</dt><dd>{m.id}</dd></div>
-                        <div><dt>entityType</dt><dd>{m.entityType}</dd></div>
-                        <div><dt>trust / taint</dt><dd>{m.trustClass} / {m.taint}</dd></div>
-                        {m.outcome !== undefined && <div><dt>outcome</dt><dd>{m.outcome}</dd></div>}
-                        {m.supersedesId !== undefined && <div><dt>supersedes</dt><dd>{m.supersedesId}</dd></div>}
-                        {m.provenance.runId !== undefined && <div><dt>run</dt><dd>{m.provenance.runId}</dd></div>}
-                        {m.provenance.sourceRef !== undefined && <div><dt>source</dt><dd>{m.provenance.sourceRef}</dd></div>}
+                        <div><dt>{t('memory.detail.id')}</dt><dd>{m.id}</dd></div>
+                        <div><dt>{t('memory.detail.entityType')}</dt><dd>{m.entityType}</dd></div>
+                        <div><dt>{t('memory.detail.trustTaint')}</dt><dd>{m.trustClass} / {m.taint}</dd></div>
+                        {m.outcome !== undefined && <div><dt>{t('memory.detail.outcome')}</dt><dd>{m.outcome}</dd></div>}
+                        {m.supersedesId !== undefined && <div><dt>{t('memory.detail.supersedes')}</dt><dd>{m.supersedesId}</dd></div>}
+                        {m.provenance.runId !== undefined && <div><dt>{t('memory.detail.run')}</dt><dd>{m.provenance.runId}</dd></div>}
+                        {m.provenance.sourceRef !== undefined && <div><dt>{t('memory.detail.source')}</dt><dd>{m.provenance.sourceRef}</dd></div>}
                       </dl>
                     </div>
                   )}

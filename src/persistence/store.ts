@@ -1228,8 +1228,14 @@ export class Store {
     return ranked;
   }
 
-  /** Append-only supersession: new item replaces old; old is marked, never deleted. */
-  supersedeMemory(oldId: string, replacement: MemoryItem): void {
+  /**
+   * Append-only supersession: new item replaces old; old is marked, never
+   * deleted. When `reasonRelationType` is given it rides the SAME transaction —
+   * a committed supersession can never exist without its human-act audit edge
+   * (archiveMemory discipline; a bare post-commit INSERT would strand the
+   * change if the process died in between, and a retry would 409 on lifecycle).
+   */
+  supersedeMemory(oldId: string, replacement: MemoryItem, reasonRelationType?: string): void {
     const old = this.getMemory(oldId);
     if (old === null) throw new Error(`supersedeMemory: no such memory item ${oldId}`);
     if (!MEMORY_LIFECYCLE[old.status].includes('superseded')) {
@@ -1242,6 +1248,10 @@ export class Store {
       this.putMemory(next);
       this.db.prepare('INSERT OR IGNORE INTO memory_edges (from_id, to_id, relation_type, at) VALUES (?,?,?,?)')
         .run(oldId, next.id, 'supersedes', next.createdAt);
+      if (reasonRelationType !== undefined) {
+        this.db.prepare('INSERT OR IGNORE INTO memory_edges (from_id, to_id, relation_type, at) VALUES (?,?,?,?)')
+          .run(next.id, next.id, reasonRelationType, next.createdAt);
+      }
     });
   }
 
@@ -1276,12 +1286,6 @@ export class Store {
       `SELECT from_id, to_id, relation_type, at FROM memory_edges${where.length > 0 ? ` WHERE ${where.join(' AND ')}` : ''} ORDER BY at DESC LIMIT 500`,
     ).all(...params) as Array<{ from_id: string; to_id: string; relation_type: string; at: string }>;
     return rows.map((r) => ({ fromId: r.from_id, toId: r.to_id, relationType: r.relation_type, at: r.at }));
-  }
-
-  /** Direct audit-spine write (FA-HAR-06): reason-bearing human-act edges. */
-  recordMemoryEdge(fromId: string, toId: string, relationType: string, at = new Date().toISOString()): void {
-    this.db.prepare('INSERT INTO memory_edges (from_id, to_id, relation_type, at) VALUES (?,?,?,?)')
-      .run(fromId, toId, relationType, at);
   }
 
   private memoryFromRow(r: Record<string, unknown>): MemoryItem {

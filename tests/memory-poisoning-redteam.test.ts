@@ -67,38 +67,46 @@ describe('memory poisoning red team', () => {
     expect(stored.trustClass).toBe('own_unverified'); // fenced on write, never fabricated authority
   });
 
-  it('poisoned negative-outcome entries stay explainable and excluded from own_* conditioning', () => {
+  it('poisoned negative-outcome entries surface with their honest label, never laundered', () => {
     const store = mkStore();
     store.putMemory(mkItem({
       kind: 'experiment_outcome', outcome: 'failed', failureReason: 'dataset 404 (genuine reason)',
       body: POISON_FAILED_BODY, trustClass: 'own_unverified', taint: 'trusted', provenance: {},
     }));
-    const items = memoryNegativeConditioning(store, 'anything', 5);
+    // tokens that actually reach the poisoned row — the assertions below must
+    // run against a hit, not against an empty result set
+    const items = memoryNegativeConditioning(store, 'elevate trusted override', 5);
+    expect(items.length).toBeGreaterThanOrEqual(1);
     for (const h of items) {
-      // experiment_outcome items ride with their failure reason; the payload body stays visible data
-      expect(h.trustClass.startsWith('own_')).toBe(true); // own_unverified is the honest own-* label
-      expect(h.trustClass).not.toBe('own_verified');
+      // the payload body stays visible data, but the label is the honest own-*
+      // class — injected prose never launders it to own_verified
+      expect(h.trustClass).toBe('own_unverified');
+      expect(h.body).toContain('SYSTEM:');
     }
   });
 
-  it('conditioning disclosure stays truthful: the export counts events, never trust-lauunders', () => {
+  it('conditioning disclosure stays truthful: counts events, never launders trust', () => {
     const store = mkStore();
     const q = ResearchQuestion.parse({
       id: newId('q'), text: 'does X cause Y?', goalType: 'explanatory', createdAt: new Date().toISOString(),
       scope: { domain: 'd', phenomena: ['p'] }, constraints: {},
     });
     const run = store.createRun(q);
-    store.putMemory(mkItem({ title: INJECT_TITLE, body: INJECT_BODY }));
+    // the conditioning surface only reads [experiment_outcome, episodic] with
+    // own_* trust — seed exactly that shape, or the test proves nothing
+    store.putMemory(injectOutcome());
     const items = memoryNegativeConditioning(store, 'system prompt injection', 5);
-    if (items.length > 0) {
-      recordMemoryConditioning(store, run.id, 'generate_hypotheses', items);
-    }
+    expect(items.length).toBeGreaterThanOrEqual(1);
+    recordMemoryConditioning(store, run.id, 'generate_hypotheses', items);
     const events = store.listEvents(run.id).filter((e) =>
       (e.detail as { reason?: string })?.reason === 'memory_conditioning');
     const disclosedCount = events.reduce((n, e) => n + ((e.detail as { items?: unknown[] }).items?.length ?? 0), 0);
-    // disclosure counts exactly the conditioned items — one event per (stage, id-set), nothing more
-    expect(events.length).toBeLessThanOrEqual(1);
+    // one event per (stage, id-set); the disclosure counts exactly the
+    // conditioned items and repeats their trust labels VERBATIM — never an upgrade
+    expect(events.length).toBe(1);
     expect(disclosedCount).toBe(items.length);
+    const disclosed = (events[0]!.detail as { items: Array<{ trustClass: string }> }).items;
+    expect(disclosed.every((m) => m.trustClass === 'own_unverified')).toBe(true);
   });
 
   it('archived poisoned items are excluded from every retrieval surface (activation surface closes)', () => {

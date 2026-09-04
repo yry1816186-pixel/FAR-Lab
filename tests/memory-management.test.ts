@@ -89,6 +89,19 @@ describe('editMemory (supersession)', () => {
     expect(edges.some((e) => e.relationType === 'supersedes' && e.toId === r.newId)).toBe(true);
   });
 
+  it('a long edit reason survives verbatim on the audit spine (no silent truncation)', async () => {
+    const { app } = await mkApp();
+    const item = mkItem();
+    app.store.putMemory(item);
+    const longReason = 'r'.repeat(500); // exceeds the old 180-char edge truncation
+    const r = editMemory(app, item.id, { body: 'v2', reason: longReason });
+    // the edge is the only persistent audit for workspace-global items — it
+    // must carry the full human act, and land in the same commit as the change
+    const act = app.store.listMemoryEdges({ fromId: r.newId! })
+      .find((e) => e.relationType.startsWith('edited_human:'));
+    expect(act?.relationType).toBe(`edited_human:${longReason}`);
+  });
+
   it('a human edit cannot mint own_* trust (own_verified original -> external_* replacement)', async () => {
     const { app } = await mkApp();
     // an own_unverified item (own_verified without resolvable receipt fences on write)
@@ -121,7 +134,10 @@ describe('editMemory (supersession)', () => {
       expect((e as MemoryOpError).status).toBe(409);
     }
     expect(first.newId).toBeDefined();
-    try { editMemory(app, 'mem_doesnotexist', { body: 'x', reason: 'r' }); } catch (e) {
+    try {
+      editMemory(app, 'mem_doesnotexist', { body: 'x', reason: 'r' });
+      expect.unreachable('editing an unknown id must throw');
+    } catch (e) {
       expect((e as MemoryOpError).code).toBe('not_found');
     }
   });

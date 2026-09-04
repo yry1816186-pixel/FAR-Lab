@@ -63,7 +63,15 @@ const memoryItemOf = (v: unknown): v is MemoryItemView =>
 const memoryListErr = (): ApiError =>
   new ApiError({ code: 'unexpected_schema', message: 'memory list response shape mismatch', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'memory' } });
 
-export const getMemoryItems = async (opts: { kind?: string; status?: string } = {}, signal?: AbortSignal): Promise<MemoryItemView[]> => {
+/** Items plus the honest-enumeration contract the server discloses (cap 500). */
+export interface MemoryListView {
+  items: MemoryItemView[];
+  /** false when the workspace holds more items than the list cap — counts are
+   *  then subset counts and the UI must not present them as totals. */
+  complete: boolean;
+}
+
+export const getMemoryItems = async (opts: { kind?: string; status?: string } = {}, signal?: AbortSignal): Promise<MemoryListView> => {
   const qs = new URLSearchParams();
   if (opts.kind !== undefined) qs.set('kind', opts.kind);
   if (opts.status !== undefined) qs.set('status', opts.status);
@@ -71,7 +79,9 @@ export const getMemoryItems = async (opts: { kind?: string; status?: string } = 
   const data = await api.getJson(`${BASE}/memory${q}`, signal);
   const list = (data as { items?: unknown }).items;
   if (!Array.isArray(list)) throw memoryListErr();
-  return list.filter(memoryItemOf);
+  const complete = (data as { complete?: unknown }).complete;
+  if (typeof complete !== 'boolean') throw memoryListErr();
+  return { items: list.filter(memoryItemOf), complete };
 };
 
 export interface MemoryMutationResponse {
@@ -82,8 +92,18 @@ export interface MemoryMutationResponse {
 }
 
 const memoryMutationOf = (data: unknown): MemoryMutationResponse => {
-  if (typeof data !== 'object' || data === null || typeof (data as { memoryId?: unknown }).memoryId !== 'string') throw memoryListErr();
-  return data as MemoryMutationResponse;
+  // Narrowed to the fields the UI contract consumes (status drives reload
+  // behavior; newId/eventId are informational) — malformed shapes fail loud.
+  if (typeof data !== 'object' || data === null) throw memoryListErr();
+  const memoryId = (data as { memoryId?: unknown }).memoryId;
+  const status = (data as { status?: unknown }).status;
+  if (typeof memoryId !== 'string') throw memoryListErr();
+  if (status !== 'active' && status !== 'superseded' && status !== 'archived') throw memoryListErr();
+  const newId = (data as { newId?: unknown }).newId;
+  const eventId = (data as { eventId?: unknown }).eventId;
+  if (newId !== undefined && typeof newId !== 'string') throw memoryListErr();
+  if (eventId !== undefined && eventId !== null && typeof eventId !== 'number') throw memoryListErr();
+  return { memoryId, ...(newId !== undefined ? { newId } : {}), status, eventId: eventId ?? null };
 };
 
 export const editMemoryItem = async (id: string, body: { title?: string; body?: string; failureReason?: string; reason: string }, signal?: AbortSignal): Promise<MemoryMutationResponse> =>

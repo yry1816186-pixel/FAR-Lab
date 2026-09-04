@@ -77,8 +77,15 @@ const auditEvent = (app: App, item: MemoryItem, detail: Record<string, unknown>)
   return app.store.appendEvent(runId, { type: 'note', detail: { ...detail, memoryId: item.id, actor: 'human' } }).seq;
 };
 
+/**
+ * The audit-spine edge carries the FULL reason (schema-bounded at 2,000
+ * chars): for workspace-global items this edge is the only persistent audit of
+ * the human act, so truncating it here would silently destroy the researcher's
+ * record. relation_type has no CHECK (migration v6) and no index scans its
+ * value, so length is free.
+ */
 const reasonEdgeType = (action: 'edited_human' | 'archived_human', reason: string): string =>
-  `${action}:${reason.slice(0, 180).replace(/\s+/g, ' ').trim()}`;
+  `${action}:${reason.replace(/\s+/g, ' ').trim()}`;
 
 export interface MemoryMutationResult {
   memoryId: string;
@@ -126,8 +133,9 @@ export function editMemory(app: App, id: string, rawBody: unknown): MemoryMutati
     lastAccessedAt: now,
     accessCount: 0,
   });
-  app.store.supersedeMemory(old.id, next);
-  app.store.recordMemoryEdge(next.id, next.id, reasonEdgeType('edited_human', reason), now);
+  // Supersession and its reason-bearing audit edge commit in ONE transaction —
+  // a committed change can never be missing its reason (see store.supersedeMemory).
+  app.store.supersedeMemory(old.id, next, reasonEdgeType('edited_human', reason));
   const eventId = auditEvent(app, old, {
     reason: 'memory_edited_human',
     newId: next.id,
