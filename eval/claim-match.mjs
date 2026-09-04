@@ -175,23 +175,36 @@ const claimDirection = (text) => {
   return null; // no directional operator
 };
 
+// ---- negation-polarity arm (S1, 2026-09-05) ----
+// The STOPWORDS list erases not/no/nor BEFORE cosine, so "A does not inhibit X"
+// and "A inhibits X" land in the band looking near-identical (plan-sciq S1 root
+// cause; the recorded negation-FN family of adjudication-accuracy 2026-08-29).
+// DIRECT predicate negation of the same directional assertion is a different
+// finding — decided deterministically. Deliberately narrower than naive
+// negation-parity: complement phrasings ("low X" vs "high Y" where X inhibits
+// Y — gold TRUE, two-sides-of-one-fact) carry no explicit predicate negation
+// and are untouched; subject-negated claims already abstain in claimDirection.
+const PREDICATE_NEGATION = /\b(?:not|cannot|can\s?not|doesn'?t|does\s?not|don'?t|didn'?t|did\s?not|fails?\s+to|failed\s+to|unable\s+to|neither|nor)\b/;
+
 const hasAny = (low, phrases) => phrases.some((p) => low.includes(p));
 
 /**
- * Deterministic verdict for a BORDERLINE pair (S2 pre-layer).
+ * Deterministic verdict for a BORDERLINE pair (S2 pre-layer + S1 negation arm).
  * Returns false when a general scientific invariant proves the pair asserts
- * DIFFERENT findings (opposing directions, or correlation vs mechanism);
- * returns null to abstain (send to the LLM band unchanged). Never returns
- * true — sameness stays the LLM band's job.
+ * DIFFERENT findings (opposing directions, negated vs asserted same direction,
+ * or correlation vs mechanism); returns null to abstain (send to the LLM band
+ * unchanged). Never returns true — sameness stays the LLM band's job.
  */
 export const deterministicBandVerdict = (claim, counterpart) => {
-  const da = claimDirection(claim);
-  if (da !== null) {
-    const db = claimDirection(counterpart);
-    if (db !== null && da !== db) return false; // "A restores X" vs "A reduces X"
-  }
   const la = String(claim ?? '').toLowerCase();
   const lb = String(counterpart ?? '').toLowerCase();
+  const da = claimDirection(claim);
+  const db = claimDirection(counterpart);
+  if (da !== null && db !== null && da !== db) return false; // "A restores X" vs "A reduces X"
+  if (da !== null && db !== null && da === db
+    && PREDICATE_NEGATION.test(la) !== PREDICATE_NEGATION.test(lb)) {
+    return false; // "A does not inhibit X" vs "A inhibits X" — negated vs asserted
+  }
   const aCorr = hasAny(la, CORRELATION_KIND);
   const aCausal = hasAny(la, CAUSAL_KIND);
   const bCorr = hasAny(lb, CORRELATION_KIND);
