@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CitationIntegrityError, detectPandoc, renderWithPandoc } from '../src/report/pandoc.js';
+import { isPandocFormat } from '../src/report/package.js';
 
 // *** TEST-ONLY *** Lane-07 pandoc bridge. Pandoc is OPTIONAL infrastructure: these
 // tests run the REAL local pandoc when present (the dev machine has 3.8.3) and skip
@@ -55,8 +56,15 @@ describe('renderWithPandoc (real pandoc)', () => {
     }
   });
 
-  it('rejects an unknown format name at the package layer (typed union)', () => {
-    // compile-time union; runtime guard is exercised by package tests passing strings
-    expect(['docx', 'jats', 'html']).toContain('docx');
+  it('rejects an unknown format name at the package layer (runtime guard)', () => {
+    // the package gate (report/package.ts) throws `unknown pandoc format` for any
+    // non-member — pin the predicate itself, both directions (a widened array or
+    // a loosened comparison fails here).
+    expect(isPandocFormat('docx')).toBe(true);
+    expect(isPandocFormat('jats')).toBe(true);
+    expect(isPandocFormat('html')).toBe(true);
+    expect(isPandocFormat('doc')).toBe(false); // near-miss extension
+    expect(isPandocFormat('DOCX')).toBe(false); // case-sensitive union
+    expect(isPandocFormat('')).toBe(false);
   });
 });

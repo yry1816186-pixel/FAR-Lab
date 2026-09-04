@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { performance } from 'node:perf_hooks';
 import { openDb } from '../src/persistence/db.js';
 import { Store } from '../src/persistence/store.js';
 import { ResearchQuestion, newId } from '../src/domain/index.js';
@@ -53,7 +52,7 @@ describe('FTS incremental upsert (FA-DAT-04)', () => {
     store['db'].close();
   });
 
-  it('a single put stays O(1): 2000-object mirror, one update well under the amplification budget', () => {
+  it('a single put stays O(1): 2000-object mirror, one update touches only its own rows', () => {
     const store = mkStore();
     const questions = Array.from({ length: 2000 }, (_, i) => mkQuestion(`amplification corpus sentence ${i} with shared tokens`));
     for (const q of questions) store.createRun(q);
@@ -64,13 +63,16 @@ describe('FTS incremental upsert (FA-DAT-04)', () => {
     store.createRun(warm);
     store.putObject('question', { ...warm, text: 'warmup write two' }); // warm the statements
 
-    const t0 = performance.now();
+    // Deterministic O(1) evidence: the COUNT of changed rows during one put.
+    // (The previous wall-clock budget flaked on stalled shared CI runners —
+    // timing measures the machine, total_changes measures the algorithm.)
+    // Old behavior rewrote all 2000 rows per table (~4000 FTS inserts + 2 bulk
+    // deletes); the O(1) path touches only this object's own rows.
+    const changesOf = (): number => Number((store['db'].prepare('SELECT total_changes() AS n').get() as { n: number }).n);
+    const before = changesOf();
     store.putObject('question', { ...questions[1000]!, text: 'the single measured update' });
-    const singlePutMs = performance.now() - t0;
-    // Old behavior rewrote all 2000 rows (2 tables = 4000 inserts + 2 bulk deletes)
-    // — typically 100ms+ on this hardware. Budget 30ms keeps a >3x margin over
-    // the new O(1) path while failing loudly if the full reindex ever returns.
-    expect(singlePutMs).toBeLessThan(30);
+    const changedRows = changesOf() - before;
+    expect(changedRows).toBeLessThan(50);
     expect(store.searchText('measured update', { questions: 5, hypotheses: 0, claims: 0 }).questions.length).toBe(1);
     expect(rowCount(store, 'far_search')).toBe(2001);
     store['db'].close();
