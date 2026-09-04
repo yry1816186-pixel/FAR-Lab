@@ -747,6 +747,7 @@
 .scope-acts { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .scope-note { font-size: 11.5px; color: var(--v2-text-3); line-height: 1.6; margin: 0; }
 /* §27: execution-truth badge on the map topline — mode honesty is first-class */
+.lab-truth--live { color: var(--v2-ok-on-tint); border-color: var(--ok-border); }
 .lab-truth--mixed { color: var(--v2-caution-on-tint); border-color: var(--warn-border); }
 .lab-truth--recorded_replay, .lab-truth--synthetic { color: var(--v2-refuted-on-tint); border-color: var(--err-border); }
 

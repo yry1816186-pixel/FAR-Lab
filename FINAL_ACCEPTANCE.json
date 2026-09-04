@@ -596,14 +596,15 @@
       "id": "FA-HCI-01",
       "domain": "hci",
       "title": "StudyMap live-band stream-health + protocol empty-state + live truth badge",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P1",
       "owner": "sibling-lane",
-      "gap": "StreamStatusChip only in RunDetail; protocol band absent = silent; map truth badge hidden while live (RunHeader inconsistent)",
+      "gap": "closed: stream banner on map live band; protocol honest empty state; truth badge always visible",
       "target": "reconnect banner on map; honest empty state; badge always visible",
       "verify": "e2e assertions",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/07-hci.md CAP-11/12/16"
+        "FINAL_EVIDENCE/audit-2026-08-30/07-hci.md CAP-11/12/16",
+        "web/e2e/map-surface.spec.ts (3/3 engines green): truth badge visible WHILE LIVE (positive 全实时/fully live label + lab-truth--live tone; only empty stays silent); StreamStatusChip rendered inside StudyMap LiveBand (App passes the SSE snapshot down) — deterministic SSE-blocked scenario (events/stream route aborted = restricted-network shape) shows the banner while the polling fallback carries the run to its verdict; settled runs without a protocol render the explicit 未注册≠遗漏 registered-empty band (map.protocolNone*)"
       ]
     },
     {

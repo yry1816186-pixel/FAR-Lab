@@ -807,6 +807,7 @@ export function App(): JSX.Element {
               <StudyMap
                 run={runDetail}
                 events={events}
+                stream={stream}
                 studies={studies}
                 focusClaimId={studyView ? focusClaimId : null}
                 onClaimFocused={() => setFocusClaimId(null)}

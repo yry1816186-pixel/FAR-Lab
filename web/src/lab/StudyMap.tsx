@@ -21,6 +21,9 @@ import { getProtocolState, type ProtocolStateView } from '../api/protocol';
 import { zhFirst, markerZh, dimensionLabel, decodeEntities } from './bilingual';
 import { ellipsize } from './text';
 import { useRunTruth } from '../components/detail/ResearchStatePanel';
+import { StreamStatusChip } from '../components/detail/StreamStatusChip';
+import type { StreamSnapshot } from '../hooks/eventStreamTracker';
+
 import { ScopeReview } from './ScopeReview';
 import { runLabel, type StudyGroup } from '../studies';
 import './lab.css';
@@ -79,10 +82,12 @@ const versionLabelDisplay = (label: string, t: ReturnType<typeof useI18n>['t']):
 };
 
 export function StudyMap({
-  run, events, studies, focusClaimId, onClaimFocused, onMutated,
+  run, events, studies, focusClaimId, onClaimFocused, onMutated, stream,
 }: {
   run: ResearchRun;
   events: RunEvent[];
+  /** Realtime stream health (FA-HCI-01): drives the visible reconnect/fallback chip on the live band. */
+  stream: StreamSnapshot;
   studies: StudyGroup[];
   /** Palette claim hit -> open that claim in the inspector once claims load. */
   focusClaimId?: string | null;
@@ -354,9 +359,11 @@ export function StudyMap({
         {science?.nextActions[0]?.researcherDecisionRequired === true && (
           <span className="lab-status lab-status--decision" title={science.nextActions[0].objective}>{t('map.pendingDecision')}</span>
         )}
-        {truth !== null && truth.klass !== 'live' && truth.klass !== 'empty' && (
-          <span className={`lab-status lab-truth--${truth.klass}`} title={t('map.truthHint', { n: truth.totalReceipts })}>
-            {t('map.truthBadge')}
+        {/* FA-HCI-01: the badge is ALWAYS visible (RunHeader parity) — live is a
+            positive claim, empty is the only silent case. */}
+        {truth !== null && truth.klass !== 'empty' && (
+          <span className={`lab-status lab-truth--${truth.klass}`} title={truth.klass === 'live' ? t('map.truthHintLive', { n: truth.totalReceipts }) : t('map.truthHint', { n: truth.totalReceipts })}>
+            {truth.klass === 'live' ? t('map.truthBadgeLive') : t('map.truthBadge')}
           </span>
         )}
         <span className="lab-spacer" />
@@ -428,6 +435,7 @@ export function StudyMap({
             onCancel={() => { void lifecycle('cancel'); }}
             cancelArmed={cancelArmed}
             onArmCancel={() => setCancelArmed((v) => !v)}
+            stream={stream}
             busy={lifecycleBusy}
             elapsedMin={elapsedMin}
             cancelRequested={cancelRequested}
@@ -631,6 +639,14 @@ export function StudyMap({
             )}
         </section>
 
+        {/* FA-HCI-01: an absent protocol band was silent — a settled reader could
+            not tell 'computed, nothing to preregister' from 'missing'. Say it. */}
+        {settled && protocol === null && protocolError === null && (
+          <section className="map-node">
+            <p className="map-node-label">{t('map.protocolNoneTitle')}</p>
+            <p className="small muted">{t('map.protocolNoneBody')}</p>
+          </section>
+        )}
         {(protocol !== null || protocolError !== null) && (
           <ProtocolPanel
             runId={run.id}
@@ -696,9 +712,10 @@ export function StudyMap({
 }
 
 /** Live execution narrative — six questions answered from real state, no fake progress. */
-function LiveBand({ run, events, onCancel, cancelArmed, onArmCancel, busy, elapsedMin, cancelRequested }: {
+function LiveBand({ run, events, onCancel, cancelArmed, onArmCancel, busy, elapsedMin, cancelRequested, stream }: {
   run: ResearchRun;
   events: RunEvent[];
+  stream: StreamSnapshot;
   onCancel: () => void;
   cancelArmed: boolean;
   onArmCancel: () => void;
@@ -723,6 +740,8 @@ function LiveBand({ run, events, onCancel, cancelArmed, onArmCancel, busy, elaps
         {t('map.liveElapsed', { min: elapsedMin })}
       </p>
       <p className="mb-line">{t('map.liveWhy', { stage: stageLabel })}</p>
+      {/* FA-HCI-01: a dropped realtime feed is never silent on the map either */}
+      <StreamStatusChip snapshot={stream} />
       {cancelRequested && (
         <p className="mb-line" role="status">{t('map.cancelPending')}</p>
       )}
