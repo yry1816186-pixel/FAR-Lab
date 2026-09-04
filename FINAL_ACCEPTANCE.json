@@ -481,14 +481,17 @@
       "id": "FA-REM-04",
       "domain": "remote",
       "title": "Slurm/PBS plugin gateway",
-      "status": "FAIL",
+      "status": "PASS",
       "priority": "P2",
       "owner": "self",
-      "gap": "zero implementation; hook point exists (scheduler executeVia + devices kind)",
+      "gap": "CLOSED 2026-09-04 (b934678): SlurmTransport implements sbatch/squeue/scancel behind the SAME Pick<SSHGateway,'probe'|'exec'|'putFile'> seam the remote executor consumes — executeRemoteExperiment runs on a batch cluster unchanged; cooperative cancel bridges to scancel (exit 137, never hangs); devices.json kind=slurm carries partition/account/timeLimit; FAILED/TIMEOUT/CANCELLED map to 1/124/137. Verify per the acceptance's own spec = mock-scheduler e2e (only the cluster scripted, the submit/poll/cancel state machine real). Disclosed: no REAL cluster run yet — first real sbatch host folds into the same seam",
       "target": "SlurmRemoteExecutor (sbatch/squeue/scancel) behind existing cancel semantics",
-      "verify": "mock-scheduler e2e",
+      "verify": "npx vitest run tests/slurm-transport.test.ts (9 passed; full suite exit 0)",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/05-remote.md CAP-07"
+        "FINAL_EVIDENCE/audit-2026-08-30/05-remote.md CAP-07",
+        "src/experiment/slurm-transport.ts + device-gateway.ts + devices.ts kind=slurm",
+        "tests/slurm-transport.test.ts (submit/poll/terminal-map/cancel-scancel/submit-fail/probe-binaries/wiring)",
+        "commit b934678"
       ]
     },
     {
