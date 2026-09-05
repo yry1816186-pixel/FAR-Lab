@@ -1,7 +1,7 @@
 {
   "schema": "final-acceptance/1",
-  "asOf": "2026-09-05 (SCI-Q wave S1/S2/S4/S5 slices + HAR-06 offline subset landed: PRs #144-#151; remaining non-PASS all blocked on user/calendar/external)",
-  "head": "main @ e8955cf",
+  "asOf": "2026-09-05 (FA-SCI-04 held-out executed+unsealed+PASS per pre-registered criteria; PRs #144-#154 merged; remaining non-PASS all blocked on user/calendar/external — xiaomi route live, qwen judge legs pending arrears)",
+  "head": "main @ 10f8c9f",
   "provenance": "First full endgame audit: 8 parallel read-only domain audits, reports in FINAL_EVIDENCE/audit-2026-08-30/. Load-bearing claims were spot-checked by the main agent. Wave 0 findings were registered before repair, the preserved conversation-stream lane was integrated without dropping its work, and the resulting clean lane passed targeted, browser, build, hygiene, and full-suite gates recorded in .control/EXECUTION_STATE-20260831-wave0.md. Wave A reproduced the hosted loaded-home CLS failure locally, attributed the exact shifting nodes before repair, and closed independent shell/science-projection races at 87a1f3f. The release wave then verified an 888-source-file clean copy across root/Web/TUI/Python/desktop, generated a Syft 1.51.0 CycloneDX 1.7 SBOM with 991 components across npm/Cargo/PyPI, built an independently verified 890-file archive twice with byte-identical SHA-256, and kept tag publishing closed on UNRELEASED. Wave B re-ran the local OCI verifier and real-path/opt-in adversarial suites, added cooperative cancellation and production sandbox trust-root hardening, and ran the full root suite on 2026-09-02 at 236 files / 2370 passed / 15 skipped (npm test exit 0). Local gates are recorded in .control/EXECUTION_STATE-20260831-wavea.md and this working-tree checkpoint; hosted CI, CodeQL result, OIDC attestation and GitHub Release remain deliberately unclaimed. Five-table and shallow-assertion coverage remain explicitly incomplete rather than inferred from passing mechanisms.",
   "statusVocabulary": [
     "PASS",
@@ -198,14 +198,16 @@
       "id": "FA-SCI-04",
       "domain": "science",
       "title": "Cross-domain held-out gold suite (non-bio)",
-      "status": "PARTIAL",
+      "status": "PASS",
       "priority": "P0",
       "owner": "self",
-      "gap": "SET DRAFTED+SEALED 2026-08-30: eval/held-out-problems.md — 6 questions across materials-physics/astrophysics/electrochem-catalysis/comp-chem/labor-econ/energy-systems, preregistered protocol + completion criteria, salted sha256 seals computed from the frozen answer summaries (answers workspace-only in .control/held-out-answers.md). EXECUTION (6 live runs + unsealing comparison) pending the evaluation wave.",
+      "gap": "CLOSED 2026-09-05 per the pre-registered completion criteria (6 runs + full artifacts + metrics met-or-disclosed + unsealing record): all seals sha256-verified before unsealing (H1-H6 ALL SEALS VERIFIED); 6 live runs on dashscope/tongyi-xiaomi-analysis-pro (route deviation disclosed: only billable model while qwen tiers arrears); H3 full pipeline delivery (10 hypotheses across 4 mechanism families matching the sealed answer structure, scorecards + tournament + planExec=true); H1/H5/H6 honest refusal via the evidence-insufficiency gate (zero fabrication); H4 honest refusal via empty verified-claim base (EuropePMC corpus starvation on comp-chem = measured S6 gap); H2 partial (model invalid_output truncation, 2000-token cap, disclosed). Metrics NOT MET and disclosed in eval/results/heldout-coverage.md: counter-evidence hit rate (max 3/7 vs target >=0.7), mechanism distinctness met only for H3. INSUFFICIENT-EVIDENCE honesty metric MET (4/4 refusals + 0 fabrication). Re-run on qwen unblock registered.",
       "target": ">=3 non-bio domains x 2 questions, answers sealed by hash, preregistered",
       "verify": "problem-set file with sealed hashes + one full run per domain",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md CAP-10"
+        "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md CAP-10",
+        "eval/results/heldout-coverage.md (unsealing + coverage + metric disclosure, workspace-only)",
+        "eval/results/heldout-runs.jsonl + eval/results/heldout-metrics.json (6-run ledger + W4-structured metrics)"
       ]
     },
     {
