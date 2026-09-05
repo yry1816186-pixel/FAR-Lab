@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { preMergeNearDuplicates } from '../src/pipeline/stages/hypothesis-dedup.js';
+import { preMergeNearDuplicates, preferEvidenceConditionedRepresentative } from '../src/pipeline/stages/hypothesis-dedup.js';
 import type { NormalizedCluster } from '../src/pipeline/stages/hypothesis-dedup.js';
 
 // RU-10 A4.5 — deterministic near-duplicate pre-merge feeding the hypothesis
@@ -58,5 +58,37 @@ describe('preMergeNearDuplicates', () => {
     const merged = preMergeNearDuplicates([base, v2, v3], llmClusters, 0.9);
     expect(merged).toHaveLength(1);
     expect(merged[0]?.members).toEqual([0, 1, 2]);
+  });
+});
+
+describe('preferEvidenceConditionedRepresentative (S2)', () => {
+  const cands = [
+    { strategy: 'mechanism_novelty', inputClaimIds: [] as string[] },
+    { strategy: 'evidence_conditioned', inputClaimIds: ['clm_a', 'clm_b'] },
+    { strategy: 'mechanism_novelty', inputClaimIds: [] },
+    { strategy: 'evidence_conditioned', inputClaimIds: [] as string[] }, // no claim linkage — no preference
+  ];
+
+  it('a lower-index novelty paraphrase no longer swallows the claim-conditioned member', () => {
+    const out = preferEvidenceConditionedRepresentative([cluster([0, 1], 'same mechanism')], cands);
+    expect(out[0]!.members[0]).toBe(1); // evidence_conditioned with claims leads
+    expect(out[0]!.members).toEqual([1, 0]);
+    expect(out[0]!.reason).toContain('claim-conditioned');
+  });
+
+  it('no conditioned member (or conditioned without claims) keeps ascending order', () => {
+    const out = preferEvidenceConditionedRepresentative([cluster([0, 2], 'same mechanism'), cluster([3], 'x')], cands);
+    expect(out[0]!.members).toEqual([0, 2]);
+    expect(out[1]!.members).toEqual([3]);
+  });
+
+  it('already-preferred and singleton clusters pass through untouched', () => {
+    const out = preferEvidenceConditionedRepresentative([cluster([1, 0], 'already ordered')], cands);
+    // cluster() helper sorts ascending; pass an explicitly ordered one instead
+    const ordered: NormalizedCluster[] = [{ members: [1, 0], reason: 'explicit order' }];
+    const out2 = preferEvidenceConditionedRepresentative(ordered, cands);
+    expect(out2[0]!.members).toEqual([1, 0]); // 1 stays first, no reorder needed
+    expect(out2[0]!.reason).toBe('explicit order');
+    expect(out).toBeTruthy();
   });
 });

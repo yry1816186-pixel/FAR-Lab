@@ -34,7 +34,7 @@ import {
   verifiedClaims,
 } from './shared.js';
 import { evaluateQualityGate, type QualityGateSignal } from '../../app/quality-gate.js';
-import { preMergeNearDuplicates } from './hypothesis-dedup.js';
+import { preMergeNearDuplicates, preferEvidenceConditionedRepresentative } from './hypothesis-dedup.js';
 
 /**
  * generate_hypotheses — multi-strategy hypothesis search (mission §26, R-06).
@@ -302,10 +302,13 @@ const clusterCandidates = async (
     // post-normalization stays the real dedup owner.
     temperature: 0.2,
   });
-  return preMergeNearDuplicates(
-    raws.map((r) => `${r.out.statement} ${r.out.mechanism}`),
-    normalizeClusters(res.data.clusters, raws.length),
-    NEAR_DUP_JACCARD,
+  return preferEvidenceConditionedRepresentative(
+    preMergeNearDuplicates(
+      raws.map((r) => `${r.out.statement} ${r.out.mechanism}`),
+      normalizeClusters(res.data.clusters, raws.length),
+      NEAR_DUP_JACCARD,
+    ),
+    raws,
   );
 };
 

@@ -98,3 +98,32 @@ export function preMergeNearDuplicates(
   out.sort((a, b) => (a.members[0] ?? 0) - (b.members[0] ?? 0));
   return out;
 }
+
+/**
+ * S2 representative preference (2026-09-05): within a paraphrase-equivalent
+ * cluster every member asserts the same mechanism, but the EVIDENCE-CONDITIONED
+ * member carries the verified-claim linkage (inputClaimIds) that evidence
+ * relations and deterministic grounding bind to. The default first-member
+ * rule (lowest index) let a lower-index novelty-strategy paraphrase swallow
+ * the established-mechanism candidate — discarding its evidence identity and
+ * (with the rank honesty gate) ranking the mechanism as unlinked novelty.
+ * Same-mechanism clusters keep their evidence linkage: prefer the
+ * evidence_conditioned member as representative; ascending order remains the
+ * tie-break among equally-conditioned members. Pure; not a tuning knob.
+ */
+export const preferEvidenceConditionedRepresentative = <T extends { strategy: string; inputClaimIds: readonly string[] }>(
+  clusters: readonly NormalizedCluster[],
+  candidates: readonly T[],
+): NormalizedCluster[] =>
+  clusters.map((cl) => {
+    if (cl.members.length < 2) return cl;
+    const established = cl.members.find(
+      (m) => candidates[m] !== undefined && candidates[m]!.strategy === 'evidence_conditioned'
+        && candidates[m]!.inputClaimIds.length > 0,
+    );
+    if (established === undefined || cl.members[0] === established) return cl;
+    return {
+      members: [established, ...cl.members.filter((m) => m !== established)],
+      reason: `${cl.reason} (+representative prefers the claim-conditioned member — established mechanisms keep their evidence linkage)`,
+    };
+  });
