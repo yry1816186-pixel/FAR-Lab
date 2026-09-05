@@ -30,9 +30,22 @@ const detDecided = bandAll.filter((r) => deterministicBandVerdict(r.claim, r.cou
 const band = bandAll.filter((r) => deterministicBandVerdict(r.claim, r.counterpart) !== false);
 
 const PROVIDER = process.env.FARLAB_JUDGE_PROVIDER ?? 'zai';
-const { createZaiProvider } = await import('../dist/providers/zai.js');
-process.env.ZAI_API_KEY ??= process.env.ZHIPU_API_KEY;
-const provider = createZaiProvider({ totalTimeoutMs: 300_000, model: process.env.FARLAB_ZAI_MODEL ?? 'glm-5.3' });
+/** Judge route: zai (glm, declared default) or dashscope (2026-09-05: the only
+ *  billable route while the account's qwen tiers are in arrears — model via
+ *  FARLAB_DASHSCOPE_MODEL, e.g. tongyi-xiaomi-analysis-pro). Same structured-call
+ *  surface; the family is recorded in the artifact either way. */
+let provider;
+if (PROVIDER === 'dashscope') {
+  const { createDashScopeProvider } = await import('../dist/providers/dashscope.js');
+  provider = createDashScopeProvider({
+    totalTimeoutMs: 300_000,
+    model: process.env.FARLAB_DASHSCOPE_MODEL ?? 'qwen3.7-plus',
+  });
+} else {
+  process.env.ZAI_API_KEY ??= process.env.ZHIPU_API_KEY;
+  const { createZaiProvider } = await import('../dist/providers/zai.js');
+  provider = createZaiProvider({ totalTimeoutMs: 300_000, model: process.env.FARLAB_ZAI_MODEL ?? 'glm-5.3' });
+}
 if (!provider.liveReady) { console.error('FATAL: judge route not live-ready'); process.exit(1); }
 
 // Mirrors rediscovery-judge.mjs's adjudication task VERBATIM (including the
@@ -60,15 +73,25 @@ const adjudicate = async (items) => {
     votes.push(r.data.verdicts.map((x) => x === true));
   }
   const valid = votes.filter((v) => v !== null);
-  if (valid.length === 0) throw new Error('all votes failed for a batch');
+  // UNSCORED batch (inspect_ai semantics): excluded from the measurement, never
+  // counted as no — one poisoned batch must not kill the standing instrument
+  // (observed 2026-09-05: batch 51-60 all-votes-failed on a route that scored
+  // the other 100 pairs fine)
+  if (valid.length === 0) return null;
   const majority = Math.floor(valid.length / 2) + 1;
   return items.map((_, k) => valid.filter((v) => v[k] === true).length >= majority);
 };
 
 const out = detDecided.map((p) => ({ label: p.label, verdict: false, det: true, sim: p.bestSim, claim: p.claim.slice(0, 90), counterpart: p.counterpart.slice(0, 90) }));
+let unscoredBatches = 0;
 for (let i = 0; i < band.length; i += BATCH) {
   const batch = band.slice(i, i + BATCH);
   const verdicts = await adjudicate(batch);
+  if (verdicts === null) {
+    unscoredBatches += 1;
+    process.stderr.write(`[adj-acc] batch ${i / BATCH + 1} UNSCORED (all votes failed — excluded, never counted as no)\n`);
+    continue;
+  }
   batch.forEach((p, k) => out.push({ label: p.label, verdict: verdicts[k], sim: p.bestSim, claim: p.claim.slice(0, 90), counterpart: p.counterpart.slice(0, 90) }));
   process.stderr.write(`[adj-acc] ${Math.min(i + BATCH, band.length)}/${band.length}\n`);
 }
@@ -81,7 +104,7 @@ const acc = (tp + tn) / out.length;
 const summary = {
   generatedAt: new Date().toISOString(), judge: provider.modelId, judgeRoute: PROVIDER,
   votes: VOTES, n: out.length, goldTrue: tp + fn, goldFalse: tn + fp,
-  detBandDecided: detDecided.length, llmBand: band.length,
+  detBandDecided: detDecided.length, llmBand: band.length, unscoredBatches,
   accuracy: Math.round(acc * 1000) / 1000,
   truePositiveRate: Math.round((tp / (tp + fn)) * 1000) / 1000,
   falsePositiveRate: Math.round((fp / (fp + tn)) * 1000) / 1000,
