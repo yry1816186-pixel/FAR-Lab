@@ -117,7 +117,10 @@ const farRun = (task, question) => {
   return JSON.parse(line ?? '{}');
 };
 
-const DB_PATH = resolve(process.cwd(), '.far-run/far.db');
+// Runs db: default .far-run/far.db (historical banked runs live there). Override
+// with FARLAB_MLR_DB for isolated re-generation batches (2026-09-05: the 72h soak
+// owns .far-run — new runs must not write there; snapshot it and generate elsewhere).
+const DB_PATH = resolve(process.cwd(), process.env.FARLAB_MLR_DB ?? '.far-run/far.db');
 
 const renderIdea = (runId) => {
   const db = new DatabaseSync(DB_PATH, { readOnly: true });
@@ -386,7 +389,12 @@ for (const r of uniqueRuns) {
       try {
         const review = await judgeOne(provider, rubric, dims, stage, md, taskText, r.task, agent, ideaMd);
         records.push({
-judge: 'glm (makeProvider route; identity per PROTOCOL addendum)', temperature: 0,
+          // 2026-09-05 fix: task/runId/agent/stage were dropped from success records
+          // (only error/skipped rows carried them) — per-agent north-star means were
+          // uncomputable from the artifact. Judge identity derives from the live
+          // provider instead of a stale hardcoded label.
+          task: r.task, runId: r.runId, agent, stage,
+          judge: `${provider.providerName ?? 'makeProvider'}/${provider.modelId} (route per PROTOCOL addendum)`, temperature: 0,
           ...(agent === 'farlab' ? { rendering: 'idea-proposal-v2' } : {}),
           scores: Object.fromEntries(Object.entries(review).map(([k, v]) => [k, v.score])),
           overall: review.OverallAssessment.score,
