@@ -62,8 +62,8 @@
         "value": 7,
         "detail": "idea 7.00 / proposal 6.20; Feasibility 7.40 already exceeds anchors",
         "at": "2026-08-22",
-        "evidence": "eval/results/mlr-bench.jsonl; evidence/W-EV2/mlr-bench.md",
-        "note": "W5-F3 adapter fidelity landed (D-050): judging protocol now includes idea-consistency context — post-D-050 numbers NOT directly comparable to the recorded 30/30 (old/new protocols must both be reported); farlab-vs-anchor internal comparisons stay symmetric; live re-run queued on D-036"
+        "evidence": "eval/results/mlr-bench.jsonl.archived-glm30-20260822 (the 2026-08-22 glm-judged 30/30 evidence — the LIVE eval/results/mlr-bench.jsonl was rotated 2026-09-05 23:34 by a completed qwen3.7-max judge pass over the 9 banked tasks, glm-era generation x max judge = mixed-route, disclosure-only); evidence/W-EV2/mlr-bench.md",
+        "note": "W5-F3 adapter fidelity landed (D-050): judging protocol now includes idea-consistency context — post-D-050 numbers NOT directly comparable to the recorded 30/30 (old/new protocols must both be reported); farlab-vs-anchor internal comparisons stay symmetric; N=30 all-max regeneration + unified qwen3.7-max judge IN FLIGHT 2026-09-05/06 (artifact eval/results/mlr-out-max-n30.jsonl; generation route disclosure: 21 regenerated tasks on dashscope/qwen3.7-max after the zai-meta routing incident, 9 banked tasks remain glm-era generation — mixed-generation sample, disclosed)"
       },
       "target": {
         "idea": 7.4,
