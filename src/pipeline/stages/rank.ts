@@ -554,6 +554,8 @@ export interface DeterministicGrounding {
 }
 
 export const GROUNDING_PRODUCER = 'deterministic-evidence-body (Σlog-LR band + QBAF, relationStrength-v1 inputs)';
+/** Producer label for the novelty honesty gate (below) — a definitional zero, not a judgment. */
+export const NOVELTY_GATE_PRODUCER = 'deterministic-literature-novelty (already_done verdict => novelty 0)';
 
 /** Map one hypothesis's evidence body to the evidence_grounding dimension value. */
 export const deterministicEvidenceGrounding = (body: EvidenceBody): DeterministicGrounding => {
@@ -839,6 +841,44 @@ async function rankExecute(ctx: StageContext): Promise<StageOutcome> {
         compositeDims,
         excluded: composite.excluded,
       });
+    }
+
+    // ---- S2 novelty honesty gate (2026-09-05, applied to the ranked set):
+    // claiming novelty for established work is FALSE. When the D-017
+    // literature-novelty layer's prior-art search returned 'already_done', the
+    // novelty dimension is definitionally 0 — the LLM self-score cannot assert
+    // novelty the run's own corpus search contradicts. Same discipline as the
+    // Lane-06 grounding override: deterministic code owns the measured
+    // dimension; this is a DEFINITIONAL correction, not a reweight
+    // (RANK_WEIGHTS unchanged; the composite reweight remains a measured,
+    // before/after-guarded design change). Applies whether or not the LLM
+    // emitted a novelty score — an absent dimension contributes no weight, and
+    // zero novelty must actually cost the already_done candidate its 0.10.
+    const NOVELTY_GATE_RATIONALE = 'literature-novelty layer verdict: already_done — novelty is definitionally zero';
+    for (let idx = 0; idx < ranked.length; idx += 1) {
+      const r = ranked[idx]!;
+      if (r.hyp.literatureNovelty?.verdict !== 'already_done') continue;
+      if (r.compositeDims.some((d) => d.dimension === 'novelty')) {
+        warnings.push(`${r.hyp.id}: novelty LLM self-score zeroed — literature-novelty verdict is already_done`);
+      } else {
+        warnings.push(`${r.hyp.id}: novelty dimension added at 0 — literature-novelty verdict is already_done`);
+      }
+      r.compositeDims = [
+        ...r.compositeDims.filter((d) => d.dimension !== 'novelty'),
+        { dimension: 'novelty', value: 0 },
+      ];
+      r.dimensions = [
+        ...r.dimensions.filter((d) => d.dimension !== 'novelty'),
+        {
+          dimension: 'novelty',
+          value: 0,
+          rationale: NOVELTY_GATE_RATIONALE,
+          evidenceClaimIds: [],
+          producer: NOVELTY_GATE_PRODUCER,
+          calibration: 'deterministic',
+        },
+      ];
+      r.composite = compositeScore(r.compositeDims)?.value ?? r.composite;
     }
 
     if (ranked.length === 0) {

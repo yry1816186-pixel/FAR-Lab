@@ -1286,6 +1286,65 @@ describe('critique_falsify stage', () => {
 // ---------------------------------------------------------------------------
 
 describe('rank stage', () => {
+  it('novelty honesty gate: already_done verdict zeroes (or adds-at-zero) the novelty dimension and recomputes the composite', async () => {
+    const { store, run } = setup();
+    const hA = makeHyp(run.id, 'established mechanism (already done)', { createdAt: ts(0) });
+    const hB = makeHyp(run.id, 'genuinely novel mechanism', { createdAt: ts(1) });
+    // D-017 layer verdicts: A's prior-art search says the literature already did it
+    const ALREADY_DONE = {
+      verdict: 'already_done',
+      neighbors: [],
+      justification: 'fixture: prior-art search matched the established finding',
+      producer: 'test-stub/test-stub novelty layer',
+      calibration: 'uncalibrated_llm_judgment',
+      assessedAt: ts(0),
+    } as const;
+    store.putObject('hypothesis', { ...hA, literatureNovelty: ALREADY_DONE });
+    store.putObject('hypothesis', hB);
+    // A's LLM self-score claims novelty 0.9 — the gate must replace it with 0
+    const dimsA = CORE_DIMS(0.5).map((d) => (d.dimension === 'novelty' ? { ...d, value: 0.9 } : d));
+    const dimsA0 = [...dimsA, dim('uncertainty', null)];
+    const dimsB = [...CORE_DIMS(0.5), dim('uncertainty', null)];
+    const rankOut = {
+      assessments: [
+        { hypothesisId: hA.id, dimensions: dimsA0 },
+        { hypothesisId: hB.id, dimensions: dimsB },
+      ],
+    };
+    const { ctx } = makeCtx(run, store, [
+      { rawOutput: JSON.stringify(rankOut) },
+      // D-016 tournament pair (A, B) — verdict irrelevant to the gate assertions
+      { rawOutput: JSON.stringify({ aFirstVerdict: 'b', bFirstVerdict: 'b', rationale: 'fixture judgement: novel candidate preferred by the stub' }) },
+    ]);
+    expect(await rankStage.applicable(ctx)).toBe(true);
+    const outcome = await rankStage.execute(ctx);
+    expect(outcome.kind).toBe('done');
+    const summary = outcome.kind === 'done' ? outcome.summary : '';
+
+    const cards = store.listObjects('scorecard', run.id);
+    const cardA = cards.find((c) => c.hypothesisId === hA.id);
+    const cardB = cards.find((c) => c.hypothesisId === hB.id);
+    expect(cardA).toBeDefined();
+    expect(cardB).toBeDefined();
+    // the gated dimension is a DEFINITIONAL zero, deterministic and disclosed
+    const novA = cardA?.dimensions.find((d) => d.dimension === 'novelty');
+    expect(novA).toMatchObject({ value: 0, calibration: 'deterministic' });
+    expect(novA?.producer).toContain('deterministic-literature-novelty');
+    expect(novA?.rationale).toContain('already_done');
+    // the ungated hypothesis keeps its uncalibrated stub novelty judgment
+    const novB = cardB?.dimensions.find((d) => d.dimension === 'novelty');
+    expect(novB?.calibration).toBe('uncalibrated_llm_judgment');
+    // composite arithmetic (rendered in the rationale string, 4dp): both candidates
+    // have deterministic evidence_grounding 0 (no relations — the Lane-06 measurement),
+    // five dims at 0.5; the gate zeroes A's novelty: B = 0.5*0.8 = 0.4000, A = 0.5*0.7 = 0.3500
+    expect(cardA?.overallRationale).toContain('0.3500');
+    expect(cardB?.overallRationale).toContain('0.4000');
+    // (final rank order is not asserted here: it is tournament-first (D-016) and this
+    // fixture's pairwise verdicts are stub noise — the gate's mechanism is the
+    // zeroed dimension and the composite drop, both asserted above)
+    expect(summary).toContain('novelty LLM self-score zeroed');
+  });
+
   it('computes deterministic weighted ranks with evidence_grounding tie-break, filters refs, emits comparison artifact', async () => {
     const { store, run } = setup();
     const c1 = makeClaim(run.id, 'evidence claim one');
