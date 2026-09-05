@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-04T17:21:24.778Z",
+  "generatedAt": "2026-09-05T19:24:56.396Z",
   "prompts": [
     {
       "file": "src/pipeline/stages/scope.ts",
@@ -372,17 +372,23 @@
     {
       "file": "src/pipeline/stages/falsify.ts",
       "name": "INLINE:Youareanadversar",
-      "chars": 3018,
-      "sha256": "eacfc8a98e6f1fb6",
+      "chars": 3773,
+      "sha256": "1a83da5256d2ae71",
       "sample": "You are an adversarial reviewer. Produce a COMPLETE falsific",
-      "version": 2,
-      "provenance": "extractor widening: +-continued literals now merge into the full runtime prompt (identity = whole text); falsify spec prompt adds sharedFocus + supporting-qualifies rules (FA-SCI-03)",
+      "version": 3,
+      "provenance": "SCI-03 weakens discriminative definition (2026-09-06): weakens requires compatibility-with-partial-truth (must not assert negation of core relation); literature-state hypotheses: at-odds findings are contradicts; rarity/exception-hypothesis direction rule added (challenge-to-mainstream supports rarity). Miss-class analysis: max-judge n=56, pipeline weakens 0/10 exact = 4 under-commit + 4 direction errors + 2 topical-adjacent. Re-measurement leg queued (fresh runs + cross-family judge).",
       "history": [
         {
           "sha256": "247334cf742c7541",
           "chars": 100,
           "version": 1,
           "at": "2026-09-04T17:20:44.594Z"
+        },
+        {
+          "sha256": "eacfc8a98e6f1fb6",
+          "chars": 3018,
+          "version": 2,
+          "at": "2026-09-04T17:21:24.778Z"
         }
       ]
     },
