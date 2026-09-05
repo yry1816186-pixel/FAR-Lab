@@ -1,7 +1,7 @@
 {
   "schema": "final-acceptance/1",
-  "asOf": "2026-09-05 (FA-SCI-04 held-out executed+unsealed+PASS per pre-registered criteria; PRs #144-#154 merged; remaining non-PASS all blocked on user/calendar/external — xiaomi route live, qwen judge legs pending arrears)",
-  "head": "main @ 10f8c9f",
+  "asOf": "2026-09-05 (qwen3.7-max unlock window: dual-judge accounting for FA-SCI-01/SCI-03 + FA-SCI-04 route-2 replication recorded; PRs #144-#160 merged; MLR N=30 regeneration + threeway pin in flight; remaining non-PASS blocked on user/calendar/external)",
+  "head": "main @ e9c22bf",
   "provenance": "First full endgame audit: 8 parallel read-only domain audits, reports in FINAL_EVIDENCE/audit-2026-08-30/. Load-bearing claims were spot-checked by the main agent. Wave 0 findings were registered before repair, the preserved conversation-stream lane was integrated without dropping its work, and the resulting clean lane passed targeted, browser, build, hygiene, and full-suite gates recorded in .control/EXECUTION_STATE-20260831-wave0.md. Wave A reproduced the hosted loaded-home CLS failure locally, attributed the exact shifting nodes before repair, and closed independent shell/science-projection races at 87a1f3f. The release wave then verified an 888-source-file clean copy across root/Web/TUI/Python/desktop, generated a Syft 1.51.0 CycloneDX 1.7 SBOM with 991 components across npm/Cargo/PyPI, built an independently verified 890-file archive twice with byte-identical SHA-256, and kept tag publishing closed on UNRELEASED. Wave B re-ran the local OCI verifier and real-path/opt-in adversarial suites, added cooperative cancellation and production sandbox trust-root hardening, and ran the full root suite on 2026-09-02 at 236 files / 2370 passed / 15 skipped (npm test exit 0). Local gates are recorded in .control/EXECUTION_STATE-20260831-wavea.md and this working-tree checkpoint; hosted CI, CodeQL result, OIDC attestation and GitHub Release remain deliberately unclaimed. Five-table and shallow-assertion coverage remain explicitly incomplete rather than inferred from passing mechanisms.",
   "statusVocabulary": [
     "PASS",
@@ -144,11 +144,11 @@
     {
       "id": "FA-SCI-01",
       "domain": "science",
-      "title": "Rediscovery mean F1 to target (0.226 → 0.7 staged)",
+      "title": "Rediscovery mean F1 to target (max judge 0.11 / glm 0.226 dual-disclosed → 0.7 staged)",
       "status": "PARTIAL",
       "priority": "P0",
       "owner": "self",
-      "gap": "2/5 tasks top hypothesis proposes different mechanism than established finding (novelty-vs-rediscovery tension); N=5 self-authored tasks",
+      "gap": "DUAL-JUDGE DISCLOSED 2026-09-05 (judge route switch = protocol change, recorded with artifacts): SAME frozen artifacts score F1 0.226 under glm-5.3 (lenient) vs 0.11 under the user-mandated qwen3.7-max (strict, 5-vote). Manual spot-check (egfr) proves the max zeros more truthful: agent decomposition all C797S-family vs GT all T790M/MET-HER3, zero real overlap — glm non-zero was borderline leniency inflation. FRESH POST-GATE runs (2026-09-05, route+judge max, post #150/#151/#156/#158): F1 0.08, BUT the egfr tournament champion IS the established T790M hypothesis (5-0) correctly rendered — product layer fixed; residual gap = decomposition-granularity alignment + judge-band strictness (S1 @max: TPR 0.838, 6 complementary-phrasing FNs; three judge generations all miss instrument targets 0.88/0.90/0.12). Remaining product lever: granularity alignment; judge-band calibration is protocol-layer, not silently changeable. N=5 self-authored tasks.",
       "target": ">=10 tasks, staged intermediate F1>=0.4 with per-task bootstrap CI",
       "verify": "node eval/rediscovery.mjs, artifacts with seed/route/prompt receipts",
       "evidence": [
@@ -156,7 +156,11 @@
         "eval/north-star.json",
         "INSTRUMENT CAVEAT 2026-09-04 (sweep finding, commit 0aeeb6d): the frozen 0.226 F1 was measured with an INVERTED cdiff gtClaim (Loss of secondary bile acids inhibits... — corrected to Secondary bile acids inhibit...); forward re-measurements may shift; the frozen number stands as recorded-at-the-time",
         "eval/results/rediscovery-rescore.json (post-GT-fix deterministic re-score of stored decompositions: cdiff F1 in [0, 0.571] with 7 borderline pairs; task means lower=0.025 upper=0.483 N=5 — final F1 awaits live 5-vote borderline adjudication)",
-        "eval/rediscovery-rescore.mjs (deterministic re-score tool: stored agent decomposition x current GT, borderline bounds)"
+        "eval/rediscovery-rescore.mjs (deterministic re-score tool: stored agent decomposition x current GT, borderline bounds)",
+        "eval/results/rediscovery.max-judge-20260905-1532.jsonl (frozen artifacts re-judged qwen3.7-max 5-vote: crc 0.533, others 0, mean 0.107)",
+        "eval/results/adjudication-accuracy.json (2026-09-05 judge qwen3.7-max: acc 0.789/TPR 0.838/FPR 0.236, tp31/fn6/tn55/fp17, n=109)",
+        "eval/results/rediscovery.jsonl (fresh post-gate 5-run corpus @max, mean F1 0.075) + .control/rediscovery-judge-max.log",
+        "eval/north-star.json rediscovery-mean-f1: dual-number discipline glm 0.226 / max 0.11, target 0.7 unchanged"
       ]
     },
     {
@@ -184,14 +188,16 @@
       "status": "PARTIAL",
       "priority": "P0",
       "owner": "self",
-      "gap": "OFFLINE LEVERS SHIPPED (2026-09-05): (1) T4 shared-focus gate — critique links must carry sharedFocus naming mechanism/entity words that occur VERBATIM in both the claim and hypothesis surface (verifySharedFocus, <2 verified tokens = link refused with visible warning; falsify.ts); calibration recorded: lexical containment cannot separate the miss classes (judge-unrelated containment 0.077-0.375 vs judge-related down to 0 — the pipeline links ON surface overlap, so only a verified mechanism-token assertion adds signal). (2) Supporting-side qualifies labeling (component/subgroup/condition support lands as qualifies, schema-enforced). Prompts re-gated (snapshot v-bump + gold anchors green; extractor widened to cover +-concatenated prompt tails). REMAINING: live cross-family re-judge on the funded route to measure exact-label movement (blocked on dashscope arrears).",
+      "gap": "LIVE CROSS-FAMILY RE-JUDGE DONE 2026-09-05 (judge qwen3.7-max, user-mandated route; prior glm-4.6 0.450 n=60 kept as route history): exact-label 28/56=0.500 (target >=0.7 not met, stays PARTIAL honestly). Decomposition: supports 22/24=0.917 (near target); contradicts 5/12 (6 judged supports = inversions); weakens 0/10 (judged contradicts 4/supports 4/unrelated 2 — counter-family adjacency, not fabrication); qualifies 1/10 (8 judged supports); counter-family strict hit 10/22=0.455. DOMINANT MISS CLASS = weakens<->contradicts typology boundary + supporting-side granularity — next lever is the weakens discriminating definition (relation typology), NOT more linking gates: the #144 sharedFocus gate shipped 2026-09-05 did not move the boundary classes, as predicted by the calibration study.",
       "target": "exact-label>=0.7 on >=5 problems, cross-family judge",
       "verify": "spikes/relation-precision.mjs expanded sample",
       "evidence": [
         "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md CAP-04",
         "eval/omega/anchors/relation-precision-n30{,-b2}-20260904.jsonl miss decomposition (33 misses: ~12 topically-kin-but-unrelated, ~12 qualifies-boundary, 4 inverted)",
         ".control calibration study: lexical containment ranges (unrelated 0.077-0.375, related 0-0.615) — gates must verify assertions, not measure overlap",
-        "src/pipeline/stages/falsify.ts verifySharedFocus + focus gate + supporting qualifies relation; tests/falsify-binding.test.ts 61/61 incl refusal + qualifies routing"
+        "src/pipeline/stages/falsify.ts verifySharedFocus + focus gate + supporting qualifies relation; tests/falsify-binding.test.ts 61/61 incl refusal + qualifies routing",
+        "spikes/output/relation-precision-max-n60-20260905.jsonl (n=56 blind cross-family re-judge rows, 0 errors) + .control/relprec-max.log",
+        "eval/north-star.json relation-blind-agreement: 0.450 (glm-4.6, 2026-09-04) -> 0.500 (qwen3.7-max, 2026-09-05), target 0.8 unchanged"
       ]
     },
     {
@@ -207,7 +213,8 @@
       "evidence": [
         "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md CAP-10",
         "eval/results/heldout-coverage.md (unsealing + coverage + metric disclosure, workspace-only)",
-        "eval/results/heldout-runs.jsonl + eval/results/heldout-metrics.json (6-run ledger + W4-structured metrics)"
+        "eval/results/heldout-runs.jsonl + eval/results/heldout-metrics.json (6-run ledger + W4-structured metrics)",
+        "ROUTE-2 REPLICATION 2026-09-05 (dashscope/qwen3.7-max, .tmp-heldout-max): H2/H3/H5 full-pipeline completed (H2 2000-token truncation GONE at 15.4min/392k tokens; H5 passes sufficiency gate) with top-hypothesis structure matching sealed answers on all three (manual comparison 17:55, eval/results/heldout-coverage.md appendix 2) — delivery 3/6 vs xiaomi batch 1/6; H1/H6 refusal is model-independent (2 routes agree); H4 partial on scope schema (assumptions 300-char cap vs max long-form, registered capability debt); counter-evidence density 9->45; claimBinding 6/6 at 100%; anchor live firings 6 (H1 verb-opposition x2, H2 null-vs-effect x4). eval/results/heldout-max-metrics.json"
       ]
     },
     {
@@ -1084,5 +1091,5 @@
     "note": "Mission stop requires ALL of: no internal FAIL/PARTIAL; canonical clean-clone CI green; science north-star met or externally justified; real evidence across all planes; 24h→72h soak+chaos; win/mac/linux matrix; sandbox attack suite; production-path-only flows; clean-machine bundle verify; honest BLOCKED_EXTERNAL only; docs==commit; final red-team audit no new P0/P1.",
     "currentVerdict": "NOT READY — 8 FAIL, 22 PARTIAL, 33 PASS, 2 BLOCKED_EXTERNAL (66 tracked). Closed this wave: FA-SEC-01 (hosted ubuntu OCI evidence on canonical main, run 33583828122), FA-PLT-01/02 (canonical main CI fully green), FA-REM-01, FA-SEC-04, FA-SEC-08, FA-HAR-01, FA-HCI-04, FA-DAT-03 (decision record), FA-EVAL-02 (preregistered user-study protocol; execution BLOCKED_EXTERNAL by design), FA-EVAL-04, FA-SEC-12, FA-PRF-02 (hosted perf gate PASS). Still open: hosted OIDC/release evidence, scientific targets (4 metrics), 6h+ soak (running; verdict at hour 6), streaming data plane, evaluation-wave re-measurement, five-table sweep (233/960: three of five tables complete; runtime+tests remain), and B-QWEN (user-owned 09-05)."
   },
-  "currentVerdict": "NOT READY — 2 FAIL, 6 PARTIAL, 54 PASS, 4 BLOCKED_EXTERNAL (66 tracked; per-item statuses authoritative, dated closures through 2026-09-05)"
+  "currentVerdict": "NOT READY — 2 FAIL, 5 PARTIAL, 55 PASS, 4 BLOCKED_EXTERNAL (66 tracked; per-item statuses authoritative, dated closures through 2026-09-05; FA-SCI-04 flipped PASS 2026-09-05 per pre-registered criteria)"
 }
