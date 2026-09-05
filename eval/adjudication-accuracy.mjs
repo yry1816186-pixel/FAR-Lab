@@ -73,15 +73,25 @@ const adjudicate = async (items) => {
     votes.push(r.data.verdicts.map((x) => x === true));
   }
   const valid = votes.filter((v) => v !== null);
-  if (valid.length === 0) throw new Error('all votes failed for a batch');
+  // UNSCORED batch (inspect_ai semantics): excluded from the measurement, never
+  // counted as no — one poisoned batch must not kill the standing instrument
+  // (observed 2026-09-05: batch 51-60 all-votes-failed on a route that scored
+  // the other 100 pairs fine)
+  if (valid.length === 0) return null;
   const majority = Math.floor(valid.length / 2) + 1;
   return items.map((_, k) => valid.filter((v) => v[k] === true).length >= majority);
 };
 
 const out = detDecided.map((p) => ({ label: p.label, verdict: false, det: true, sim: p.bestSim, claim: p.claim.slice(0, 90), counterpart: p.counterpart.slice(0, 90) }));
+let unscoredBatches = 0;
 for (let i = 0; i < band.length; i += BATCH) {
   const batch = band.slice(i, i + BATCH);
   const verdicts = await adjudicate(batch);
+  if (verdicts === null) {
+    unscoredBatches += 1;
+    process.stderr.write(`[adj-acc] batch ${i / BATCH + 1} UNSCORED (all votes failed — excluded, never counted as no)\n`);
+    continue;
+  }
   batch.forEach((p, k) => out.push({ label: p.label, verdict: verdicts[k], sim: p.bestSim, claim: p.claim.slice(0, 90), counterpart: p.counterpart.slice(0, 90) }));
   process.stderr.write(`[adj-acc] ${Math.min(i + BATCH, band.length)}/${band.length}\n`);
 }
@@ -94,7 +104,7 @@ const acc = (tp + tn) / out.length;
 const summary = {
   generatedAt: new Date().toISOString(), judge: provider.modelId, judgeRoute: PROVIDER,
   votes: VOTES, n: out.length, goldTrue: tp + fn, goldFalse: tn + fp,
-  detBandDecided: detDecided.length, llmBand: band.length,
+  detBandDecided: detDecided.length, llmBand: band.length, unscoredBatches,
   accuracy: Math.round(acc * 1000) / 1000,
   truePositiveRate: Math.round((tp / (tp + fn)) * 1000) / 1000,
   falsePositiveRate: Math.round((fp / (fp + tn)) * 1000) / 1000,
