@@ -36,8 +36,11 @@ const objects = (kind, runId) =>
 const COUNTER_RELATIONS = new Set(['contradicts', 'weakens', 'fails_to_replicate', 'alternative_explanation']);
 
 const farlabRunMetrics = (runId) => {
-  const run = db.prepare('SELECT doc FROM runs WHERE id=?').get(runId);
-  const runDoc = JSON.parse(run.doc);
+  const runRow = db.prepare('SELECT doc FROM runs WHERE id=?').get(runId);
+  // An absent runId is a pointing error (problems.json pinned to runs from a
+  // different FARLAB_DATA_DIR), not a metrics-zero situation — fail loudly.
+  if (!runRow) throw new Error(`run not found in this db: ${runId}`);
+  const runDoc = JSON.parse(runRow.doc);
   const sources = objects('source_document', runId);
   const claims = objects('claim', runId);
   const relations = objects('evidence_relation', runId);
