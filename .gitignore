@@ -111,3 +111,6 @@ work/
 # Submission final-package QA render iterations (process artifacts, ~77MB local only;
 # the deliverables docx/pdf/figs/generators ARE tracked under submission/final/)
 /submission/final/pdf-qa*/
+
+# live-run runtime data dirs (xiaomi-route probes, universal smoke)
+.tmp-*/
