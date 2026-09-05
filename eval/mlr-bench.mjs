@@ -26,7 +26,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 
 import { resolve, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
-import { makeProvider } from './lib.mjs';
+import { makeProvider, parseRunOutput } from './lib.mjs';
 import { isRepresentative } from '../dist/pipeline/stages/shared.js';
 
 const SEED = 20260822;
@@ -108,13 +108,17 @@ const eligibleTasks = () => {
 // FAR-Lab run + deterministic idea/proposal rendering from persisted objects
 // ---------------------------------------------------------------------------
 
+// runId extraction: see parseRunOutput in eval/lib.mjs (2026-09-05 fix — the final
+// run report carries `id`, not `runId`; the old last-line `.runId` read silently
+// wrote runId-less rows for completed runs, invisible to resume and judging).
 const farRun = (task, question) => {
   const stdout = execFileSync('node', [
     'dist/cli/main.js', 'research', 'start', question,
     '--domain', 'machine learning', '--goal', 'exploratory', '--json',
   ], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: Number(process.env.MLR_RUN_TIMEOUT_MIN ?? 45) * 60_000 });
-  const line = stdout.split('\n').filter((l) => l.trim().startsWith('{')).at(-1);
-  return JSON.parse(line ?? '{}');
+  const r = parseRunOutput(stdout);
+  if (r.runId === undefined) throw new Error(`research start returned no runId (status=${String(r.status)}) — output shape drifted, refusing to write a runId-less row`);
+  return r;
 };
 
 // Runs db: default .far-run/far.db (historical banked runs live there). Override
