@@ -528,6 +528,67 @@ describe('build_evidence stage', () => {
     expect(store.listObjects('evidence_relation', ctx.run.id)).toHaveLength(4); // +1 stance relation from docC only
   });
 
+  it('direction anchor: opposing-direction pair gets a deterministic counter disclosure even when the adjudicator abstains', async () => {
+    // The measured held-out gap (2026-09-05): counter-evidence hit rate <= 3/7
+    // because the strict cross adjudicator defaults to not_comparable on
+    // non-numeric opposition. The lexical anchor (Lane-06 sibling) guarantees
+    // the counter signal is VISIBLE on the claims whatever the verdict.
+    const ABSTRACT_DOWN =
+      'A three-year trial of CRISPR base editing of the maize DREB gene reduces kernel yield under drought conditions. ' +
+      'Edited lines lost eight percent yield on average relative to controls across all seasons.';
+    const { ctx, store } = bench([
+      extractionStep([
+        {
+          text: 'Base editing of the maize DREB gene increases kernel yield under drought.',
+          quote: Q_VERBATIM[1],
+          stance: 'supports',
+        },
+      ]),
+      extractionStep([
+        {
+          text: 'Base editing of the maize DREB gene reduces kernel yield under drought.',
+          quote: 'reduces kernel yield under drought conditions',
+          stance: 'contradicts',
+        },
+      ]),
+      { rawOutput: JSON.stringify({ enoughEvidence: true, gapDescription: 'fixture: adequate for direction-anchor testing', queries: [] }) },
+      // the adjudicator ABSTAINS — the strict path the held-out runs exercised
+      {
+        rawOutput: JSON.stringify({
+          verdicts: [
+            {
+              pairId: 0,
+              verdict: 'not_comparable',
+              sharedSubject: 'effect of maize DREB base editing on kernel yield under drought',
+              confidence: 'low',
+            },
+          ],
+        }),
+      },
+    ]);
+    const docA = mkSource(ctx.run.id, newId('src'));
+    const docB = mkSource(ctx.run.id, newId('src'), { abstractText: ABSTRACT_DOWN });
+    corpusOf(ctx, [docA, docB]);
+
+    const outcome = await buildEvidenceStage.execute(ctx);
+    expect(outcome.kind).toBe('done');
+    if (outcome.kind === 'done') {
+      expect(outcome.summary).toContain('cross_relations=0 persisted (1 not_comparable) of 1 prefiltered pairs');
+      expect(outcome.summary).toContain('2 directional-conflict disclosure(s)');
+    }
+    // the counter signal rides BOTH claims as an idempotent-prefixed note
+    const claims = store.listObjects('claim', ctx.run.id);
+    expect(claims).toHaveLength(2);
+    for (const c of claims) {
+      const note = c.uncertainties.find((u) => u.startsWith('directional conflict:'));
+      expect(note, `claim ${c.id} carries the directional conflict note`).toBeDefined();
+      expect(note).toContain('increases');
+      expect(note).toContain('reduces');
+    }
+    // abstention persisted zero claim-claim relations (only the 2 stance relations)
+    expect(store.listObjects('evidence_relation', ctx.run.id).filter((r) => r.targetClaimId !== undefined)).toHaveLength(0);
+  });
+
   it('high-overlap non-substring quote (jaccard >= 0.8) → verified with alignmentChecked=true', async () => {
     // fixture sanity pinned at unit level too: this quote is a fuzzy, not verbatim, match
     expect(checkQuoteAlignment(Q_FUZZY, ABSTRACT_A).verdict).toBe('fuzzy');
