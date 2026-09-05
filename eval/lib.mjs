@@ -107,3 +107,19 @@ export const parseBaselineOutput = (raw) => {
   if (!Array.isArray(raw.citations)) errs.push('citations missing (must be an array, possibly empty)');
   return errs.length === 0 ? { ok: true } : { ok: false, reason: errs.join('; ') };
 };
+
+/**
+ * `research start --json` stdout parser (2026-09-05 instrument fix). The CLI prints
+ * TWO json lines: the early {runId,status} ack, and on completion the full run
+ * report whose identifier field is `id` (ResearchRun object shape — NOT runId).
+ * Reading `.runId` off the last line silently yielded undefined: completed runs were
+ * written as runId-less ledger rows that neither resume nor judging could see
+ * (live-burned 2026-09-05: 9 completed runs vanished from the MLR ledger this way).
+ * Accepts both shapes; last json line wins (it carries the terminal status).
+ */
+export const parseRunOutput = (stdout) => {
+  const line = stdout.split('\n').filter((l) => l.trim().startsWith('{')).at(-1);
+  if (line === undefined) return { runId: undefined, status: undefined };
+  const parsed = JSON.parse(line);
+  return { runId: parsed.runId ?? parsed.id, status: parsed.status };
+};
