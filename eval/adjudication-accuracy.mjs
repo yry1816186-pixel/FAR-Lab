@@ -30,9 +30,22 @@ const detDecided = bandAll.filter((r) => deterministicBandVerdict(r.claim, r.cou
 const band = bandAll.filter((r) => deterministicBandVerdict(r.claim, r.counterpart) !== false);
 
 const PROVIDER = process.env.FARLAB_JUDGE_PROVIDER ?? 'zai';
-const { createZaiProvider } = await import('../dist/providers/zai.js');
-process.env.ZAI_API_KEY ??= process.env.ZHIPU_API_KEY;
-const provider = createZaiProvider({ totalTimeoutMs: 300_000, model: process.env.FARLAB_ZAI_MODEL ?? 'glm-5.3' });
+/** Judge route: zai (glm, declared default) or dashscope (2026-09-05: the only
+ *  billable route while the account's qwen tiers are in arrears — model via
+ *  FARLAB_DASHSCOPE_MODEL, e.g. tongyi-xiaomi-analysis-pro). Same structured-call
+ *  surface; the family is recorded in the artifact either way. */
+let provider;
+if (PROVIDER === 'dashscope') {
+  const { createDashScopeProvider } = await import('../dist/providers/dashscope.js');
+  provider = createDashScopeProvider({
+    totalTimeoutMs: 300_000,
+    model: process.env.FARLAB_DASHSCOPE_MODEL ?? 'qwen3.7-plus',
+  });
+} else {
+  process.env.ZAI_API_KEY ??= process.env.ZHIPU_API_KEY;
+  const { createZaiProvider } = await import('../dist/providers/zai.js');
+  provider = createZaiProvider({ totalTimeoutMs: 300_000, model: process.env.FARLAB_ZAI_MODEL ?? 'glm-5.3' });
+}
 if (!provider.liveReady) { console.error('FATAL: judge route not live-ready'); process.exit(1); }
 
 // Mirrors rediscovery-judge.mjs's adjudication task VERBATIM (including the
