@@ -1,7 +1,7 @@
 {
   "schema": "final-acceptance/1",
-  "asOf": "2026-09-05 (qwen3.7-max unlock window: dual-judge accounting for FA-SCI-01/SCI-03 + FA-SCI-04 route-2 replication recorded; PRs #144-#160 merged; MLR N=30 regeneration + threeway pin in flight; remaining non-PASS blocked on user/calendar/external)",
-  "head": "main @ e9c22bf",
+  "asOf": "2026-09-06 (Arrearage relapse window: AstaBench LitQA2 adapter landed PR #164 + SCI-03 weakens discriminator PR #165 + adversarial-audit corrections PR #163; MLR 26/30 banked; all live legs BLOCKED_EXTERNAL on dashscope Arrearage 2026-09-06 03:4x; remaining: settle account -> one-command resume sequence in mission state)",
+  "head": "main @ db73aab",
   "provenance": "First full endgame audit: 8 parallel read-only domain audits, reports in FINAL_EVIDENCE/audit-2026-08-30/. Load-bearing claims were spot-checked by the main agent. Wave 0 findings were registered before repair, the preserved conversation-stream lane was integrated without dropping its work, and the resulting clean lane passed targeted, browser, build, hygiene, and full-suite gates recorded in .control/EXECUTION_STATE-20260831-wave0.md. Wave A reproduced the hosted loaded-home CLS failure locally, attributed the exact shifting nodes before repair, and closed independent shell/science-projection races at 87a1f3f. The release wave then verified an 888-source-file clean copy across root/Web/TUI/Python/desktop, generated a Syft 1.51.0 CycloneDX 1.7 SBOM with 991 components across npm/Cargo/PyPI, built an independently verified 890-file archive twice with byte-identical SHA-256, and kept tag publishing closed on UNRELEASED. Wave B re-ran the local OCI verifier and real-path/opt-in adversarial suites, added cooperative cancellation and production sandbox trust-root hardening, and ran the full root suite on 2026-09-02 at 236 files / 2370 passed / 15 skipped (npm test exit 0). Local gates are recorded in .control/EXECUTION_STATE-20260831-wavea.md and this working-tree checkpoint; hosted CI, CodeQL result, OIDC attestation and GitHub Release remain deliberately unclaimed. Five-table and shallow-assertion coverage remain explicitly incomplete rather than inferred from passing mechanisms.",
   "statusVocabulary": [
     "PASS",
@@ -250,15 +250,17 @@
       "id": "FA-SCI-07",
       "domain": "science",
       "title": "External benchmark anchor (AstaBench literature slice / MLR full)",
-      "status": "FAIL",
+      "status": "PARTIAL",
       "priority": "P1",
       "owner": "self",
-      "gap": "zero AstaBench integration; MLR-Bench at N=5, pre-D-050 protocol",
+      "gap": "AstaBench adapter LANDED+verified offline (PR #164, 13 tests) but live LitQA2 measurement BLOCKED_EXTERNAL (dashscope Arrearage 2026-09-06, all 20 provider calls failed fast — evidence/W-EV2/asta-litqa2.md §5); MLR half tracked by FA-EVAL-01",
       "target": "AstaBench literature-understanding subset adapter + MLR re-run 30 tasks under new protocol",
       "verify": "eval scripts + archived raw artifacts",
       "evidence": [
         "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md",
-        "2026-09-04 AstaBench HF reachability probe: huggingface.co reachable (200) but candidate dataset ids (AstaLab/asta-bench etc.) return 401 gated/unavailable — needs the correct dataset org/id or access grant before integration"
+        "2026-09-04 probe root-caused: wrong dataset org (AstaLab/ vs allenai/) — correct chain: pool=futurehouse/lab-bench LitQA2 (public CC-BY-SA-4.0, 199 q, hf-mirror), semantics=allenai/asta-bench (Apache-2.0), dev/test mapping gated (401)",
+        "PR #164 (merged 67afc3f): eval/asta-litqa2.mjs — AstaBench MCQ template verbatim, deterministic scoring (accuracy/precision/coverage + unsure), FAR-Lab EuropePMC adapter over planned keyword queries, PUB_YEAR:[2010 TO 2024] date discipline; tests/asta-litqa2.test.ts 13/13; full gates 2548 passed/0 failed",
+        "live leg attempted 2026-09-06 03:4x: BLOCKED_EXTERNAL dashscope Arrearage (20/20 provider calls ~80ms fast-fail; retrieval itself OK); rerun = .control/run-asta-litqa2-max.ps1"
       ]
     },
     {
@@ -880,11 +882,13 @@
       "status": "PARTIAL",
       "priority": "P2",
       "owner": "self",
-      "gap": "stuck at N=5 pre-protocol-change results",
+      "gap": "26/30 runs banked (17 new @dashscope/qwen3.7-max, receipts verified + 9 glm-era banked; mixed-generation sample disclosed); 4 gen runs (crl/fm4science/trl/unireps) + full 30-task judge pass died on dashscope Arrearage 2026-09-06 03:4x (156 error rows in mlr-out-max-n30.jsonl — overwrite-on-rerun); resume = .control/run-mlr-gen-max.ps1",
       "target": "30 tasks, idea>=7.4",
       "verify": "mlr-bench.jsonl full run",
       "evidence": [
-        "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md CAP-06"
+        "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md CAP-06",
+        "eval/results/mlr-runs-n30.jsonl: 30 rows, 26 with runId (17 completed @max), .control/mlr-gen-max.log run-by-run",
+        "PR #159 (judge rows carry task/agent/stage), #162 (runId parse fix, live-burned), #163 (rotation disclosure)"
       ]
     },
     {
@@ -1091,5 +1095,5 @@
     "note": "Mission stop requires ALL of: no internal FAIL/PARTIAL; canonical clean-clone CI green; science north-star met or externally justified; real evidence across all planes; 24h→72h soak+chaos; win/mac/linux matrix; sandbox attack suite; production-path-only flows; clean-machine bundle verify; honest BLOCKED_EXTERNAL only; docs==commit; final red-team audit no new P0/P1.",
     "currentVerdict": "NOT READY — 8 FAIL, 22 PARTIAL, 33 PASS, 2 BLOCKED_EXTERNAL (66 tracked). Closed this wave: FA-SEC-01 (hosted ubuntu OCI evidence on canonical main, run 33583828122), FA-PLT-01/02 (canonical main CI fully green), FA-REM-01, FA-SEC-04, FA-SEC-08, FA-HAR-01, FA-HCI-04, FA-DAT-03 (decision record), FA-EVAL-02 (preregistered user-study protocol; execution BLOCKED_EXTERNAL by design), FA-EVAL-04, FA-SEC-12, FA-PRF-02 (hosted perf gate PASS). Still open: hosted OIDC/release evidence, scientific targets (4 metrics), 6h+ soak (running; verdict at hour 6), streaming data plane, evaluation-wave re-measurement, five-table sweep (233/960: three of five tables complete; runtime+tests remain), and B-QWEN (user-owned 09-05)."
   },
-  "currentVerdict": "NOT READY — 2 FAIL, 5 PARTIAL, 55 PASS, 4 BLOCKED_EXTERNAL (66 tracked; per-item statuses authoritative, dated closures through 2026-09-05; FA-SCI-04 flipped PASS 2026-09-05 per pre-registered criteria)"
+  "currentVerdict": "NOT READY — 1 FAIL, 6 PARTIAL, 55 PASS, 4 BLOCKED_EXTERNAL (66 tracked; per-item statuses authoritative, dated closures through 2026-09-06; FA-SCI-07 FAIL->PARTIAL 2026-09-06: adapter landed+verified offline, live measurement externally blocked)"
 }
