@@ -352,12 +352,19 @@ export const falsifyStage: StageHandler = {
           '"supports" ONLY when the claim\'s finding is direct evidence for THIS hypothesis\'s core mechanism or prediction ' +
           'about the same subject — topical kinship or shared vocabulary alone is NOT support; ' +
           '"contradicts" ONLY when the claim asserts a finding incompatible with the hypothesis\'s core prediction about ' +
-          'the same subject AND the same quantity/relationship; "weakens" when the claim reduces confidence without ' +
-          'direct incompatibility (uncontrolled confounder, weaker effect than the mechanism requires); "qualifies" when ' +
+          'the same subject AND the same quantity/relationship — including hypotheses about what the literature shows: ' +
+          'a claim reporting findings AT ODDS with the asserted literature-state is a contradiction, not a weakening; ' +
+          '"weakens" ONLY when the claim reduces confidence while remaining COMPATIBLE with the hypothesis being partly ' +
+          'true — it must not assert the negation of the core relation (uncontrolled confounder, effect weaker than the ' +
+          'mechanism requires, a load-bearing assumption that fails while the mechanism could still hold in other conditions); ' +
+          '"qualifies" when ' +
           'the claim bounds the conditions under which the hypothesis applies. NULL-SIDE DIRECTION: first read what the ' +
           'hypothesis PREDICTS — an effect, or an ABSENCE (no effect / no correlation / no transfer). A finding of no ' +
           'effect SUPPORTS a no-effect hypothesis and CONTRADICTS an effect hypothesis; never label by the claim\'s ' +
-          'valence alone. A claim stretched from a different ' +
+          'valence alone. The same directional discipline applies to rarity/exception hypotheses: a hypothesis asserting ' +
+          'that an association or mechanism holds ONLY in a narrow class is SUPPORTED by findings that challenge the ' +
+          'general or mainstream case, and CONTRADICTED by findings of the association holding in the broader class — ' +
+          'a claim negative toward the mainstream view is NOT thereby negative toward a rarity hypothesis. A claim stretched from a different ' +
           'subject, measure, or mechanistic layer must not be linked at all. For claims that bear NO real relation ' +
           'to this hypothesis, do NOT link them — list their ids in consideredClaimIds instead: the claims you ' +
           'examined and rejected as unrelated (a claim absent from both the links and consideredClaimIds reads as ' +
