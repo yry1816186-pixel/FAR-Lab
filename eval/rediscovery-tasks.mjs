@@ -12,7 +12,7 @@
  * within the same gtClaims revision (recorded in results as gtRev).
  */
 import { DatabaseSync } from 'node:sqlite';
-import { resolve } from 'node:path';
+import { resolve, join } from 'node:path';
 import { isRepresentative } from '../dist/pipeline/stages/shared.js';
 
 export const GT_REV = 'gt-fixed-2026-08-22';
@@ -106,7 +106,10 @@ export const TASKS = [
   },
 ];
 
-export const DB_PATH = resolve(process.cwd(), '.far-run/far.db');
+// Honors FARLAB_DATA_DIR (same env the CLI uses) so fresh-run batches can
+// generate + render in an isolated dir — the 72h soak owns the default
+// .far-run workspace (2026-09-05).
+export const DB_PATH = resolve(process.cwd(), process.env.FARLAB_DATA_DIR ? join(process.env.FARLAB_DATA_DIR, 'far.db') : '.far-run/far.db');
 
 /** Deterministic top-hypothesis render (tournament winner; unchanged from v1/v2). */
 export const renderTopHypothesis = (runId) => {
