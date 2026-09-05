@@ -4,17 +4,16 @@ import { assertionDirection, directionPairContext } from '../src/domain/claim-di
 describe('assertionDirection (deterministic lexical direction)', () => {
   it('increase-class operator reads +1, decrease-class reads -1', () => {
     expect(assertionDirection('Compound F increases drought tolerance in maize')).toEqual({
-      dir: 1, negated: false, operators: ['increases'],
+      kind: 'directional', dir: 1, negated: false, operators: ['increases'],
     });
     expect(assertionDirection('Compound F reduces kernel yield under drought')).toEqual({
-      dir: -1, negated: false, operators: ['reduces'],
+      kind: 'directional', dir: -1, negated: false, operators: ['reduces'],
     });
   });
 
   it('an explicit negator flips the effective direction, not the verb class', () => {
     const d = assertionDirection('Editing does not increase kernel yield under drought');
-    expect(d?.dir).toBe(1);
-    expect(d?.negated).toBe(true);
+    expect(d).toEqual({ kind: 'directional', dir: 1, negated: true, operators: ['increase'] });
   });
 
   it('subject-negated assertions abstain (operator subject flips polarity)', () => {
@@ -33,8 +32,26 @@ describe('assertionDirection (deterministic lexical direction)', () => {
   it('the negator itself never masquerades as an operator token', () => {
     // "cannot" survives the length floor as a token but is not in any lexicon
     const d = assertionDirection('The construct cannot promote flowering');
-    expect(d?.operators).toEqual(['promote']);
-    expect(d?.negated).toBe(true);
+    expect(d).toEqual({ kind: 'directional', dir: 1, negated: true, operators: ['promote'] });
+  });
+
+  it('explicit null-outcome phrasing reads kind=null (the measured econ miss class)', () => {
+    // compound head noun ("employment effects") carries the null, not just the bare noun
+    expect(assertionDirection('No negative employment effects on low-wage workers overall')).toEqual({
+      kind: 'null', phrase: 'no negative employment effects',
+    });
+    expect(assertionDirection('The two formulations showed no significant difference in survival')).toMatchObject({ kind: 'null' });
+    expect(assertionDirection('Edited lines were indistinguishable from controls')).toMatchObject({ kind: 'null' });
+  });
+
+  it('looser null phrasing about a third quantity stays unread (precision guard)', () => {
+    // "no evidence of publication bias" is a null about bias, not about the
+    // studied effect — must not license any pair reading
+    expect(assertionDirection('The review found no evidence of publication bias in this literature')).toBeNull();
+  });
+
+  it('a null phrase and a direction operator in one text abstain (which quantity?)', () => {
+    expect(assertionDirection('Treatment increases yield in maize and shows no adverse effects on soil')).toBeNull();
   });
 });
 
@@ -80,5 +97,31 @@ describe('directionPairContext (cross-paper direction anchor)', () => {
   it('abstains when either side carries no safe direction reading', () => {
     expect(directionPairContext('Base editing increases kernel yield', 'The construct carried a silent substitution')).toBeNull();
     expect(directionPairContext('Loss of DREB reduces yield', 'Editing increases yield')).toBeNull();
+  });
+
+  it('null vs clean directional is opposition (the live probe miss, verbatim corpus phrasing)', () => {
+    const a = directionPairContext(
+      'No negative employment effects on low-wage workers overall',
+      'Minimum wage reduces employment in small firms',
+    );
+    expect(a?.opposite).toBe(true);
+    expect(a?.context).toContain('null-vs-effect opposition');
+    expect(a?.context).toContain('reduces');
+  });
+
+  it('null vs negated directional abstains ("does not increase" is null-or-opposite, not provably opposite)', () => {
+    expect(directionPairContext(
+      'No significant difference in yield between edited and control lines',
+      'Editing does not increase kernel yield under drought',
+    )).toBeNull();
+  });
+
+  it('null vs null is corroboration of absence', () => {
+    const a = directionPairContext(
+      'No negative employment effects on low-wage workers overall',
+      'The policy shows no significant impact on teen employment',
+    );
+    expect(a?.opposite).toBe(false);
+    expect(a?.context).toContain('corroboration of a null finding');
   });
 });

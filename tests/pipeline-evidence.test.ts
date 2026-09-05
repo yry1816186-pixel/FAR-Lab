@@ -589,6 +589,65 @@ describe('build_evidence stage', () => {
     expect(store.listObjects('evidence_relation', ctx.run.id).filter((r) => r.targetClaimId !== undefined)).toHaveLength(0);
   });
 
+  it('direction anchor: null-effect vs asserted-effect pair gets the counter disclosure (measured econ miss class)', async () => {
+    // Live probe corpus phrasing: the null claim ("no negative employment
+    // effects") carries no direction verb, so the verb-opposition anchor
+    // abstained — the null-vs-effect arm closes that measured miss.
+    const ABSTRACT_DOWN_NULL =
+      'In a structural model of local labor demand, the minimum wage rate reduces employment in small firms. ' +
+      'A multi-state study of minimum wage policy finds no negative employment effects on low-wage workers overall, ' +
+      'with employment trajectories matching control regions across the post-policy window.';
+    const { ctx, store } = bench([
+      extractionStep([
+        {
+          text: 'The minimum wage rate reduces employment in small firms.',
+          quote: 'the minimum wage rate reduces employment in small firms',
+          stance: 'contradicts',
+        },
+      ]),
+      extractionStep([
+        {
+          text: 'No negative employment effects on low-wage workers overall.',
+          quote: 'no negative employment effects on low-wage workers overall',
+          stance: 'supports',
+        },
+      ]),
+      { rawOutput: JSON.stringify({ enoughEvidence: true, gapDescription: 'fixture: adequate for null-anchor testing', queries: [] }) },
+      {
+        rawOutput: JSON.stringify({
+          verdicts: [
+            {
+              pairId: 0,
+              verdict: 'not_comparable',
+              sharedSubject: 'minimum wage effects on employment',
+              confidence: 'low',
+            },
+          ],
+        }),
+      },
+    ]);
+    const docA = mkSource(ctx.run.id, newId('src'), { abstractText: ABSTRACT_DOWN_NULL });
+    const docB = mkSource(ctx.run.id, newId('src'), {
+      abstractText:
+        'A pooled evaluation of minimum wage policies reports no negative employment effects on low-wage workers overall. ' +
+        'Across treated and control regions, employment series remained indistinguishable over the full post-policy window.',
+    });
+    corpusOf(ctx, [docA, docB]);
+
+    const outcome = await buildEvidenceStage.execute(ctx);
+    expect(outcome.kind).toBe('done');
+    if (outcome.kind === 'done') {
+      expect(outcome.summary).toContain('2 directional-conflict disclosure(s)');
+    }
+    const claims = store.listObjects('claim', ctx.run.id);
+    expect(claims).toHaveLength(2);
+    for (const c of claims) {
+      const note = c.uncertainties.find((u) => u.startsWith('directional conflict:'));
+      expect(note, `claim ${c.id} carries the null-vs-effect note`).toBeDefined();
+      expect(note).toContain('null-vs-effect opposition');
+    }
+  });
+
   it('high-overlap non-substring quote (jaccard >= 0.8) → verified with alignmentChecked=true', async () => {
     // fixture sanity pinned at unit level too: this quote is a fuzzy, not verbatim, match
     expect(checkQuoteAlignment(Q_FUZZY, ABSTRACT_A).verdict).toBe('fuzzy');
