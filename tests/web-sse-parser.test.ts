@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { consumeSse } from '../web/src/api/conversationStream';
-import { ApiError } from '../web/src/api/client';
 
 /** SSE wire bytes split at ARBITRARY boundaries (mid-JSON, mid-CJK-codepoint). */
 const responseOver = (chunks: string[]): Response => {
@@ -54,7 +53,6 @@ describe('web SSE wire parser (FA-PRF-03 partial-SSE chaos)', () => {
       code: 'stream_malformed',
       retryable: true,
     });
-    expect(ApiError).toBeDefined();
   });
 
   it('detects the terminal completed payload', async () => {

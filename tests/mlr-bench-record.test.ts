@@ -142,3 +142,49 @@ describe('rediscovery-tasks DB_PATH follows FARLAB_DATA_DIR (#160)', () => {
     expect(out.replace(/\\/g, '/')).toContain('.far-run/far.db');
   });
 });
+
+describe('mlr-bench farRun data-dir consistency (isolated batches write where they read)', () => {
+  // The read side (renderers) honors FARLAB_MLR_DB; the spawned research run must be
+  // redirected to the SAME db directory — otherwise an isolated batch writes the
+  // soak-owned .far-run while reading an empty snapshot (silent 'no farlab output').
+  const probe = (mlrDb) => {
+    const env = { ...process.env };
+    if (mlrDb === undefined) delete env.FARLAB_MLR_DB;
+    else env.FARLAB_MLR_DB = mlrDb;
+    return JSON.parse(execFileSync('node', ['--input-type=module', '-e', `
+      const m = await import("./eval/mlr-bench.mjs");
+      const { args, env } = m.farRunArgs("q?");
+      const i = args.indexOf("--data-dir");
+      console.log(JSON.stringify({ dataDir: i >= 0 ? args[i + 1] : null, envDir: env.FARLAB_DATA_DIR ?? null }));
+    `], { encoding: 'utf8', cwd: process.cwd(), env }));
+  };
+
+  it('redirects the child run to the FARLAB_MLR_DB directory (flag + env belt-and-braces)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'farlab-mlrdb-'));
+    const { dataDir, envDir } = probe(join(dir, 'far.db'));
+    expect(resolve(dataDir)).toBe(resolve(dir));
+    expect(resolve(envDir)).toBe(resolve(dir));
+  });
+
+  it('defaults the child run to .far-run without the env (unchanged historical behavior)', () => {
+    const { dataDir, envDir } = probe(undefined);
+    expect(resolve(dataDir).replace(/\\/g, '/')).toContain('.far-run');
+    expect(resolve(envDir).replace(/\\/g, '/')).toContain('.far-run');
+  });
+
+  it('dies visibly when FARLAB_MLR_DB is not a far.db inside the intended data dir', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'farlab-mlrdb-'));
+    const env = { ...process.env, FARLAB_MLR_DB: join(dir, 'snap.db') };
+    let stderr = '';
+    try {
+      execFileSync('node', ['--input-type=module', '-e', `
+        const m = await import("./eval/mlr-bench.mjs");
+        m.farRunArgs("q?");
+      `], { encoding: 'utf8', cwd: process.cwd(), env, stdio: ['ignore', 'ignore', 'pipe'] });
+      expect.unreachable('farRunArgs must throw on a non-far.db FARLAB_MLR_DB');
+    } catch (err) {
+      stderr = String(err.stderr ?? '');
+    }
+    expect(stderr).toMatch(/must point at a 'far\.db'/);
+  });
+});

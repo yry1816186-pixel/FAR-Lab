@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import type { Store } from '../persistence/store.js';
 import type { ArtifactStore } from '../shared/ports.js';
 import { assertFetchDestination } from '../shared/destination-guard.js';
+import { sha256FileHex } from '../shared/crypto.js';
 import type { DatasetRecord, DatasetSource, DatasetUse, RunId } from '../domain/index.js';
 import { parseCsv, analyzeCsvFile, type CsvFileStats } from './csv.js';
 
@@ -109,14 +110,19 @@ export const acquireDataset = async (
     }
     // Column view re-derivation (FA-DAT-01): prefer re-streaming the ORIGINAL SOURCE
     // when the resolver still has it (local file); fall back to the stored artifact.
-    // A row-count disagreement with the record is a split-breaking inconsistency —
-    // refused loudly, never guessed.
+    // The re-derived view must describe the SAME BYTES that were acquired — a row-count
+    // agreement alone would let an edited file with unchanged row count split against
+    // a contentRef it no longer matches. Hash-verify and refuse loudly, never guess.
     if (use.source.resolver === 'local' && fs.existsSync(use.source.path)) {
       const stats = await analyzeCsvFile(use.source.path, {
         targetColumn: use.targetColumn,
         groupColumn: use.groupColumn,
         maxRows: csvMaxRows(),
       });
+      const hashNow = await sha256FileHex(use.source.path);
+      if (`sha256:${hashNow}` !== existing.contentRef) {
+        throw new Error(`dataset ${id} source bytes changed since acquisition (now sha256:${hashNow.slice(0, 12)}…, record ${existing.contentRef.slice(0, 19)}…) — refusing to split inconsistent bytes`);
+      }
       if (stats.nRows !== existing.nRows) {
         throw new Error(`dataset ${id} source now has ${stats.nRows} rows but was acquired with ${existing.nRows} — refusing to split inconsistent bytes`);
       }
@@ -155,6 +161,14 @@ export const acquireDataset = async (
       groupColumn: use.groupColumn,
       maxRows: csvMaxRows(),
     });
+    // TOCTOU closure (same discipline as the netcdf path): the persisted artifact and
+    // the recorded stats must describe the same bytes. If the file changed between the
+    // streaming put and the analysis pass, the recorded contentRef/nRows/columns would
+    // describe different bytes than were analyzed — refuse before any record is written.
+    const hashAfter = await sha256FileHex(use.source.path);
+    if (hashAfter !== raw.hash) {
+      throw new Error(`local dataset ${use.source.path} changed during acquisition (put sha256:${raw.hash.slice(0, 12)}…, after sha256:${hashAfter.slice(0, 12)}…) — refusing inconsistent record`);
+    }
     const now = new Date().toISOString();
     const record: DatasetRecord = {
       id,

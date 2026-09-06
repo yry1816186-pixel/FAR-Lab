@@ -104,10 +104,10 @@ describe('method-family override (FA-HCI-02)', () => {
     const replaced = server.app.store.listObjects('method_selection', runId).find((s) => s.id === selectionId);
     expect(replaced?.decidedBy).toBe('researcher_override');
 
-    const science = await fetch(`${server.base}/api/v1/runs/${runId}/science`).then((r) => r.json() as Promise<{ problemModel: { methodSelections: Array<{ selectedFamilies: string[] }> | null } }>).catch(() => null);
-    if (science !== null && science.problemModel !== null) {
-      expect(science.problemModel.methodSelections[0]?.selectedFamilies).toEqual(['numerical_simulation']);
-    }
+    // No /science projection assertion here: this seed has no problem_model object, so
+    // the projection's problemModel is legitimately null and the old conditional check
+    // (`if (science.problemModel !== null)`) could never assert anything. The projection
+    // with real problem models is covered by problem-model-disclosure.test.ts.
   });
 
   it('refuses unassessed families and plan-less selections honestly (400, nothing persisted)', async () => {

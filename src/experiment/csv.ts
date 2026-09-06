@@ -52,7 +52,9 @@ export const parseCsv = (text: string, opts: { maxRows?: number } = {}): ParsedC
     const fields = tokenizeCsvLine(rawLine);
     sawAny = true;
     rows.push(fields);
-    if (rows.length > maxRows) throw new Error(`csv exceeds maxRows=${maxRows}`);
+    // maxRows bounds DATA rows (header excluded) — identical semantics to
+    // analyzeCsvFile, so a file that streams also parses (and vice versa).
+    if (rows.length - 1 > maxRows) throw new Error(`csv exceeds maxRows=${maxRows}`);
   }
   if (!sawAny) throw new Error('csv has no rows');
   const header = rows[0];
@@ -90,8 +92,9 @@ export const analyzeCsvFile = async (
   opts: { targetColumn: string; groupColumn?: string; maxRows?: number },
 ): Promise<CsvFileStats> => {
   const maxRows = opts.maxRows ?? 500_000;
+  const input = createReadStream(filePath);
   const lines = createInterface({
-    input: createReadStream(filePath),
+    input,
     crlfDelay: Infinity, // treats \r\n as one break, matching parseCsv's /\r\n|\n|\r/
   });
 
@@ -134,11 +137,14 @@ export const analyzeCsvFile = async (
       }
       nRows += 1;
       targetValues.push(canon(String(fields[targetIdx] ?? '')));
-      groupValues.push(canon(String(fields[groupIdx] ?? '')));
+      if (groupIdx >= 0) groupValues.push(canon(String(fields[groupIdx] ?? '')));
       if (nRows > maxRows) throw new Error(`csv exceeds maxRows=${maxRows}`);
     }
   } finally {
+    // lines.close() settles the interface but does NOT destroy the input stream —
+    // without destroy(), a mid-file throw leaks the fd until GC (EMFILE on a server).
     lines.close();
+    input.destroy();
   }
   if (header === null) throw new Error('csv has no rows');
   if (nRows === 0) throw new Error('csv has a header but no data rows');

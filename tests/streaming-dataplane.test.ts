@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, rmSync, writeFileSync, readdirSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { openArtifactStore } from '../src/persistence/artifacts.js';
@@ -126,6 +126,45 @@ describe('FA-DAT-01: streaming CSV analysis matches parseCsv', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it('maxRows bounds DATA rows identically in parseCsv and analyzeCsvFile (boundary lock)', async () => {
+    const dir = tmpDir();
+    try {
+      const make = (n: number): string => {
+        const lines = ['x0,label'];
+        for (let i = 0; i < n; i += 1) lines.push(`${i},pos`);
+        const file = join(dir, `b${n}.csv`);
+        writeFileSync(file, lines.join('\n') + '\n', 'utf8');
+        return file;
+      };
+      // Exactly maxRows data rows: BOTH paths must accept (parseCsv used to count the
+      // header against the budget and throw where the streaming path passed).
+      expect(parseCsv(readFileSync(make(3), 'utf8'), { maxRows: 3 }).rows).toHaveLength(3);
+      expect((await analyzeCsvFile(make(3), { targetColumn: 'label', maxRows: 3 })).nRows).toBe(3);
+      // maxRows+1 data rows: BOTH paths must throw.
+      const over = make(4);
+      expect(() => parseCsv(readFileSync(over, 'utf8'), { maxRows: 3 })).toThrow('csv exceeds maxRows=3');
+      await expect(analyzeCsvFile(over, { targetColumn: 'label', maxRows: 3 })).rejects.toThrow('csv exceeds maxRows=3');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('a mid-file throw destroys the input stream (no fd leak)', async () => {
+    const dir = tmpDir();
+    try {
+      const bad = join(dir, 'bad.csv');
+      writeFileSync(bad, 'a,b\n1,2,3\n', 'utf8');
+      await expect(analyzeCsvFile(bad, { targetColumn: 'a' })).rejects.toThrow(/fields, header has/);
+      // On Windows an open fd blocks deletion — a successful unlink right after the
+      // rejected analysis proves the read stream was destroyed, not just the interface.
+      // (On POSIX unlink succeeds regardless; the guard there is by construction.)
+      rmSync(bad, { force: true });
+      expect(existsSync(bad)).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('FA-DAT-01: column-view splits equal row-view splits (equivalence lock)', () => {
@@ -240,25 +279,84 @@ describe('FA-DAT-01: streaming local dataset acquisition', () => {
       world.cleanup();
     }
   });
+
+  it('re-derivation refuses a source edited after acquisition, even with an unchanged row count', async () => {
+    const world = makeWorld();
+    try {
+      const artifacts = openArtifactStore(join(world.dir, 'artifacts'));
+      const runId = world.store.listRuns(1)[0]!.id;
+      const use = {
+        source: { resolver: 'local' as const, path: world.csvPath },
+        targetColumn: 'label',
+        split: { method: 'random' as const, ratios: { train: 0.7, val: 0, test: 0.3 }, seed: 1 },
+      };
+      const { record } = await acquireDataset(world.store, artifacts, runId as never, use);
+      expect(record.nRows).toBe(64);
+      // Same row count, different bytes (labels flipped): a row-count-only check would
+      // let this through and split against a contentRef the file no longer matches.
+      const original = readFileSync(world.csvPath, 'utf8');
+      writeFileSync(world.csvPath, original.replace(/pos/g, 'neg'), 'utf8');
+      await expect(acquireDataset(world.store, artifacts, runId as never, use))
+        .rejects.toThrow(/source bytes changed since acquisition/);
+      // Restoring the exact bytes makes the re-derivation pass again.
+      writeFileSync(world.csvPath, original, 'utf8');
+      const again = await acquireDataset(world.store, artifacts, runId as never, use);
+      expect(again.record.id).toBe(record.id);
+      expect(again.csv.nRows).toBe(64);
+    } finally {
+      world.cleanup();
+    }
+  });
+
+  it('acquisition refuses when the file changes between the streaming put and the analysis pass', async () => {
+    const world = makeWorld();
+    try {
+      const runId = world.store.listRuns(1)[0]!.id;
+      const use = {
+        source: { resolver: 'local' as const, path: world.csvPath },
+        targetColumn: 'label',
+        split: { method: 'random' as const, ratios: { train: 0.7, val: 0, test: 0.3 }, seed: 1 },
+      };
+      const artifacts = openArtifactStore(join(world.dir, 'artifacts'));
+      const original = readFileSync(world.csvPath, 'utf8');
+      // Simulate a concurrent edit landing after the persisted put but before analysis:
+      // the recorded contentRef would describe different bytes than the column view.
+      const racing: typeof artifacts = Object.assign(Object.create(Object.getPrototypeOf(artifacts)), artifacts, {
+        putStream: async (source: AsyncIterable<Buffer>) => {
+          const result = await artifacts.putStream!(source);
+          writeFileSync(world.csvPath, original.replace(/pos/g, 'neg'), 'utf8');
+          return result;
+        },
+      });
+      await expect(acquireDataset(world.store, racing, runId as never, use))
+        .rejects.toThrow(/changed during acquisition/);
+      // No record may be written for the inconsistent acquisition.
+      expect(world.store.getObject('dataset_record', datasetIdFor(use.source))).toBeNull();
+    } finally {
+      world.cleanup();
+    }
+  });
 });
 
 describe('FA-DAT-01: http response body cap', () => {
   it('a body larger than the cap fails closed mid-read instead of buffering', async () => {
+    // 100 MB enqueued, cap trips at 64 MB — ~36 unconsumed chunks remain queued when
+    // the read throws (mirrors a real undici body mid-stream; draining the whole
+    // queue first would close the stream and leave cancel() nothing to do).
     const chunks: Uint8Array[] = [];
-    let total = 0;
-    while (total < 64 * 1024 * 1024 + 1024) {
-      const c = new Uint8Array(1024 * 1024);
-      chunks.push(c);
-      total += c.byteLength;
-    }
+    for (let i = 0; i < 100; i += 1) chunks.push(new Uint8Array(1024 * 1024));
+    let cancelled = false;
     const body = new ReadableStream<Uint8Array>({
       start(controller) { for (const c of chunks) controller.enqueue(c); controller.close(); },
+      cancel() { cancelled = true; },
     });
     const res = { ok: true, status: 200, body, text: async () => { throw new Error('text() must not be used when body is present'); } };
     await expect(httpGet('https://scholar.example/big', {
       fetchImpl: async () => res as never,
       context: { family: 'test', query: 'big' },
     })).rejects.toThrow(/exceeds .* bytes/);
+    // The abandoned reader must be cancelled — an unconsumed body pins the socket.
+    expect(cancelled).toBe(true);
   }, 60_000);
 
   it('fakes without a streaming body keep using text()', async () => {

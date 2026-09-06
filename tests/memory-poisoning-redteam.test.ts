@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -13,8 +13,12 @@ import { ResearchQuestion, newId } from '../src/domain/index.js';
 // never sanitized — free text is data), but trust labels travel unchanged,
 // provenance cannot be minted, and the conditioning disclosure stays truthful.
 
+const tmpDirs: string[] = [];
+afterAll(() => { for (const d of tmpDirs) { try { fs.rmSync(d, { recursive: true, force: true }); } catch { /* open handle lag on Windows */ } } });
+
 const mkStore = (): Store => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'far-memredteam-'));
+  tmpDirs.push(dir);
   return new Store(openDb(path.join(dir, 'far.db')));
 };
 

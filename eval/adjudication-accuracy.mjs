@@ -134,7 +134,28 @@ const summary = {
   falsePositiveRate: Math.round((fp / (fp + tn)) * 1000) / 1000,
   tp, fn, tn, fp,
 };
-writeFileSync(resolve(process.cwd(), 'eval/results/adjudication-accuracy.json'), JSON.stringify({ summary, pairs: out }, null, 2) + '\n');
+// Artifact discipline (2026-09-06, adversarial audit): eval/results/ is gitignored,
+// so the on-disk artifact is the ONLY copy of a measured baseline. A calibrated run
+// writes a profile-suffixed file and never touches the canonical bare-run artifact;
+// any run refuses to overwrite an existing artifact stamped with a DIFFERENT
+// calibration profile (a silent cross-profile overwrite destroyed the only baseline).
+const OUT_FILE = calProfile.active
+  ? `eval/results/adjudication-accuracy-${calProfile.version}.json`
+  : 'eval/results/adjudication-accuracy.json';
+{
+  const outPath = resolve(process.cwd(), OUT_FILE);
+  try {
+    const prev = JSON.parse(readFileSync(outPath, 'utf8'));
+    const prevProfile = prev?.summary?.calibration?.profile ?? 'none';
+    if (prevProfile !== calProfile.version) {
+      console.error(`FATAL: refusing to overwrite ${OUT_FILE}: existing artifact carries profile '${prevProfile}', this run is '${calProfile.version}' — move or rename the existing file first`);
+      process.exit(1);
+    }
+  } catch (err) {
+    if (err.code !== 'ENOENT') throw err;
+  }
+}
+writeFileSync(resolve(process.cwd(), OUT_FILE), JSON.stringify({ summary, pairs: out }, null, 2) + '\n');
 console.log(JSON.stringify(summary, null, 2));
 console.log('\nfalse negatives (gold TRUE, judged no) — the strictness residue:');
 for (const r of out.filter((x) => x.label && !x.verdict)) console.log(`  [${r.sim.toFixed(3)}] ${r.claim} || ${r.counterpart}`);
