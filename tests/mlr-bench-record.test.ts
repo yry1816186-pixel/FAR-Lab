@@ -50,7 +50,7 @@ describe('mlr-bench import cleanliness (ΩF-010 family)', () => {
       if (err.status === undefined) throw e; // our own thrown Error, not the expected exec failure
       expect(err.status).toBe(1);
       const combined = String(err.stderr ?? '') + String(err.stdout ?? '');
-      expect(combined).toMatch(/live route not ready|cannot read .+ review_idea\.py/);
+      expect(combined).toMatch(/live route not ready|cannot read .*review_idea\.py/);
     }
   });
 });
