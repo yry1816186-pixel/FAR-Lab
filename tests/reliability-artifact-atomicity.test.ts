@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { openArtifactStore } from '../src/persistence/artifacts.js';
 
 // Reliability workstream 2026-08-24: content-addressed puts must land ATOMICALLY.
@@ -59,6 +60,7 @@ describe('artifact store atomic landing', () => {
     let err: unknown = null;
     try { await store.put(payload); } catch (e) { err = e; }
     expect(err).toBeInstanceOf(Error);
+    expect(fs.readdirSync(dir).filter((name) => name.startsWith('.incoming-'))).toEqual([]);
     // Nothing landed anywhere: no blob path, no dot-temp, in any directory.
     for (const shard of fs.readdirSync(dir, { withFileTypes: true })) {
       if (!shard.isDirectory()) continue;
@@ -66,5 +68,31 @@ describe('artifact store atomic landing', () => {
         expect(/^[0-9a-f]{64}$/.test(f) || f.startsWith('.')).toBe(false);
       }
     }
+  });
+
+  it('an asynchronous open failure rejects the put without crashing the caller process', () => {
+    // Use a real process so an unhandled stream error cannot be hidden by the
+    // test runner. Native Node type stripping keeps this independent of dist.
+    const moduleUrl = new URL('../src/persistence/artifacts.ts', import.meta.url).href;
+    const script = `
+      import fs from 'node:fs';
+      import { openArtifactStore } from ${JSON.stringify(moduleUrl)};
+      const store = openArtifactStore(${JSON.stringify(dir)});
+      fs.rmSync(${JSON.stringify(dir)}, { recursive: true });
+      try { await store.put('failed write'); process.exitCode = 2; }
+      catch (error) { if (error.code !== 'ENOENT') throw error; }
+    `;
+    expect(() => execFileSync(process.execPath, ['--input-type=module', '-e', script], { stdio: 'pipe' })).not.toThrow();
+  });
+
+  it('a source failure before its first chunk closes and removes the staged file', async () => {
+    const store = openArtifactStore(dir);
+    const source = (async function* (): AsyncGenerator<Buffer> {
+      // Rejects before the first chunk reaches the store.
+      await Promise.reject(new Error('input unavailable before first chunk'));
+      yield Buffer.alloc(0);
+    })();
+    await expect(store.putStream!(source)).rejects.toThrow('input unavailable before first chunk');
+    expect(fs.readdirSync(dir)).toEqual([]);
   });
 });
