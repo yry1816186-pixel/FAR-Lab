@@ -63,7 +63,7 @@ const SUBJECT_NEGATION = [
   'reduced', 'deficient in', 'deficiency of',
 ];
 
-// Same curated negator set as the matcher's PREDICATE_NEGATION (157-pair
+// Same curated negator set as the matcher's PREDICATE_NEGATION_RE (157-pair
 // zero-error provenance); operates on the raw lowercase text.
 const PREDICATE_NEGATION = /\b(?:not|cannot|can\s?not|doesn'?t|does\s?not|don'?t|didn'?t|did\s?not|fails?\s+to|failed\s+to|unable\s+to|neither|nor)\b/;
 

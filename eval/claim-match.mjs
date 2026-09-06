@@ -136,7 +136,8 @@ const DIRECTION_DOWN = new Set([
 ]);
 // When the operator's SUBJECT is a negated entity ("loss of X inhibits Y"),
 // the effective polarity is not the verb's polarity — abstain the whole claim.
-const SUBJECT_NEGATION = [
+// Exported for judge-calibration.mjs's subject-complement signal (single owner).
+export const SUBJECT_NEGATION_PHRASES = [
   'loss of', 'depletion of', 'absence of', 'lack of', 'without',
   'removal of', 'inhibition of', 'inhibitor of', 'inhibitors of',
   'reduced', 'deficient in', 'deficiency of',
@@ -161,7 +162,7 @@ const CAUSAL_KIND = [
 
 const claimDirection = (text) => {
   const low = String(text ?? '').toLowerCase();
-  if (SUBJECT_NEGATION.some((p) => low.includes(p))) return null;
+  if (SUBJECT_NEGATION_PHRASES.some((p) => low.includes(p))) return null;
   const tokens = contentTokens(text);
   let up = 0;
   let down = 0;
@@ -184,7 +185,8 @@ const claimDirection = (text) => {
 // negation-parity: complement phrasings ("low X" vs "high Y" where X inhibits
 // Y — gold TRUE, two-sides-of-one-fact) carry no explicit predicate negation
 // and are untouched; subject-negated claims already abstain in claimDirection.
-const PREDICATE_NEGATION = /\b(?:not|cannot|can\s?not|doesn'?t|does\s?not|don'?t|didn'?t|did\s?not|fails?\s+to|failed\s+to|unable\s+to|neither|nor)\b/;
+// Exported for judge-calibration.mjs's superlative-complement signal (single owner).
+export const PREDICATE_NEGATION_RE = /\b(?:not|cannot|can\s?not|doesn'?t|does\s?not|don'?t|didn'?t|did\s?not|fails?\s+to|failed\s+to|unable\s+to|neither|nor)\b/;
 
 const hasAny = (low, phrases) => phrases.some((p) => low.includes(p));
 
@@ -202,7 +204,7 @@ export const deterministicBandVerdict = (claim, counterpart) => {
   const db = claimDirection(counterpart);
   if (da !== null && db !== null && da !== db) return false; // "A restores X" vs "A reduces X"
   if (da !== null && db !== null && da === db
-    && PREDICATE_NEGATION.test(la) !== PREDICATE_NEGATION.test(lb)) {
+    && PREDICATE_NEGATION_RE.test(la) !== PREDICATE_NEGATION_RE.test(lb)) {
     return false; // "A does not inhibit X" vs "A inhibits X" — negated vs asserted
   }
   const aCorr = hasAny(la, CORRELATION_KIND);

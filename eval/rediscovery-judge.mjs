@@ -27,6 +27,7 @@
  */
 
 import { thresholdMatch, finalizeCounts, MATCH_DEFAULTS, deterministicBandVerdict } from './claim-match.mjs';
+import { resolveCalibration, bandCalibrationMatch } from './judge-calibration.mjs';
 import { atLeast } from './reducers.mjs';
 
 const DECOMPOSE_SCHEMA = {
@@ -148,8 +149,12 @@ export const medianPass = (passes) => {
  * Full judge pipeline over one (agentText, fixed GT) pair. `call` is the provider
  * adapter: async (req, validate) -> { ok, data } | { ok:false, error }. Returns
  * fail-visible errors instead of throwing so variance harnesses can record them.
+ * `calibration` names an OPT-IN band-calibration profile (judge-calibration.mjs;
+ * default 'none' keeps majority-of-valid semantics byte-identical; the chosen
+ * profile is stamped into the result for provenance — protocols change explicitly).
  */
-export const judgeRediscovery = async ({ agentText, gtClaims, call, passes = 5, votes = 5 }) => {
+export const judgeRediscovery = async ({ agentText, gtClaims, call, passes = 5, votes = 5, calibration = 'none' }) => {
+  const calProfile = resolveCalibration(calibration);
   const validateDecompose = (raw) => {
     if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return new Error('not an object');
     if (!Array.isArray(raw.agentClaims) || raw.agentClaims.length === 0) return new Error('agentClaims empty');
@@ -172,6 +177,7 @@ export const judgeRediscovery = async ({ agentText, gtClaims, call, passes = 5, 
   const adjudications = [];
   let adjudicationVotes = [];
   let votesFailed = 0;
+  let calibrationSummary = { profile: calProfile.version, fired: 0, flipped: 0 };
   // S2 deterministic band pre-layer: zero-gold-error rules (opposing directions,
   // correlation-vs-mechanism) decide some borderline pairs outright. Decided
   // pairs never reach the LLM — they cannot swing on re-judge, which is the
@@ -236,12 +242,37 @@ export const judgeRediscovery = async ({ agentText, gtClaims, call, passes = 5, 
     const valid = voteRows.filter((row) => row !== null);
     if (valid.length === 0) return { ok: false, error: { stage: 'adjudicate', message: 'all adjudication votes failed' } };
     const majorityThreshold = Math.floor(valid.length / 2) + 1;
+    let calFired = 0;
+    let calFlipped = 0;
     llmEntries.forEach((k, n) => {
       const perItem = valid.map((row) => row[n] === true);
-      const matched = atLeast(perItem, majorityThreshold);
+      const yes = perItem.filter(Boolean).length;
+      const majorityMatched = atLeast(perItem, majorityThreshold);
+      // opt-in band calibration: a deterministic complement signal (validated
+      // zero-gold-error, judge-calibration.mjs) lowers the yes-threshold for the
+      // recorded strict-side FN family; profile 'none' (default) leaves majority
+      // semantics untouched. det-false pairs can never reach here (pre-layer
+      // precedence) and can never be rescued (intrinsic guard in bandCalibrationMatch).
+      const cal = bandCalibrationMatch({
+        profile: calProfile,
+        claim: items[n].claim,
+        counterpart: items[n].bestCounterpart,
+        yesCount: yes,
+        validCount: valid.length,
+      });
+      const matched = cal.fired ? cal.matched : majorityMatched;
+      if (cal.fired) {
+        calFired += 1;
+        if (matched && !majorityMatched) calFlipped += 1;
+      }
       adjudications[k] = { matched };
-      adjudicationVotes.push({ k, votesOk: valid.length, yes: perItem.filter(Boolean).length, matched, unanimous: perItem.every(Boolean) });
+      adjudicationVotes.push({
+        k, votesOk: valid.length, yes, matched, unanimous: perItem.every(Boolean),
+        basis: cal.fired ? 'complement-rescue' : 'majority',
+        ...(cal.fired ? { calibrationSignal: cal.signal, calibrationThreshold: cal.threshold } : {}),
+      });
     });
+    calibrationSummary = { profile: calProfile.version, fired: calFired, flipped: calFlipped };
   }
   const counts = finalizeCounts(agentClaims, gtClaims, m, adjudications);
   const votesRequested = llmEntries.length * votes;
@@ -250,6 +281,7 @@ export const judgeRediscovery = async ({ agentText, gtClaims, call, passes = 5, 
     agentClaims,
     decomposition: { passes: decPasses.map((p) => p.length), selected: agentClaims.length },
     matcher: { version: 'v2.5-det-band-rules-negation', ...MATCH, borderline: m.borderline.length, detBandDecided },
+    calibration: calibrationSummary,
     adjudications,
     adjudicationVotes,
     scoredUnscored: { votesRequested, votesOk: votesRequested - votesFailed, votesFailed, note: 'failed votes are excluded from the decision, never counted as no (inspect_ai unscored semantics)' },

@@ -25,6 +25,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { makeProvider, parseRunOutput } from './lib.mjs';
 import { isRepresentative } from '../dist/pipeline/stages/shared.js';
@@ -38,10 +39,6 @@ const SAMPLE_N = Number(process.env.MLR_SAMPLE_N ?? 5);
 // unified judge pass.
 const SHARD = Number(process.env.MLR_SHARD ?? 0);
 const SHARDS = Number(process.env.MLR_SHARDS ?? 0);
-if (!Number.isInteger(SHARD) || !Number.isInteger(SHARDS) || SHARDS < 0 || (SHARDS > 0 && (SHARD < 1 || SHARD > SHARDS))) {
-  console.error('FATAL: MLR_SHARD/MLR_SHARDS must be i/n with 1<=i<=n (or 0/0 = unsharded)');
-  process.exit(2);
-}
 const REPO = resolve(process.cwd(), process.env.MLRBENCH_REPO ?? '.cache/repos/mlrbench');
 const RESULTS_DIR = resolve(process.cwd(), 'eval/results');
 const OUT = resolve(process.cwd(), process.env.MLR_OUT ?? join(RESULTS_DIR, 'mlr-bench.jsonl'));
@@ -65,14 +62,18 @@ const die = (msg) => { console.error('FATAL: ' + msg); process.exit(1); };
 // ---------------------------------------------------------------------------
 
 const extractRubric = (pyPath, constName) => {
-  const src = readFileSync(pyPath, 'utf8');
+  let src;
+  try {
+    src = readFileSync(pyPath, 'utf8');
+  } catch {
+    // fail visibly with an actionable message — a raw ENOENT stack (missing/absent
+    // .cache clone) is a diagnosis dead end for batch operators
+    die(`cannot read ${pyPath} (MLRBENCH_REPO clone missing? expected upstream mlrbench repo at that path)`);
+  }
   const m = src.match(new RegExp(`${constName}\\s*=\\s*"""([\\s\\S]*?)"""`));
   if (m === null) die(`cannot extract ${constName} from ${pyPath}`);
   return m[1];
 };
-
-const IDEA_RUBRIC = extractRubric(join(REPO, 'mlrbench/evals/review_idea.py'), 'RESEARCH_IDEA_RUBRIC');
-const PROPOSAL_RUBRIC = extractRubric(join(REPO, 'mlrbench/evals/review_proposal.py'), 'RESEARCH_PROPOSAL_RUBRIC');
 
 const taskMd = (task) => readFileSync(join(REPO, 'tasks', task + '.md'), 'utf8');
 
@@ -247,7 +248,24 @@ const IDEA_DIMS = ['Consistency', 'Clarity', 'Novelty', 'Feasibility', 'Signific
 const PROPOSAL_DIMS = ['Consistency', 'Clarity', 'Novelty', 'Soundness', 'Feasibility', 'Significance', 'OverallAssessment'];
 const dimName = (rubric, dim) => rubric.toUpperCase().includes(dim.toUpperCase());
 
-const parseReview = (expectedDims, raw) => {
+/**
+ * Success-record assembly for the judged rows (2026-09-05 fix, unit-locked): every
+ * SUCCESS row must carry task/runId/agent/stage (per-agent north-star means are
+ * computed from the artifact) and the judge identity derives from the LIVE provider
+ * (providerName/modelId), never a stale hardcoded label.
+ */
+export const buildSuccessRecord = ({ task, runId, agent, stage, review, provider }) => ({
+  task, runId, agent, stage,
+  judge: `${provider.providerName ?? 'makeProvider'}/${provider.modelId} (route per PROTOCOL addendum)`, temperature: 0,
+  ...(agent === 'farlab' ? { rendering: 'idea-proposal-v2' } : {}),
+  scores: Object.fromEntries(Object.entries(review).map(([k, v]) => [k, v.score])),
+  overall: review.OverallAssessment.score,
+  strengths: review.OverallAssessment.strengths,
+  weaknesses: review.OverallAssessment.weaknesses,
+});
+
+/** Dimension-key validation for the verbatim MLR rubrics (exported for unit lock). */
+export const parseReview = (expectedDims, raw) => {
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return new Error('not an object');
   const entries = Object.entries(raw);
   const got = [...entries.map(([k]) => k)].sort();
@@ -296,11 +314,19 @@ const judgeOne = async (provider, rubric, expectedDims, stage, contentMd, taskTe
 };
 
 // ---------------------------------------------------------------------------
-// main
+// main (guarded: importing this module must not execute the batch — the
+// asta-litqa2 import-side-effect lesson ΩF-010 applies here too)
 // ---------------------------------------------------------------------------
 
-const provider = await makeProvider();
-if (!provider.liveReady && !RENDER_ONLY) die('live route not ready (check FARLAB_BASELINE_PROVIDER/ZAI key per makeProvider — deepseek is banned)');
+async function main() {
+  if (!Number.isInteger(SHARD) || !Number.isInteger(SHARDS) || SHARD < 0 || (SHARDS > 0 && (SHARD < 1 || SHARD > SHARDS))) {
+    console.error('FATAL: MLR_SHARD/MLR_SHARDS must be i/n with 1<=i<=n (or 0/0 = unsharded)');
+    process.exit(2);
+  }
+  const IDEA_RUBRIC = extractRubric(join(REPO, 'mlrbench/evals/review_idea.py'), 'RESEARCH_IDEA_RUBRIC');
+  const PROPOSAL_RUBRIC = extractRubric(join(REPO, 'mlrbench/evals/review_proposal.py'), 'RESEARCH_PROPOSAL_RUBRIC');
+  const provider = await makeProvider();
+  if (!provider.liveReady && !RENDER_ONLY) die('live route not ready (check FARLAB_BASELINE_PROVIDER/ZAI key per makeProvider — deepseek is banned)');
 
 const eligible = eligibleTasks();
 if (eligible.length < SAMPLE_N) die(`only ${eligible.length} eligible tasks with full anchor coverage`);
@@ -392,19 +418,7 @@ for (const r of uniqueRuns) {
       }
       try {
         const review = await judgeOne(provider, rubric, dims, stage, md, taskText, r.task, agent, ideaMd);
-        records.push({
-          // 2026-09-05 fix: task/runId/agent/stage were dropped from success records
-          // (only error/skipped rows carried them) — per-agent north-star means were
-          // uncomputable from the artifact. Judge identity derives from the live
-          // provider instead of a stale hardcoded label.
-          task: r.task, runId: r.runId, agent, stage,
-          judge: `${provider.providerName ?? 'makeProvider'}/${provider.modelId} (route per PROTOCOL addendum)`, temperature: 0,
-          ...(agent === 'farlab' ? { rendering: 'idea-proposal-v2' } : {}),
-          scores: Object.fromEntries(Object.entries(review).map(([k, v]) => [k, v.score])),
-          overall: review.OverallAssessment.score,
-          strengths: review.OverallAssessment.strengths,
-          weaknesses: review.OverallAssessment.weaknesses,
-        });
+        records.push(buildSuccessRecord({ task: r.task, runId: r.runId, agent, stage, review, provider }));
         console.log(`[mlr-bench] judged ${r.task}/${agent}/${stage} overall=${review.OverallAssessment.score}`);
       } catch (e) {
         records.push({ task: r.task, runId: r.runId, agent, stage, error: String(e.message).slice(0, 300) });
@@ -432,3 +446,8 @@ for (const [agent, stages] of Object.entries(byAgent)) {
   }
 }
 console.log(`\nDONE -> ${OUT}`);
+}
+
+if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  await main();
+}
