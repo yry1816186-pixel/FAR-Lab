@@ -16,6 +16,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { loadLocalSecrets } from './load-secrets.mjs';
 import { deterministicBandVerdict } from './claim-match.mjs';
+import { resolveCalibration, bandCalibrationMatch } from './judge-calibration.mjs';
 loadLocalSecrets();
 
 const GOLD_FILES = ['eval/claim-pair-gold.jsonl', 'eval/claim-pair-gold-v21.jsonl'];
@@ -30,6 +31,13 @@ const detDecided = bandAll.filter((r) => deterministicBandVerdict(r.claim, r.cou
 const band = bandAll.filter((r) => deterministicBandVerdict(r.claim, r.counterpart) !== false);
 
 const PROVIDER = process.env.FARLAB_JUDGE_PROVIDER ?? 'zai';
+/** Opt-in band calibration profile (judge-calibration.mjs). Default 'none' = the
+ * measured production behavior unchanged; an explicit profile name is recorded in
+ * the artifact so the re-run directly reports the rescue effect against gold. */
+const CALIBRATION = process.env.FARLAB_ADJ_CALIBRATION ?? 'none';
+const calProfile = resolveCalibration(CALIBRATION);
+let calFired = 0;
+let calFlipped = 0;
 /** Judge route: zai (glm, declared default) or dashscope (2026-09-05: the only
  *  billable route while the account's qwen tiers are in arrears — model via
  *  FARLAB_DASHSCOPE_MODEL, e.g. tongyi-xiaomi-analysis-pro). Same structured-call
@@ -79,10 +87,25 @@ const adjudicate = async (items) => {
   // the other 100 pairs fine)
   if (valid.length === 0) return null;
   const majority = Math.floor(valid.length / 2) + 1;
-  return items.map((_, k) => valid.filter((v) => v[k] === true).length >= majority);
+  return items.map((it, k) => {
+    const yes = valid.filter((v) => v[k] === true).length;
+    const majorityMatched = yes >= majority;
+    const cal = bandCalibrationMatch({
+      profile: calProfile, claim: it.claim, counterpart: it.counterpart,
+      yesCount: yes, validCount: valid.length,
+    });
+    if (cal.fired) {
+      calFired += 1;
+      if (cal.matched && !majorityMatched) calFlipped += 1;
+    }
+    return {
+      matched: cal.fired ? cal.matched : majorityMatched,
+      basis: cal.fired ? 'complement-rescue' : 'majority',
+    };
+  });
 };
 
-const out = detDecided.map((p) => ({ label: p.label, verdict: false, det: true, sim: p.bestSim, claim: p.claim.slice(0, 90), counterpart: p.counterpart.slice(0, 90) }));
+const out = detDecided.map((p) => ({ label: p.label, verdict: false, basis: 'det-band', det: true, sim: p.bestSim, claim: p.claim.slice(0, 90), counterpart: p.counterpart.slice(0, 90) }));
 let unscoredBatches = 0;
 for (let i = 0; i < band.length; i += BATCH) {
   const batch = band.slice(i, i + BATCH);
@@ -92,7 +115,7 @@ for (let i = 0; i < band.length; i += BATCH) {
     process.stderr.write(`[adj-acc] batch ${i / BATCH + 1} UNSCORED (all votes failed — excluded, never counted as no)\n`);
     continue;
   }
-  batch.forEach((p, k) => out.push({ label: p.label, verdict: verdicts[k], sim: p.bestSim, claim: p.claim.slice(0, 90), counterpart: p.counterpart.slice(0, 90) }));
+  batch.forEach((p, k) => out.push({ label: p.label, verdict: verdicts[k].matched, basis: verdicts[k].basis, sim: p.bestSim, claim: p.claim.slice(0, 90), counterpart: p.counterpart.slice(0, 90) }));
   process.stderr.write(`[adj-acc] ${Math.min(i + BATCH, band.length)}/${band.length}\n`);
 }
 
@@ -105,6 +128,7 @@ const summary = {
   generatedAt: new Date().toISOString(), judge: provider.modelId, judgeRoute: PROVIDER,
   votes: VOTES, n: out.length, goldTrue: tp + fn, goldFalse: tn + fp,
   detBandDecided: detDecided.length, llmBand: band.length, unscoredBatches,
+  calibration: { profile: calProfile.version, fired: calFired, flipped: calFlipped },
   accuracy: Math.round(acc * 1000) / 1000,
   truePositiveRate: Math.round((tp / (tp + fn)) * 1000) / 1000,
   falsePositiveRate: Math.round((fp / (fp + tn)) * 1000) / 1000,

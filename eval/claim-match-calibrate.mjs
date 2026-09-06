@@ -21,6 +21,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { deterministicBandVerdict } from './claim-match.mjs';
+import { complementRescueSignal, subjectComplementSignal, superlativeComplementSignal } from './judge-calibration.mjs';
 
 const GOLD_FILES = [
   'eval/claim-pair-gold.jsonl',
@@ -80,3 +81,23 @@ console.log(`\nband pre-layer (deterministicBandVerdict, 2026-09-05): band n=${b
 console.log(`effective deterministic share on band pairs: ${detFired.length}/${bandRows.length} = ${Math.round((100 * detFired.length) / Math.max(bandRows.length, 1))}%; LLM-band residue ${bandRows.length - detFired.length}`);
 console.log('Note: rules fire only inside [low, high); the threshold extremes above stay untouched.');
 console.log('\nNote: gold N=157 (104 verbose-era 2026-08-22 + 53 v2.1-concise-era 2026-08-29 covering the below-floor zone), main-agent annotated; thresholds generalize modulo that sample (disclosed limitation). The overlap zone itself is the D-038 finding restated on clean labels: scientific-semantic matching needs the adjudication layer; determinism buys the extremes only.');
+
+// ---- band-calibration arm (2026-09-06): zero-gold-error lens on the rescue signals ----
+// The opt-in complement-rescue signals (judge-calibration.mjs) lower the yes-threshold
+// only for pairs they fire on, so their shippability gate is ZERO fires on gold-FALSE
+// band pairs (a fire on a false pair could mint a leniency FP once the profile is
+// enabled). det-false pairs are excluded — the pre-layer takes precedence.
+const calBand = bandRows.filter((r) => deterministicBandVerdict(r.claim, r.counterpart) !== false);
+const sigStats = (name, sig) => {
+  const onTrue = calBand.filter((r) => r.label === true && sig(r.claim, r.counterpart)).length;
+  const onFalse = calBand.filter((r) => r.label === false && sig(r.claim, r.counterpart)).length;
+  console.log(`  ${name}: fireOnTrue=${onTrue} fireOnFalse=${onFalse}${onFalse === 0 ? '' : '  << NOT SHIPPABLE (gold-false fire)'}`);
+  return { onTrue, onFalse };
+};
+console.log(`\nband-calibration signals (complement-rescue, det-false pairs excluded; band n=${calBand.length}):`);
+const s2 = sigStats('subject-complement      ', subjectComplementSignal);
+const s4 = sigStats('superlative-complement  ', superlativeComplementSignal);
+const su = sigStats('union (shipped profile) ', complementRescueSignal);
+const unionClean = s2.onFalse === 0 && s4.onFalse === 0 && su.onFalse === 0;
+console.log(`union verdict: ${unionClean ? `ZERO gold-false fires — profile 'complement-minority-v1' stays shippable (rescue potential ${su.onTrue} gold-true band pairs)` : 'GOLD-FALSE FIRE — profile must be withdrawn or narrowed'}`);
+console.log('Note: the rescue lowers the LLM yes-threshold to the profile minimum (never mints from 0 yes votes); its LIVE effect on TPR/FPR is measured by re-running adjudication-accuracy with FARLAB_ADJ_CALIBRATION=<profile>.');
