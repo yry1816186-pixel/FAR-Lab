@@ -32,7 +32,10 @@ const seedRun = (): string => {
 
 beforeEach(() => {
   dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'farlab-restore-'));
-  backupDir = path.join(os.tmpdir(), `farlab-restore-bk-${Date.now()}-${Math.floor(Math.random() * 1e6)}`);
+  // Derive an opaque, non-predictable temp path (CodeQL js/insecure-temporary-file),
+  // then drop the empty dir so backupWorkspace sees a fresh destination and creates it.
+  backupDir = fs.mkdtempSync(path.join(os.tmpdir(), 'farlab-restore-bk-'));
+  fs.rmdirSync(backupDir);
   db = openDb(path.join(dataDir, 'far.db'));
 });
 
