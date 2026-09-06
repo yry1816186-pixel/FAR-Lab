@@ -11,11 +11,12 @@ const json = (file, value) => { const p = path.join(root, file); fs.mkdirSync(pa
 if (args.includes('--key-stdin')) {
   const input = createInterface({ input: process.stdin, terminal: false });
   console.log('Waiting for API credential on stdin (not persisted).');
-  process.env.DASHSCOPE_API_KEY = await new Promise(resolve => input.once('line', line => { input.close(); resolve(line.trim()); }));
+  process.env.DASHSCOPE_API_KEY = await new Promise((resolve, reject) => { input.once('line', line => { resolve(line.trim()); input.close(); }); input.once('close', () => reject(new Error('Credential stdin ended before a key was received'))); });
 }
 process.env.FARLAB_DASHSCOPE_MODEL = 'qwen3.7-max';
 process.env.FARLAB_DASHSCOPE_THINKING = 'off';
 process.env.FARLAB_MODEL_PROVIDER = 'dashscope';
+process.env.FARLAB_MODEL_CONCURRENCY = arg('model-concurrency', '40');
 process.env.FARLAB_TOTAL_BUDGET_MS = '180000';
 process.env.FARLAB_MIN_CALL_INTERVAL_MS = '0';
 process.env.FARLAB_MAX_ITERATION_ROUNDS = '1';
@@ -29,7 +30,7 @@ if (!probe.ok) { process.exitCode = 2; } else if (!args.includes('--probe')) {
   const { createApp } = await import('../dist/app/composition.js');
   const { ResearchQuestion, newId } = await import('../dist/domain/index.js');
   const { buildReproducibilityPackage } = await import('../dist/report/package.js');
-  const input = JSON.parse(fs.readFileSync(arg('questions', 'artifacts/sjtu-125/questions.json'), 'utf8'));
+  const input = JSON.parse(fs.readFileSync(arg('questions', 'artifacts/sjtu-125/source/questions.json'), 'utf8'));
   const questions = Array.isArray(input) ? input : (input.questions ?? input.problems);
   if (questions.length !== 125 || new Set(questions.map(q => q.id)).size !== 125) throw new Error('Expected 125 distinct questions');
   const limit = Number(arg('limit', '125'));
@@ -39,9 +40,21 @@ if (!probe.ok) { process.exitCode = 2; } else if (!args.includes('--probe')) {
   const records = fs.existsSync(path.join(root, 'runs.json')) ? JSON.parse(fs.readFileSync(path.join(root, 'runs.json'), 'utf8')) : {};
   let cursor = 0;
   const app = await createApp({ dataDir: path.join(root, 'runtime'), providerName: 'dashscope' });
+  if (args.includes('--recover-stopped')) {
+    for (const record of Object.values(records)) {
+      const lease = app.store.getRunLease(record.runId);
+      if (!lease.holder) continue;
+      const owner = Number(lease.holder.split('-')[0]);
+      let stopped = false;
+      try { process.kill(owner, 0); } catch (error) { if (error.code === 'ESRCH') stopped = true; else throw error; }
+      if (!stopped) throw new Error(`Refusing recovery: lease owner ${owner} is still alive`);
+      app.store.releaseLease(record.runId, lease.holder);
+      app.store.appendEvent(record.runId, { type: 'note', detail: { reason: 'batch_stopped_process_lease_recovery', previousOwnerPid: owner, recoveringPid: process.pid } });
+    }
+  }
   const snapshot = () => { json('runs.json', records); const states = {}; for (const r of Object.values(records)) states[r.status] = (states[r.status] ?? 0) + 1; const progress = { updatedAt: new Date().toISOString(), elapsedSeconds: Math.round((Date.now() - started) / 1000), total: questions.length, started: Object.keys(records).length, states }; json('progress.json', progress); console.log(JSON.stringify(progress)); };
   const timer = setInterval(snapshot, 30000);
-  json('configuration.json', { model: provider.modelId, provider: provider.name, baseUrl: provider.baseUrl, concurrency, iterationRounds: 1, runTokenBudget: 180000, commit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), workspaceHasExistingChanges: true, startedAt: new Date(started).toISOString(), scope: 'Full FAR-Lab pipeline, one autonomous iteration; scientific findings remain unverified until independent validation.' });
+  json('configuration.json', { pid: process.pid, model: provider.modelId, provider: provider.name, baseUrl: provider.baseUrl, concurrency, modelConcurrency: Number(process.env.FARLAB_MODEL_CONCURRENCY), iterationRounds: 1, runTokenBudget: 180000, commit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), workspaceHasExistingChanges: true, startedAt: new Date(started).toISOString(), scope: 'Full FAR-Lab pipeline, one autonomous iteration; scientific findings remain unverified until independent validation.' });
   try {
     await Promise.all(Array.from({ length: concurrency }, async () => {
       while (cursor < Math.min(limit, questions.length)) {
@@ -54,16 +67,17 @@ if (!probe.ok) { process.exitCode = 2; } else if (!args.includes('--probe')) {
           if (!run) {
             const text = item.question ?? item.text ?? item.title;
             if (typeof text !== 'string' || text.length < 5) throw new Error('Missing question text');
-            const q = ResearchQuestion.parse({ id: newId('q'), text, background: item.context ?? item.background ?? '', goalType: 'exploratory', scope: { domain: item.category ?? item.domain ?? 'general science', phenomena: [text] }, constraints: { resourceConstraints: ['Bounded automated literature research; do not claim real-world experiments were performed without execution evidence.'] }, createdAt: new Date().toISOString() });
+            // Page context includes neighboring questions and is provenance only.
+            const q = ResearchQuestion.parse({ id: newId('q'), text, background: '', goalType: 'exploratory', scope: { domain: item.category ?? item.domain ?? 'general science', phenomena: [text] }, constraints: { resourceConstraints: ['Bounded automated literature research; do not claim real-world experiments were performed without execution evidence.'] }, createdAt: new Date().toISOString() });
             run = app.store.createRun(q, { routeOverride: 'dashscope' });
           }
-          records[id] = { ...records[id], id: item.id, question: item.question ?? item.text ?? item.title, runId: run.id, status: 'running', startedAt: new Date().toISOString(), exported: false };
+          records[id] = { ...records[id], id: item.id, question: item.question ?? item.text ?? item.title, runId: run.id, status: 'running', startedAt: records[id]?.startedAt ?? new Date().toISOString(), exported: false };
           snapshot();
           for (let attempt = 1; attempt <= 2; attempt++) {
             run = await app.orchestrator.execute(run.id);
-            records[id] = { ...records[id], status: run.status, attempt, error: run.lastError, stages: run.stages };
+            records[id] = { ...records[id], status: run.status, runStatus: run.status, attempt, error: run.lastError, stages: run.stages };
             snapshot();
-            if (run.status !== 'failed' || /auth|quota|401|403/i.test(run.lastError ?? '')) break;
+            if (!run.stages.some(s => s.state === 'failed') || /auth|quota|401|403/i.test(run.lastError ?? '')) break;
           }
           const dir = path.join(root, 'results', id.padStart(3, '0'));
           fs.mkdirSync(dir, { recursive: true });
@@ -77,7 +91,7 @@ if (!probe.ok) { process.exitCode = 2; } else if (!args.includes('--probe')) {
           }
           records[id].endedAt = new Date().toISOString();
         } catch (error) {
-          records[id] = { ...records[id], status: 'failed', error: String(error.message).slice(0, 1500), endedAt: new Date().toISOString() };
+          records[id] = { ...records[id], status: 'failed', runStatus: run?.status, error: String(error.message).slice(0, 1500), endedAt: new Date().toISOString() };
         }
         snapshot();
       }

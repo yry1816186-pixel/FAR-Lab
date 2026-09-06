@@ -54,6 +54,8 @@ Rules:
 - Consider AT LEAST TWO families per objective, including ones you reject — say why in the rationale.
 - Every candidate with assessment "selected" MUST have a "validationPlan" naming the real check that verifies results (e.g. convergence order against an analytic solution, preregistered statistical test, held-out test set, protocol QC rule, independent replication).
 - Candidates you do NOT select must OMIT validationPlan entirely (short placeholders like "n/a" are rejected).
+- Every selected validationPlan must contain at least 10 characters and describe a real check. Never emit an empty validationPlan.
+- If any candidate is selected for an objective, OMIT undecidedReason entirely. If none is selected, provide an undecidedReason of at least 10 characters explaining the actual obstacle. Never emit an empty string, null, or "n/a" for undecidedReason.
 - Match the family to the problem: a well-posed PDE/ODE question selects numerical_simulation with a convergence/discretization-error validation plan; a question about a natural phenomenon with no formal structure selects retrieval_synthesis and/or physical_experiment; a closed-form identity claim selects analytic_symbolic with a grid-check plan.
 - Prefer empty arrays over fabricating variables, data, premises or unknowns.
 - LANGUAGE (hard rule): every generated text field MUST be in the question's own language — never translate, never switch languages mid-model. An English question yields an entirely English problem model.`;
