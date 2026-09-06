@@ -34,7 +34,6 @@ const exists = rel => fs.existsSync(path.join(root, rel));
 
 // 1. Required files
 const REQUIRED = [
-  'AGENTS.md',
   'START_HERE.md',
   'FINAL_BUILD_PROMPT.md',
   '.control/EXECUTION_STATE.json',
@@ -52,10 +51,11 @@ const REQUIRED = [
 ];
 // Workspace-process state that the repository no longer carries (repo
 // governance 2026-08-28: source + necessary files only — these are gitignored
-// and live only in the working workspace). Missing them is still a LOCAL
+// and live only in the working workspace; AGENTS.md joined them on 2026-09-06).
+// Missing them is still a LOCAL
 // workspace invariant; CI checkouts of the public repo degrade to a warning
 // exactly like .control/.
-const WORKSPACE_ONLY_REQUIRED = new Set(['START_HERE.md', 'FINAL_BUILD_PROMPT.md', 'research/EVIDENCE_INDEX.md']);
+const WORKSPACE_ONLY_REQUIRED = new Set(['AGENTS.md', 'START_HERE.md', 'FINAL_BUILD_PROMPT.md', 'research/EVIDENCE_INDEX.md']);
 for (const rel of REQUIRED) {
   if (!exists(rel)) {
     // CI checkouts have no .control/ or other gitignored workspace state by

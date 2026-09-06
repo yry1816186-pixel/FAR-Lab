@@ -1,0 +1,31 @@
+{
+  "name": "counter-evidence-discipline",
+  "version": "1.0.0",
+  "license": "MIT",
+  "sourceUri": "builtin:FAR-Lab R2-09 capability-ecosystem lane; methodology distilled from the workspace's Track-1 Direction-A falsification discipline",
+  "skills": [
+    {
+      "name": "systematic-counter-evidence",
+      "description": "Systematic counter-evidence hunting for scientific hypotheses: five query families, verdict rubric, and absence-of-evidence discipline",
+      "whenToUse": "refining hypotheses counter evidence contradiction failed replication boundary condition competing mechanism falsify",
+      "priority": 20,
+      "body": "## Counter-evidence search discipline\n\nSearch FIVE distinct query families per hypothesis — one family is anecdotal coverage, five is a hunt:\n\n1. **Direct contradiction**: mechanism + negated outcome (\"X does not mediate\", \"no effect of X on Y\").\n2. **Failed replication**: mechanism + (replication OR reproducibility OR \"failed to replicate\" OR \"non-replication\").\n3. **Boundary conditions**: mechanism + (only in | except | whereas | moderator | context-dependent). Look for scope limits, not just refutations.\n4. **Competing mechanisms**: the phenomenon + (alternative mechanism | rival explanation | instead mediated by).\n5. **Methodological critique**: mechanism + (confound | artifact | measurement error | p-hacking | publication bias).\n\n## Verdict rubric (per finding)\n\n- `contradicts`: directly incompatible result on the same causal link.\n- `mixed`: supports in one regime, contradicts in another — record BOTH regimes; boundary findings are usually `mixed`, not `contradicts`.\n- `supports`: strengthens the link (record for balance — do not suppress convenient support).\n- `irrelevant`: shares vocabulary but not the causal link. Discard with a one-line reason.\n\n## Absence discipline\n\n- No hits in a family is a FINDING (\"family X: no counter-evidence located\"), never a search failure. Do not re-query with trivia variations to manufacture hits.\n- Absence of counter-evidence lowers urgency, never raises confidence to certainty — state the search boundary honestly (families covered, databases queried, date).\n\n## Specificity traps\n\n- A contradiction against a STRONGER version of the hypothesis (different population, dose, timescale) is `mixed` at best.\n- Review-article claims are secondhand: mark them, prefer primary results when both appear.\n- Never promote a speculative discussion-section sentence to `contradicts`."
+    }
+  ],
+  "hookRules": [
+    {
+      "label": "destructive-ops-need-approval",
+      "event": "before_tool",
+      "match": { "riskClass": "destructive" },
+      "action": { "type": "require_approval", "reason": "destructive-class tools (delete/overwrite/purge semantics) require explicit researcher approval even in sessions that admit them" }
+    }
+  ],
+  "commands": [
+    {
+      "name": "counter-review",
+      "label": "Counter-evidence review",
+      "template": "Run the systematic-counter-evidence discipline over hypothesis: {{statement}}. Cover all five query families, apply the verdict rubric verbatim, and end with the search boundary statement (families covered, sources queried, date).",
+      "scope": "both"
+    }
+  ]
+}

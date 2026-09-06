@@ -1,0 +1,1103 @@
+{
+  "schema": "final-acceptance/1",
+  "sourceOfTruth": "FINAL_ACCEPTANCE.json",
+  "asOf": "2026-09-06 closeout: 56 PASS / 6 PARTIAL / 0 FAIL / 4 BLOCKED_EXTERNAL; full Vitest 2721 passed / 15 skipped, plus 12 cancellation tests; final completion remains NOT_READY",
+  "head": "lane/docs-readme-revamp @ 6326b5baceeb33a2955f47c2abd23e7eddf5ed93 + uncommitted endgame and closeout changes",
+  "currentVerification": ".control/CLOSEOUT_VERIFICATION.json",
+  "provenance": "First full endgame audit: 8 parallel read-only domain audits, reports in FINAL_EVIDENCE/audit-2026-08-30/. Load-bearing claims were spot-checked by the main agent. Wave 0 findings were registered before repair, the preserved conversation-stream lane was integrated without dropping its work, and the resulting clean lane passed targeted, browser, build, hygiene, and full-suite gates recorded in .control/EXECUTION_STATE-20260831-wave0.md. Wave A reproduced the hosted loaded-home CLS failure locally, attributed the exact shifting nodes before repair, and closed independent shell/science-projection races at 87a1f3f. The release wave then verified an 888-source-file clean copy across root/Web/TUI/Python/desktop, generated a Syft 1.51.0 CycloneDX 1.7 SBOM with 991 components across npm/Cargo/PyPI, built an independently verified 890-file archive twice with byte-identical SHA-256, and kept tag publishing closed on UNRELEASED. Wave B re-ran the local OCI verifier and real-path/opt-in adversarial suites, added cooperative cancellation and production sandbox trust-root hardening. The current endgame wave adds executable e-process accumulation, workflow fail-fast contracts, and the SQLite-backed Scientific World Model; the latest full root suite on 2026-09-06 passed 263 files / 2641 tests / 15 skipped, with typecheck, build, lint, JSON validation, and diff-check also passing. Local gates are recorded in .control/EXECUTION_STATE-20260831-wavea.md and this working-tree checkpoint; hosted CI, CodeQL result, OIDC attestation and GitHub Release remain deliberately unclaimed. Remaining PARTIAL/BLOCKED_EXTERNAL items are preserved as evidence-dependent rather than inferred from passing mechanisms.",
+  "statusVocabulary": [
+    "PASS",
+    "PARTIAL",
+    "FAIL",
+    "BLOCKED_EXTERNAL"
+  ],
+  "priorityVocabulary": [
+    "P0 correctness/safety/scientific-truth/core-flow",
+    "P1 acceptance/reliability/reproducibility",
+    "P2 architecture/product/performance/frontier"
+  ],
+  "ownerVocabulary": [
+    "self",
+    "sibling-lane",
+    "user",
+    "external"
+  ],
+  "items": [
+    {
+      "id": "FA-PLT-02",
+      "domain": "platform",
+      "title": "Hosted CI green on canonical main (ACC-38 factual basis)",
+      "status": "PASS",
+      "priority": "P0",
+      "owner": "self",
+      "gap": "CLOSED 2026-09-02: canonical main merge commit 0da4c68adf0ac1496d67de59990e9755edced64d ran green at https://github.com/yry1816186-pixel/FAR-Lab/actions/runs/33583828122 — Verify on ubuntu/windows/macos all SUCCESS and Web E2E (chromium / full) 26/26 in 6.8m (the loaded-home CLS fix from 87a1f3f is now hosted-verified on canonical main: home CLS 0.0001 / map 0.0184-0.0185 locally, full browser gate green hosted). History: canonical main@cc4009c run 33315252432 was the last red (loaded-home CLS 0.123795); the fix lane was integrated via PR #137 (admin merge under the owner-configured bypass actor, all 38 checks green pre-merge).",
+      "target": "green verify+web-e2e on hosted runner, SHA recorded",
+      "verify": "FARLAB_E2E_PORT=3311 PLAYWRIGHT_CHANNEL='' npx playwright test --workers=1 (23/23 local), then canonical hosted verify+web-e2e green with SHA/run recorded",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/08-platform.md",
+        "https://github.com/yry1816186-pixel/FAR-Lab/actions/runs/33315252432",
+        ".control/EXECUTION_STATE-20260831-wavea.md",
+        "web/e2e/PERF_BASELINE.md",
+        "web/e2e/perf.spec.ts",
+        "web/src/components/AwarenessBar.tsx",
+        "web/src/lab/StudyMap.tsx"
+      ]
+    },
+    {
+      "id": "FA-EVAL-14",
+      "domain": "evaluation",
+      "title": "Submission docs number honesty (judge variance)",
+      "status": "PASS",
+      "priority": "P0",
+      "owner": "self",
+      "gap": "FIXED 2026-08-30: all three citation surfaces now state 08-29 measured values (4/5 swing<=0.045, worst 0.267, target not met, superseded 0.061 disclosed); both PDFs regenerated + extraction-verified; north-star evidence pointer corrected to v22 file.",
+      "target": "docs cite 08-29 measured values with 未达标 disclosure + attribution; north-star pointer fixed",
+      "verify": "rg 0.061 → 0 hits in submission/; diff vs eval/results originals",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md",
+        "evidence/W9/judge-variance-hardening.md:59"
+      ]
+    },
+    {
+      "id": "FA-SEC-01",
+      "domain": "security",
+      "title": "Exploration CodeAct real OS-level isolation",
+      "status": "PASS",
+      "priority": "P0",
+      "owner": "self",
+      "gap": "CLOSED 2026-09-02 (hosted evidence complete). LOCALLY: production explore_code creates a dedicated Docker Linux OCI container, resolves the operator tag once to a full immutable image ID before create, verifies image + complete HostConfig before start, attests kernel/runtime facts in-container (including root mount ro from /proc/self/mountinfo), runs as UID/GID 65532 with network none/read-only rootfs/drop ALL/NNP/seccomp/cgroup limits/private namespaces, bounds stdout, and force-removes timed-out or failed containers. Independent review found three Low failure-path gaps; all were fixed (strict Privileged=false verifier contract, immutable image pin/container binding, always-run CI residue assertion, attach-client kill in cleanup finally) and regression-tested. Cleanup remains retryable after transient Docker removal failure. Local Docker Desktop Linux production/adversarial paths are green for image sha256:4836603133c4d7536d3918ae1daef5609214da8155044d3af1d767fed70574dc and were re-verified 2026-09-02 at commit d17e706 against the rebuilt image sha256:f00cad3d803eaafa089d7fe87654e52d710706e41c1ca0aac2628dd72f0bbe19 (base-image refresh; sandbox:verify + opt-in OCI adversarial/cleanup suites re-run green). Cancellation now covers warmup and in-flight calls with idempotent sidecar close, and ToolContext.signal is forwarded through the production tool adapter. The production runExploration runner owns createExplorationSandbox; neither it nor wireResearchTools accepts a caller-supplied sidecar factory. Deterministic tests replace only that module boundary inside an isolated Vitest worker; this is not a runtime extension seam or a cryptographic attestation token. CI and Docker lifecycle environment consistency fixes are locally verified. HOSTED (closing evidence): canonical main merge commit 0da4c68adf0ac1496d67de59990e9755edced64d ran the exploration-sandbox job GREEN on ubuntu-latest at https://github.com/yry1816186-pixel/FAR-Lab/actions/runs/33583828122 with image sha256:fedefb6ec129bfbaca3b19136bb0da5e313ba69d557e9fdd73b8a743657a2b10; job log records 'FA-SEC-01 Linux /proc attach-client cleanup: checked=4 remaining=0' and 'FA-SEC-01 container cleanup: exploration=0 verifier=0'; blocker B-FA-SEC-01-HOSTED-OCI is RESOLVED with the machine-checkable resolution evidence. D-SEC-01 reclassified rootless daemon, gVisor/VM and Windows-native AppContainer+Job as separate threat/deployment profiles; none is claimed by the current single-user Docker Linux OCI baseline.",
+      "target": "single-user local release baseline: dedicated fail-closed Docker Linux OCI process with exact env allowlist, no network, read-only rootfs, non-root UID/GID, no capabilities, NNP+seccomp/private namespaces/resource limits and forced cleanup; stronger daemon, hostile-tenant and Windows-native profiles are triggered by their corresponding product claims",
+      "verify": "local: npm run sandbox:build && npm run sandbox:verify; FARLAB_VERIFY_EXPLORATION_SANDBOX=1 production-path + OCI adversarial suites; failure-injection cleanup contract; full npm test. closure: hosted Ubuntu exploration-sandbox green on the final source SHA with run URL/SHA/image ID and Linux /proc attach-client cleanup evidence. Re-open for rootless/gVisor/VM/AppContainer evidence only when a D-SEC-01 reversal trigger applies",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/03-security.md CAP-01",
+        "experiment-runtime/Dockerfile",
+        "experiment-runtime/sandbox-policy.json",
+        "src/experiment/exploration-sandbox.ts",
+        "scripts/verify-exploration-sandbox.mjs",
+        "tests/exploration-sandbox-contract.test.ts",
+        "tests/exploration-sandbox-verifier.test.ts",
+        "tests/exploration-sandbox-cleanup.test.ts",
+        "tests/exploration-sandbox-adversarial.test.ts",
+        "tests/exploration-runner.test.ts (cancellation + missing-attestation regressions)",
+        "tests/research-tools.test.ts (production wiring trust-root + signal forwarding regressions)",
+        ".github/workflows/ci.yml exploration-sandbox",
+        "project-spec/ARCHITECTURE.md §8.1 / .control/DECISIONS.jsonl D-SEC-01, D-SEC-02, D-SEC-03"
+      ]
+    },
+    {
+      "id": "FA-SEC-02",
+      "domain": "security",
+      "title": "CodeAct static gate known bypasses closed",
+      "status": "PASS",
+      "priority": "P0",
+      "owner": "self",
+      "gap": "CLOSED 2026-08-30: TS gate tracks alias bindings with depth-lowered thresholds + bans getattr/setattr/delattr; Python AST pass mirrors alias tracking; RUNTIME layer added (dangerous-module identity scrub with restore + guarded getattr + setattr/delattr removed); 8 malicious variants + 4 live-sandbox assertions locked in tests/codeact-escape-regression.test.ts (os-present: False proven). OS-level isolation remains tracked separately in FA-SEC-01.",
+      "target": "gate rejects known-corpus variants AND/OR runtime interception (getattr guard), locked by malicious regression suite",
+      "verify": "tests/codeact-escape-regression extended 6-8 variants",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/03-security.md CAP-02, attack path A"
+      ]
+    },
+    {
+      "id": "FA-SEC-04",
+      "domain": "security",
+      "title": "Network egress deny-by-default + destination guard",
+      "status": "PASS",
+      "priority": "P0",
+      "owner": "self",
+      "gap": "CLOSED 2026-09-02 (both layers). Sources layer landed 2026-08-30 (assertFetchDestination + manual per-hop redirect guard). Process-boundary layer landed 2026-09-02 at commit 735c94b: the policy's single owner moved to src/shared/destination-guard.ts (sources re-exports it) and is now enforced at every audited egress chokepoint — providers transport (runOpenAICompatStructuredCall rejects a metadata/RFC1918/plaintext endpoint fail-closed with a receipt before any wire traffic), MCP streamable-HTTP connect(), the configurable Zotero base, and the OpenML upstream-returned ARFF download URL (redirect-pivot class). 9 regressions in tests/egress-guard.test.ts lock the policy table, zero-dispatch assertions and the loopback legal path. Disclosed limit: a DNS name that privately resolves (rebinding) is invisible to a static guard; network-level enforcement remains the sandbox/OS profile's job.",
+      "target": "fixed-host allowlist at sources fetch chokepoint + private-range rejection + no cross-host redirect; providers layer after sibling lane lands",
+      "verify": "redirect-to-169.254.169.254 fake-fetch test asserts rejection",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/03-security.md CAP-04/05",
+        "src/shared/destination-guard.ts",
+        "tests/egress-guard.test.ts",
+        "commit 735c94b (providers/MCP/zotero/datasets enforcement)"
+      ]
+    },
+    {
+      "id": "FA-SEC-06",
+      "domain": "security",
+      "title": "OpenAlex api_key leak surface closed",
+      "status": "PASS",
+      "priority": "P0",
+      "owner": "self",
+      "gap": "CLOSED 2026-08-30: OpenAlex key rides Authorization Bearer header (officially documented method) in both openalex.ts and fulltext.ts; SourceAdapterError constructor redacts credential query values from url+message (chokepoint); 3 regression tests.",
+      "target": "key via header; error objects/redaction never contain key value",
+      "verify": "unit test asserts no api_key value in errors/logs",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/03-security.md CAP-06, attack path B"
+      ]
+    },
+    {
+      "id": "FA-SEC-07",
+      "domain": "security",
+      "title": "netcdf path fence realpath recheck",
+      "status": "PASS",
+      "priority": "P0",
+      "owner": "self",
+      "gap": "CLOSED 2026-08-30: assertLocalNetcdfPath gains realpath recheck (workspace-tools pattern, missing-target/exotic-FS tolerant); symlink-escape regression test (runs where symlinks creatable).",
+      "target": "realpath recheck (copy workspace-tools.ts:150-162 pattern) + symlink regression test",
+      "verify": "root-inside symlink → outside asserts rejection",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/03-security.md CAP-07, attack path C"
+      ]
+    },
+    {
+      "id": "FA-SCI-01",
+      "domain": "science",
+      "title": "Rediscovery mean F1 to target (max judge 0.11 / glm 0.226 dual-disclosed → 0.7 staged)",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "owner": "self",
+      "gap": "DUAL-JUDGE DISCLOSED 2026-09-05 (judge route switch = protocol change, recorded with artifacts): SAME frozen artifacts score F1 0.226 under glm-5.3 (lenient) vs 0.11 under the user-mandated qwen3.7-max (strict, 5-vote). Manual spot-check (egfr) proves the max zeros more truthful: agent decomposition all C797S-family vs GT all T790M/MET-HER3, zero real overlap — glm non-zero was borderline leniency inflation. FRESH POST-GATE runs (2026-09-05, route+judge max, post #150/#151/#156/#158): F1 0.08, BUT the egfr tournament champion IS the established T790M hypothesis (5-0) correctly rendered — product layer fixed; residual gap = decomposition-granularity alignment + judge-band strictness (S1 @max: TPR 0.838, 6 complementary-phrasing FNs; three judge generations all miss instrument targets 0.88/0.90/0.12). Remaining product lever: granularity alignment; judge-band calibration is protocol-layer — an OPT-IN calibration framework now exists (2026-09-06, eval/judge-calibration.mjs, ledger I-009): profile none keeps majority semantics byte-identical (default), complement-minority-v2 rescues 2 of the 6 recorded FN shapes with ZERO gold-false fires on the 157-pair gold (v2 2026-09-06 adversarial-audit hardening: content-bigram + two-shared-token gates, no in-sample overtrigger; prototype-key and threshold>=1 guards; 22 unit locks + standing offline calibrate arm); live TPR/FPR re-test pending API recovery (.control/run-adj-acc-max.ps1 with FARLAB_ADJ_CALIBRATION). N=5 self-authored tasks.",
+      "target": ">=10 tasks, staged intermediate F1>=0.4 with per-task bootstrap CI",
+      "verify": "node eval/rediscovery.mjs, artifacts with seed/route/prompt receipts",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/01-science.md CAP-12",
+        "eval/north-star.json",
+        "INSTRUMENT CAVEAT 2026-09-04 (sweep finding, commit 0aeeb6d): the frozen 0.226 F1 was measured with an INVERTED cdiff gtClaim (Loss of secondary bile acids inhibits... — corrected to Secondary bile acids inhibit...); forward re-measurements may shift; the frozen number stands as recorded-at-the-time",
+        "eval/results/rediscovery-rescore.json (post-GT-fix deterministic re-score of stored decompositions: cdiff F1 in [0, 0.571] with 7 borderline pairs; task means lower=0.025 upper=0.483 N=5 — final F1 awaits live 5-vote borderline adjudication)",
+        "eval/rediscovery-rescore.mjs (deterministic re-score tool: stored agent decomposition x current GT, borderline bounds)",
+        "eval/results/rediscovery.max-judge-20260905-1532.jsonl (frozen artifacts re-judged qwen3.7-max 5-vote: crc 0.533, others 0, mean 0.107)",
+        "eval/results/adjudication-accuracy.json (2026-09-05 judge qwen3.7-max: acc 0.789/TPR 0.838/FPR 0.236, tp31/fn6/tn55/fp17, n=109)",
+        "eval/results/rediscovery.jsonl (fresh post-gate 5-run corpus @max, mean F1 0.075) + .control/rediscovery-judge-max.log",
+        "eval/north-star.json rediscovery-mean-f1: dual-number discipline glm 0.226 / max 0.11, target 0.7 unchanged",
+        "eval/judge-calibration.mjs + tests/judge-calibration.test.ts 19/19 + claim-match-calibrate.mjs band-calibration arm (2026-09-06, dev-complete awaiting live re-test; ledger I-009)"
+      ]
+    },
+    {
+      "id": "FA-SCI-02",
+      "domain": "science",
+      "title": "Judge variance to <=0.15",
+      "status": "PASS",
+      "priority": "P0",
+      "owner": "self",
+      "gap": "CLOSED 2026-09-03: worstTaskSwing 0.057 (target 0.15, stretch 0.08 both met) via v2.4 judge protocol — three-iteration root-cause chain: (1) qwen3.7-max R3 baseline worst 0.2; (2) passes 7/votes 9 stabilized 4/5 tasks; (3) diagnostic isolated the residual to medianPass's equal-count content lottery -> medoid selection (most-representative pass, deterministic hash tie-break). crispr 0.267x3 stable; all five tasks swing 0/0/0.057/0/0",
+      "target": "worstTaskSwing<=0.15 via 5-pass decomposition stabilization",
+      "verify": "node eval/judge-variance.mjs --live 3 (exit 0, allUnderTarget015 true, 2026-09-03)",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md CAP-03",
+        "eval/omega/anchors/judgevar-v24-20260903.json (committed verdict run)",
+        "eval/omega/anchors/judgevar-v23-intermediate-20260903.md (stabilization chain)",
+        "eval/rediscovery-judge.mjs medoid + tests/rediscovery-judge.test.ts regression",
+        "eval/north-star.json rediscovery-judge-variance 0.267 -> 0.057"
+      ]
+    },
+    {
+      "id": "FA-SCI-03",
+      "domain": "science",
+      "title": "Relation agreement exact-label to 0.8 (0.61 blind / 0.467 exact)",
+      "status": "PARTIAL",
+      "priority": "P0",
+      "owner": "self",
+      "gap": "LIVE CROSS-FAMILY RE-JUDGE DONE 2026-09-05 (judge qwen3.7-max, user-mandated route; prior glm-4.6 0.450 n=60 kept as route history): exact-label 28/56=0.500 (target >=0.7 not met, stays PARTIAL honestly). Decomposition: supports 22/24=0.917 (near target); contradicts 5/12 (6 judged supports = inversions); weakens 0/10 (judged contradicts 4/supports 4/unrelated 2 — counter-family adjacency, not fabrication); qualifies 1/10 (8 judged supports); counter-family strict hit 10/22=0.455. DOMINANT MISS CLASS = weakens<->contradicts typology boundary + supporting-side granularity — next lever is the weakens discriminating definition (relation typology), NOT more linking gates: the #144 sharedFocus gate shipped 2026-09-05 did not move the boundary classes, as predicted by the calibration study.",
+      "target": "exact-label>=0.7 on >=5 problems, cross-family judge",
+      "verify": "spikes/relation-precision.mjs expanded sample",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md CAP-04",
+        "eval/omega/anchors/relation-precision-n30{,-b2}-20260904.jsonl miss decomposition (33 misses: ~12 topically-kin-but-unrelated, ~12 qualifies-boundary, 4 inverted)",
+        ".control calibration study: lexical containment ranges (unrelated 0.077-0.375, related 0-0.615) — gates must verify assertions, not measure overlap",
+        "src/pipeline/stages/falsify.ts verifySharedFocus + focus gate + supporting qualifies relation; tests/falsify-binding.test.ts 61/61 incl refusal + qualifies routing",
+        "spikes/output/relation-precision-max-n60-20260905.jsonl (n=56 blind cross-family re-judge rows, 0 errors) + .control/relprec-max.log",
+        "eval/north-star.json relation-blind-agreement: 0.450 (glm-4.6, 2026-09-04) -> 0.500 (qwen3.7-max, 2026-09-05), target 0.8 unchanged"
+      ]
+    },
+    {
+      "id": "FA-SCI-04",
+      "domain": "science",
+      "title": "Cross-domain held-out gold suite (non-bio)",
+      "status": "PASS",
+      "priority": "P0",
+      "owner": "self",
+      "gap": "CLOSED 2026-09-05 per the pre-registered completion criteria (6 runs + full artifacts + metrics met-or-disclosed + unsealing record): all seals sha256-verified before unsealing (H1-H6 ALL SEALS VERIFIED); 6 live runs on dashscope/tongyi-xiaomi-analysis-pro (route deviation disclosed: only billable model while qwen tiers arrears); H3 full pipeline delivery (10 hypotheses across 4 mechanism families matching the sealed answer structure, scorecards + tournament + planExec=true); H1/H5/H6 honest refusal via the evidence-insufficiency gate (zero fabrication); H4 honest refusal via empty verified-claim base (EuropePMC corpus starvation on comp-chem = measured S6 gap); H2 partial (model invalid_output truncation, 2000-token cap, disclosed). Metrics NOT MET and disclosed in eval/results/heldout-coverage.md: counter-evidence hit rate (max 3/7 vs target >=0.7), mechanism distinctness met only for H3. INSUFFICIENT-EVIDENCE honesty metric MET (4/4 refusals + 0 fabrication). Re-run on qwen unblock registered.",
+      "target": ">=3 non-bio domains x 2 questions, answers sealed by hash, preregistered",
+      "verify": "problem-set file with sealed hashes + one full run per domain",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md CAP-10",
+        "eval/results/heldout-coverage.md (unsealing + coverage + metric disclosure, workspace-only)",
+        "eval/results/heldout-runs.jsonl + eval/results/heldout-metrics.json (6-run ledger + W4-structured metrics)",
+        "ROUTE-2 REPLICATION 2026-09-05 (dashscope/qwen3.7-max, .tmp-heldout-max): H2/H3/H5 full-pipeline completed (H2 2000-token truncation GONE at 15.4min/392k tokens; H5 passes sufficiency gate) with top-hypothesis structure matching sealed answers on all three (manual comparison 17:55, eval/results/heldout-coverage.md appendix 2) — delivery 3/6 vs xiaomi batch 1/6; H1/H6 refusal is model-independent (2 routes agree); H4 partial on scope schema (assumptions 300-char cap vs max long-form, registered capability debt); counter-evidence density 9->45; claimBinding 5/5 measured at 100% (H4 null: 0 claims, partial — not counted); anchor live firings 6 (H1 verb-opposition x2, H2 null-vs-effect x4). eval/results/heldout-max-metrics.json | ADVERSARIAL AUDIT 2026-09-05: 6/6 overstated measured coverage (H4 has null binding rate), corrected to 5/5."
+      ]
+    },
+    {
+      "id": "FA-SCI-05",
+      "domain": "science",
+      "title": "ODE executor leg exists or claim corrected",
+      "status": "PASS",
+      "priority": "P1",
+      "owner": "self",
+      "gap": "CLOSED (vertical slice landed, acceptance text stale): src/experiment/executor-ode.ts executeOdeAnalysis + domain OdeSpec/odeIntegrationVerdict (sidecar scipy solve_ivp leg, FEM pattern mirrored, injection-safe rhs) with tests/executor-ode.test.ts green (8/8, re-verified 2026-09-04) incl. the mechanical convergence-order verdict; the 08-30 honesty comment fix remains in force",
+      "target": "ode_integrate op (scipy solve_ivp + convergence-order verdict, FEM pattern) OR honest comment fix",
+      "verify": "executor test asserting mechanical verdict (tests/executor-ode.test.ts 8/8 green)",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/04-data.md CAP-11",
+        "src/experiment/executor-ode.ts + tests/executor-ode.test.ts (re-verified 2026-09-04)"
+      ]
+    },
+    {
+      "id": "FA-SCI-06",
+      "domain": "science",
+      "title": "Structured-output live failure rate <=0.005 (now 0.011)",
+      "status": "PASS",
+      "priority": "P1",
+      "owner": "self",
+      "gap": "CLOSED 2026-09-04: quota unblocked (funded dashscope route), remeasured over the recorded live corpus — 38 databases (main workspace + all omega pin workspaces), 7,649 live model-call receipts, 19 stage-level invalid_output failures => rate 0.0025 <= 0.005 target. DISCLOSED: this is the qwen3.x-route era (glm/deepseek-era 08-22 measured 0.011); final-outcome basis (a call recovered after corrective re-asks counts as success, exhaustion counts once)",
+      "target": "remeasure on zai glm route",
+      "verify": "receipts-based statistics (.control/tmp-failrate2.cjs computation, 2026-09-04)",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md CAP-05"
+      ]
+    },
+    {
+      "id": "FA-SCI-07",
+      "domain": "science",
+      "title": "External benchmark anchor (AstaBench literature slice / MLR full)",
+      "status": "PARTIAL",
+      "priority": "P1",
+      "owner": "self",
+      "gap": "AstaBench adapter LANDED+verified offline (PR #164, 13 tests) but live LitQA2 measurement BLOCKED_EXTERNAL (dashscope Arrearage 2026-09-06, all 20 provider calls failed fast — evidence/W-EV2/asta-litqa2.md §5); MLR half tracked by FA-EVAL-01",
+      "target": "AstaBench literature-understanding subset adapter + MLR re-run 30 tasks under new protocol",
+      "verify": "eval scripts + archived raw artifacts",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md",
+        "2026-09-04 probe root-caused: wrong dataset org (AstaLab/ vs allenai/) — correct chain: pool=futurehouse/lab-bench LitQA2 (public CC-BY-SA-4.0, 199 q, hf-mirror), semantics=allenai/asta-bench (Apache-2.0), dev/test mapping gated (401)",
+        "PR #164 (merged 67afc3f): eval/asta-litqa2.mjs — AstaBench MCQ template verbatim, deterministic scoring (accuracy/precision/coverage + unsure), FAR-Lab EuropePMC adapter over planned keyword queries, PUB_YEAR:[2010 TO 2024] date discipline; tests/asta-litqa2.test.ts 13/13; full gates 2548 passed/0 failed",
+        "live leg attempted 2026-09-06 03:4x: BLOCKED_EXTERNAL dashscope Arrearage (20/20 provider calls ~80ms fast-fail; retrieval itself OK); rerun = .control/run-asta-litqa2-max.ps1"
+      ]
+    },
+    {
+      "id": "FA-SCI-08",
+      "domain": "science",
+      "title": "External-product baseline (Elicit etc.) on same questions",
+      "status": "BLOCKED_EXTERNAL",
+      "priority": "P2",
+      "owner": "user (external product access) + self (protocol/comparison artifact)",
+      "gap": "Reclassified 2026-09-04: every candidate external research product (Elicit, Consensus, etc.) requires a user account/subscription — an automated runnable comparison cannot be executed without user-owned credentials, and driving them otherwise would violate their ToS. The engineering side (frozen 6-question set, archived protocol shape, structured comparison artifact schema) is ready; blocked on the user providing one external product session/account",
+      "target": "1 real external product on the 6-question set, archived protocol",
+      "verify": "structured comparison artifact",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md CAP-09"
+      ]
+    },
+    {
+      "id": "FA-HAR-01",
+      "domain": "harness",
+      "title": "Agent kernel per-tool deadline (silent-hang seam)",
+      "status": "PASS",
+      "priority": "P1",
+      "owner": "self",
+      "gap": "CLOSED 2026-09-02 at commit e944c57: the bare `await tool.execute` now races the REMAINING step budget when stepTimeoutMs is configured; a tool that never settles (and ignores its abort signal) finishes the run as step_timeout with the hung tool named in the error, transcript (skipped/hung tool_result) and turn record. The abandoned promise keeps a no-op catch so a late rejection never becomes unhandled; unconfigured stepTimeoutMs preserves the previous behavior. Regression: tests/agent-loop.test.ts hung-tool case.",
+      "target": "per-tool deadline wrapper + hung-tool test returns step_timeout",
+      "verify": "new regression test",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/02-harness.md CAP-11",
+        "src/agent/loop.ts (ToolStepDeadlineExceeded race)",
+        "tests/agent-loop.test.ts (hung-tool regression)"
+      ]
+    },
+    {
+      "id": "FA-HAR-02",
+      "domain": "harness",
+      "title": "Budget/pacing default-on for unattended runs",
+      "status": "PASS",
+      "priority": "P1",
+      "owner": "self",
+      "gap": "closed: config-default semantics locked by test",
+      "target": "automation fires inherit run budget view + default gentle pacing",
+      "verify": "config-defaults test + one >=72h unattended soak",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/02-harness.md CAP-04/10",
+        "commit c38ed2f tests/providers.test.ts unattended-run config defaults (FA-HAR-02): pacing default 600ms on, explicit 0 respected, runTokenBudgetCap null opt-in (73/73 green)"
+      ]
+    },
+    {
+      "id": "FA-HAR-03",
+      "domain": "harness",
+      "title": "Provider failover live evidence (ACC-31 tested->live)",
+      "status": "PASS",
+      "priority": "P1",
+      "owner": "self",
+      "gap": "closed: live route-switch receipt captured",
+      "target": "one live failover run with receipt chain",
+      "verify": "receipts show serving-route switch mid-run",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/02-harness.md CAP-09",
+        "run_5ve7ej9ez40rbd33w4yrm74ghs pinned to mcfg_j56nhyv295zzy6efxjshg54rk2 (dead route); receipt rcp_qhe2k78bf9q5bn8jqtf6aznjb7 (stage scope, 2026-09-04T04:10:39Z) shows provider=custom:mcfg_bc4pqq38dvk723f03x4qz5zpwv = the declared fallbackConfigIds[0], usage 1831 tokens, finishReason=stop — serving route switched primary->fallback (query .far-run/far.db objects kind=receipt)",
+        "GET /api/v1/model-configs on server :3196: mcfg_j56n... fallbackConfigIds=[mcfg_bc4pqq38dvk723f03x4qz5zpwv]; offline auth_error->failover logic covered by unit tests (tests/providers.test.ts)"
+      ]
+    },
+    {
+      "id": "FA-HAR-04",
+      "domain": "harness",
+      "title": "72h unattended soak with >=2 auto-iterations + power-loss recovery",
+      "status": "BLOCKED_EXTERNAL",
+      "priority": "P1",
+      "owner": "external",
+      "gap": "Software-owned soak harness, observability, fault injection, and recovery checks are implemented. The required 72h uninterrupted runtime and power-loss observation are calendar-bound external evidence; the detached leg is due 2026-09-07.",
+      "target": ">=72h soak: RSS/handles/DB growth sampled, >=1 crash-level recovery",
+      "verify": "soak log + before/after chain verification",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/02-harness.md CAP-12"
+      ]
+    },
+    {
+      "id": "FA-HAR-05",
+      "domain": "harness",
+      "title": "Human steer queue wired in production",
+      "status": "PASS",
+      "priority": "P2",
+      "owner": "self",
+      "gap": "closed: POST /conversations/:id/steer live queue + loop injection",
+      "target": "one production path (conversation) feeds steer",
+      "verify": "e2e steer test",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/02-harness.md CAP-08",
+        "POST /api/v1/conversations/:id/steer (api.ts): ConversationTurnHub.steer() queues into the running turn; hub runtime exposes steer poll -> runAndLandTurn -> generateConversationTurn cfg.steer -> agent loop injects kind=steer transcript entry between turns (loop.ts steer poll); 409 no_active_turn when idle; tests/conversation-stream.test.ts mid-turn steering (FA-HAR-05): 202 + stream steered event + steer text present in 2nd model-call request body (46/46 suite green, tsc/eslint/build clean)"
+      ]
+    },
+    {
+      "id": "FA-HAR-06",
+      "domain": "harness",
+      "title": "Memory: >=7d retrieval sanity + poisoning red-team + user-facing management (view/edit/delete/export)",
+      "status": "PARTIAL",
+      "priority": "P2",
+      "owner": "self",
+      "gap": "ACT-R 14d decay never validated on real long data; memory-negative-conditioning no A/B (live legs). Offline subset CLOSED 2026-09-05 via PR #146: management surface (edit=audited supersession with trust re-derivation, archive=terminal+append-only, export=cap-disclosed attachment) + poisoning red-team suites + UI e2e (21 consolidated rows, real armed archive).",
+      "target": "live recheck after >=7d + red-team injection + memory management surface",
+      "verify": "memory-live-check rerun + UI e2e",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/02-harness.md CAP-06",
+        "PR #146 (add1fd8): tests/memory-{management,management-api,poisoning-redteam}.test.ts 33/33; web/e2e/memory-surface.spec.ts 2/2; full suite 2486/0"
+      ]
+    },
+    {
+      "id": "FA-HAR-07",
+      "domain": "harness",
+      "title": "Python sidecar spawn failure rejects pending calls immediately",
+      "status": "PASS",
+      "priority": "P1",
+      "owner": "self",
+      "gap": "CLOSED 2026-08-31: process error/exit and stdin failure now settle one terminal cause, reject all pending calls, and make future calls fail immediately. A real missing launcher fails in <1s (future call <100ms); the provisioned minimized-env sidecar still boots and answers.",
+      "target": "spawn/error/close settle the process lifecycle once and reject every pending or future call immediately with the launch cause",
+      "verify": "real missing-command regression completes in under 1s; provisioned sidecar suites remain green",
+      "evidence": [
+        "src/experiment/python.ts",
+        "tests/sidecar-env.test.ts",
+        "full-suite Wave 0 run 2026-08-31: repeated sidecar timeouts with uv absent"
+      ]
+    },
+    {
+      "id": "FA-DAT-01",
+      "domain": "data",
+      "title": "Streaming data plane (100MB/200MB full-buffer caps removed)",
+      "status": "PASS",
+      "priority": "P1",
+      "owner": "self",
+      "gap": "CLOSED 2026-09-04: streaming plane landed (c3b8f3f, parallel session) — putStream streaming landing + stream sha256 + streaming CSV row analysis + column-view split + netcdf de-cap + http size cap; capacity benchmark at the acceptance's own target sizes RUNS GREEN through the real paths (54d8221): 1GB CSV acquire+split (24,004,000 rows, split 40.7s — the pre-DAT-01 path hard-threw at its 100MB buffer cap) and 500MB NetCDF streaming put+hash (previously threw at 200MB). Peak RSS 1958MB < the 2048MB limit, composition disclosed (includes uv sidecar residency)",
+      "target": "streaming sha256 + chunked put + CSV row iterator; 500MB NetCDF + 1GB CSV e2e benchmark",
+      "verify": "node scripts/capacity-benchmark.mjs (defaults = acceptance sizes); artifact eval/omega/anchors/capacity-benchmark-20260904.json",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/04-data.md CAP-07",
+        "src/persistence/artifacts.ts putStream + src/shared/crypto.ts sha256FileHex + src/experiment/csv.ts streaming analysis (c3b8f3f)",
+        "scripts/capacity-benchmark.mjs + eval/omega/anchors/capacity-benchmark-20260904.json (commit 54d8221)"
+      ]
+    },
+    {
+      "id": "FA-DAT-02",
+      "domain": "data",
+      "title": "far restore verb + 3-DB consistent backup + corruption drill",
+      "status": "PASS",
+      "priority": "P1",
+      "owner": "self",
+      "gap": "CLOSED 2026-08-30: backupWorkspace/restoreWorkspace (src/app/backup-restore.ts) — 3-DB VACUUM INTO set + MANIFEST(sha256+user_version), read-only verify-before-touch, -wal hot-writer guard, move-aside rollback; far backup/restore CLI verbs + HELP + completion + docs; 10 real-path tests incl. real byte-corruption round-trip (tests/restore-drill.test.ts, storage-hardening.test.ts).",
+      "target": "far restore + one-shot 3-DB backup set + PRAGMA integrity_check failure injection test",
+      "verify": "automated drill in tests",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/04-data.md CAP-04"
+      ]
+    },
+    {
+      "id": "FA-DAT-03",
+      "domain": "data",
+      "title": "At-rest encryption decision recorded and implemented or scoped out",
+      "status": "PASS",
+      "priority": "P2",
+      "owner": "self",
+      "gap": "CLOSED 2026-09-02 via the decision-record path: SECURITY.md now carries an explicit at-rest-encryption NON-GOAL section (FA-DAT-03/D-DAT-03) — single-user local deployment, FDE (BitLocker/FileVault/LUKS) is the correct control against the stated threat actors, app-layer cipher adds no OS-enforced boundary while adding a key-management surface; API keys are not stored in the databases (env/local secrets file; receipts hash-only). Reopen trigger recorded: any multi-user/shared-workspace/server mode REQUIRES per-workspace encryption (SQLCipher/AES-GCM) before that mode ships.",
+      "target": "SECURITY.md explicit non-goal OR SQLCipher+AES-GCM",
+      "verify": "decision record + implementation/tests if in scope",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/04-data.md CAP-08",
+        "SECURITY.md (At-Rest Encryption section)"
+      ]
+    },
+    {
+      "id": "FA-DAT-04",
+      "domain": "data",
+      "title": "FTS incremental upsert (write amplification at scale)",
+      "status": "PASS",
+      "priority": "P2",
+      "owner": "self",
+      "gap": "closed: put-time O(1) targeted mirror upsert",
+      "target": "per-obj_id upsert + scale test",
+      "verify": "benchmark before/after",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/04-data.md CAP-09",
+        "src/persistence/store.ts upsertFtsRow: putObject now drops+reinserts ONLY its own obj_id mirror row (both far_search and far_search_tri, tri gated on trigramReady) — the per-put full reindexFts(kind) is gone; full rebuild stays on the lazy first-search ensureFts path",
+        "tests/fts-incremental.test.ts: update-visibility (new text searchable, old text gone, no dup rows), 1:1 row parity across 300 bulk + 50 updates, and the 2000-object amplification budget — single put <30ms where the old full reindex rewrote 4000 rows (full suite 2467 green, tsc/eslint/build clean)"
+      ]
+    },
+    {
+      "id": "FA-DAT-05",
+      "domain": "data",
+      "title": "verify legacy no-op checks degraded-marked + recompute level real",
+      "status": "PASS",
+      "priority": "P2",
+      "owner": "self",
+      "gap": "CLOSED 2026-08-30: VerificationCheck.vacuous + report.vacuousChecks machine-readable; CLI prints (vacuous) markers + disclosure line; regression test asserts 5 vacuous checks on legacy bundle.",
+      "target": "explicit legacy marker in verdict; real replay for recompute",
+      "verify": "verify.test.ts extended",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/04-data.md CAP-13"
+      ]
+    },
+    {
+      "id": "FA-REM-01",
+      "domain": "remote",
+      "title": "ACC-25 claim wording matches evidence (containerized same-host target)",
+      "status": "PASS",
+      "priority": "P0",
+      "owner": "self",
+      "gap": "CLOSED 2026-09-02: project-spec/ACCEPTANCE.md ACC-25 now reads 'remote device via gateway on a containerized same-host Linux target (live_verified; physical/HPC target untested — disclosed)'; the remote suite was RE-RUN on a live Docker engine and its log persisted at evidence/r2-10-scientific-execution/remote-suite-2026-09-02.log (gateway/gateway-discipline/remote-executor: 3 files, 10 real-path tests passed incl. key-only SSH, remote training, host-key-tamper rejection, full worker chain; the only 2 skipped tests are the inverse docker-unavailable disclosure guards, which correctly did not run).",
+      "target": "ACCEPTANCE wording 'containerized Linux target live_verified; physical/HPC untested' + suite log persisted",
+      "verify": "evidence dir contains suite log",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/05-remote.md CAP-09",
+        "evidence/r2-10-scientific-execution/remote-suite-2026-09-02.log",
+        "project-spec/ACCEPTANCE.md ACC-25"
+      ]
+    },
+    {
+      "id": "FA-REM-02",
+      "domain": "remote",
+      "title": "Remote cell-level fingerprint dedup (resume not retrain)",
+      "status": "PASS",
+      "priority": "P1",
+      "owner": "self",
+      "gap": "已闭（2026-09-02 ce87d9c）：共享 cell-dedup 模块（指纹序列化形状冻结，存量指纹兼容回归锁定）接入 remote-executor——同设备重试回放缓存细胞 0 次重训（设备+python+pip 作用域，跨设备诚实重训）；失败/取消路径 rm -rf /tmp/farlab/<id> 设备清理；scheduler.ts 崩溃窗口注释与实现一致。验证：tests/remote-executor-dedup.test.ts 5 例（同设备重试 0 训练/细胞一致/统计回放、跨设备 4 训练对照、失败清理、指纹冻结×3）；全套 2398 过/15 跳；真 docker SSH e2e 过。",
+      "target": "shared dedup module wired into remote-executor + failure-path cleanup of /tmp/farlab/<id>",
+      "verify": "test comparing cached-lookup vs sequential",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/05-remote.md CAP-03",
+        "tests/remote-executor-dedup.test.ts",
+        "src/experiment/cell-dedup.ts"
+      ]
+    },
+    {
+      "id": "FA-REM-03",
+      "domain": "remote",
+      "title": "Probe = full environment+capability fingerprint (versions/hardware) into provenance",
+      "status": "PASS",
+      "priority": "P1",
+      "owner": "self",
+      "gap": "CLOSED 2026-08-30: probe emits full fingerprint (python/numpy versions, cpuCount, gpu via nvidia-smi, pip-freeze sha256) persisted into experiment environment + ResultCell fingerprints now include remotePipFreeze; parseProbeReport unit tests (honest null degradation). Remote mem-total still omitted (cpu+gpu suffice for device identity); scheduler-driven device matching remains future work.",
+      "target": "probe collects pip-freeze hash + nvidia-smi/lscpu/mem; drives device matching",
+      "verify": "probe output in environment provenance",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/05-remote.md CAP-05/08"
+      ]
+    },
+    {
+      "id": "FA-REM-04",
+      "domain": "remote",
+      "title": "Slurm/PBS plugin gateway",
+      "status": "PASS",
+      "priority": "P2",
+      "owner": "self",
+      "gap": "CLOSED 2026-09-04 (b934678): SlurmTransport implements sbatch/squeue/scancel behind the SAME Pick<SSHGateway,'probe'|'exec'|'putFile'> seam the remote executor consumes — executeRemoteExperiment runs on a batch cluster unchanged; cooperative cancel bridges to scancel (exit 137, never hangs); devices.json kind=slurm carries partition/account/timeLimit; FAILED/TIMEOUT/CANCELLED map to 1/124/137. Verify per the acceptance's own spec = mock-scheduler e2e (only the cluster scripted, the submit/poll/cancel state machine real). Disclosed: no REAL cluster run yet — first real sbatch host folds into the same seam",
+      "target": "SlurmRemoteExecutor (sbatch/squeue/scancel) behind existing cancel semantics",
+      "verify": "npx vitest run tests/slurm-transport.test.ts (9 passed; full suite exit 0)",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/05-remote.md CAP-07",
+        "src/experiment/slurm-transport.ts + device-gateway.ts + devices.ts kind=slurm",
+        "tests/slurm-transport.test.ts (submit/poll/terminal-map/cancel-scancel/submit-fail/probe-binaries/wiring)",
+        "commit b934678"
+      ]
+    },
+    {
+      "id": "FA-PRF-01",
+      "domain": "perf",
+      "title": "Capacity benchmark at 1000+ claims / 100+ hypotheses",
+      "status": "PASS",
+      "priority": "P1",
+      "owner": "self",
+      "gap": "CLOSED (backend plane) 2026-08-30: tests/capacity-bench.test.ts — 1000 claims/100 hyps/3000 relations SYNTHETIC-labeled always-on gate: bulk write 1.4s, /science projection warm 31ms, listEvents(4100+) 30ms, lineage 15ms; artifact evidence/capacity/capacity-2026-08-30.json. Web-rendering capacity at this scale remains the HCI lane item (truncation-based UI unchanged).",
+      "target": "synthetic-labeled large-corpus fixture + capacity spec in CI",
+      "verify": "benchmark artifact + CI threshold",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/06-perf-reliability.md CAP-2"
+      ]
+    },
+    {
+      "id": "FA-PRF-02",
+      "domain": "perf",
+      "title": "Backend perf gate in CI with p50/p95/p99",
+      "status": "PASS",
+      "priority": "P1",
+      "owner": "self",
+      "gap": "CLOSED 2026-09-02: scripts/perf-gate.mjs measures ten real-path operations per run (CLI cold start, createApp, API server start/get-runs/heavy-run/events-pagination/health-chain-verify, store listEvents+verifyEventChain at 15k events, kernel turn machinery) with p50/p95/p99 and hard p95 ceilings (THRESHOLDS_MS); ci.yml runs `--ci` inside Verify (ubuntu-latest). Hosted first run GREEN on PR #139's verify (run 33588116282: cold-start 241ms, events-pagination 125ms, chain-verify 44ms — every metric far under threshold; artifact evidence/reliability/perf-gate.json per run). Fail-closed semantics are unit-locked (non-finite p95 = breach, missing threshold = breach). Thresholds remain provisional until tightened against more hosted artifacts.",
+      "target": "reliability-perf.mjs -ci mode with hard thresholds in ci.yml",
+      "verify": "CI log shows gate",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/06-perf-reliability.md PERF-1/3",
+        "scripts/perf-gate.mjs + tests/perf-gate.test.ts",
+        ".github/workflows/ci.yml (Backend perf gate step)",
+        "hosted run 33588116282 job log (PERF-GATE CI PASS)"
+      ]
+    },
+    {
+      "id": "FA-PRF-03",
+      "domain": "perf",
+      "title": "Chaos matrix closed (TLS failure, server SIGKILL, SSE mid-stream reconnect, partial SSE)",
+      "status": "PASS",
+      "priority": "P1",
+      "owner": "self",
+      "gap": "closed: 14/14 chaos matrix scripted and green",
+      "target": ">=90% coverage, each case scripted",
+      "verify": "faults.json extended",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/06-perf-reliability.md CHAOS-4",
+        "node spikes/reliability-faults.mjs -> evidence/reliability/faults.json: 14/14 PASS incl. the 4 previously-missing cases — tls-cert-failure (CERT_HAS_EXPIRED undici-cause shape through the real retry core; taxonomy network_error for expired/leaf/altname/selfsigned via observability.ts errno list), server-sigkill-mid-write (kill -9 of the real API server process during checkpoint churn + slow SSE turn: chain intact, 235 events, conversation objects zod-valid), sse-midstream-reconnect-e2e (tests/conversation-stream-reconnect.test.ts: client drop mid-turn + afterSeq reattach — zero dup, zero loss, terminal lands, reply persisted), sse-partial-frame-client (tests/web-sse-parser.test.ts on the SHIPPED web consumeSse: 1-byte tears incl. CJK boundaries, malformed frame fails visibly)",
+        "fixture drift repairs while closing: egress-guard-era baseUrls https; DNS case updated to the 2026-08-29 bounded-retry policy; disk-full injection seam moved to the FA-DAT-01 streaming write path"
+      ]
+    },
+    {
+      "id": "FA-PRF-04",
+      "domain": "perf",
+      "title": "Cancel ms-level abort regression test",
+      "status": "PASS",
+      "priority": "P1",
+      "owner": "self",
+      "gap": "CLOSED 2026-08-30: tests/cancel-wire-timing.test.ts drives the real orchestrator+lease+wireCancels against a hanging provider whose only exit is the injected AbortSignal — measured 0.6ms cancel→abort, asserted <1s, run lands cancelled.",
+      "target": "slow-provider stub + cancel <1s test",
+      "verify": "new test",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/06-perf-reliability.md CANC-6"
+      ]
+    },
+    {
+      "id": "FA-PRF-05",
+      "domain": "perf",
+      "title": "sweep-zombie tested + scheduled + liveness-linked",
+      "status": "PASS",
+      "priority": "P1",
+      "owner": "self",
+      "gap": "CLOSED 2026-08-30: sweep-zombie-runs.mjs gained FARLAB_DATA_DIR support (was hardcoded .far-run) + tests/sweep-zombie.test.ts: dry-run no-op, --execute marks only stale running runs with run_status_changed audit event, fresh/completed runs protected.",
+      "target": "vitest wrapper + lease cross-check",
+      "verify": "tests + watchdog integration",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/06-perf-reliability.md STUCK-10"
+      ]
+    },
+    {
+      "id": "FA-PRF-06",
+      "domain": "perf",
+      "title": ">=6h real soak (RSS/handles/DB growth)",
+      "status": "PARTIAL",
+      "priority": "P1",
+      "owner": "self",
+      "gap": "6h leg PASSED (verdict line, 360 samples); 72h leg running (calendar-bound 2026-09-07)",
+      "target": "6h→24h→72h staged soak logs",
+      "verify": "soak artifacts with verdicts",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/06-perf-reliability.md SOAK-9",
+        "eval/results/soak-2026-09-032354-6h.jsonl soak-verdict: hours=6 samples=360 rssMb 116.5->88.7 (-23.9%, leak bound 50%), activeHandles 3.3->3.4, dbGrowth 2.07MB/h, runsLaunched=8, pass=true (full offline workloads, kill-resistant interim verdicts hourly, pid 45424 survived session reaping)",
+        "72h soak: launched 2026-09-04 13:24 detached (run-soak72h.ps1 -> eval/results/soak-72h-ws), verdict due 2026-09-07"
+      ]
+    },
+    {
+      "id": "FA-HCI-01",
+      "domain": "hci",
+      "title": "StudyMap live-band stream-health + protocol empty-state + live truth badge",
+      "status": "PASS",
+      "priority": "P1",
+      "owner": "sibling-lane",
+      "gap": "closed: stream banner on map live band; protocol honest empty state; truth badge always visible",
+      "target": "reconnect banner on map; honest empty state; badge always visible",
+      "verify": "e2e assertions",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/07-hci.md CAP-11/12/16",
+        "web/e2e/map-surface.spec.ts (3/3 engines green): truth badge visible WHILE LIVE (positive 全实时/fully live label + lab-truth--live tone; only empty stays silent); StreamStatusChip rendered inside StudyMap LiveBand (App passes the SSE snapshot down) — deterministic SSE-blocked scenario (events/stream route aborted = restricted-network shape) shows the banner while the polling fallback carries the run to its verdict; settled runs without a protocol render the explicit 未注册≠遗漏 registered-empty band (map.protocolNone*)"
+      ]
+    },
+    {
+      "id": "FA-HCI-02",
+      "domain": "hci",
+      "title": "Method-family human override into causal revision chain",
+      "status": "PASS",
+      "priority": "P1",
+      "owner": "sibling-lane",
+      "gap": "closed: researcher override wired into the causal revision chain",
+      "target": "override control in scope review feeding revision",
+      "verify": "e2e + revision-chain test",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/07-hci.md CAP-04",
+        "src/server/method-ops.ts overrideMethodSelection (mirrors hypothesis-ops BP-2): human_expert FeedbackSignal -> Revision (scope modify, before/after) -> VersionDiff (semanticFlags method_family_override, predecessor archived sha256); MethodSelection replaced in place with decidedBy=researcher_override; audit note appended to the run event chain; unassessed families and plan-less selections refused 400 honestly",
+        "POST /api/v1/runs/:id/method-selections/:sid/override (api.ts); tests/method-override.test.ts e2e over the real HTTP server: revision-chain assertions + honest-refusal + cross-run 404 (3/3); web: ProblemModelBand override control (StudyMap) with candidate checkboxes, reason, validation-plan input, revision id feedback; web typecheck+build green, full suite green"
+      ]
+    },
+    {
+      "id": "FA-HCI-03",
+      "domain": "hci",
+      "title": "Standing gates as full-surface sweeps (axe EN/dark/all surfaces, 375px all, keyboard journey)",
+      "status": "PASS",
+      "priority": "P1",
+      "owner": "sibling-lane",
+      "gap": "closed: parameterized full-surface sweeps green",
+      "target": "parameterized sweeps in surfaces.spec",
+      "verify": "e2e green over expanded matrix",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/07-hci.md CAP-18/19/20",
+        "web/e2e/surfaces.spec.ts FA-HCI-03 sweeps (chromium 11/11 green incl. all pre-existing surface tests): (1) axe critical/serious over FOUR surfaces (home/workspace/library/study-map) x FOUR combos (zh/en x light/dark, 16 scans, deterministic 3-cycle theme pinning + language restore); (2) 375px integrity on all four surfaces (scrollWidth-innerWidth <= 1); (3) real keyboard journey — rail Enter navigation into library+workspace, n-shortcut formation focus, palette Ctrl+K + typed filter (list narrows) + ArrowDown/Up + Esc close"
+      ]
+    },
+    {
+      "id": "FA-HCI-04",
+      "domain": "hci",
+      "title": "EN leak: ResearchActions hardcoded zh insert text",
+      "status": "PASS",
+      "priority": "P2",
+      "owner": "self",
+      "gap": "CLOSED 2026-09-02 at commit e5052a6: the promoteToFeedback composition moved to dict keys actions.promoteHead/promoteUncertainties/promoteNextStep in BOTH dictionaries with {var} interpolation, and the uncertainty separator localizes with lang（；vs '; '); web typecheck green; hosted e2e (including the zh/en parity surface suite) green on lane 678d89a and PR #137 checks.",
+      "target": "move to dict",
+      "verify": "EN parity e2e",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/07-hci.md CAP-17"
+      ]
+    },
+    {
+      "id": "FA-SEC-08",
+      "domain": "security",
+      "title": "fence delimiter crypto-random (Math.random predictable)",
+      "status": "PASS",
+      "priority": "P1",
+      "owner": "self",
+      "gap": "CLOSED 2026-09-02 at commit 08bcaf4: the untrusted-data fence delimiter is now randomBytes(6) hex (48 bits, node:crypto) instead of Math.random's predictable xorshift128+ stream; the dead random seam parameter was removed (backoff jitter keeps its own deterministic seam). Regression asserts the hex shape, within-request marker consistency and cross-request uniqueness.",
+      "target": "crypto.randomBytes",
+      "verify": "entropy assertion",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/03-security.md CAP-08, path D",
+        "src/providers/http.ts buildMessages",
+        "tests/providers.test.ts (fence entropy regression)"
+      ]
+    },
+    {
+      "id": "FA-SEC-09",
+      "domain": "security",
+      "title": "Supply chain: SBOM + SAST + npm-audit CI gate + web overrides completion",
+      "status": "PASS",
+      "priority": "P1",
+      "owner": "self",
+      "gap": "",
+      "target": "cyclonedx SBOM + npm audit --omit=dev gate + remaining overrides",
+      "verify": "hosted: four npm-audit cells + CodeQL security-extended (Actions/JS-TS/Python/Rust) + Syft 1.51.0 CycloneDX all green on main; SBOM retained in the release artifact",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/03-security.md CAP-10",
+        ".github/workflows/ci.yml",
+        "scripts/release-artifacts-lib.mjs",
+        "tests/release-artifacts.test.ts",
+        "hosted run https://github.com/yry1816186-pixel/FAR-Lab/actions/runs/33888629815 @ 85de4a7 (workflow_dispatch; release-pack success)"
+      ]
+    },
+    {
+      "id": "FA-SEC-10",
+      "domain": "security",
+      "title": "Release artifact signing (SHA256SUMS + sigstore) + update integrity",
+      "status": "PASS",
+      "priority": "P2",
+      "owner": "self",
+      "gap": "Tauri updater remains a design-absent feature (target is \"when enabled\"); signing claimed for what ships: hosted actions/attest v4 provenance + SBOM attestations, gh attestation verify passed on the archive and SHA256SUMS inside the run",
+      "target": "signed release artifacts; Tauri updater signature when enabled",
+      "verify": "hosted: gh attestation verify (archive + checksums) passed in-run; bundles finalized into the artifact",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/03-security.md CAP-11",
+        ".github/workflows/ci.yml",
+        "scripts/build-release-artifacts.mjs",
+        "scripts/verify-release-artifacts.mjs",
+        "scripts/finalize-release-attestations.mjs",
+        "hosted run https://github.com/yry1816186-pixel/FAR-Lab/actions/runs/33888629815 @ 85de4a7 (workflow_dispatch; release-pack success)"
+      ]
+    },
+    {
+      "id": "FA-SEC-11",
+      "domain": "security",
+      "title": "Threat-model register complete (R-19 sandbox bypass, R-20 egress, R-21 signing, archive bomb, TOCTOU symlink)",
+      "status": "PASS",
+      "priority": "P1",
+      "owner": "self",
+      "gap": "CLOSED 2026-09-04 (acceptance text was stale — the register already carried every named entry): R-19 sandbox bypass (fail-closed OCI boundary, FA-SEC-01 PASS), R-20 egress (destination-guard single policy owner, FA-SEC-04 scope, DNS-rebinding residual disclosed), R-21 signing (SHA256SUMS+sigstore+SBOM in the release job; hosted run rides PR #141), R-23 archive bomb (512/64MB/256MB budgets, declared-vs-actual refusal, docx/pdf residual disclosed), R-24 TOCTOU symlink (netcdf realpath recheck + regression; materializeDir residual disclosed with reopen trigger). Every entry carries owner-mitigation + explicit reopen triggers",
+      "target": "register entries + owners",
+      "verify": "doc review",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/03-security.md CAP-13"
+      ]
+    },
+    {
+      "id": "FA-SEC-12",
+      "domain": "security",
+      "title": "Web client archive-bomb caps (jszip/mammoth/pdfjs)",
+      "status": "PASS",
+      "priority": "P2",
+      "owner": "self",
+      "gap": "CLOSED 2026-09-02 at commit 0b26d06 for the jszip surface: assertZipEntryBudget (512 entries / 64MB per-entry declared uncompressed / 256MB total declared, mirroring the server zip reader) runs BEFORE any decompression at the pptx/odf/epub entry points; absent size declarations fall back to the entry-count cap. 5 regressions including a real 700-entry .odt bomb failing the client parse visibly. Disclosed residual: docx routes through mammoth's internal reader (bounded only by the 25MB file-size cap) and pdfjs streams by the binary file-size cap — no jszip-seamless budget exists for those two without forking their readers.",
+      "target": "size/entry caps before parse",
+      "verify": "nested-zip sample rejected",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/03-security.md CAP-09"
+      ]
+    },
+    {
+      "id": "FA-PLT-01",
+      "domain": "platform",
+      "title": "CI matrix: windows runner + firefox/webkit smoke",
+      "status": "PASS",
+      "priority": "P1",
+      "owner": "self",
+      "gap": "CLOSED 2026-09-02: canonical main 0da4c68 run 33583828122 completed with Verify (windows-latest) SUCCESS, Verify (macos-15) SUCCESS, Web E2E (firefox / smoke) SUCCESS and Web E2E (webkit / smoke) SUCCESS (webkit exceeds this item's minimum; also green on lane runs 33580883479 and the PR #137 checks). The stale 8a5200f in-progress display is superseded by three completed green matrix runs.",
+      "target": "os matrix (ubuntu+windows) + firefox smoke project",
+      "verify": "workflow runs green on both",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/08-platform.md CAP-01/08",
+        ".github/workflows/ci.yml",
+        "https://github.com/yry1816186-pixel/FAR-Lab/actions/runs/33369651681"
+      ]
+    },
+    {
+      "id": "FA-PLT-03",
+      "domain": "platform",
+      "title": "release-pack executed for real (tag → export-public self-check → GitHub Release)",
+      "status": "PASS",
+      "priority": "P1",
+      "owner": "self",
+      "gap": "public GitHub Release (tag publication) is the user's version decision — CHANGELOG UNRELEASED gate intentionally blocks it; the hosted-runner release artifact target is met",
+      "target": "one real release artifact from hosted runner",
+      "verify": "hosted: release-pack export-public (clean-copy install+typecheck+lint+test+build) + SBOM + attested artifact farlab-public-release-85de4a7f175b52f9eef55f86f3393f8ac62b696a (workflow artifact, 30d retention)",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/08-platform.md CAP-05/10",
+        "zcode-harness/public-release-manifest.json",
+        "scripts/export-public.mjs",
+        "scripts/build-release-artifacts.mjs",
+        "tests/release-artifacts.test.ts",
+        "hosted run https://github.com/yry1816186-pixel/FAR-Lab/actions/runs/33888629815 @ 85de4a7 (workflow_dispatch; release-pack success)"
+      ]
+    },
+    {
+      "id": "FA-PLT-04",
+      "domain": "platform",
+      "title": "CHANGELOG + version policy + TUI package publish hygiene",
+      "status": "PASS",
+      "priority": "P2",
+      "owner": "self",
+      "gap": "CLOSED 2026-08-31: CHANGELOG and explicit version policy exist; root/Web/TUI/Python/desktop/Tauri/Cargo all align at 0.1.0; tag gate requires an annotated matching tag and ISO-dated changelog section. TUI declares Node >=24, Apache-2.0, public publish config and a src/README files allowlist. Real npm pack --dry-run contained 18 intended files and no tests.",
+      "target": "CHANGELOG.md + engines/files in tui + version strategy",
+      "verify": "npm pack --dry-run clean",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/08-platform.md CAP-07/10",
+        "CHANGELOG.md",
+        "VERSIONING.md",
+        "packages/tui/package.json"
+      ]
+    },
+    {
+      "id": "FA-PLT-05",
+      "domain": "platform",
+      "title": "Desktop signing/notarization/updater + uninstall registry cleanup",
+      "status": "BLOCKED_EXTERNAL",
+      "priority": "P2",
+      "owner": "user (signing budget/certificates) + self (updater/uninstall engineering)",
+      "gap": "Reclassified 2026-09-04: code-signing certificates (Windows EV / Apple Developer + notarization) are a purchasing decision only the user can make; the acceptance's own target text names it ('signing budget decision'). Updater + HKCU uninstall-cleanup engineering remains self-owned and queued behind the certificate decision",
+      "target": "signing budget decision + updater + uninstall cleanup",
+      "verify": "installed→updated→rolled back→uninstalled e2e",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/08-platform.md CAP-03/04"
+      ]
+    },
+    {
+      "id": "FA-PLT-06",
+      "domain": "platform",
+      "title": "CI numpy pin + rust-toolchain pin",
+      "status": "PASS",
+      "priority": "P2",
+      "owner": "self",
+      "gap": "CLOSED 2026-08-31: NumPy remains constrained by the locked Python runtime and rust-toolchain.toml pins stable 1.98.0 with minimal profile plus clippy/rustfmt. The clean public copy successfully resolved desktop cargo metadata under the exact 1.98.0 toolchain.",
+      "target": "pins added",
+      "verify": "workflow diff",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/08-platform.md CAP-11",
+        "rust-toolchain.toml",
+        "experiment-runtime/uv.lock",
+        ".github/workflows/ci.yml"
+      ]
+    },
+    {
+      "id": "FA-PLT-07",
+      "domain": "platform",
+      "title": "Web production artifact budget and optional-capability loading",
+      "status": "PASS",
+      "priority": "P1",
+      "owner": "self",
+      "gap": "CLOSED 2026-08-31 after pre-repair registration. Production build now reports a 7,346,964-byte application artifact (down from 47,856,580), zero source maps, zero wasm outside /models, and a 1,203,645-byte initial closure (336,506 gzip). The browser manifest contains exactly one modern pdfjs runtime and no legacy runtime; KaTeX/CSS, ASR, ingest parsers, XLSX and Radar remain dynamic. The build-integrated deterministic gate rejects exact-budget equality, maps, misplaced wasm, static optional sources and legacy pdfjs. A real cold-shell trace requested only main JS/CSS plus four fonts. Real-browser ASR-unavailable, initial-workspace state retention and PDF ingestion passed 15/15 across five no-retry repetitions, then the combined perf/optional gate passed 5/5 with home CLS 0.0001 and map CLS 0.0002. Missing ASR now retains model_missing instead of generic transcribe_failed, and the composer no longer loses a selected file when the initial runs response reveals a fresh workspace.",
+      "target": "application-shell artifact (excluding explicitly vendored /models optional assets) <10,000,000 bytes with zero .map and zero ORT wasm outside /models; optional ASR continues to use separately vendored version-matched assets and fails visibly when absent; exactly one browser pdfjs runtime; KaTeX, ASR, ingest and comparison visualization remain lazy; a deterministic gate records shell/initial/optional assets and fails budget regressions",
+      "verify": "production build + deterministic bundle-budget gate + cold-shell network inventory + real PDF/ASR-unavailable/browser regressions",
+      "evidence": [
+        ".control/EXECUTION_STATE-20260831-wavea.md",
+        "web/vite.config.ts",
+        "web/src/dictation/asr-worker.ts",
+        "web/src/utils/ingest.ts",
+        "web/src/utils/pdfCollect.ts",
+        "web/scripts/check-bundle-budget.mjs",
+        "tests/web-bundle-budget.test.ts",
+        "web/e2e/optional-assets.spec.ts",
+        "web/e2e/perf.spec.ts"
+      ]
+    },
+    {
+      "id": "FA-PLT-08",
+      "domain": "platform",
+      "title": "Static frontend cache identity and deployment revalidation",
+      "status": "PASS",
+      "priority": "P1",
+      "owner": "self",
+      "gap": "CLOSED 2026-08-31 after pre-repair live evidence was registered. The production static server now emits a strong sha256 ETag and nosniff on every successful representation, no-cache on index/model/stable paths, and public max-age=31536000 immutable on Vite /assets. Matching If-None-Match returns a bodyless 304 with the same cache policy for GET and HEAD. The complete 78-test API integration file passes, including index/assets/models, conditional requests, MIME, missing-model 404s and traversal refusal. Post-build live probes on isolated port 3321 observed index 200 no-cache and hashed JS 200 immutable, then 304/0 bytes for both validators.",
+      "target": "unversioned/index/model files revalidate on every reuse; Vite /assets content-hashed files advertise one-year immutable caching; every successful static representation has an identity validator; matching If-None-Match returns bodyless 304 for GET and HEAD without weakening honest 404/path-traversal behavior",
+      "verify": "static server integration tests assert Cache-Control + ETag on index/assets/models, conditional 304, GET/HEAD parity, MIME and existing 404/traversal invariants; isolated live curl probes confirm production headers",
+      "evidence": [
+        ".control/EXECUTION_STATE-20260831-wavea.md",
+        "src/server/api.ts",
+        "tests/api.test.ts"
+      ]
+    },
+    {
+      "id": "FA-EVAL-01",
+      "domain": "evaluation",
+      "title": "MLR-Bench full re-run under post-D-050 protocol (N=30)",
+      "status": "PARTIAL",
+      "priority": "P2",
+      "owner": "self",
+      "gap": "26/30 runs banked (17 new @dashscope/qwen3.7-max, receipts verified + 9 glm-era banked; mixed-generation sample disclosed); 4 gen runs (crl/fm4science/trl/unireps) + full 30-task judge pass died on dashscope Arrearage 2026-09-06 03:4x (156 error rows in mlr-out-max-n30.jsonl — overwrite-on-rerun); resume = .control/run-mlr-gen-max.ps1",
+      "target": "30 tasks, idea>=7.4",
+      "verify": "mlr-bench.jsonl full run",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md CAP-06",
+        "eval/results/mlr-runs-n30.jsonl: 30 rows, 26 with runId (17 completed @max), .control/mlr-gen-max.log run-by-run",
+        "PR #159 (judge rows carry task/agent/stage), #162 (runId parse fix, live-burned), #163 (rotation disclosure)"
+      ]
+    },
+    {
+      "id": "FA-EVAL-02",
+      "domain": "evaluation",
+      "title": "User-study protocol + instrumentation developed (execution BLOCKED_EXTERNAL)",
+      "status": "PASS",
+      "priority": "P1",
+      "owner": "self",
+      "gap": "CLOSED at the designed scope 2026-09-02: eval/user-study/PROTOCOL.md (preregistered: RQs, n>=3 within-subject fixed-order A→C journeys, objective per-journey completion criteria, primary endpoints SUS>=68 + >=2/3 journeys, analysis plan with negative-result parity, preregistered limitations, deviation discipline), MATERIALS.md (zh/en recruitment script, consent form, task cards mapped verbatim to the completion criteria, standard 10-item SUS zh/en + raw NASA-TLX + per-journey Likert, frozen orientation script, session checklist skeleton), INSTRUMENTATION.md (every measure mapped to existing durable artifacts — no telemetry theater). EXECUTION remains BLOCKED_EXTERNAL by design: participants are user-owned (co-schedulable with the FA-X-02 acceptance drive).",
+      "target": "protocol+materials+instrumentation in repo; n>=3 execution marked BLOCKED_EXTERNAL",
+      "verify": "docs + instrumented flows",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md CAP-12"
+      ]
+    },
+    {
+      "id": "FA-EVAL-03",
+      "domain": "evaluation",
+      "title": "Prompt engineering: version ids + gold corpus + failure taxonomy regression",
+      "status": "PASS",
+      "priority": "P2",
+      "owner": "self",
+      "gap": "",
+      "target": "version field + per-prompt gold corpus + taxonomy eval",
+      "verify": "node eval/prompt-regression.mjs --check && node eval/prompt-gold.mjs --check (both exit 0 at HEAD; both wired into .github/workflows/ci.yml)",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md CAP-11",
+        "eval/prompt-snapshot.json (96 prompts, per-entry version/provenance/history)",
+        "eval/prompt-regression.mjs --snapshot --note bump flow (refusal path verified live)",
+        ".github/workflows/ci.yml prompt drift gate step",
+        "eval/prompt-gold.json (96/96 prompts: hand-authored intent + load-bearing anchors)",
+        "eval/prompt-gold.mjs --check (anchor-loss = semantic drift = FAIL; mutation-tested live 2026-09-04)",
+        ".github/workflows/ci.yml prompt semantic gold gate step"
+      ]
+    },
+    {
+      "id": "FA-EVAL-04",
+      "domain": "evaluation",
+      "title": "FRONTIER_STATUS / blocker records track live CI state + science metrics",
+      "status": "PASS",
+      "priority": "P1",
+      "owner": "self",
+      "gap": "CLOSED 2026-09-02: FRONTIER_STATUS refreshed to canonical main 0da4c68 with the required lastCIgreenSHA/lastCIgreenRunUrl fields, a scienceMetrics dimension (all four north-star values with targets and honest below-target status), and an explicit refresh rule (after every merged green wave and every evaluation wave); asOf now tracks the merge instead of a stale 08-27 snapshot.",
+      "target": "refresh rule after each eval wave + lastCIgreenSHA field",
+      "verify": "diff asOf vs latest generatedAt",
+      "evidence": [
+        "FINAL_EVIDENCE/audit-2026-08-30/09-evaluation.md CAP-15"
+      ]
+    },
+    {
+      "id": "FA-W0-01",
+      "domain": "correctness",
+      "title": "Unicode/CJK evidence-alignment tokenization",
+      "status": "PASS",
+      "priority": "P0",
+      "owner": "self",
+      "gap": "CLOSED on Wave 0 lane: deterministic NFKC tokenizer handles Han/Hiragana/Katakana/Hangul without ICU-dependent segmentation; Chinese punctuation drift and one-character transcription-error regressions pass while unrelated Chinese remains unaligned.",
+      "target": "pure-CJK claims can reach exact/fuzzy alignment under the same deterministic evidence thresholds as Latin text",
+      "verify": "npm test -- --run tests/pipeline-evidence.test.ts",
+      "evidence": [
+        "src/pipeline/stages/align.ts",
+        "tests/pipeline-evidence.test.ts"
+      ]
+    },
+    {
+      "id": "FA-W0-02",
+      "domain": "agent",
+      "title": "Agent handoff, action-deduplication, child-budget, and MCP-reconnect hardening",
+      "status": "PASS",
+      "priority": "P0",
+      "owner": "self",
+      "gap": "CLOSED on the integrated Wave 0 lane: closed handoff schema + quality/reference gate + fact-only degradation, durable successful-effect deduplication, deterministic child budget split, bounded retryable-only MCP reconnect, and AbortSignal/model-output streaming coexist. Targeted agent/MCP tests and the final 232-file/2346-test clean-lane gate passed with only 12 explicitly skipped tests.",
+      "target": "all five hardenings coexist with streaming/resume behavior and pass full verification",
+      "verify": "npm test -- --maxWorkers=4 --minWorkers=4 after clean-lane integration",
+      "evidence": [
+        "tests/agent-compaction.test.ts",
+        "tests/agent-loop.test.ts",
+        "tests/agent-longhorizon.test.ts",
+        "tests/agent-rollout.test.ts",
+        "tests/agent-subagents.test.ts",
+        "tests/mcp-manager.test.ts"
+      ]
+    },
+    {
+      "id": "FA-W0-03",
+      "domain": "product",
+      "title": "Research-scope three-form semantic convergence",
+      "status": "PASS",
+      "priority": "P0",
+      "owner": "self",
+      "gap": "CLOSED after the pre-fix duplicate-state/API-boundary finding was registered: NewResearch, ScopeReview, and the StudyMap-embedded review now share one ResearchScope-derived draft model, patch builder, validator, accessible accordion editor, and polling-safe edit fingerprint. PATCH semantics now require phenomena while permitting canonical empty inScope/outOfScope arrays. Pure-model/API regressions, production builds, and a real Chromium journey on isolated port 3298 all passed.",
+      "target": "one ResearchScope-derived draft/patch model and one accessible accordion editor shared by create/review/study-map flows; API validation matches canonical empty-boundary semantics",
+      "verify": "pure draft/patch tests + shared-component caller inventory + API empty-boundary regression + production build/browser smoke",
+      "evidence": [
+        "web/src/lab/NewResearch.tsx",
+        "web/src/lab/ScopeReview.tsx",
+        "web/src/lab/StudyMap.tsx",
+        "web/src/lab/ScopeEditor.tsx",
+        "web/src/lab/scopeEditorModel.ts",
+        "tests/scope-editor-model.test.ts",
+        "tests/draft-journey.test.ts"
+      ]
+    },
+    {
+      "id": "FA-W0-04",
+      "domain": "security",
+      "title": "Repository hygiene and plaintext-secret sweep",
+      "status": "PASS",
+      "priority": "P0",
+      "owner": "self",
+      "gap": "CLOSED for the deterministic repository-hygiene scope: the latest Wave A rescan passed across 901 files with no HIGH finding. Its MEDIUM heuristic matches remain visible test/dummy credential assignments plus one lexical false positive (`const token = jsonStringPrefixAt(...)`), not hidden plaintext secrets. Path hygiene reported zero errors; its only warnings were ignored auxiliary-worktree dist/node_modules artifacts and therefore not tracked repository content. Exhaustive semantic file review remains separately open under FA-W0-05/06.",
+      "target": "tracked repository passes deterministic secret/path hygiene with every finding fixed or explicitly recorded",
+      "verify": "node zcode-harness/scripts/secret-scan.mjs && node zcode-harness/scripts/path-hygiene.mjs",
+      "evidence": [
+        "zcode-harness/scripts/secret-scan.mjs",
+        "zcode-harness/scripts/path-hygiene.mjs",
+        ".control/EXECUTION_STATE-20260831-wave0.md",
+        ".control/EXECUTION_STATE-20260831-wavea.md"
+      ]
+    },
+    {
+      "id": "FA-W0-05",
+      "domain": "governance",
+      "title": "Five-table full-file sweep ledger with FA-first finding control",
+      "status": "PASS",
+      "priority": "P0",
+      "owner": "self",
+      "gap": "",
+      "target": "100% tracked-file adjudication with no open finding and every finding linked to FINAL_ACCEPTANCE before repair",
+      "verify": "npm run endgame:sweep:sync && npm run endgame:sweep:complete",
+      "evidence": [
+        "zcode-harness/scripts/endgame-sweep.mjs",
+        "tests/endgame-sweep.test.ts",
+        ".control/SWEEP-LOG.json",
+        "COMPLETE 2026-09-05: runtime 396/396, tests 400/400, delivery 130/130, specs 72/72, governance 67/67, assertions 193/193 — endgame-sweep check PASS. Whole-file review by main agent across all batches (subagents rate-limited); 5 real findings fixed through the finding_fixed ledger discipline (EvidenceGraph drag refs, metrics ENOENT, rediscovery GT inversion, experiment-regression tautology, + sweep-era fixes); zero findings in the final 700-file pass"
+      ]
+    },
+    {
+      "id": "FA-W0-06",
+      "domain": "evaluation",
+      "title": "Whole-repository shallow-assertion adjudication",
+      "status": "PASS",
+      "priority": "P1",
+      "owner": "self",
+      "gap": "",
+      "target": "every live candidate strengthened or justified with rationale/evidence; removed assertions retained as retired history",
+      "verify": "npm run endgame:sweep:status && npm run endgame:sweep:complete",
+      "evidence": [
+        ".control/SWEEP-LOG.json",
+        "tests/endgame-sweep.test.ts",
+        "193/193 shallow assertions adjudicated justified (2026-09-04): each pins presence-of-required-artifact after a real production action, fail-visibility, policy boundary, or schema round-trip; one extraction false-positive (fixture string literal) documented in ledger rationale",
+        "endgame-sweep check PASS after full-table sync; assertions 193/193 100%"
+      ]
+    },
+    {
+      "id": "FA-W0-07",
+      "domain": "product",
+      "title": "Conversation model reasoning remains durably attached to the agent message after streaming integration",
+      "status": "PASS",
+      "priority": "P0",
+      "owner": "self",
+      "gap": "CLOSED after the failures were registered before repair: bounded provider reasoning is collected through model_call_done and persisted on the completed agent message without entering the public reply stream; caller abort preserves the last valid projected prefix; retry keeps the prior durable draft until the first valid replacement delta and then resets exactly once. Production HTTP/SSE regressions cover completion, tool/thinking privacy, raw-JSON nonleak, disconnect/replay, concurrent-turn rejection, cancel, and retry replacement across real provider dialect parsers.",
+      "target": "private reasoning never enters the public stream, but bounded provider reasoning is retained on the completed agent message exactly as before streaming",
+      "verify": "npm test -- --run tests/thinking-display.test.ts tests/conversation-stream.test.ts tests/provider-streaming.test.ts tests/providers.test.ts plus the final full gate",
+      "evidence": [
+        "tests/thinking-display.test.ts",
+        "tests/conversation-stream.test.ts",
+        "tests/provider-streaming.test.ts",
+        "src/server/conversation-agent.ts",
+        "src/server/conversations.ts"
+      ]
+    },
+      {
+        "id": "FA-X-01",
+        "domain": "external",
+        "title": "B-QWEN live route credential (ACC-02)",
+        "status": "PASS",
+        "priority": "P0",
+        "owner": "user",
+        "gap": "CLOSED 2026-09-03: mandated DashScope/Qwen route completed with 229 live receipts; credential was process-scoped and never persisted.",
+        "target": "live_verified with receipted competition route",
+        "verify": "evidence/b-qwen/README + report.md + far.db copy",
+        "evidence": [
+          ".control/BLOCKERS.json B-QWEN-LIVE-ROUTE",
+          "evidence/b-qwen/"
+        ]
+    },
+    {
+      "id": "FA-X-02",
+      "domain": "external",
+      "title": "Owner acceptance drive + S1 PDF review + demo video",
+      "status": "BLOCKED_EXTERNAL",
+      "priority": "P1",
+      "owner": "user",
+      "gap": "user-owned; CPS-P6 pending",
+      "target": "owner verdict recorded",
+      "verify": "user session",
+      "evidence": [
+        ".control/EXECUTION_STATE.json nextAction"
+      ]
+    }
+  ],
+  "stopConditions": {
+    "note": "Mission stop requires ALL of: no internal FAIL/PARTIAL; canonical clean-clone CI green; science north-star met or externally justified; real evidence across all planes; 24h→72h soak+chaos; win/mac/linux matrix; sandbox attack suite; production-path-only flows; clean-machine bundle verify; honest BLOCKED_EXTERNAL only; docs==commit; final red-team audit no new P0/P1.",
+    "currentVerdict": "NOT READY — 0 FAIL, 6 PARTIAL, 56 PASS, 4 BLOCKED_EXTERNAL (66 tracked; per-item statuses authoritative; software-owned endgame closures verified 2026-09-06; remaining gaps require time-bound, scientific, or external evidence)"
+  },
+  "currentVerdict": "NOT READY — 0 FAIL, 6 PARTIAL, 56 PASS, 4 BLOCKED_EXTERNAL (66 tracked; per-item statuses authoritative; software-owned e-process and workflow fail-fast closures verified 2026-09-06; remaining gaps require time-bound or external evidence)"
+}

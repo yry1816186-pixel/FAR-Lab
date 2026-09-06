@@ -70,13 +70,14 @@ eval/results/
 /spikes/
 
 # Agent-runtime state, mission files and agent tooling (local only, 2026-09-06)
+# skills/ and FINAL_ACCEPTANCE.json stay TRACKED: skills/ is a runtime domain
+# pack loaded by capability assembly; FINAL_ACCEPTANCE.json is the FA ledger the
+# endgame-sweep tests operate on.
 /.agent_brain/
 /.control/
 /.claude/
 /.impeccable/
-/skills/
 /FINAL_EVIDENCE/
-/FINAL_ACCEPTANCE.json
 /FINAL_GAPS.md
 /OMEGA-ULTRA-CONTRACT.md
 /AGENTS.md
