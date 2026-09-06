@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -32,11 +32,15 @@ const seedRun = (): string => {
 
 beforeEach(() => {
   dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'farlab-restore-'));
-  backupDir = path.join(os.tmpdir(), `farlab-restore-bk-${Date.now()}-${Math.floor(Math.random() * 1e6)}`);
+  // Derive an opaque, non-predictable temp path (CodeQL js/insecure-temporary-file),
+  // then drop the empty dir so backupWorkspace sees a fresh destination and creates it.
+  backupDir = fs.mkdtempSync(path.join(os.tmpdir(), 'farlab-restore-bk-'));
+  fs.rmdirSync(backupDir);
   db = openDb(path.join(dataDir, 'far.db'));
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   // Tests close/reopen the handle mid-drill; only close what is still open.
   try { db?.close(); } catch { /* already closed by the drill */ }
   db = null;
@@ -119,5 +123,72 @@ describe('workspace backup/restore (FA-DAT-02)', () => {
     } finally {
       fs.rmSync(emptyDir, { recursive: true, force: true });
     }
+  });
+
+  it.each(['../outside.db', 'nested/far.db', 'far.db/../../outside.db', 'C:\\outside.db'])('rejects an out-of-contract manifest filename %s before filesystem access', (name) => {
+    seedRun();
+    db.close();
+    const { manifest } = backupWorkspace(dataDir, backupDir);
+    const before = fs.readFileSync(path.join(dataDir, 'far.db'));
+    fs.writeFileSync(path.join(backupDir, 'MANIFEST.json'), JSON.stringify({ ...manifest, files: [{ ...manifest.files[0], name }] }));
+    expect(() => restoreWorkspace(backupDir, dataDir, { replace: true })).toThrow(/invalid backup manifest/);
+    expect(fs.readFileSync(path.join(dataDir, 'far.db'))).toEqual(before);
+  });
+
+  it.each(['missing-authority', 'duplicate-member'])('rejects a %s manifest instead of reporting success', (kind) => {
+    seedRun();
+    db.close();
+    const { manifest } = backupWorkspace(dataDir, backupDir);
+    const files = kind === 'missing-authority' ? [] : [manifest.files[0], manifest.files[0]];
+    fs.writeFileSync(path.join(backupDir, 'MANIFEST.json'), JSON.stringify({ ...manifest, files }));
+    expect(() => restoreWorkspace(backupDir, dataDir, { replace: true })).toThrow(/invalid backup manifest/);
+  });
+
+  it('rolls back every installed member when the second member cannot be installed', () => {
+    seedRun();
+    db.close();
+    fs.copyFileSync(path.join(dataDir, 'far.db'), path.join(dataDir, 'far-scheduler.db'));
+    backupWorkspace(dataDir, backupDir);
+    const live = path.join(dataDir, 'far.db');
+    db = openDb(live);
+    const newerRun = seedRun();
+    db.close();
+    const before = fs.readFileSync(live);
+    const originalRename = fs.renameSync.bind(fs);
+    const originalCopy = fs.copyFileSync.bind(fs);
+    const scheduler = path.join(dataDir, 'far-scheduler.db');
+    // Inject one OS installation failure; all database creation, verification,
+    // installation of the first member, and rollback use the real filesystem.
+    let failed = false;
+    const rejectSchedulerInstall = (dest: fs.PathLike): void => {
+      if (!failed && String(dest) === scheduler) {
+        failed = true;
+        throw new Error('injected second-member installation failure');
+      }
+    };
+    vi.spyOn(fs, 'copyFileSync').mockImplementation((src, dest, mode) => {
+      rejectSchedulerInstall(dest);
+      originalCopy(src, dest, mode);
+    });
+    vi.spyOn(fs, 'renameSync').mockImplementation((src, dest) => {
+      rejectSchedulerInstall(dest);
+      originalRename(src, dest);
+    });
+    expect(() => restoreWorkspace(backupDir, dataDir, { replace: true })).toThrow(/injected second-member/);
+    expect(failed).toBe(true);
+    expect(fs.readFileSync(live)).toEqual(before);
+    db = openDb(live);
+    expect(new Store(db).listRuns().some((run) => run.id === newerRun)).toBe(true);
+    expect(fs.readdirSync(dataDir).some((name) => name.includes('pre-restore') || name.startsWith('.restore-'))).toBe(false);
+  });
+
+  it('preflights all --replace conflicts before installing any member', () => {
+    seedRun();
+    db.close();
+    fs.copyFileSync(path.join(dataDir, 'far.db'), path.join(dataDir, 'far-scheduler.db'));
+    backupWorkspace(dataDir, backupDir);
+    fs.unlinkSync(path.join(dataDir, 'far.db'));
+    expect(() => restoreWorkspace(backupDir, dataDir)).toThrow(/--replace/);
+    expect(fs.existsSync(path.join(dataDir, 'far.db'))).toBe(false);
   });
 });

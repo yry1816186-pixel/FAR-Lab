@@ -55,49 +55,43 @@ export const openArtifactStore = (rootDir: string): ArtifactStore => {
       // The final shard path depends on the FULL digest, unknown until the stream
       // ends — stage in an anonymous temp at the store root, then rename into place.
       const tmp = path.join(root, `.incoming-${process.pid}-${randomBytes(6).toString('hex')}`);
-      const out = fs.createWriteStream(tmp, { flags: 'wx' });
+      // A FileHandle makes open/write/close failures promise rejections. A
+      // WriteStream also emits 'error', which used to escape the caller's catch
+      // and terminate the server on a missing/unwritable artifact directory.
+      const out = await fs.promises.open(tmp, 'wx');
       try {
-        for await (const chunk of source) {
-          const b = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-          hash.update(b);
-          size += b.length;
-          // Node convention: the write callback receives null on success (and an
-          // Error only on failure) — both null and undefined mean "write ok".
-          await new Promise<void>((resolve, reject) => {
-            out.write(b, (err) => (err === undefined || err === null ? resolve() : reject(err)));
-          });
+        try {
+          for await (const chunk of source) {
+            const b = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+            hash.update(b);
+            size += b.length;
+            // Sequential writes preserve bounded memory and backpressure.
+            await out.writeFile(b);
+          }
+        } finally {
+          // Close before cleanup/rename, including when the input stream fails
+          // before its first chunk (Windows cannot unlink an open file).
+          await out.close();
         }
-        await new Promise<void>((resolve, reject) => {
-          out.end((err?: Error | null) => (err === undefined || err === null ? resolve() : reject(err)));
-        });
-      } catch (e) {
-        out.destroy();
-        removeOrphanTemp(tmp); // failed source/write leaves no partial blob behind
-        throw e;
-      }
-      const hex = hash.digest('hex');
-      const file = pathOf(hex);
-      if (fs.existsSync(file)) {
-        removeOrphanTemp(tmp);
-        if (!(await streamEqualsHash(file, hex))) {
-          throw new Error(`artifact hash collision refused: ${hex} exists with different content`);
+        const hex = hash.digest('hex');
+        const file = pathOf(hex);
+        if (fs.existsSync(file)) {
+          if (!(await streamEqualsHash(file, hex))) {
+            throw new Error(`artifact hash collision refused: ${hex} exists with different content`);
+          }
+          // Byte-identical content already landed — this put is a no-op.
+          return { ref: `sha256:${hex}`, hash: hex, size };
         }
-        // Byte-identical content already landed — this put is a no-op.
-        return { ref: `sha256:${hex}`, hash: hex, size };
-      }
-      fs.mkdirSync(path.dirname(file), { recursive: true });
-      try {
-        // Atomic landing (reliability 2026-08-24): a same-directory rename(2) is atomic
-        // on POSIX and NTFS, so readers see either the old state or the complete blob —
-        // never a partial one. A concurrent put of the same content racing between the
-        // existsSync and this rename replaces the target with byte-identical bytes
-        // (same hash), so collision-refusal semantics hold either way.
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        // Atomic landing on POSIX/NTFS: readers see the complete blob. Concurrent
+        // identical puts can replace only the same content-addressed bytes.
         fs.renameSync(tmp, file);
-      } catch (e) {
-        removeOrphanTemp(tmp); // best effort — the primary failure below wins
-        throw e;
+        return { ref: `sha256:${hex}`, hash: hex, size };
+      } finally {
+        // Also covers shard creation and collision-check failures, which used to
+        // leak root-level incoming files after the stream had finished writing.
+        removeOrphanTemp(tmp);
       }
-      return { ref: `sha256:${hex}`, hash: hex, size };
     },
     async get(ref) {
       let hash: string;

@@ -282,7 +282,7 @@ test('FA-HCI-03 axe sweep: every surface, every language, light and dark — no 
   ];
   for (const { lang, theme } of combos) {
     await page.goto('/#/');
-    await expect(page.getByRole('heading', { name: '研究索引' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /研究索引|Studies/ })).toBeVisible();
     // The toggle is a 3-cycle (auto -> light -> dark -> auto) and the choice
     // persists across navigations — derive click count from the CURRENT state.
     const themeToggle = page.getByRole('button', { name: /切换主题|Switch theme/ });
@@ -293,11 +293,8 @@ test('FA-HCI-03 axe sweep: every surface, every language, light and dark — no 
     const need = (to - from + 3) % 3;
     for (let k = 0; k < need; k++) await themeToggle.click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
-    const enActive = await page.getByRole('button', { name: 'English', exact: true }).getAttribute('aria-pressed');
-    if (lang === 'en' && enActive !== 'true') {
-      await page.getByRole('button', { name: 'English', exact: true }).click();
-      await expect(page.getByRole('heading', { name: 'Studies' })).toBeVisible();
-    }
+    const languageButton = page.getByRole('button', { name: lang === 'en' ? 'English' : '中文', exact: true });
+    if (await languageButton.getAttribute('aria-pressed') !== 'true') await languageButton.click();
     for (const surface of SURFACES) {
       await page.goto(surface.url());
       if (surface.readyClass !== undefined && surface.readyTextRe !== undefined) {
@@ -307,11 +304,11 @@ test('FA-HCI-03 axe sweep: every surface, every language, light and dark — no 
       } else {
         await expect(page.locator(MAP_READY).first()).toBeVisible({ timeout: 60_000 });
       }
-      if (lang === 'en') {
-        await page.goto('/#/');
-        await page.getByRole('button', { name: '中文', exact: true }).click();
-        await expect(page.getByRole('heading', { name: '研究索引' })).toBeVisible();
-      }
+      // Scan the requested surface in the requested language. Previously the
+      // English branch navigated back to Chinese home before every scan.
+      await expect(languageButton).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+      expect(new URL(page.url()).hash).toBe(new URL(surface.url(), page.url()).hash);
       const violations = await axeScan(page);
       expect(violations, `${lang}/${theme}/${surface.name}: ${violations.map((v) => `${v.id}@${v.nodes}`).join(', ')}`).toEqual([]);
     }
