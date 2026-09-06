@@ -195,7 +195,7 @@ describe('orchestrator: agent-kind workflow steps', () => {
     expect(done?.reportId).toBe('agr_test');
   });
 
-  it('without a plane, the agent step is skipped honestly with an audit event and the run still completes', async () => {
+  it('without a plane, the agent step fails fast with an audit event', async () => {
     const dir = tmp();
     const store = openStore(dir);
     const run = makeRun(store);
@@ -204,9 +204,11 @@ describe('orchestrator: agent-kind workflow steps', () => {
       store, artifacts: {} as ArtifactStore, provider: {} as ModelProvider,
       sourceFor: noSource, stages: okStages(), signals: new Map(),
     }).execute(run.id);
-    expect(after.status).toBe('completed');
-    const reasons = store.listEvents(run.id).map((e) => (e.detail as { reason?: unknown })?.reason);
-    expect(reasons).toContain('agent_step_unavailable');
+    expect(after.status).toBe('failed');
+    expect(after.lastError).toContain('has no kernel capability plane');
+    const events = store.listEvents(run.id);
+    const failure = events.find((e) => e.type === 'stage_failed');
+    expect(failure?.detail).toMatchObject({ reason: 'missing_kernel_plane', failFast: true });
   });
 
   it('ΩF-005: agent-step completion persists — re-entry (feedback reopen) never re-runs it', async () => {

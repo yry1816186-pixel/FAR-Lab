@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { CampaignSpec } from '../src/domain/campaign.js';
 import { decideCampaign, runnableUnits, evaluateStop, alphaLedger, type UnitRuntimeState } from '../src/app/campaign.js';
+import { computeEProcess, eProcessThresholdForAlpha } from '../src/domain/e-process.js';
 
 // RU-8 GO3 — campaign runtime decision core. Pure functions, offline/deterministic.
 
@@ -91,5 +92,26 @@ describe('alphaLedger + decideCampaign guard', () => {
     const d = decideCampaign(spec2, [st('root', 'failed'), st('other', 'pending')]);
     expect(d.stopped).toBe(true);
     expect(d.runnable).toEqual([]);
+  });
+});
+
+describe('e-process policy', () => {
+  it('computes a bounded anytime-valid e-process and rejects out-of-range rows', () => {
+    const result = computeEProcess([1, 1, 0, 1], { direction: 'above', threshold: 0.5, lower: 0, upper: 1 });
+    expect(result.n).toBe(4);
+    expect(result.eValue).toBeGreaterThan(1);
+    expect(result.factors.every((factor) => factor > 0)).toBe(true);
+    expect(eProcessThresholdForAlpha(0.05)).toBe(20);
+    expect(() => computeEProcess([2], { direction: 'above', threshold: 0.5, lower: 0, upper: 1 })).toThrow(/outside/);
+  });
+
+  it('stops a campaign when the accumulated e-value crosses its preregistered threshold', () => {
+    const spec = specOf({ policy: 'e_value_accumulation', eValueThreshold: 4 }, [{ kind: 'e_value_threshold' }]);
+    const r = evaluateStop(spec, [
+      { label: 'root', state: 'completed', eValue: 2 },
+      { label: 'left', state: 'completed', eValue: 2 },
+    ]);
+    expect(r.stopped).toBe(true);
+    expect(r.stopReason).toContain('e_value_threshold');
   });
 });

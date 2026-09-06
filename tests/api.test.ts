@@ -516,6 +516,159 @@ const postJson = async (url: string, body: unknown): Promise<{ status: number; b
   return { status: res.status, body: text.length > 0 ? JSON.parse(text) : null };
 };
 
+describe('POST /api/v1/science/compute', () => {
+  it('executes deterministic Bayesian computation with explicit provenance', async () => {
+    const response = await postJson(`${base}/api/v1/science/compute`, {
+      operation: 'bayesian_beta_binomial',
+      input: { priorAlpha: 1, priorBeta: 1, successes: 8, trials: 10 },
+    });
+    expect(response.status).toBe(200);
+    expect(response.body.operation).toBe('bayesian_beta_binomial');
+    expect(response.body.result.provenance).toBe('COMPUTED');
+    expect(response.body.result.mean).toBeCloseTo(0.75, 10);
+  });
+
+  it('rejects malformed scientific requests before computation', async () => {
+    const response = await postJson(`${base}/api/v1/science/compute`, { operation: 'unknown', input: {} });
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('validation');
+  });
+
+  it('executes data profiling and SVG visualization operations', async () => {
+    const profile = await postJson(`${base}/api/v1/science/compute`, {
+      operation: 'data_profile', input: { columns: ['x'], rows: [[1], [null], [3]] },
+    });
+    expect(profile.status).toBe(200);
+    expect(profile.body.result.provenance).toBe('COMPUTED');
+    expect(profile.body.result.columns[0].missing).toBe(1);
+    const plot = await postJson(`${base}/api/v1/science/compute`, {
+      operation: 'plot_svg', input: { kind: 'scatter', x: [0, 1], y: [1, 2] },
+    });
+    expect(plot.status).toBe(200);
+    expect(plot.body.result.format).toBe('svg');
+    expect(plot.body.result.svg).toContain('<circle');
+    expect(plot.body.result.sha256).toMatch(/^[0-9a-f]{64}$/);
+    const png = await postJson(`${base}/api/v1/science/compute`, {
+      operation: 'plot', input: { kind: 'line', format: 'png', x: [0, 1, 2], y: [1, 3, 2], title: 'signal' },
+    });
+    expect(png.status).toBe(200);
+    expect(png.body.result.format).toBe('png');
+    expect(png.body.result.mimeType).toBe('image/png');
+    expect(png.body.result.contentBase64).toMatch(/^iVBOR/);
+    expect(png.body.result.bytes).toBeGreaterThan(1000);
+    const grouped = await postJson(`${base}/api/v1/science/compute`, {
+      operation: 'dataframe_groupby',
+      input: { columns: ['site', 'value'], rows: [['A', 1], ['A', 3], ['B', 10]], groupBy: 'site', valueColumn: 'value' },
+    });
+    expect(grouped.status).toBe(200);
+    expect(grouped.body.result.engine).toMatch(/^pandas-/);
+    expect(grouped.body.result.rows).toEqual([{ site: 'A', count: 2, mean: 2 }, { site: 'B', count: 1, mean: 10 }]);
+    const ols = await postJson(`${base}/api/v1/science/compute`, {
+      operation: 'ols_regression', input: { x: [[0], [1], [2], [3]], y: [1, 3, 5, 7] },
+    });
+    expect(ols.status).toBe(200);
+    expect(ols.body.result.engine).toMatch(/^statsmodels-/);
+    expect(ols.body.result.coefficients[1]).toBeCloseTo(2, 8);
+    const parquet = await postJson(`${base}/api/v1/science/compute`, {
+      operation: 'parquet_roundtrip', input: { columns: ['site', 'value'], rows: [['A', 1], ['B', 2]] },
+    });
+    expect(parquet.status).toBe(200);
+    expect(parquet.body.result.format).toBe('parquet');
+    expect(parquet.body.result.contentBase64).toMatch(/^[A-Za-z0-9+/]+=*$/);
+    expect(parquet.body.result.bytes).toBeGreaterThan(0);
+    const hdf5 = await postJson(`${base}/api/v1/science/compute`, {
+      operation: 'hdf5_roundtrip', input: { dataset: 'measurements', values: [1, 2, 3] },
+    });
+    expect(hdf5.status).toBe(200);
+    expect(hdf5.body.result.format).toBe('hdf5');
+    expect(hdf5.body.result.shape).toEqual([3]);
+    expect(hdf5.body.result.contentBase64).toMatch(/^[A-Za-z0-9+/]+=*$/);
+    const torch = await postJson(`${base}/api/v1/science/compute`, {
+      operation: 'torch_train_cpu',
+      input: {
+        features: [[0, 0], [1, 1], [2, 0], [3, 1], [4, 0], [5, 1]],
+        targets: [1, 2.5, 5, 6.5, 9, 10.5],
+        epochs: 40,
+        hiddenDim: 8,
+        learningRate: 0.02,
+        seed: 7,
+      },
+    });
+    expect(torch.status).toBe(200);
+    expect(torch.body.result.device).toBe('cpu');
+    expect(torch.body.result.provenance).toBe('COMPUTED');
+    expect(torch.body.result.checkpointSha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(torch.body.result.checkpointReloadLoss).toBeCloseTo(torch.body.result.loss.final, 5);
+  });
+
+  it('executes checkpoint prediction and resume, and rejects unverifiable or mismatched checkpoints', async () => {
+    const trainingInput = {
+      features: [[0, 0], [1, 1], [2, 0], [3, 1], [4, 0], [5, 1]],
+      targets: [1, 2.5, 5, 6.5, 9, 10.5],
+      epochs: 12,
+      hiddenDim: 6,
+      learningRate: 0.02,
+      seed: 11,
+    };
+    const trained = await postJson(`${base}/api/v1/science/compute`, {
+      operation: 'torch_train_cpu', input: trainingInput,
+    });
+    expect(trained.status).toBe(200);
+    const checkpoint = {
+      checkpointBase64: trained.body.result.checkpointBase64,
+      checkpointSha256: trained.body.result.checkpointSha256,
+    };
+
+    const predicted = await postJson(`${base}/api/v1/science/compute`, {
+      operation: 'torch_predict_cpu',
+      input: { ...checkpoint, features: trainingInput.features, targets: trainingInput.targets },
+    });
+    expect(predicted.status).toBe(200);
+    expect(predicted.body.result.provenance).toBe('COMPUTED');
+    expect(predicted.body.result.device).toBe('cpu');
+    expect(predicted.body.result.predictions).toHaveLength(trainingInput.features.length);
+    expect(predicted.body.result.mse).toBeGreaterThanOrEqual(0);
+
+    const resumed = await postJson(`${base}/api/v1/science/compute`, {
+      operation: 'torch_resume_cpu',
+      input: { ...checkpoint, features: trainingInput.features, targets: trainingInput.targets, epochs: 2 },
+    });
+    expect(resumed.status).toBe(200);
+    expect(resumed.body.result.provenance).toBe('COMPUTED');
+    expect(resumed.body.result.epochs).toBe(2);
+    expect(resumed.body.result.checkpointSha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(resumed.body.result.checkpointSha256).not.toBe(checkpoint.checkpointSha256);
+
+    const badHash = await postJson(`${base}/api/v1/science/compute`, {
+      operation: 'torch_predict_cpu',
+      input: { ...checkpoint, checkpointSha256: '0'.repeat(64), features: trainingInput.features },
+    });
+    expect(badHash.status).toBe(400);
+    expect(badHash.body.error.code).toBe('validation');
+    expect(badHash.body.error.message).toContain('checkpointSha256');
+
+    const wrongArchitecture = await postJson(`${base}/api/v1/science/compute`, {
+      operation: 'torch_predict_cpu',
+      input: { ...checkpoint, features: trainingInput.features.map(([x]) => [x]) },
+    });
+    expect(wrongArchitecture.status).toBe(400);
+    expect(wrongArchitecture.body.error.code).toBe('validation');
+    expect(wrongArchitecture.body.error.message).toContain('matching checkpoint inputDim');
+  });
+});
+
+describe('GET /api/v1/science/operations', () => {
+  it('publishes the executable scientific capability registry', async () => {
+    const response = await getJson(`${base}/api/v1/science/operations`);
+    expect(response.status).toBe(200);
+    expect(response.body.execution).toBe('local-deterministic');
+    expect(response.body.operations.some((x: { operation: string }) => x.operation === 'plot_svg')).toBe(true);
+    expect(response.body.operations.some((x: { operation: string }) => x.operation === 'data_profile')).toBe(true);
+    expect(response.body.schemaVersion).toBe(1);
+    expect(response.body.capabilities.some((x: { operation: string }) => x.operation === 'torch_train_cpu')).toBe(true);
+  });
+});
+
 /** Raw request that preserves the exact path (fetch/URL normalize dot segments away). */
 const rawGet = (port: number, rawPath: string): Promise<{ status: number; body: string }> =>
   new Promise((resolve, reject) => {
@@ -933,6 +1086,18 @@ describe('run resource endpoints', () => {
     expect(without.body.plan).toBeNull();
   });
 
+  it('GET science returns and persists the versioned Scientific World Model', async () => {
+    const first = await getJson(`${base}/api/v1/runs/${run1}/science`);
+    expect(first.status).toBe(200);
+    expect(first.body.worldModel).toMatchObject({ runId: run1, version: 1 });
+    expect(first.body.worldModel.provenance.sourceObjectIds.length).toBeGreaterThan(0);
+    const persisted = app.store.listObjects('scientific_world_model', run1);
+    expect(persisted).toHaveLength(1);
+    const second = await getJson(`${base}/api/v1/runs/${run1}/science`);
+    expect(second.body.worldModel.id).toBe(first.body.worldModel.id);
+    expect(app.store.listObjects('scientific_world_model', run1)).toHaveLength(1);
+  });
+
   it('GET /library/sources aggregates workspace-wide and deduplicates by normalized identifier', async () => {
     const before = (await getJson(`${base}/api/v1/library/sources`)).body;
     expect(before.distinct).toBeGreaterThan(0);
@@ -1113,6 +1278,12 @@ describe('POST cancel and resume', () => {
 // ---- Product Spine action dispatch (2026-08-28) --------------------------------
 
 describe('POST /api/v1/runs/:id/dispatch', () => {
+  it('fails honestly when NEXT_BEST_ACTION has no actionable affordance', async () => {
+    const { status, body } = await postJson(`${base}/api/v1/runs/${run1}/dispatch`, { actionType: 'NEXT_BEST_ACTION' });
+    expect(status).toBe(400);
+    expect(body.error.message).toContain('no actionable next-best research action');
+  });
+
   it('rejects non-dispatchable action types honestly (422, no fake affordance)', async () => {
     const { status, body } = await postJson(`${base}/api/v1/runs/${run1}/dispatch`, { actionType: 'COUNTER_EVIDENCE_SEARCH' });
     expect(status).toBe(400);

@@ -11,7 +11,8 @@ import { makeRunBudget } from '../../app/run-budget.js';
 import { resolveRunProvider } from '../../app/provider-resolver.js';
 import type { AgentTool, ToolContext, ToolResult } from '../tool.js';
 import { SessionTelemetry } from '../telemetry.js';
-import { runAgentLoop, type AgentLoopConfig, type AgentLoopResult } from '../loop.js';
+import { runUnifiedAgentLoop } from '../runtime.js';
+import type { AgentLoopConfig, AgentLoopResult } from '../loop.js';
 import { runSubagents, type SubagentResult } from '../subagents.js';
 import { wireResearchTools } from './research-tools.js';
 import { assembleSessionCapabilities } from './assembly.js';
@@ -435,7 +436,7 @@ export const runEvidenceGapRefinement = async (deps: RefineDeps, runId: string, 
       ],
     };
 
-    const res = await runAgentLoop(cfg, mainDeps);
+    const res = await runUnifiedAgentLoop(cfg, mainDeps);
 
     const session = AgentSession.parse({
       id: sessionId, runId, capability: CAPABILITY, purpose: PURPOSE,

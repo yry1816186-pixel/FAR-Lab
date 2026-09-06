@@ -7,6 +7,7 @@ import { Store } from '../src/persistence/store.js';
 import { Orchestrator } from '../src/app/orchestrator.js';
 import { ResearchQuestion, newId, RunStageName } from '../src/domain/index.js';
 import { STAGE_ORDER } from '../src/domain/run.js';
+import { WorkflowPlanSchema } from '../src/domain/workflow-plan.js';
 import type { StageHandler } from '../src/pipeline/types.js';
 import type { ModelProvider, ArtifactStore, SourceAdapter } from '../src/shared/ports.js';
 import type { SourceFamily } from '../src/domain/source.js';
@@ -153,6 +154,60 @@ describe('orchestrator: closed-loop truth and terminal guidance', () => {
       .listEvents(run.id)
       .filter((e) => (e.detail as { reason?: unknown })?.reason === 'loop_status_guidance');
     expect(guidance).toHaveLength(1);
+    db.close();
+  });
+
+  it('fails fast when a planned stage has no handler instead of leaving it pending', async () => {
+    const dir = tmp();
+    const db = openDb(path.join(dir, 'far.db'));
+    const store = new Store(db);
+    const run = makeRun(store);
+    const stages = new Map<RunStageName, StageHandler>(
+      STAGE_ORDER.filter((stage) => stage !== 'scope').map((stage) => [stage, okHandler(stage)] as const),
+    );
+
+    const after = await build(store, stages).execute(run.id);
+
+    expect(after.status).toBe('failed');
+    const scope = after.stages.find((stage) => stage.stage === 'scope');
+    expect(scope?.state).toBe('failed');
+    expect(scope?.error).toBe("workflow stage 'scope' has no registered handler");
+    const failure = store.listEvents(run.id).find(
+      (event) => event.type === 'stage_failed' && event.stage === 'scope',
+    );
+    expect(failure?.status).toBe('failed');
+    expect(failure?.detail).toMatchObject({ reason: 'missing_handler', failFast: true });
+    db.close();
+  });
+
+  it('fails fast when an agent step has no kernel capability plane', async () => {
+    const dir = tmp();
+    const db = openDb(path.join(dir, 'far.db'));
+    const store = new Store(db);
+    const run = makeRun(store);
+    store.putObject('workflow_plan', WorkflowPlanSchema.parse({
+      id: `wfp_${run.id}_agent`,
+      runId: run.id,
+      version: 1,
+      origin: 'kernel',
+      createdAt: new Date().toISOString(),
+      steps: [{
+        id: 'agent-1',
+        kind: 'agent',
+        target: 'problem-modeling',
+        after: [],
+        completion: { kind: 'agent_result_ok' },
+        attemptCap: 1,
+      }],
+    }));
+
+    const after = await build(store, new Map()).execute(run.id);
+
+    expect(after.status).toBe('failed');
+    expect(after.lastError).toBe("workflow agent capability 'problem-modeling' has no kernel capability plane");
+    const failure = store.listEvents(run.id).find((event) => event.type === 'stage_failed');
+    expect(failure?.stage).toBe('problem-modeling');
+    expect(failure?.detail).toMatchObject({ reason: 'missing_kernel_plane', failFast: true });
     db.close();
   });
 });

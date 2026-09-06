@@ -1,9 +1,4 @@
-/**
- * DeepSeek live adapter (UNBANNED 2026-08-26 by user directive: the product is
- * model-agnostic — every provider worldwide routes freely; the 2026-08-22 ban
- * applied to that era's project-internal usage policy, not to the product's
- * capability set, and git history keeps the provenance).
- */
+/** DeepSeek live adapter; provider selection remains model/vendor-neutral. */
 import type { ModelProvider, StructuredCallRequest, StructuredCallResult } from '../shared/ports.js';
 import {
   authFailClosedResult,

@@ -13,6 +13,7 @@
  *   GET  /api/v1/verify/:bundleId                    bundle verification report
  */
 import { api, ApiError } from './client';
+import type { ModelConfigPricing, ReasoningCapability } from './types';
 import {
   normalizeEvidence, normalizeEvents, normalizeHypotheses, normalizePlan, normalizeQuestion, normalizeScience,
   normalizeReceipts, normalizeRevisions, normalizeRun, normalizeRunSummaries, normalizeSearch, normalizeSources,
@@ -536,8 +537,30 @@ const modelConfigOf = (data: unknown): ModelConfigSummary => {
     // listed only on a test-harness server (FARLAB_TEST_DOUBLE=1), never a product
     // route the settings UI can create.
     if (typeof c.id === 'string' && typeof c.label === 'string'
-      && (c.wire === 'openai' || c.wire === 'anthropic' || c.wire === 'gemini' || c.wire === 'offline')
+      && (c.wire === 'openai' || c.wire === 'openai_responses' || c.wire === 'anthropic' || c.wire === 'gemini' || c.wire === 'offline')
       && typeof c.baseUrl === 'string' && typeof c.modelId === 'string') {
+      const invalidConfig = (): ApiError => new ApiError({ code: 'unexpected_schema', message: 'Invalid model configuration capability fields', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'model config' } });
+      let fallbackConfigIds: string[] | undefined;
+      if (c.fallbackConfigIds !== undefined) {
+        if (!Array.isArray(c.fallbackConfigIds) || !c.fallbackConfigIds.every((value): value is string => typeof value === 'string' && value.length > 0)) throw invalidConfig();
+        fallbackConfigIds = [...c.fallbackConfigIds];
+      }
+      let pricing: ModelConfigPricing | undefined;
+      if (c.pricing !== undefined) {
+        if (typeof c.pricing !== 'object' || c.pricing === null) throw invalidConfig();
+        const value = c.pricing as Record<string, unknown>;
+        if (typeof value.inputUsdPerMTok !== 'number' || !Number.isFinite(value.inputUsdPerMTok) || value.inputUsdPerMTok < 0
+          || typeof value.outputUsdPerMTok !== 'number' || !Number.isFinite(value.outputUsdPerMTok) || value.outputUsdPerMTok < 0) throw invalidConfig();
+        pricing = { inputUsdPerMTok: value.inputUsdPerMTok, outputUsdPerMTok: value.outputUsdPerMTok };
+      }
+      let reasoning: ReasoningCapability | undefined;
+      if (c.reasoning !== undefined) {
+        if (typeof c.reasoning !== 'object' || c.reasoning === null) throw invalidConfig();
+        const value = c.reasoning as Record<string, unknown>;
+        if ((value.style !== 'reasoning_effort' && value.style !== 'enable_thinking' && value.style !== 'thinking_budget' && value.style !== 'thinking_config')
+          || (value.defaultGear !== 'low' && value.defaultGear !== 'medium' && value.defaultGear !== 'high')) throw invalidConfig();
+        reasoning = { style: value.style, defaultGear: value.defaultGear };
+      }
       return {
         id: c.id,
         label: c.label,
@@ -547,6 +570,9 @@ const modelConfigOf = (data: unknown): ModelConfigSummary => {
         apiKeySet: c.apiKeySet === true,
         apiKeyMasked: typeof c.apiKeyMasked === 'string' ? c.apiKeyMasked : '',
         active: c.active === true,
+        ...(fallbackConfigIds !== undefined ? { fallbackConfigIds } : {}),
+        ...(pricing !== undefined ? { pricing } : {}),
+        ...(reasoning !== undefined ? { reasoning } : {}),
         createdAt: typeof c.createdAt === 'string' ? c.createdAt : '',
         updatedAt: typeof c.updatedAt === 'string' ? c.updatedAt : '',
       };

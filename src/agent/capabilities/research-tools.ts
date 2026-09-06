@@ -4,6 +4,7 @@ import type { ArtifactStore } from '../../shared/ports.js';
 import { queryRunEvents, previewFor } from '../research-query.js';
 import { runExploration } from '../exploration-runner.js';
 import type { ToolContext } from '../tool.js';
+import { wireScientificTools } from './scientific-tools.js';
 
 /**
  * Research-tools capability (AVO fusion wiring): the G4/G5/G6 planes exposed
@@ -162,4 +163,5 @@ export const wireResearchTools = (
       },
     };
   })(),
+  ...wireScientificTools(deps),
 ];

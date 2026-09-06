@@ -1,24 +1,19 @@
 {
   "status": "IN_PROGRESS",
-  "updatedAt": "2026-09-02T14:05:00+08:00",
-  "lane": "lane/endgame-waveb @ 8481c22（已推 origin：c3b8f3f FA-DAT-01 流式数据面 + 2fd75b4 gaps 闭账 + 8481c22 收尾交接批）",
-  "currentObjective": "本收尾窗完成：在途 FA-DAT-01 流式数据面已提交（等价回归 14 测试 + typecheck/build 绿；容量基准 1GB/500MB 全量跑按用户指令移交下窗）；项目进入 Ω-ULTRA 终局重构交接——权威任务书=仓库根 OMEGA-ULTRA-CONTRACT.md，入口=Claude Code /omega 斜杠命令（.claude/commands/omega.md）",
+  "updatedAt": "2026-09-06T22:57:00+08:00",
+  "lane": "lane/docs-readme-revamp @ 6326b5baceeb33a2955f47c2abd23e7eddf5ed93 + uncommitted changes",
+  "currentObjective": "优先收尾并转入真实案例和比赛文档；本轮构建、测试和干净数据目录浏览器流程已验证，不扩展重构，不宣称项目零问题或最终完成",
+  "currentVerification": ".control/CLOSEOUT_VERIFICATION.json",
   "criticalProblemSet": [
-    {
-      "rank": 1,
-      "id": "CPS-N5",
-      "problem": "FA-SEC-01 本地 Docker Linux OCI 已通过独立 verifier、生产真实 caller、对抗/超时清理与全量回归；最终源码 SHA 尚无 hosted Ubuntu exploration-sandbox run URL，Linux /proc attach-client 清理分支未在该平台证明",
-      "why": "安全边界不得由本机 Docker Desktop 证据越级关闭"
-    },
-    {
-      "rank": 2,
-      "id": "CPS-N4",
-      "problem": "ACC-02/B-QWEN（09-05 用户窗口）BLOCKED_EXTERNAL 维持；completion-gate 唯一缺口",
-      "why": "用户侧外部条件"
-    }
+    { "rank": 1, "id": "FA-SCI-01", "problem": "Rediscovery judge-band live TPR/FPR calibration remains unverified without provider budget", "why": "scientific metric requires real model evidence" },
+    { "rank": 2, "id": "FA-SCI-03", "problem": "Cross-family relation exact-label agreement remains below target", "why": "protocol/model evaluation gap, not a deterministic runtime defect" },
+    { "rank": 3, "id": "FA-HAR-04", "problem": "72h soak and power-loss evidence is calendar-bound", "why": "elapsed runtime cannot be compressed honestly" }
   ],
   "missionFacts": [
-    "2026-09-02 收尾窗（用户指令：免重跑、全部提交推送）：125d499..8481c22 三提交已推 origin；competition-inputs/ 与 submission/final/pdf-qa*（~77MB）按 .gitignore 治理边界留本地不入公开库；GitHub Dependabot 现报 2 漏洞（1 moderate/1 low）待处理；root 全量 vitest/lint 本窗未重跑（上一窗口 2370 过/15 跳基线，改动面定向验证已绿）",
+    "2026-09-06 verification: npm test -- --run exit 0 (263 files, 2641 passed, 15 skipped); npm run typecheck, build, lint and git diff --check all exit 0",
+    "2026-09-06 control-plane truth: FINAL_ACCEPTANCE.json is canonical; 56 PASS / 6 PARTIAL / 0 FAIL / 4 BLOCKED_EXTERNAL; completion-gate --final remains NOT_READY with no failed or malformed entries",
+    "2026-09-06 provider-policy truth: product routes are model/vendor neutral and accept the configured live wire adapters; Qwen/DashScope is optional test or competition evidence, while benchmark-specific provider allowlists do not constrain product routing",
+    "Software-owned closures in this wave: executable e_value_accumulation with bounded stopping/provenance; missing workflow handlers fail-fast to failed state; Scientific World Model persisted in SQLite objects and idempotently refreshed by /runs/:id/science; deterministic scientific compute plane (Bayesian beta-binomial, backdoor causal adjustment, quadratic optimization) exposed at /api/v1/science/compute; Conversation/Kernel/Refine/Subagent share runUnifiedAgentLoop; soak verdict includes workload failures",
     "主线收口：main cc4009c→495e53c（+7838/-766，125 文件）——Wave 0 全量+Wave A 大部+夜间车道五族 CI 根因修复（windows verify 三红/license CRLF/e2e 三族/retrieve 取消检查点/cancel 事件单源化）",
     "桌面发布链实证：NSIS 126.1MB 真包（sidecar 173MB 随包）静默安装→离源树 1s 健康→打包资源服务 web→退出无孤儿→卸载文件全清（BUILD_SCOPE 已更新）",
     "TUI+桌面壳 i18n 机制（FARLANG）+设计基线走查 9C+26W 入 HCI 账本（修复落点 Wave D）",
@@ -29,5 +24,5 @@
     "兄弟车道：wave0/wavea 账本+485d925（fresh 锚）已并入主线；当前活跃于 brand/competition-inputs/submission-final（未跟踪目录——发布物料，未触碰）",
     "教训入账：add 后未即时 commit→rebase 吞改动+主题混杂（已在 d8a1416 消息纠正）；PowerShell here-string 触发 hook 误拦（源码写操作一律 Edit 工具）；本地 vite-node 对 web/ 下 .mjs 的 Windows 空产物（测试走子进程边界）"
   ],
-  "nextAction": "下一任务：执行 OMEGA-ULTRA-CONTRACT.md（/omega 启动，Mission State=.control/OMEGA-MISSION-STATE.md；Wave 0=Reality Map+baseline freeze+benchmark harness 骨架；容量基准全量跑可并入 Wave 0 或 Wave F）。遗留外部项不变：B-QWEN 09-05 用户窗口、hosted SEC-01/PLT-02 核验、FA-EVAL-02 被试 BLOCKED_EXTERNAL"
+  "nextAction": "优先执行有预算上限的真实案例、验证 bundle 并生成比赛文档；按 CLOSEOUT_VERIFICATION.json 保留科学质量、软件自有发布事项与外部/时间证据缺口。Qwen 仅测试/竞赛路线，产品保持模型与厂商中立。"
 }

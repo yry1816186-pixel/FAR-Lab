@@ -82,7 +82,7 @@ describe('GET /model-configs/builtin-routes', () => {
     const names = routesOf(body).map((r) => r.name);
     expect(names).toContain('zai');
     expect(names).toContain('dashscope');
-    expect(names).toContain('deepseek'); // unbanned 2026-08-26: editable live route
+    expect(names).toContain('deepseek'); // supported editable live route
     expect(names).toContain('universal'); // any-endpoint env route
     expect(routesOf(body).every((r) => r.kind === 'live')).toBe(true);
     const deepseek = routesOf(body).find((r) => r.name === 'deepseek')!;

@@ -54,6 +54,12 @@ token 预算 / 无实质差异"的有界约束下确定性地闭环 `实验 → 
   仅取自已存元数据；可用 `far verify` 独立验证。
 - **模型控制面**——模型无关、网关中立的容灾链；内置路由 `zai`（默认）、`dashscope`、
   `deepseek`、`universal`，以及自定义路由。Qwen/DashScope 只是其中一条可选路由。
+  `universal` 当前验证的协议契约为 OpenAI Chat Completions 兼容、OpenAI Responses API、Anthropic
+  Messages 兼容和 Gemini `generateContent` 原生协议；未实现的其他协议会明确拒绝，
+  不会静默伪装成兼容路由。
+  Responses 路由选择 `openai_responses`，基础地址如 `https://api.openai.com/v1`，模型 ID 以网关实际提供为准。
+  支持流式输出、结构化输出，以及将声明的 `reasoning_effort` 映射为 `reasoning.effort`。
+  外部 Responses 服务尚未实测，状态为 `UNVERIFIED_EXTERNAL`；本地契约测试不等于外部服务认证。
 - **多端形态**——CLI 工作台（`far`，20+ 命令）、React Web 工作台、可选 TUI、
   Tauri v2 桌面壳（未签名/未公证，不作为受支持分发渠道）。
 

@@ -4,7 +4,7 @@
       "id": "B-QWEN-LIVE-ROUTE",
       "status": "RESOLVED",
       "critical": true,
-      "reason": "Competition-mandated Qwen-via-Bailian/DashScope receipted live route does not exist: needs user-provided credential. DeepSeek-era live evidence superseded (DeepSeek banned project-side). No fabrication allowed; live-API policy forbids spending any key 'to feel sure'. [2026-08-27 window: Qwen-via-Bailian route contract tests green at 42452c9 + CI verify/web-e2e both SUCCESS; engineering side fully ready — only the credential run remains.]",
+      "reason": "Competition-mandated Qwen-via-Bailian/DashScope receipted live route is a competition evidence requirement; DeepSeek remains a supported product route but its evidence does not satisfy the Qwen/Bailian rule. No fabrication allowed; live-API policy forbids spending any key 'to feel sure'. [Engineering route and contract tests are green; only competition evidence is external.]",
       "owner": "user (credential) + model-plane (route already implemented and contract-tested)",
       "openedAt": "2026-08-24",
       "lastReviewed": "2026-09-03",

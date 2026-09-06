@@ -33,5 +33,9 @@ export * from './screening.js';
 export * from './scientific-state.js';
 export * from './next-action.js';
 export * from './state-delta.js';
+export * from './e-process.js';
+export * from './world-model.js';
+export * from './kernel-control.js';
+export * from './scientific-compute.js';
 
 

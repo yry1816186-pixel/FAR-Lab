@@ -8,7 +8,8 @@ import type { AgentTool, ToolResult } from '../agent/tool.js';
 import { assembleSessionCapabilities } from '../agent/capabilities/assembly.js';
 import { makeWorkspaceFileTools } from '../agent/capabilities/workspace-tools.js';
 import { SessionTelemetry } from '../agent/telemetry.js';
-import { runAgentLoop, type AgentLoopStatus } from '../agent/loop.js';
+import { runUnifiedAgentLoop } from '../agent/runtime.js';
+import type { AgentLoopStatus } from '../agent/loop.js';
 import type { AgentEventSink, ReceiptSink, TranscriptEntry } from '../agent/protocol.js';
 import type { ReasoningStyle, ReasoningGear } from '../domain/model-config.js';
 import { openRolloutWriter, readRollout, reconstructSession, rolloutFile, type InterruptedTurnDisposition } from '../agent/rollout.js';
@@ -716,7 +717,7 @@ export async function generateConversationTurn(
 
   let res;
   try {
-    res = await runAgentLoop(
+    res = await runUnifiedAgentLoop(
     {
       capability: 'conversation-resident',
       systemPrompt: assembly.skillsPrompt.length > 0

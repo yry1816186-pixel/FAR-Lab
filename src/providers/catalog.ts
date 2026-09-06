@@ -34,6 +34,7 @@ export type ProviderTemplate = z.infer<typeof ProviderTemplate>;
 const RAW_TEMPLATES: Array<z.input<typeof ProviderTemplate>> = [
   // ---- international labs & aggregators ----
   { id: 'openai', label: 'OpenAI', wire: 'openai', baseUrl: 'https://api.openai.com/v1', keyUrl: 'https://platform.openai.com/api-keys' },
+  { id: 'openai-responses', label: 'OpenAI Responses API', wire: 'openai_responses', baseUrl: 'https://api.openai.com/v1', keyUrl: 'https://platform.openai.com/api-keys', note: 'Responses API wire; reasoning and structured outputs' },
   { id: 'anthropic', label: 'Anthropic', wire: 'anthropic', baseUrl: 'https://api.anthropic.com', keyUrl: 'https://console.anthropic.com/settings/keys' },
   { id: 'google-gemini', label: 'Google Gemini', wire: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com', keyUrl: 'https://aistudio.google.com/apikey', note: '原生 generateContent 协议；亦提供 OpenAI 兼容端点（/v1beta/openai）' },
   { id: 'xai', label: 'xAI (Grok)', wire: 'openai', baseUrl: 'https://api.x.ai/v1', keyUrl: 'https://console.x.ai/' },

@@ -125,7 +125,7 @@ export interface StructuredCallResult<T> {
   };
 }
 
-/** Model Execution Plane port. Implementations: DeepSeek (live), Z.ai (adapter), test stubs (test-only). */
+/** Model Execution Plane port. Implementations include vendor adapters and test-only stubs. */
 export interface ModelProvider {
   readonly name: string;
   /** Whether live credentials/route are currently usable; false => calls fail closed with auth_error. */

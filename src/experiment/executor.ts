@@ -6,6 +6,7 @@ import {
   newId, ExperimentSpec,
   checkExperimentSpec, mechanicalVerdict, impliedPowerFor, POWER_METHOD,
   REGRESSOR_BUILDERS,
+  computeEProcess, eProcessThresholdForAlpha,
   type ExperimentRun, type ResultCell, type ResultSet, type StatReport,
   type FeedbackSignal, type HypothesisCandidate, type SplitOutcome, type SidecarStatsResult, type Comparison,
 } from '../domain/index.js';
@@ -112,7 +113,27 @@ export const computeStatReports = async (args: {
     }
     const hyp = comp.hypothesisId !== undefined ? hypotheses.find((h) => h.id === comp.hypothesisId) : undefined;
     const bound = comp.hypothesisId !== undefined && hyp !== undefined;
-    const verdict = bound && !sequential ? mechanicalVerdict(comp, stat.ci) : undefined;
+    const mechanical = bound && !sequential ? mechanicalVerdict(comp, stat.ci) : undefined;
+    const eRows = comp.kind === 'absolute'
+      ? perRowByModel.get(comp.modelIdx ?? -1)
+      : (() => {
+        const a = perRowByModel.get(comp.modelAIdx ?? -1);
+        const b = perRowByModel.get(comp.modelBIdx ?? -1);
+        return a !== undefined && b !== undefined && a.length === b.length ? a.map((v, i) => v - b[i]!) : undefined;
+      })();
+    const eResult = spec.statistics.multipleTestingPolicy === 'e_value_accumulation' && eRows !== undefined
+      ? computeEProcess(eRows, comp.kind === 'absolute'
+        ? { direction: comp.direction, threshold: comp.threshold, lower: 0, upper: 1 }
+        : { direction: comp.direction, threshold: comp.threshold, lower: -1, upper: 1 })
+      : undefined;
+    const eThreshold = spec.statistics.multipleTestingPolicy === 'e_value_accumulation'
+      ? eProcessThresholdForAlpha(spec.statistics.alpha)
+      : undefined;
+    const verdict = bound && !sequential
+      ? spec.statistics.multipleTestingPolicy === 'e_value_accumulation' && eResult !== undefined && eThreshold !== undefined
+        ? eResult.eValue >= eThreshold ? 'supports' : 'inconclusive'
+        : mechanical
+      : undefined;
     // BP-5: disclosed-convention implied power — visible BEFORE results are over-read.
     const nTest = comp.kind === 'absolute'
       ? (perRowByModel.get(comp.modelIdx ?? -1)?.length ?? 0)
@@ -142,6 +163,7 @@ export const computeStatReports = async (args: {
       verdict,
       secondary,
       adjustedAlpha: confirmatoryCount > 0 ? effectiveAlpha : undefined,
+      ...(eResult !== undefined ? { eValue: eResult.eValue, eValueThreshold: eThreshold } : {}),
       verdictDerivation: derivation,
       ...(impliedPower !== null ? { impliedPower, powerMethod: POWER_METHOD } : {}),
       exploratory: !bound || sequential,

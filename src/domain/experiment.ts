@@ -490,6 +490,9 @@ export const StatReport = z.object({
   secondary: z.boolean().default(false),
   /** P2 alpha_spending: the per-comparison adjusted alpha actually used (recorded, never silent). */
   adjustedAlpha: z.number().positive().max(0.5).optional(),
+  /** Anytime-valid e-process result for e_value_accumulation policy. */
+  eValue: z.number().nonnegative().finite().optional(),
+  eValueThreshold: z.number().positive().finite().optional(),
   /** Human-readable derivation: rule + measured values -> verdict. Auditable, mechanical. */
   verdictDerivation: z.string().optional(),
   /** BP-5: power implied by the declared MDE at the achieved nTest (disclosed worst-case convention, POWER_METHOD). */
@@ -687,7 +690,11 @@ export const checkSimulationSpec = (
     if (spec.statistics.multipleTestingPolicy === undefined) missing.push('multiple comparisons require multipleTestingPolicy');
   }
   if (spec.statistics.multipleTestingPolicy === 'e_value_accumulation') {
-    missing.push('multipleTestingPolicy=e_value_accumulation is not implemented in the executor (D-086); use single_primary or alpha_spending');
+    for (const [ci, c] of spec.comparisons.entries()) {
+      if ('metricKey' in c && c.metricKey !== 'accuracy') {
+        missing.push(`comparisons[${ci}] e_value_accumulation requires accuracy (bounded per-row correctness)`);
+      }
+    }
   }
   return { passed: missing.length === 0, missing };
 };
@@ -809,11 +816,14 @@ export const checkExperimentSpec = (
   if (spec.statistics.multipleTestingPolicy !== undefined && primaries.length < 1) {
     missing.push('multipleTestingPolicy set but no primary comparison');
   }
-  // Fail-closed: the policy enum is shared with plan-level text, but the executor only
-  // implements single_primary + alpha_spending. Declaring e_value_accumulation here is
-  // rejected loudly instead of silently downgraded (zero-theater rule).
+  // e_value_accumulation is implemented by the deterministic bounded e-process in
+  // src/domain/e-process.ts. It is valid only for per-row bounded correctness data.
   if (spec.statistics.multipleTestingPolicy === 'e_value_accumulation') {
-    missing.push('multipleTestingPolicy=e_value_accumulation is not implemented in the executor (D-086); use single_primary or alpha_spending');
+    for (const [ci, c] of spec.comparisons.entries()) {
+      if (c.metricKey !== 'accuracy') {
+        missing.push(`comparisons[${ci}] e_value_accumulation requires accuracy (bounded per-row correctness)`);
+      }
+    }
   }
   // Task coherence (R2-10 regression closure): one target column defines one task.
   // The sidecar template registry mirrors these sets (builders.py REGRESSORS).

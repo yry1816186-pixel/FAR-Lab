@@ -23,11 +23,11 @@ import { ModelConfigId } from './ids.js';
  * the provider catalog, the CLI route set and the settings UI. A researcher can
  * never select it, and it can never masquerade as a live model call.
  */
-export const ProviderWireProtocol = z.enum(['openai', 'anthropic', 'gemini', 'offline']);
+export const ProviderWireProtocol = z.enum(['openai', 'openai_responses', 'anthropic', 'gemini', 'offline']);
 export type ProviderWireProtocol = z.infer<typeof ProviderWireProtocol>;
 
 /** Product-selectable wires: everything a researcher can actually configure as a route. */
-export const PRODUCT_WIRE_PROTOCOLS: readonly ProviderWireProtocol[] = ['openai', 'anthropic', 'gemini'];
+export const PRODUCT_WIRE_PROTOCOLS: readonly ProviderWireProtocol[] = ['openai', 'openai_responses', 'anthropic', 'gemini'];
 
 /** Test-double wire: no real endpoint is contacted, so the URL is a fixed sentinel. */
 export const TEST_DOUBLE_WIRE_BASE_URL = 'https://offline.farlab.invalid/v1';
@@ -120,7 +120,7 @@ const assertReasoningWireCompat = (
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['reasoning'], message: 'wire "offline" is the in-process test double (test/E2E only) — it speaks no thinking dialect; remove the reasoning declaration' });
     return;
   }
-  if (cfg.wire !== requiredWire[style]) {
+  if (cfg.wire !== requiredWire[style] && !(cfg.wire === 'openai_responses' && style === 'reasoning_effort')) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['reasoning'], message: `reasoning style "${style}" requires wire "${requiredWire[style]}"` });
   }
 };

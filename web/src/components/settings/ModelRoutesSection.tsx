@@ -58,6 +58,7 @@ interface BuiltinFormState {
 /** Worldwide preset templates from the server catalog (wire+baseUrl prefills). */
 const PRESET_FALLBACK: ReadonlyArray<{ label: string; wire: ProviderWireProtocol; baseUrl: string }> = [
   { label: 'OpenAI', wire: 'openai', baseUrl: 'https://api.openai.com/v1' },
+  { label: 'OpenAI Responses API', wire: 'openai_responses', baseUrl: 'https://api.openai.com/v1' },
   { label: 'Anthropic', wire: 'anthropic', baseUrl: 'https://api.anthropic.com' },
   { label: 'Google Gemini', wire: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com' },
 ];
@@ -73,7 +74,7 @@ export function ModelRoutesSection(): JSX.Element {
   /** BP-4: workspace usage ledger + discovery results. */
   const [usage, setUsage] = useState<UsageAggregate[] | null>(null);
   const [discovered, setDiscovered] = useState<Record<string, DiscoveredModel[]>>({});
-  /** Built-in env routes (zai/dashscope + banned archived): modelId/pricing/default management. */
+  /** Built-in environment routes: modelId, pricing, and default management. */
   const [builtinRoutes, setBuiltinRoutes] = useState<BuiltinRouteSummary[] | null>(null);
   const [builtinSource, setBuiltinSource] = useState<'ui' | 'env'>('env');
   const [editingBuiltin, setEditingBuiltin] = useState<string | null>(null);
@@ -85,7 +86,7 @@ export function ModelRoutesSection(): JSX.Element {
   const [spendInput, setSpendInput] = useState('');
   const [spendBusy, setSpendBusy] = useState(false);
   const [spendError, setSpendError] = useState<string | null>(null);
-  /** Worldwide preset catalog (server catalog.ts); fallback trio while/offline. */
+  /** Worldwide preset catalog (server catalog.ts); local defaults on load failure. */
   const [templates, setTemplates] = useState<ReadonlyArray<{ label: string; wire: ProviderWireProtocol; baseUrl: string; note?: string; keyUrl?: string }> | null>(null);
 
   useEffect(() => {
@@ -102,6 +103,7 @@ export function ModelRoutesSection(): JSX.Element {
   const wireLabel = (wire: ProviderWireProtocol): string =>
     t(
       wire === 'openai' ? 'settings.wireOpenai'
+        : wire === 'openai_responses' ? 'settings.wireOpenaiResponses'
         : wire === 'anthropic' ? 'settings.wireAnthropic'
           : wire === 'gemini' ? 'settings.wireGemini'
             : 'settings.wireTestDouble',
@@ -537,6 +539,7 @@ export function ModelRoutesSection(): JSX.Element {
           <label className="field-label" htmlFor="mcfg-wire">{t('settings.wire')}</label>
           <select id="mcfg-wire" value={form.wire} onChange={(e) => setForm({ ...form, wire: e.target.value as ProviderWireProtocol })}>
             <option value="openai">{t('settings.wireOpenai')}</option>
+            <option value="openai_responses">{t('settings.wireOpenaiResponses')}</option>
             <option value="anthropic">{t('settings.wireAnthropic')}</option>
             <option value="gemini">{t('settings.wireGemini')}</option>
           </select>
@@ -596,7 +599,7 @@ export function ModelRoutesSection(): JSX.Element {
             onChange={(e) => setForm({ ...form, reasoningStyle: e.target.value as FormState['reasoningStyle'] })}
           >
             <option value="">{t('settings.reasoningNone')}</option>
-            <option value="reasoning_effort" disabled={form.wire !== 'openai'}>{t('settings.reasoningEffort')}</option>
+            <option value="reasoning_effort" disabled={form.wire !== 'openai' && form.wire !== 'openai_responses'}>{t('settings.reasoningEffort')}</option>
             <option value="enable_thinking" disabled={form.wire !== 'openai'}>{t('settings.reasoningThinking')}</option>
             <option value="thinking_budget" disabled={form.wire !== 'anthropic'}>{t('settings.reasoningBudget')}</option>
             <option value="thinking_config" disabled={form.wire !== 'gemini'}>{t('settings.reasoningConfig')}</option>

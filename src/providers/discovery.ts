@@ -1,4 +1,5 @@
 import type { ProviderWireProtocol } from '../domain/model-config.js';
+import { assertFetchDestination } from '../shared/destination-guard.js';
 
 /**
  * BP-4 model discovery: list the models an endpoint actually serves.
@@ -12,8 +13,7 @@ import type { ProviderWireProtocol } from '../domain/model-config.js';
  *
  * The parser is tolerant and HONEST: only fields present in the response are
  * reported; missing context windows / capabilities surface as undefined, never
- * guessed. Live use requires real credentials (BLOCKED-live under the current
- * no-live-API directive); the parser itself is fully covered offline.
+ * guessed. Live use requires the endpoint's credentials when authentication is enabled.
  */
 
 export interface DiscoveredModel {
@@ -30,21 +30,51 @@ export interface DiscoveryResult {
   rawCount: number;
 }
 
-export type FetchLike = (url: string, init?: { method?: string; headers?: Record<string, string> }) => Promise<{
+export type FetchLike = (url: string, init?: RequestInit) => Promise<{
   status: number;
   ok: boolean;
   json(): Promise<unknown>;
 }>;
 
 export const discoverModels = async (
-  input: { wire: ProviderWireProtocol; baseUrl: string; apiKey: string },
+  input: { wire: ProviderWireProtocol; baseUrl: string; apiKey: string; signal?: AbortSignal; timeoutMs?: number },
   fetchImpl: FetchLike,
 ): Promise<DiscoveryResult> => {
-  const base = input.baseUrl.replace(/\/+$/, '');
-  const url =
+  if (!['openai', 'openai_responses', 'anthropic', 'gemini'].includes(input.wire)) {
+    throw new Error('model discovery: unsupported wire protocol');
+  }
+  let url: URL;
+  try {
+    url = new URL(input.baseUrl);
+  } catch {
+    throw new Error('model discovery: invalid base URL');
+  }
+  if (!['http:', 'https:'].includes(url.protocol) || url.username.length > 0 || url.password.length > 0) {
+    throw new Error('model discovery: base URL must use HTTP(S) without embedded credentials');
+  }
+  try {
+    assertFetchDestination(url.href);
+  } catch {
+    throw new Error('model discovery: base URL rejected by destination policy');
+  }
+  const base = url.pathname.replace(/\/+$/, '');
+  url.pathname =
     input.wire === 'anthropic' ? `${base}/v1/models`
     : input.wire === 'gemini' ? `${base}/v1beta/models`
     : `${base}/models`;
+  url.hash = '';
+  const timeoutMs = input.timeoutMs ?? 15_000;
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > 120_000) {
+    throw new Error('model discovery: timeout must be between 1 and 120000 milliseconds');
+  }
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  const signal = input.signal === undefined ? timeoutSignal : AbortSignal.any([input.signal, timeoutSignal]);
+  const transportError = (): Error => new Error(
+    input.signal?.aborted === true ? 'model discovery cancelled'
+    : timeoutSignal.aborted ? 'model discovery timed out'
+    : 'model discovery: endpoint request failed',
+  );
+  if (signal.aborted) throw transportError();
   const headers: Record<string, string> =
     input.wire === 'anthropic'
       ? { 'x-api-key': input.apiKey, 'anthropic-version': '2023-06-01' }
@@ -53,13 +83,20 @@ export const discoverModels = async (
         : input.apiKey.length > 0
           ? { authorization: `Bearer ${input.apiKey}` }
           : {};
-  const res = await fetchImpl(url, { method: 'GET', headers });
+  const res = await fetchImpl(url.href, { method: 'GET', headers, signal, redirect: 'error' }).catch(() => {
+    throw transportError();
+  });
   if (!res.ok) {
-    throw new Error(`model discovery failed: HTTP ${res.status} from ${url}`);
+    throw new Error(`model discovery failed: HTTP ${res.status}`);
   }
-  const body = await res.json(); // only parsed after the ok gate — an HTML error page never becomes a parse error
+  const body = await res.json().catch(() => {
+    if (signal.aborted) throw transportError();
+    throw new Error('model discovery: endpoint returned invalid JSON');
+  });
   const models = input.wire === 'gemini' ? parseGeminiModels(body) : parseModels(body);
-  return { models, httpStatus: res.status, rawCount: models.length };
+  const catalog = body as { models?: unknown[]; data?: unknown[] };
+  const rawCount = (input.wire === 'gemini' ? catalog.models : catalog.data)?.length ?? 0;
+  return { models, httpStatus: res.status, rawCount };
 };
 
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v.length > 0 ? v : undefined);

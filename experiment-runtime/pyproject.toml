@@ -13,6 +13,17 @@ dependencies = [
     "sympy>=1.14.0",
     "xarray>=2026.7.0",
     "netcdf4>=1.7.4",
+    "pandas>=3,<4",
+    "matplotlib>=3.9,<4",
+    "statsmodels>=0.14,<1",
+    "pyarrow>=18,<23",
+    "h5py>=3.12,<4",
+    "torch>=2.4,<3",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8,<9",
 ]
 
 [build-system]

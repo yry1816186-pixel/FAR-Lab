@@ -1,4 +1,4 @@
-import { ResearchRun, RunStatus, RunStageName, ProvenanceReceipt, newId } from '../domain/index.js';
+import { ResearchRun, RunStatus, RunStageName, ProvenanceReceipt, newId, makeKernelControlState, selectNextBestAction } from '../domain/index.js';
 import { randomBytes } from 'node:crypto';
 import type { Store } from '../persistence/store.js';
 import type { StageHandler, StageContext } from '../pipeline/types.js';
@@ -118,6 +118,33 @@ export class Orchestrator {
 
   private stageRecord(run: ResearchRun, stage: RunStageName) {
     return run.stages.find((s) => s.stage === stage);
+  }
+
+  /** Persist the state-driven kernel control plane. This is a projection/checkpoint,
+   * never a second source of scientific truth; all IDs are provenance-linked to
+   * the current run objects and event stream. */
+  private persistKernelControl(run: ResearchRun, budget: RunBudgetView, phase: Parameters<typeof makeKernelControlState>[0]['phase'], lastAction: string | null = null): void {
+    const pending = run.stages.filter((s) => s.state === 'pending' || s.state === 'running');
+    const candidates = pending.map((s, i) => ({
+      kind: s.stage,
+      rationale: `stage ${s.stage} remains non-terminal`,
+      expectedInformationGain: (s.stage.includes('retrieve') || s.stage.includes('evidence') ? 'high' : 'medium') as 'high' | 'medium',
+      priority: pending.length - i,
+    }));
+    const next = selectNextBestAction(candidates, 0, 0);
+    const prior = this.deps.store.listObjects('kernel_control', run.id).at(-1);
+    const priorNextKind = prior?.nextAction?.kind;
+    const priorNoChange = prior?.stuck?.consecutiveNoChange ?? 0;
+    const noChange = priorNextKind === next?.kind ? priorNoChange + 1 : 0;
+    const sourceObjectIds = this.deps.store.listObjects('scientific_world_model', run.id).at(-1)?.provenance.sourceObjectIds ?? [];
+    const state = makeKernelControlState({
+      id: newId('kc'), runId: run.id, version: (prior?.version ?? 0) + 1, phase,
+      cap: budget.cap, spent: budget.spent, attempts: (prior?.attempts ?? 0) + (lastAction ? 1 : 0),
+      completionSatisfied: pending.length === 0, noChange, cancelRequested: run.cancelRequested,
+      lastAction, nextAction: next, sourceObjectIds, eventCount: this.deps.store.listEvents(run.id).length,
+    });
+    this.deps.store.putObject('kernel_control', state);
+    this.deps.store.appendEvent(run.id, { type: 'note', detail: { reason: 'kernel_control_checkpoint', phase, stateId: state.id, nextAction: next?.kind ?? null, stuck: state.stuck.detected } });
   }
 
   /** Persist and announce the canonical linear plan when a run has none yet (first execution). */
@@ -420,6 +447,7 @@ export class Orchestrator {
       this.deps.store.appendEvent(runId, { type: 'note', detail: { reason: 'template_refusal_reopened', stages: templateRefused.map((s) => s.stage) } });
     }
     let budgetWarned = budget.nearLimit();
+    this.persistKernelControl(run, budget, 'observe');
 
     // Parking-intent lifecycle: a full (non-stopAfter) execution takes ownership of
     // the run — any stale 'parking:*' tag (crash guard left behind by a crashed
@@ -473,6 +501,7 @@ export class Orchestrator {
     };
     const kernelPlane = this.deps.kernelPlane?.({ run, budget, recordReceipt: this.receiptSink(run, lease) });
     for (;;) {
+      this.persistKernelControl(run, budget, 'select_action');
       const step = nextWorkflowStep(activePlan, (s) => {
         if (s.kind === 'agent') return agentStepDone(s.id) ? 'terminal' : 'pending';
         const rec = this.stageRecord(run, s.target);
@@ -493,12 +522,21 @@ export class Orchestrator {
           continue;
         }
         if (kernelPlane === undefined) {
-          noHandler.add(step.target);
+          const msg = `workflow agent capability '${step.target}' has no kernel capability plane`;
+          run = await this.transition(runId, (r) => {
+            r.status = 'failed' satisfies RunStatus;
+            r.lastError = msg;
+            return r;
+          }, lease);
           this.deps.store.appendEvent(runId, {
-            type: 'note',
-            detail: { reason: 'agent_step_unavailable', capability: step.target, stepId: step.id, cause: 'kernel capability plane not wired in this build' },
+            type: 'stage_failed', stage: step.target, status: run.status,
+            detail: { error: msg, reason: 'missing_kernel_plane', stepId: step.id, failFast: true },
           });
-          continue;
+          this.deps.store.appendEvent(runId, {
+            type: 'run_status_changed', status: run.status,
+            detail: { reason: 'missing_kernel_capability_plane', capability: step.target, stepId: step.id },
+          });
+          return run;
         }
         // attemptCap is ENFORCED for agent steps via a persisted counter (plan semantics:
         // a bounded capability budget, immune to in-memory Set resets across re-entries).
@@ -514,6 +552,7 @@ export class Orchestrator {
         }
         this.deps.store.setMeta(attemptKey, String(attempts + 1));
         const wireCancel = this.wireCancels.get(runId);
+        this.persistKernelControl(run, budget, 'act', step.target);
         this.deps.store.appendEvent(runId, { type: 'note', detail: { reason: 'agent_step_started', capability: step.target, stepId: step.id } });
         try {
           const res = await kernelPlane.runCapability(step.target, ...(wireCancel !== undefined ? [{ signal: wireCancel.signal }] : []));
@@ -539,6 +578,7 @@ export class Orchestrator {
             this.deps.store.appendEvent(runId, { type: 'run_cancelled', stage: step.target, status: run.status, detail: { error: msg } });
             return run;
           }
+          this.persistKernelControl(run, budget, 'update_belief', step.target);
         } catch (e) {
           markAgentStepDone(step.id);
           this.deps.store.appendEvent(runId, {
@@ -564,7 +604,28 @@ export class Orchestrator {
       }
 
       const handler = this.deps.stages.get(stage);
-      if (!handler) { noHandler.add(stage); continue; } // not implemented in this build — stays pending and visible
+      if (!handler) {
+        // A missing handler is a broken workflow contract, not a skippable stage.
+        // Leaving it pending makes the run look resumable while no execution can
+        // ever make progress. Persist a terminal failure and stop immediately so
+        // callers can repair the wiring and resume deliberately.
+        const msg = `workflow stage '${stage}' has no registered handler`;
+        run = await this.transition(runId, (r) => {
+          this.setStage(r, stage, { state: 'failed', endedAt: new Date().toISOString(), error: msg });
+          r.status = 'failed' satisfies RunStatus;
+          r.lastError = msg;
+          return r;
+        }, lease);
+        this.deps.store.appendEvent(runId, {
+          type: 'stage_failed', stage, status: run.status,
+          detail: { error: msg, reason: 'missing_handler', failFast: true },
+        });
+        this.deps.store.appendEvent(runId, {
+          type: 'run_status_changed', status: run.status,
+          detail: { reason: 'missing_stage_handler', stage },
+        });
+        return run;
+      }
 
       // Cumulative 1-based attempt counting: a stage that has never started (no startedAt,
       // e.g. fresh pending records whose zod default attempt=1 must not act as a prior try)
@@ -576,6 +637,7 @@ export class Orchestrator {
         return r;
       }, lease);
       this.deps.store.appendEvent(runId, { type: 'stage_started', stage, detail: { attempt: nextAttempt } });
+      this.persistKernelControl(run, budget, 'act', stage);
 
       const ctx = this.makeContext(run, lease, budget, kernelPlane);
       try {
@@ -613,6 +675,7 @@ export class Orchestrator {
               type: 'stage_done', stage,
               detail: { summary: outcome.summary },
             });
+            this.persistKernelControl(run, budget, 'update_belief', stage);
 
             // ---- BP-1 quality gate: after rank, decide whether the ranked set is strong
             // enough to plan against. Weak signal + rounds remaining + budget remaining
@@ -829,6 +892,7 @@ export class Orchestrator {
         delete r.lastError; // a completed run must not keep a stale failure banner
         return r;
       }, lease);
+      this.persistKernelControl(run, budget, 'converged');
       this.deps.store.appendEvent(runId, { type: 'run_status_changed', status: 'completed', detail: {} });
 
       // RU-1 memory consolidation: terminal runs project their durable facts into
@@ -893,6 +957,8 @@ export class Orchestrator {
         }
       }
     }
+    if (run.cancelRequested || signal.cancelled) this.persistKernelControl(run, budget, 'cancelled');
+    else if (failed) this.persistKernelControl(run, budget, 'blocked');
     return run;
   }
 

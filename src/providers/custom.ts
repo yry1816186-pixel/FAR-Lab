@@ -37,6 +37,8 @@ const liveWireOf = (w: ModelProviderConfig['wire']): LiveWire | null => {
   switch (w) {
     case 'openai':
       return 'openai';
+    case 'openai_responses':
+      return 'openai_responses';
     case 'anthropic':
       return 'anthropic';
     case 'gemini':
@@ -79,7 +81,7 @@ export const createCustomProvider = (
       // Anthropic Messages and Gemini generateContent wires have no OpenAI
       // tools/response_format concepts — same strip as zai (JSON-mode + prompt
       // contract carry the output shape; the caller's zod parse stays the authority).
-      const needsStrip = wire !== 'openai' && req.jsonSchema !== undefined;
+      const needsStrip = wire !== 'openai' && wire !== 'openai_responses' && req.jsonSchema !== undefined;
       const effective = needsStrip ? { ...req, jsonSchema: undefined } : req;
       return runOpenAICompatStructuredCall(
         { providerName: name, baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, modelId: cfg.modelId, executionMode: 'live', wire },

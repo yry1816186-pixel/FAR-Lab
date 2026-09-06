@@ -21,8 +21,21 @@ different (fresh) directory. Always use forward slashes in env-provided paths:
 Keys are read from `process.env` at call time and are never written to any file.
 The API server hydrates `.env` itself at boot (src/platform/dotenv.ts; disable
 with `FAR_DOTENV=off`); running the server another way requires exporting the
-vars yourself (`ZAI_API_KEY`, `DASHSCOPE_API_KEY`, ...). `far` reports missing
+vars for the route you selected (`ZAI_API_KEY`, `DASHSCOPE_API_KEY`, `FARLAB_UNIVERSAL_*`, ...). FAR-Lab is model/vendor agnostic; Qwen/DashScope is only required when a separate competition protocol demands it. `far` reports missing
 var *names* only.
+
+**A gateway uses a different protocol (for example, a vendor-native API).**
+The universal/custom route is endpoint-agnostic but protocol-validated. Use an
+OpenAI Chat Completions-compatible, OpenAI Responses API, Anthropic Messages-compatible, or Gemini
+`generateContent` endpoint. Unsupported protocols fail closed until a dedicated
+adapter is added; FAR-Lab never silently sends a mismatched request shape.
+
+**The gateway exposes `/responses`, not `/chat/completions`.**
+Choose `openai_responses` in model settings or `FARLAB_UNIVERSAL_WIRE`. Supply the
+API root (for example, `https://api.openai.com/v1`), not the full resource URL.
+Responses routes support streaming and structured outputs; a declared
+`reasoning_effort` is sent as `reasoning.effort`. Actual model features depend on
+the endpoint. External Responses live validation is `UNVERIFIED_EXTERNAL`.
 
 **Model provider 529 / HTTP 1302 capacity windows stall a run.**
 These are external overload windows. The built-in mitigations are pacing envs

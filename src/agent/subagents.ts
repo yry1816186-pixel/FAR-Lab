@@ -2,7 +2,8 @@ import { newId } from '../domain/ids.js';
 import type { AgentTelemetrySummary, AgentTurnRecord } from '../domain/agent.js';
 import { mapBounded } from '../pipeline/stages/shared.js';
 import { SessionTelemetry } from './telemetry.js';
-import { runAgentLoop, type AgentLoopConfig, type AgentLoopDeps, type AgentLoopResult } from './loop.js';
+import { runUnifiedAgentLoop } from './runtime.js';
+import type { AgentLoopConfig, AgentLoopDeps, AgentLoopResult } from './loop.js';
 import type { TranscriptEntry } from './protocol.js';
 import type { RunBudgetView } from '../app/run-budget.js';
 
@@ -122,7 +123,7 @@ export const runSubagents = async (
       ...(budget !== undefined ? { budget } : {}),
     };
     if (deps.rolloutFactory !== undefined) childDeps.rollout = deps.rolloutFactory(childDeps.sessionId);
-    const res = await runAgentLoop(
+    const res = await runUnifiedAgentLoop(
       {
         ...cfg,
         task: spec.task,

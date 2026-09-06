@@ -163,9 +163,15 @@ export function summarizeAcceptance(cwd) {
 
 export function summarizeBlockers(cwd) {
   const file = readJsonDetailed(cwd, '.control/BLOCKERS.json');
-  if (!file.exists) return { exists: false, errors: [], open: [], criticalOpen: [] };
+  if (!file.exists) return { exists: false, errors: ['Missing .control/BLOCKERS.json'], open: [], criticalOpen: [] };
   if (file.error) return { exists: true, errors: [`BLOCKERS.json malformed: ${file.error}`], open: [], criticalOpen: [] };
+  if (!file.value || typeof file.value !== 'object' || Array.isArray(file.value)) {
+    return { exists: true, errors: ['BLOCKERS.json must contain an object'], open: [], criticalOpen: [] };
+  }
   const items = arrayFrom(file.value, ['items', 'blockers']);
+  if (!Array.isArray(file.value.items) && !Array.isArray(file.value.blockers)) {
+    return { exists: true, errors: ['BLOCKERS.json contains no recognized items array'], open: [], criticalOpen: [] };
+  }
   const openItems = items.filter(x => !isClosedStatus(x?.status));
   return {
     exists: true,

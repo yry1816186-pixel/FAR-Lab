@@ -37,6 +37,8 @@ const ID_PREFIX = {
   protocol_execution: 'pex',
   problem_model: 'pmod',
   method_selection: 'msel',
+  scientific_world_model: 'wm',
+  kernel_control: 'kc',
 } as const;
 
 /** The single id-shape grammar: _[0-9a-z]{20,32} (26-char ULID-style body from newId). */
@@ -77,6 +79,8 @@ export const ProtocolId = idOf(ID_PREFIX.protocol);
 export const ProtocolExecutionId = idOf(ID_PREFIX.protocol_execution);
 export const ProblemModelId = idOf(ID_PREFIX.problem_model);
 export const MethodSelectionId = idOf(ID_PREFIX.method_selection);
+export const ScientificWorldModelId = idOf(ID_PREFIX.scientific_world_model);
+export const KernelControlStateId = idOf(ID_PREFIX.kernel_control);
 
 export type RunId = z.infer<typeof RunId>;
 export type QuestionId = z.infer<typeof QuestionId>;
@@ -109,6 +113,8 @@ export type ProtocolId = z.infer<typeof ProtocolId>;
 export type ProtocolExecutionId = z.infer<typeof ProtocolExecutionId>;
 export type ProblemModelId = z.infer<typeof ProblemModelId>;
 export type MethodSelectionId = z.infer<typeof MethodSelectionId>;
+export type ScientificWorldModelId = z.infer<typeof ScientificWorldModelId>;
+export type KernelControlStateId = z.infer<typeof KernelControlStateId>;
 
 /** Kinds an ObjectRef may point at (the referenceable subset of id-bearing kinds). */
 const OBJECT_REF_KINDS = [
@@ -118,6 +124,7 @@ const OBJECT_REF_KINDS = [
   'experiment_spec', 'experiment_run', 'dataset_record', 'result_set', 'stat_report',
   'evidence_body', 'ach_analysis', 'prediction',
   'protocol', 'protocol_execution', 'problem_model', 'method_selection',
+  'scientific_world_model',
 ] as const;
 
 /**

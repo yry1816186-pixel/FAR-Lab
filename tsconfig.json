@@ -16,5 +16,5 @@
     "types": ["node"]
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist", "web", "tests", "spikes", "eval"]
+  "exclude": ["node_modules", "dist", "web", "tests", "spikes", "eval", "src/supabase"]
 }

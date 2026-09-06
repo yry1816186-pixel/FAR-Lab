@@ -3,7 +3,8 @@ import type { ModelProvider, ArtifactStore, SourceAdapter } from '../shared/port
 import type { Store } from '../persistence/store.js';
 import type { ToolIntegration, SourceFamily } from '../domain/index.js';
 import { newId } from '../domain/ids.js';
-import { runAgentLoop, type AgentLoopStatus } from '../agent/loop.js';
+import { runUnifiedAgentLoop } from '../agent/runtime.js';
+import type { AgentLoopStatus } from '../agent/loop.js';
 import { assembleSessionCapabilities } from '../agent/capabilities/assembly.js';
 import type { AgentTool } from '../agent/tool.js';
 import { SessionTelemetry } from '../agent/telemetry.js';
@@ -114,7 +115,7 @@ export const createRunKernelPlane = (deps: RunKernelPlaneDeps): KernelCapability
       builtinAdmission: 'read_class_only',
     });
     try {
-      const res = await runAgentLoop(
+      const res = await runUnifiedAgentLoop(
         {
           capability: req.capability,
           systemPrompt: req.systemPrompt ?? `You are the ${req.capability} capability of a scientific research system. Work strictly from tool results; never fabricate sources, numbers or verdicts.`,

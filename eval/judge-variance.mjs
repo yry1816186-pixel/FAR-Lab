@@ -112,7 +112,7 @@ if (mode === 'replay') {
 }
 
 // --live R: identical pipeline R times over the same completed runs.
-// Provider routes (deepseek BANNED by user directive 2026-08-22): default 'zai' =
+// Provider routes for this benchmark (default 'zai'; product routes remain open) =
 // the PRODUCTION src provider (Anthropic Messages wire on open.bigmodel.cn, glm-5.3
 // funded model). The judge model identity is recorded per run — a route switch is a
 // judge-protocol change, disclosed with the numbers.
@@ -127,7 +127,7 @@ if (PROVIDER === 'zai') {
   const { createDashScopeProvider } = await import('../dist/providers/dashscope.js');
   provider = createDashScopeProvider({ totalTimeoutMs: 300_000 });
 } else {
-  console.error(`FATAL: unknown FARLAB_JUDGE_PROVIDER '${PROVIDER}' (zai|dashscope; deepseek banned by user directive)`);
+  console.error(`FATAL: unknown FARLAB_JUDGE_PROVIDER '${PROVIDER}' (benchmark allowlist: zai|dashscope)`);
   process.exit(1);
 }
 if (!provider.liveReady) { console.error(`FATAL: ${PROVIDER} route not live-ready (missing API key?)`); process.exit(1); }

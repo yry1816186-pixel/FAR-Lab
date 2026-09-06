@@ -1024,7 +1024,7 @@ describe('TEST-ONLY stub provider', () => {
 
 describe('provider registry', () => {
   it('resolves known providers — open set incl. deepseek + universal (user directive 2026-08-26)', () => {
-    expect(getProvider('deepseek')?.name).toBe('deepseek'); // unbanned: model-agnostic product
+    expect(getProvider('deepseek')?.name).toBe('deepseek'); // model-agnostic product route
     expect(getProvider('zai')?.name).toBe('zai');
     expect(getProvider('dashscope')?.name).toBe('dashscope');
     expect(getProvider('universal')?.name).toBe('universal');
@@ -1037,7 +1037,7 @@ describe('provider registry', () => {
     vi.stubEnv('FARLAB_MODEL_PROVIDER', 'dashscope');
     expect(defaultLiveProvider().name).toBe('dashscope');
     vi.stubEnv('FARLAB_MODEL_PROVIDER', 'deepseek');
-    expect(defaultLiveProvider().name).toBe('deepseek'); // unbanned live route (liveReady per env key)
+    expect(defaultLiveProvider().name).toBe('deepseek'); // supported live route (liveReady per env key)
     vi.stubEnv('FARLAB_MODEL_PROVIDER', 'universal');
     expect(defaultLiveProvider().name).toBe('universal'); // any-endpoint env route
     vi.stubEnv('FARLAB_MODEL_PROVIDER', 'test-stub');

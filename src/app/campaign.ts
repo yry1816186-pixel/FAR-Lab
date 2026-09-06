@@ -22,6 +22,8 @@ export interface UnitRuntimeState {
   state: 'pending' | 'running' | UnitTerminalState;
   /** Alpha actually spent by this unit's verdict (0 when not terminal / not applicable). */
   alphaSpent?: number;
+  /** Unit e-value contribution under campaign e_value_accumulation. */
+  eValue?: number;
 }
 
 export interface CampaignDecision {
@@ -32,6 +34,7 @@ export interface CampaignDecision {
   stopReason: string | null;
   /** Remaining alpha budget per unit label (alpha_spending only; others = null per label). */
   alphaBudget: Record<string, number | null>;
+  eValueProduct?: number;
 }
 
 const depsSatisfied = (unit: CampaignUnit, states: ReadonlyMap<string, UnitRuntimeState>): boolean =>
@@ -62,9 +65,13 @@ export const runnableUnits = (spec: CampaignSpec, states: readonly UnitRuntimeSt
 export const evaluateStop = (
   spec: CampaignSpec,
   states: readonly UnitRuntimeState[],
-  external: { budgetExhausted?: boolean; unitsExhausted?: boolean } = {},
+  external: { budgetExhausted?: boolean; unitsExhausted?: boolean; eValueReached?: boolean } = {},
 ): { stopped: boolean; stopReason: string | null } => {
   const byLabel = new Map(states.map((s) => [s.label, s] as const));
+  if (spec.crossUnitTesting.policy === 'e_value_accumulation') {
+    const product = states.filter((s) => s.state === 'completed').reduce((acc, s) => acc * (s.eValue ?? 1), 1);
+    if (product >= spec.crossUnitTesting.eValueThreshold) return { stopped: true, stopReason: `e_value_threshold: ${product.toPrecision(6)} >= ${spec.crossUnitTesting.eValueThreshold}` };
+  }
   const allTerminal = spec.units.every((u) => {
     const s = byLabel.get(u.label)?.state;
     return s === 'completed' || s === 'failed' || s === 'canceled';
@@ -85,6 +92,9 @@ export const evaluateStop = (
         break;
       case 'units_exhausted':
         if (external.unitsExhausted === true) return { stopped: true, stopReason: 'units_exhausted' };
+        break;
+      case 'e_value_threshold':
+        if (external.eValueReached === true) return { stopped: true, stopReason: 'e_value_threshold' };
         break;
     }
   }
@@ -112,12 +122,13 @@ export const alphaLedger = (
 export const decideCampaign = (
   spec: CampaignSpec,
   states: readonly UnitRuntimeState[],
-  external: { budgetExhausted?: boolean; unitsExhausted?: boolean } = {},
+  external: { budgetExhausted?: boolean; unitsExhausted?: boolean; eValueReached?: boolean } = {},
 ): CampaignDecision => {
   const stop = evaluateStop(spec, states, external);
-  if (stop.stopped) return { runnable: [], stopped: true, stopReason: stop.stopReason, alphaBudget: alphaLedger(spec, states) };
+  const eValueProduct = spec.crossUnitTesting.policy === 'e_value_accumulation' ? states.filter((s) => s.state === 'completed').reduce((acc, s) => acc * (s.eValue ?? 1), 1) : undefined;
+  if (stop.stopped) return { runnable: [], stopped: true, stopReason: stop.stopReason, alphaBudget: alphaLedger(spec, states), ...(eValueProduct !== undefined ? { eValueProduct } : {}) };
   // alpha_spending guard: a unit with zero remaining budget is NOT runnable
   const budget = alphaLedger(spec, states);
   const runnable = runnableUnits(spec, states).filter((label) => budget[label] === null || budget[label]! > 0);
-  return { runnable, stopped: false, stopReason: null, alphaBudget: budget };
+  return { runnable, stopped: false, stopReason: null, alphaBudget: budget, ...(eValueProduct !== undefined ? { eValueProduct } : {}) };
 };

@@ -275,3 +275,38 @@ describe('POST /api/v1/runs providerConfigId', () => {
     expect(app.store.getRun((plain.body?.runId as string) ?? '')?.providerConfigId).toBeUndefined();
   });
 });
+
+describe('POST /api/v1/model-configs/discover', () => {
+  const stubDiscovery = () => {
+    const realFetch = globalThis.fetch;
+    const modelFetch = vi.fn(async () => new Response(JSON.stringify({ data: [{ id: 'responses-model' }] }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }));
+    vi.stubGlobal('fetch', (url: string | URL | Request, init?: RequestInit) => {
+      const address = String(url);
+      return address.startsWith(base) ? realFetch(url, init) : modelFetch();
+    });
+    return modelFetch;
+  };
+
+  it('discovers a draft Responses wire through the public API', async () => {
+    const modelFetch = stubDiscovery();
+    const result = await request('POST', '/api/v1/model-configs/discover', {
+      wire: 'openai_responses', baseUrl: 'https://models.example.test/v1', apiKey: 'test-fixture-key',
+    });
+    expect(result.status).toBe(200);
+    expect(result.body?.models).toEqual([{ id: 'responses-model' }]);
+    expect(modelFetch).toHaveBeenCalledOnce();
+    expect(result.text).not.toContain('test-fixture-key');
+  });
+
+  it.each(['offline', 'grpc', 'unsupported-wire'])('rejects unsupported discovery wire %s before a request', async (wire) => {
+    const modelFetch = stubDiscovery();
+    const result = await request('POST', '/api/v1/model-configs/discover', {
+      wire, baseUrl: 'https://models.example.test/v1',
+    });
+    expect(result.status).toBe(400);
+    expect(modelFetch).not.toHaveBeenCalled();
+  });
+});

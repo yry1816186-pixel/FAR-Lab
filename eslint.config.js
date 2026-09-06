@@ -3,7 +3,7 @@ import tseslint from 'typescript-eslint';
 import globals from 'globals';
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'build/**', 'node_modules/**', 'coverage/**', 'web/**', 'desktop/**', 'artifacts/**', 'evidence/**', '.far-run/**', '.cache/**', '.control/**', 'research/**', 'zcode-harness/**', 'spikes/**', '.playwright-mcp/**', '.ruff_cache/**', 'experiment-runtime/.venv/**', '**/frontend/dist/**', '.far/**', '.zcode/**', 'far-lab-suite/**', 'work/**'] },
+  { ignores: ['dist/**', 'build/**', 'node_modules/**', 'coverage/**', 'web/**', 'desktop/**', 'artifacts/**', 'evidence/**', '.far-run/**', '.cache/**', '.control/**', 'research/**', 'zcode-harness/**', 'spikes/**', '.playwright-mcp/**', '.ruff_cache/**', 'experiment-runtime/.venv/**', '**/frontend/dist/**', '.far/**', '.zcode/**', 'far-lab-suite/**', 'work/**', 'src/supabase/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

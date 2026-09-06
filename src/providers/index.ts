@@ -12,7 +12,7 @@ import { createTestStubProvider } from './test-stub.js';
  * Built-in names are CONVENIENCE adapters over the shared transport core:
  *   - 'zai'        Zhipu GLM via the Anthropic-compatible endpoint (funded dev route)
  *   - 'dashscope'  Alibaba Bailian Qwen via the OpenAI-compatible mode
- *   - 'deepseek'   DeepSeek via the OpenAI wire (unbanned 2026-08-26)
+ *   - 'deepseek'   DeepSeek via the OpenAI wire
  *   - 'universal'  ANY endpoint on earth — wire/baseUrl/model/key all from
  *                  FARLAB_UNIVERSAL_* env (openai|anthropic|gemini wires)
  * Beyond these, the product layer (UI custom configs, custom:<mcfg id>) constructs

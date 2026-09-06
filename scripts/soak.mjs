@@ -47,6 +47,7 @@ const QUESTIONS = [
 let runIndex = 0;
 let busy = false;
 const workloads = [];
+const workloadResults = [];
 const runWorkload = async () => {
   if (busy) return;
   busy = true;
@@ -60,9 +61,15 @@ const runWorkload = async () => {
     const run = app.store.createRun(q);
     runIndex += 1;
     const after = await app.orchestrator.execute(run.id);
-    appendFileSync(OUT, `${JSON.stringify({ kind: 'workload', n: runIndex, runId: run.id, status: after.status, stages: after.stages.filter((s) => s.state !== 'done').map((s) => `${s.stage}:${s.state}`), wallMs: Date.now() - t0, at: new Date().toISOString() })}\n`);
+    const result = { n: runIndex, runId: run.id, status: after.status, stages: after.stages.filter((s) => s.state !== 'done').map((s) => `${s.stage}:${s.state}`), wallMs: Date.now() - t0 };
+    workloadResults.push(result);
+    appendFileSync(OUT, `${JSON.stringify({ kind: 'workload', ...result, at: new Date().toISOString() })}\n`);
+    return result;
   } catch (e) {
-    appendFileSync(OUT, `${JSON.stringify({ kind: 'workload-error', n: runIndex + 1, error: String(e instanceof Error ? e.message : e).slice(0, 400), at: new Date().toISOString() })}\n`);
+    const result = { n: runIndex + 1, status: 'error', error: String(e instanceof Error ? e.message : e).slice(0, 400) };
+    workloadResults.push(result);
+    appendFileSync(OUT, `${JSON.stringify({ kind: 'workload-error', ...result, at: new Date().toISOString() })}\n`);
+    return result;
   } finally {
     busy = false;
   }
@@ -86,8 +93,13 @@ const verdictOf = (slice, hoursElapsed) => {
     activeHandlesLast: Math.round(mean(last, (s) => s.activeHandles) * 10) / 10,
     dbGrowthBytesPerHour: hoursElapsed > 0 ? (slice.at(-1).dbBytes - slice[0].dbBytes) / hoursElapsed : 0,
     runsLaunched: runIndex,
+    workloadsCompleted: workloadResults.filter((w) => w.status === 'completed').length,
+    workloadFailures: workloadResults.filter((w) => w.status !== 'completed').length,
     leakRssPctBound: LEAK_RSS_PCT,
-    pass: rssGrowthPct < LEAK_RSS_PCT,
+    handleGrowthBound: mean(last, (s) => s.activeHandles) <= Math.max(mean(first, (s) => s.activeHandles) * 1.5, mean(first, (s) => s.activeHandles) + 10),
+    pass: rssGrowthPct < LEAK_RSS_PCT
+      && mean(last, (s) => s.activeHandles) <= Math.max(mean(first, (s) => s.activeHandles) * 1.5, mean(first, (s) => s.activeHandles) + 10)
+      && workloadResults.every((w) => w.status === 'completed'),
   };
 };
 
@@ -126,8 +138,15 @@ const verdict = {
   activeHandlesLast: Math.round(handleLast * 10) / 10,
   dbGrowthBytesPerHour: dbGrowthPerHour,
   runsLaunched: runIndex,
+  workloadsCompleted: workloadResults.filter((w) => w.status === 'completed').length,
+  workloadFailures: workloadResults.filter((w) => w.status !== 'completed').length,
   leakRssPctBound: LEAK_RSS_PCT,
-  pass: rssGrowthPct < LEAK_RSS_PCT && handleLast <= Math.max(handleFirst * 1.5, handleFirst + 10),
+  handleGrowthBound: handleLast <= Math.max(handleFirst * 1.5, handleFirst + 10),
+  pass: rssGrowthPct < LEAK_RSS_PCT
+    && handleLast <= Math.max(handleFirst * 1.5, handleFirst + 10)
+    && runIndex > 0
+    && workloadResults.length === runIndex
+    && workloadResults.every((w) => w.status === 'completed'),
   at: new Date().toISOString(),
 };
 appendFileSync(OUT, `${JSON.stringify(verdict)}\n`);

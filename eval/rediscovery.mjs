@@ -21,7 +21,7 @@
  * rediscovery-judge.mjs). Variance budget and offline/live measurement: eval/judge-variance.mjs.
  *
  * Usage: node eval/rediscovery.mjs [--skip-runs] [--sample N]
- * Env: FARLAB_JUDGE_PROVIDER=zai|dashscope (deepseek banned 2026-08-22; default zai); key via env or .far-run/secrets.env.
+ * Env: FARLAB_JUDGE_PROVIDER=zai|dashscope (benchmark judge allowlist; default zai); key via env or .far-run/secrets.env.
  * Writes eval/results/rediscovery.jsonl (+ -runs.jsonl).
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'node:fs';
@@ -34,7 +34,8 @@ loadLocalSecrets(); // .far-run/secrets.env keys (names only in any output)
 import { createZaiProvider } from '../dist/providers/zai.js';
 import { createDashScopeProvider } from '../dist/providers/dashscope.js';
 
-// Judge + run-generation provider (deepseek BANNED by user directive 2026-08-22).
+// Judge + run-generation provider. The benchmark allowlist is intentionally
+// narrower than the product provider plane; DeepSeek remains product-supported.
 // Default 'zai' = PRODUCTION src provider: Anthropic Messages wire on
 // open.bigmodel.cn, glm-5.3 (the funded model) — used for BOTH judging and,
 // via FARLAB_MODEL_PROVIDER=zai, main-pipeline run generation.
@@ -49,7 +50,7 @@ const makeLiveProvider = () => {
     return createZaiProvider({ totalTimeoutMs: 300_000, model: process.env.FARLAB_ZAI_MODEL ?? 'glm-5.3' });
   }
   if (PROVIDER === 'dashscope') return createDashScopeProvider({ totalTimeoutMs: 300_000 });
-  die(`unknown FARLAB_JUDGE_PROVIDER '${PROVIDER}' (zai|dashscope; deepseek banned by user directive)`);
+  die(`unknown FARLAB_JUDGE_PROVIDER '${PROVIDER}' (benchmark allowlist: zai|dashscope)`);
 };
 
 const RESULTS_DIR = resolve(process.cwd(), 'eval/results');

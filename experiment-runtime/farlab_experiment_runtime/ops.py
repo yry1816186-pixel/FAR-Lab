@@ -14,6 +14,7 @@ from .exploration import op_run_exploration
 from .netcdf import op_netcdf_profile, op_netcdf_extract_features
 from .fem import op_fem_poisson_2d, op_fem_poisson_2d_adaptive
 from .ode import op_ode_integrate
+from .scientific import OPS as SCIENTIFIC_OPS
 
 CLASSIFICATION_METRICS = ("accuracy", "balanced_accuracy", "f1_macro", "roc_auc", "log_loss")
 REGRESSION_METRICS = ("mean_squared_error", "r2")
@@ -22,8 +23,14 @@ REGRESSION_METRICS = ("mean_squared_error", "r2")
 def op_env_info(_payload: dict[str, Any]) -> dict[str, Any]:
     import os
 
+    import matplotlib
+    import pandas
+    import h5py
+    import pyarrow
     import sklearn
     import scipy
+    import statsmodels
+    import torch
 
     return {
         "pythonVersion": platform.python_version(),
@@ -31,6 +38,12 @@ def op_env_info(_payload: dict[str, Any]) -> dict[str, Any]:
             "sklearn": sklearn.__version__,
             "scipy": scipy.__version__,
             "numpy": np.__version__,
+            "pandas": pandas.__version__,
+            "matplotlib": matplotlib.__version__,
+            "statsmodels": statsmodels.__version__,
+            "pyarrow": pyarrow.__version__,
+            "h5py": h5py.__version__,
+            "torch": torch.__version__,
         },
         # R2-10 hardware capture: reproducibility context recorded into the run's
         # environment (cross-device bit-identity is NOT claimed — D-086-3 same-device only).
@@ -39,7 +52,12 @@ def op_env_info(_payload: dict[str, Any]) -> dict[str, Any]:
             "machine": platform.machine(),
             "pythonImplementation": platform.python_implementation(),
             "cpuCount": str(os.cpu_count()),
+            "torchCudaAvailable": str(bool(torch.cuda.is_available())),
         },
+        # Runtime truth used by discovery consistency checks. This is evaluated
+        # after module initialization, so it includes both core and scientific
+        # operation registrations.
+        "operations": sorted(OPS),
     }
 
 
@@ -492,6 +510,7 @@ OPS = {
     "netcdf_extract_features": op_netcdf_extract_features,
     # Wave B: preregistered ODE integration against a closed-form solution.
     "ode_integrate": op_ode_integrate,
+    **SCIENTIFIC_OPS,
 }
 
 

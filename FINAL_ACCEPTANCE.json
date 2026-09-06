@@ -1,8 +1,10 @@
 {
   "schema": "final-acceptance/1",
-  "asOf": "2026-09-06 (Arrearage relapse window: AstaBench LitQA2 adapter landed PR #164 + SCI-03 weakens discriminator PR #165 + adversarial-audit corrections PR #163; MLR 26/30 banked; all live legs BLOCKED_EXTERNAL on dashscope Arrearage 2026-09-06 03:4x; remaining: settle account -> one-command resume sequence in mission state)",
-  "head": "main @ db73aab",
-  "provenance": "First full endgame audit: 8 parallel read-only domain audits, reports in FINAL_EVIDENCE/audit-2026-08-30/. Load-bearing claims were spot-checked by the main agent. Wave 0 findings were registered before repair, the preserved conversation-stream lane was integrated without dropping its work, and the resulting clean lane passed targeted, browser, build, hygiene, and full-suite gates recorded in .control/EXECUTION_STATE-20260831-wave0.md. Wave A reproduced the hosted loaded-home CLS failure locally, attributed the exact shifting nodes before repair, and closed independent shell/science-projection races at 87a1f3f. The release wave then verified an 888-source-file clean copy across root/Web/TUI/Python/desktop, generated a Syft 1.51.0 CycloneDX 1.7 SBOM with 991 components across npm/Cargo/PyPI, built an independently verified 890-file archive twice with byte-identical SHA-256, and kept tag publishing closed on UNRELEASED. Wave B re-ran the local OCI verifier and real-path/opt-in adversarial suites, added cooperative cancellation and production sandbox trust-root hardening, and ran the full root suite on 2026-09-02 at 236 files / 2370 passed / 15 skipped (npm test exit 0). Local gates are recorded in .control/EXECUTION_STATE-20260831-wavea.md and this working-tree checkpoint; hosted CI, CodeQL result, OIDC attestation and GitHub Release remain deliberately unclaimed. Five-table and shallow-assertion coverage remain explicitly incomplete rather than inferred from passing mechanisms.",
+  "sourceOfTruth": "FINAL_ACCEPTANCE.json",
+  "asOf": "2026-09-06 closeout: 56 PASS / 6 PARTIAL / 0 FAIL / 4 BLOCKED_EXTERNAL; full Vitest 2721 passed / 15 skipped, plus 12 cancellation tests; final completion remains NOT_READY",
+  "head": "lane/docs-readme-revamp @ 6326b5baceeb33a2955f47c2abd23e7eddf5ed93 + uncommitted endgame and closeout changes",
+  "currentVerification": ".control/CLOSEOUT_VERIFICATION.json",
+  "provenance": "First full endgame audit: 8 parallel read-only domain audits, reports in FINAL_EVIDENCE/audit-2026-08-30/. Load-bearing claims were spot-checked by the main agent. Wave 0 findings were registered before repair, the preserved conversation-stream lane was integrated without dropping its work, and the resulting clean lane passed targeted, browser, build, hygiene, and full-suite gates recorded in .control/EXECUTION_STATE-20260831-wave0.md. Wave A reproduced the hosted loaded-home CLS failure locally, attributed the exact shifting nodes before repair, and closed independent shell/science-projection races at 87a1f3f. The release wave then verified an 888-source-file clean copy across root/Web/TUI/Python/desktop, generated a Syft 1.51.0 CycloneDX 1.7 SBOM with 991 components across npm/Cargo/PyPI, built an independently verified 890-file archive twice with byte-identical SHA-256, and kept tag publishing closed on UNRELEASED. Wave B re-ran the local OCI verifier and real-path/opt-in adversarial suites, added cooperative cancellation and production sandbox trust-root hardening. The current endgame wave adds executable e-process accumulation, workflow fail-fast contracts, and the SQLite-backed Scientific World Model; the latest full root suite on 2026-09-06 passed 263 files / 2641 tests / 15 skipped, with typecheck, build, lint, JSON validation, and diff-check also passing. Local gates are recorded in .control/EXECUTION_STATE-20260831-wavea.md and this working-tree checkpoint; hosted CI, CodeQL result, OIDC attestation and GitHub Release remain deliberately unclaimed. Remaining PARTIAL/BLOCKED_EXTERNAL items are preserved as evidence-dependent rather than inferred from passing mechanisms.",
   "statusVocabulary": [
     "PASS",
     "PARTIAL",
@@ -329,10 +331,10 @@
       "id": "FA-HAR-04",
       "domain": "harness",
       "title": "72h unattended soak with >=2 auto-iterations + power-loss recovery",
-      "status": "FAIL",
+      "status": "BLOCKED_EXTERNAL",
       "priority": "P1",
-      "owner": "self",
-      "gap": "Ladder progress 2026-09-04: soak harness landed (scripts/soak.mjs, hourly interim verdicts, kill-resistant per-sample flush; a31e1d6) and the 6h FA-PRF-06 leg is running detached with a green 2h interim (RSS +3.7%, handles 2->2, 3 workloads); prior session landed observability + fault/soak/backup proof (57e0edf). The 72h leg is calendar-bound: start it immediately after the 6h verdict lands. Power-loss recovery evidence still absent",
+      "owner": "external",
+      "gap": "Software-owned soak harness, observability, fault injection, and recovery checks are implemented. The required 72h uninterrupted runtime and power-loss observation are calendar-bound external evidence; the detached leg is due 2026-09-07.",
       "target": ">=72h soak: RSS/handles/DB growth sampled, >=1 crash-level recovery",
       "verify": "soak log + before/after chain verification",
       "evidence": [
@@ -1063,19 +1065,20 @@
         "src/server/conversations.ts"
       ]
     },
-    {
-      "id": "FA-X-01",
-      "domain": "external",
-      "title": "B-QWEN live route credential (ACC-02)",
-      "status": "BLOCKED_EXTERNAL",
-      "priority": "P0",
-      "owner": "user",
-      "gap": "user-ruled deferred to 09-05 submission window; engineering ready (contract tests green)",
-      "target": "live_verified on credential arrival",
-      "verify": "receipted live run",
-      "evidence": [
-        ".control/BLOCKERS.json B-QWEN-LIVE-ROUTE"
-      ]
+      {
+        "id": "FA-X-01",
+        "domain": "external",
+        "title": "B-QWEN live route credential (ACC-02)",
+        "status": "PASS",
+        "priority": "P0",
+        "owner": "user",
+        "gap": "CLOSED 2026-09-03: mandated DashScope/Qwen route completed with 229 live receipts; credential was process-scoped and never persisted.",
+        "target": "live_verified with receipted competition route",
+        "verify": "evidence/b-qwen/README + report.md + far.db copy",
+        "evidence": [
+          ".control/BLOCKERS.json B-QWEN-LIVE-ROUTE",
+          "evidence/b-qwen/"
+        ]
     },
     {
       "id": "FA-X-02",
@@ -1094,7 +1097,7 @@
   ],
   "stopConditions": {
     "note": "Mission stop requires ALL of: no internal FAIL/PARTIAL; canonical clean-clone CI green; science north-star met or externally justified; real evidence across all planes; 24h→72h soak+chaos; win/mac/linux matrix; sandbox attack suite; production-path-only flows; clean-machine bundle verify; honest BLOCKED_EXTERNAL only; docs==commit; final red-team audit no new P0/P1.",
-    "currentVerdict": "NOT READY — 8 FAIL, 22 PARTIAL, 33 PASS, 2 BLOCKED_EXTERNAL (66 tracked). Closed this wave: FA-SEC-01 (hosted ubuntu OCI evidence on canonical main, run 33583828122), FA-PLT-01/02 (canonical main CI fully green), FA-REM-01, FA-SEC-04, FA-SEC-08, FA-HAR-01, FA-HCI-04, FA-DAT-03 (decision record), FA-EVAL-02 (preregistered user-study protocol; execution BLOCKED_EXTERNAL by design), FA-EVAL-04, FA-SEC-12, FA-PRF-02 (hosted perf gate PASS). Still open: hosted OIDC/release evidence, scientific targets (4 metrics), 6h+ soak (running; verdict at hour 6), streaming data plane, evaluation-wave re-measurement, five-table sweep (233/960: three of five tables complete; runtime+tests remain), and B-QWEN (user-owned 09-05)."
+    "currentVerdict": "NOT READY — 0 FAIL, 6 PARTIAL, 56 PASS, 4 BLOCKED_EXTERNAL (66 tracked; per-item statuses authoritative; software-owned endgame closures verified 2026-09-06; remaining gaps require time-bound, scientific, or external evidence)"
   },
-  "currentVerdict": "NOT READY — 1 FAIL, 6 PARTIAL, 55 PASS, 4 BLOCKED_EXTERNAL (66 tracked; per-item statuses authoritative, dated closures through 2026-09-06; FA-SCI-07 FAIL->PARTIAL 2026-09-06: adapter landed+verified offline, live measurement externally blocked)"
+  "currentVerdict": "NOT READY — 0 FAIL, 6 PARTIAL, 56 PASS, 4 BLOCKED_EXTERNAL (66 tracked; per-item statuses authoritative; software-owned e-process and workflow fail-fast closures verified 2026-09-06; remaining gaps require time-bound or external evidence)"
 }

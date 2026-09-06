@@ -81,10 +81,15 @@ import { archiveMemory, editMemory, MemoryOpError } from './memory-ops.js';
 import { EvidenceRelation, EvidenceRelationType } from '../domain/evidence.js';
 import { diagnosticityScores, removalSensitivity } from '../domain/ach.js';
 import { canonicalSha256, sha256Hex } from '../shared/crypto.js';
-import { deriveNextActions, projectScientificState } from '../domain/index.js';
+import { deriveNextActions, projectScientificState, deriveScientificWorldModel } from '../domain/index.js';
+import type { ScientificWorldModel } from '../domain/index.js';
+import type { ScientificClaim, HypothesisCandidate, Revision, ExperimentRun, StatReport } from '../domain/index.js';
 import { projectStateDeltas } from '../domain/state-delta.js';
 import { experimentLegStatus } from '../app/iteration.js';
 import { checkPlanExecutability } from '../pipeline/stages/plan.js';
+import { ScientificComputeRequest } from '../domain/scientific-compute.js';
+import { scientificCapabilityCatalog } from '../domain/scientific-registry.js';
+import { executeScientificCompute } from '../experiment/scientific-compute.js';
 
 /**
  * Versioned HTTP API over the single application kernel (zero framework: native http +
@@ -891,6 +896,32 @@ function parseSeedSources(raw: unknown): string | {
     sendJson(res, 200, { bundles });
   };
 
+  const refreshWorldModel = (runId: string, input: {
+    claims: ScientificClaim[];
+    hypotheses: HypothesisCandidate[];
+    relations: EvidenceRelation[];
+    revisions: Revision[];
+    experiments: ExperimentRun[];
+    statReports: StatReport[];
+  }): ScientificWorldModel => {
+    const sourceObjects = [...input.claims, ...input.hypotheses, ...input.relations, ...input.revisions, ...input.experiments, ...input.statReports];
+    const sourceIds = sourceObjects.map((o) => o.id).sort();
+    const latest = app.store.listObjects('scientific_world_model', runId).at(-1) as ScientificWorldModel | undefined;
+    const latestIds = latest?.provenance.sourceObjectIds.slice().sort() ?? [];
+    if (latest !== undefined && JSON.stringify(sourceIds) === JSON.stringify(latestIds)) return latest;
+    const worldModel = deriveScientificWorldModel({
+      id: newId('wm') as ScientificWorldModel['id'], runId,
+      version: (latest?.version ?? 0) + 1, computedAt: new Date().toISOString(),
+      claims: input.claims, hypotheses: input.hypotheses, relations: input.relations,
+      revisions: input.revisions, experiments: input.experiments, statReports: input.statReports,
+      sourceEventCount: app.store.listEvents(runId).length,
+    });
+    app.store.putObjectEvented('scientific_world_model', worldModel, {
+      type: 'note', detail: { reason: 'scientific_world_model_updated', version: worldModel.version, sourceObjects: sourceIds.length },
+    });
+    return worldModel;
+  };
+
   /**
    * Product Spine (2026-08-28): the CURRENT SCIENTIFIC STATE + NEXT RESEARCH
    * ACTIONS + STATE DELTAS — one deterministic projection over the run's own
@@ -935,6 +966,8 @@ function parseSeedSources(raw: unknown): string | {
       // mapping). A wet-lab/private-data plan must not promise a runnable experiment.
       && plan.dataRequirements.some((d) => d.availability === 'public');
     const revisions = app.store.listObjects('revision', runId);
+    const experiments = app.store.listObjects('experiment_run', runId);
+    const statReports = app.store.listObjects('stat_report', runId);
     const consumed = new Set(revisions.map((r) => r.triggerFeedbackId));
     const unconsumedFeedbackCount = app.store
       .listObjects('feedback', runId)
@@ -965,8 +998,14 @@ function parseSeedSources(raw: unknown): string | {
       versionDiffs: app.store.listObjects('version_diff', runId),
     });
 
+    // Persist the deterministic world-model snapshot when its source object set
+    // changes. The snapshot is a durable projection over SQLite, never a second
+    // authority; repeated GETs are idempotent and do not append duplicate events.
+    const worldModel = refreshWorldModel(runId, { claims, hypotheses, relations, revisions, experiments, statReports });
+
     sendJson(res, 200, {
       state,
+      worldModel,
       nextActions,
       deltas,
       experimentLeg: {
@@ -990,18 +1029,84 @@ function parseSeedSources(raw: unknown): string | {
     const run = mustGetRun(runId);
     if (executing.has(runId)) throw alreadyRunning(runId);
     const body = await readJsonObject(req);
-    const actionType = typeof body['actionType'] === 'string' ? body['actionType'] : '';
+    let actionType = typeof body['actionType'] === 'string' ? body['actionType'] : '';
+    let selectedActionId: string | undefined;
+    let selectedWorldModelVersion: number | undefined;
     const DISPATCHABLE = new Set([
-      'EXECUTE_PLANNED_EXPERIMENT', 'CONSUME_FEEDBACK_INTO_REVISION', 'RESUME_EVIDENCE_DEBT',
+      'NEXT_BEST_ACTION', 'EXECUTE_PLANNED_EXPERIMENT', 'CONSUME_FEEDBACK_INTO_REVISION', 'RESUME_EVIDENCE_DEBT',
     ]);
     if (!DISPATCHABLE.has(actionType)) {
       throw validation(
-        `actionType '${actionType}' has no automated dispatch path — ` +
-          'loop-unblocking actions only (EXECUTE_PLANNED_EXPERIMENT / CONSUME_FEEDBACK_INTO_REVISION / RESUME_EVIDENCE_DEBT); ' +
+          `actionType '${actionType}' has no automated dispatch path — ` +
+          'loop-unblocking actions only (NEXT_BEST_ACTION / EXECUTE_PLANNED_EXPERIMENT / CONSUME_FEEDBACK_INTO_REVISION / RESUME_EVIDENCE_DEBT); ' +
           'RERUN_WITH_LIVE_ROUTE goes through POST /runs with the same question',
       );
     }
     if (run.status === 'running') throw alreadyRunning(runId);
+
+    // The science surface is an action selector, not merely a report. Resolve the
+    // first currently actionable action from the same deterministic projection used
+    // by GET /science, then dispatch it through the exact existing reopen machinery.
+    if (actionType === 'NEXT_BEST_ACTION') {
+      const question = app.store.getObject('question', run.questionId);
+      const claims = app.store.listObjects('claim', runId);
+      const relations = app.store.listObjects('evidence_relation', runId);
+      const hypotheses = app.store.listObjects('hypothesis', runId);
+      const scorecards = app.store.listObjects('scorecard', runId);
+      const corpus = app.store.listObjects('corpus_snapshot', runId).at(-1) ?? null;
+      const state = projectScientificState({
+        runId,
+        runStatus: run.status,
+        questionDomain: question?.scope.domain,
+        claims,
+        relations,
+        hypotheses,
+        scorecards,
+        evidenceBodies: app.store.listObjects('evidence_body', runId),
+        tournament: app.store.listObjects('tournament', runId).at(-1) ?? null,
+        counterQueriesAttempted: corpus?.queries.filter((q) => q.purpose === 'counter_evidence').length ?? 0,
+        hypothesesStageConcluded: run.stages.some((st) => st.stage === 'generate_hypotheses' && st.state !== 'pending' && st.state !== 'running'),
+      });
+      const plan = app.store.listObjects('plan', runId).at(-1) ?? null;
+      const leg = experimentLegStatus(app.store, runId);
+      const hypothesisIds = new Set(hypotheses.map((h) => h.id));
+      const executabilityPassed = plan !== null && checkPlanExecutability(plan, hypothesisIds).passed
+        && plan.dataRequirements.some((d) => d.availability === 'public');
+      const revisions = app.store.listObjects('revision', runId);
+      const experiments = app.store.listObjects('experiment_run', runId);
+      const statReports = app.store.listObjects('stat_report', runId);
+      const refreshedWorldModel = refreshWorldModel(runId, { claims, hypotheses, relations, revisions, experiments, statReports });
+      const consumed = new Set(revisions.map((r) => r.triggerFeedbackId));
+      const unconsumedFeedbackCount = app.store.listObjects('feedback', runId).filter((s) => !consumed.has(s.id)).length;
+      const actions = deriveNextActions({
+        runId,
+        runStatus: run.status,
+        state,
+        leg: { kind: leg.kind, executabilityPassed, ...(leg.kind === 'unexecutable' ? { unexecutableReason: leg.reason } : {}) },
+        unconsumedFeedbackCount,
+        hasEvidenceDebt: app.store.listObjects('source_document', runId).some((d) => d.verification === undefined),
+        planDatasets: plan?.dataRequirements.map((d) => ({ name: d.name, availability: d.availability })) ?? [],
+        achTopClaimIds: (app.store.listObjects('ach_analysis', runId).at(-1)?.diagnosticity ?? [])
+          .slice().sort((a, b) => b.score - a.score).slice(0, 3).map((d) => d.claimId),
+      });
+      const requestedId = typeof body['actionId'] === 'string' ? body['actionId'] : undefined;
+      const selected = requestedId === undefined ? actions.find((a) => a.actionable) : actions.find((a) => a.id === requestedId);
+      if (selected === undefined || !selected.actionable) {
+        throw validation(requestedId === undefined
+          ? 'no actionable next-best research action is currently available'
+          : `actionId '${requestedId}' is stale or not actionable`);
+      }
+      actionType = selected.actionType;
+      selectedActionId = selected.id;
+      selectedWorldModelVersion = refreshedWorldModel.version;
+      app.store.appendEvent(runId, {
+        type: 'note',
+        detail: {
+          reason: 'next_best_action_selected', actionId: selected.id, actionType: selected.actionType,
+          worldModelVersion: selectedWorldModelVersion ?? null, actionable: true,
+        },
+      });
+    }
 
     if (actionType === 'EXECUTE_PLANNED_EXPERIMENT') {
       const plan = app.store.listObjects('plan', runId).at(-1) ?? null;
@@ -1031,7 +1136,13 @@ function parseSeedSources(raw: unknown): string | {
       // already happened, so resume semantics still own the continuation. Truthful 409.
       throw alreadyRunning(runId);
     }
-    sendJson(res, 202, { runId, actionType, dispatched: true });
+    sendJson(res, 202, {
+      runId,
+      actionType: selectedActionId === undefined ? actionType : 'NEXT_BEST_ACTION',
+      dispatchedActionType: actionType,
+      dispatched: true,
+      ...(selectedActionId !== undefined ? { selectedActionId, worldModelVersion: selectedWorldModelVersion ?? null } : {}),
+    });
   };
 
   /**
@@ -2009,8 +2120,7 @@ function parseSeedSources(raw: unknown): string | {
   /**
    * BP-4 model discovery: list the models an endpoint serves (GET {base}/models or
    * /v1/models per wire). Accepts a stored configId or a draft {wire, baseUrl, apiKey?}.
-   * Live discovery needs real credentials (BLOCKED-live under the no-live-API
-   * directive); failures are honest 502s, never an empty-catalog success.
+   * Failures are honest 502s, never an empty-catalog success.
    */
   const discoverFromModelConfig = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
     const body = await readJsonObject(req);
@@ -2023,14 +2133,20 @@ function parseSeedSources(raw: unknown): string | {
       baseUrl = stored.baseUrl;
       apiKey = typeof body.apiKey === 'string' && body.apiKey.length > 0 ? body.apiKey : stored.apiKey;
     } else {
-      if (body.wire !== 'openai' && body.wire !== 'anthropic' && body.wire !== 'gemini') throw validation('discovery requires wire ("openai"|"anthropic"|"gemini") and baseUrl, or a stored configId');
+      const parsedWire = ProviderWireProtocol.safeParse(body.wire);
+      if (!parsedWire.success || parsedWire.data === 'offline') throw validation('discovery requires a supported model wire and baseUrl, or a stored configId');
       if (typeof body.baseUrl !== 'string' || body.baseUrl.length === 0) throw validation('discovery requires baseUrl');
-      wire = body.wire;
+      wire = parsedWire.data;
       baseUrl = body.baseUrl;
       apiKey = typeof body.apiKey === 'string' ? body.apiKey : '';
     }
+    const controller = new AbortController();
+    const onClose = (): void => {
+      if (!res.writableEnded) controller.abort();
+    };
+    res.once('close', onClose);
     try {
-      const result = await discoverModels({ wire, baseUrl, apiKey }, fetch);
+      const result = await discoverModels({ wire, baseUrl, apiKey, signal: controller.signal }, fetch);
       sendJson(res, 200, result);
     } catch (e) {
       throw new HttpError(502, {
@@ -2038,6 +2154,8 @@ function parseSeedSources(raw: unknown): string | {
         message: `model discovery failed: ${e instanceof Error ? e.message : String(e)}`,
         retryable: true,
       });
+    } finally {
+      res.off('close', onClose);
     }
   };
 
@@ -2242,6 +2360,34 @@ function parseSeedSources(raw: unknown): string | {
         return librarySources(res);
       }
       throw notFound(`no route: ${method} ${url.pathname}`);
+    }
+
+    // Deterministic scientific-computing plane. Inputs are schema-validated and
+    // results are explicitly marked COMPUTED; no model or network call occurs.
+    if (segments[2] === 'science' && segments[3] === 'operations' && segments.length === 4 && method === 'GET') {
+      const catalog = scientificCapabilityCatalog();
+      // `operations` is retained as a compatibility projection for existing
+      // clients; `capabilities` is the authoritative, versioned registry.
+      return sendJson(res, 200, {
+        ...catalog,
+        operations: catalog.capabilities,
+        execution: 'local-deterministic',
+        note: 'Each capability declares its output provenance, runtime surface and validation evidence; execution still requires the operation-specific schema and surface.',
+      });
+    }
+    if (segments[2] === 'science' && segments[3] === 'compute' && segments.length === 4 && method === 'POST') {
+      const body = await readJsonObject(req);
+      const parsed = ScientificComputeRequest.safeParse(body);
+      if (!parsed.success) throw validation(`invalid scientific compute request: ${parsed.error.issues.map((i) => i.message).join('; ')}`);
+      try {
+        // Route through the pinned scientific sidecar so the HTTP surface and
+        // experiment executor share one runtime/library authority and measured
+        // environment. Validation remains on the Node boundary.
+        const result = await executeScientificCompute(parsed.data);
+        return sendJson(res, 200, { operation: parsed.data.operation, result });
+      } catch (e) {
+        throw validation(e instanceof Error ? e.message : String(e));
+      }
     }
 
     // ---- terminal sessions (extensibility lane): persistent login shells ----

@@ -8,8 +8,8 @@ import {
 } from './http.js';
 
 /**
- * UNIVERSAL live adapter (user directive 2026-08-26: the product freely routes to
- * ANY model worldwide, any protocol). A single env-driven route pointing at any
+ * UNIVERSAL live adapter: the product freely routes to ANY model worldwide over
+ * a verified protocol contract. A single env-driven route points at any
  * endpoint on earth:
  *
  *   FARLAB_UNIVERSAL_WIRE     openai | anthropic | gemini   (default: openai)
@@ -31,10 +31,12 @@ export const ENV_BASE_URL = 'FARLAB_UNIVERSAL_BASE_URL';
 export const ENV_MODEL = 'FARLAB_UNIVERSAL_MODEL';
 export const ENV_API_KEY = 'FARLAB_UNIVERSAL_API_KEY';
 
-/** Live transport wires the universal env route accepts ('offline' is a custom-config-only wire). */
+/** Live transport wires accepted by the universal route. Unsupported vendor-native
+ * protocols fail closed until a dedicated adapter is registered. */
 const parseLiveWire = (raw: string): import('./http.js').WireName | null => {
   switch (raw) {
     case 'openai':
+    case 'openai_responses':
     case 'anthropic':
     case 'gemini':
       return raw;
@@ -71,7 +73,7 @@ export function createUniversalProvider(opts: UniversalProviderOptions = {}): Un
   const apiKey = opts.apiKey ?? process.env[ENV_API_KEY] ?? '';
 
   const missing: string[] = [];
-  if (wire === null) missing.push(`${ENV_WIRE} (must be openai|anthropic|gemini, got "${wireRaw}")`);
+  if (wire === null) missing.push(`${ENV_WIRE} (must be openai|openai_responses|anthropic|gemini, got "${wireRaw}")`);
   if (baseUrl.length === 0) missing.push(ENV_BASE_URL);
   if (modelId.length === 0) missing.push(ENV_MODEL);
   if (apiKey.length === 0) missing.push(ENV_API_KEY);
@@ -100,7 +102,7 @@ export function createUniversalProvider(opts: UniversalProviderOptions = {}): Un
       // Non-openai wires have no OpenAI tools/response_format concepts — strip the
       // strict-FC projection (same policy as zai/custom.ts; JSON mode + prompt
       // contract carry the output shape on anthropic/gemini wires).
-      const needsStrip = wire !== 'openai' && req.jsonSchema !== undefined;
+      const needsStrip = wire !== 'openai' && wire !== 'openai_responses' && req.jsonSchema !== undefined;
       const effective = needsStrip ? { ...req, jsonSchema: undefined } : req;
       return runOpenAICompatStructuredCall(
         { providerName: UNIVERSAL_PROVIDER_NAME, baseUrl, apiKey, modelId, executionMode: 'live', wire },

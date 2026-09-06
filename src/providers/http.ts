@@ -391,7 +391,7 @@ export const computeRequestHash = (req: StructuredCallRequest): string =>
  * config-schema validation — never an invalid payload). No reasoning on the request =
  * no fields at all (exact legacy wire shape; safe for any endpoint).
  */
-export type WireName = 'openai' | 'anthropic' | 'gemini';
+export type WireName = 'openai' | 'openai_responses' | 'anthropic' | 'gemini';
 export type ReasoningStyleName = 'reasoning_effort' | 'enable_thinking' | 'thinking_budget' | 'thinking_config';
 
 export const reasoningBodyFields = (
@@ -400,7 +400,8 @@ export const reasoningBodyFields = (
 ): Record<string, unknown> => {
   switch (reasoning.style) {
     case 'reasoning_effort':
-      return wire === 'openai' ? { reasoning_effort: reasoning.gear } : {};
+      return wire === 'openai_responses' ? { reasoning: { effort: reasoning.gear } }
+        : wire === 'openai' ? { reasoning_effort: reasoning.gear } : {};
     case 'enable_thinking':
       return wire === 'openai'
         ? { enable_thinking: true, thinking_budget: REASONING_GEAR_BUDGET_TOKENS[reasoning.gear] }
@@ -500,6 +501,7 @@ export const structuredOutputModeOf = (
 ): 'json_object' | 'json_schema_strict' | 'strict_tools' | 'prompt_contract' => {
   if (wire === 'anthropic') return 'prompt_contract';
   if (wire === 'gemini') return 'json_object'; // responseMimeType application/json (JSON mode)
+  if (wire === 'openai_responses' && (req.responseJsonSchema !== undefined || req.jsonSchema !== undefined)) return 'json_schema_strict';
   if (req.responseJsonSchema !== undefined) return 'json_schema_strict';
   if (req.jsonSchema !== undefined) return 'strict_tools';
   return 'json_object';
@@ -1074,6 +1076,74 @@ const parseGeminiSuccessBody = (bodyText: string, providerName: string): ChatAtt
   };
 };
 
+const buildResponsesRequestBody = (modelId: string, messages: ChatMessage[], req: StructuredCallRequest, stream: boolean): string => {
+  const schema = req.responseJsonSchema ?? req.jsonSchema;
+  return JSON.stringify({
+    model: modelId,
+    input: messages,
+    store: false,
+    text: { format: schema === undefined ? { type: 'json_object' } : { type: 'json_schema', name: 'respond', strict: true, schema } },
+    ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
+    ...(req.maxTokens !== undefined ? { max_output_tokens: req.maxTokens } : {}),
+    ...(req.reasoning !== undefined ? reasoningBodyFields('openai_responses', req.reasoning) : {}),
+    ...(stream ? { stream: true } : {}),
+  });
+};
+
+const parseResponsesSuccess = (record: unknown, providerName: string): ChatAttempt => {
+  const fail = (message: string, retryable = false): ChatAttempt => ({
+    ok: false, failure: { kind: 'provider_error', retryable, httpStatus: 200, message: `${providerName}: ${message}` },
+  });
+  if (!isRecord(record)) return fail('Responses body is not an object');
+  if (record.status !== 'completed' && record.status !== 'incomplete') {
+    const error = isRecord(record.error) ? record.error : null;
+    const retryable = error?.code === 'server_error' || error?.code === 'rate_limit_exceeded';
+    return fail(`Responses status ${String(record.status)}${typeof error?.message === 'string' ? `: ${error.message}` : ''}`, retryable);
+  }
+  const incomplete = isRecord(record.incomplete_details) ? record.incomplete_details : null;
+  if (record.status === 'incomplete' && incomplete?.reason !== 'max_output_tokens') return fail(`Responses incomplete: ${String(incomplete?.reason)}`);
+  if (!Array.isArray(record.output)) return fail('Responses body has no output items');
+  let rawContent = '';
+  let reasoningText = '';
+  for (const item of record.output) {
+    if (!isRecord(item)) return fail('Responses output item is malformed');
+    if (item.type === 'reasoning') {
+      if (Array.isArray(item.summary)) {
+        for (const summary of item.summary) {
+          if (isRecord(summary) && summary.type === 'summary_text' && typeof summary.text === 'string') reasoningText += summary.text;
+        }
+      }
+      continue;
+    }
+    if (item.type !== 'message' || item.role !== 'assistant' || !Array.isArray(item.content)) return fail('Responses output contains an unexpected item');
+    for (const part of item.content) {
+      if (!isRecord(part)) return fail('Responses content part is malformed');
+      if (part.type === 'refusal') return fail('Responses model refused the requested output');
+      if (part.type !== 'output_text' || typeof part.text !== 'string') return fail('Responses content is not output_text');
+      rawContent += part.text;
+    }
+  }
+  if (rawContent.length === 0) return fail('Responses ended without answer text');
+  const usage = isRecord(record.usage) ? record.usage : {};
+  return {
+    ok: true,
+    rawContent,
+    ...(reasoningText.length > 0 ? { reasoningText } : {}),
+    ...(typeof record.model === 'string' ? { respondedModel: record.model } : {}),
+    finishReason: record.status === 'incomplete' ? 'length' : 'stop',
+    usage: parseOpenAIUsage({
+      prompt_tokens: usage.input_tokens, completion_tokens: usage.output_tokens, total_tokens: usage.total_tokens,
+      prompt_tokens_details: usage.input_tokens_details, completion_tokens_details: usage.output_tokens_details,
+    }),
+  };
+};
+
+const parseResponsesSuccessBody = (bodyText: string, providerName: string): ChatAttempt => {
+  let body: unknown;
+  try { body = JSON.parse(bodyText); } catch { body = null; }
+  return parseResponsesSuccess(body, providerName);
+};
+
 const parseSuccessBody = (bodyText: string, providerName: string): ChatAttempt => {
   let body: unknown;
   try {
@@ -1147,6 +1217,7 @@ const parseStreamingSuccess = async (
   let usage: StructuredCallResult<unknown>['receipt']['usage'] = {};
   let frameFailure: ClassifiedFailure | null = null;
   let sawFrame = false;
+  let responsesTerminal: ChatAttempt | undefined;
 
   const appendAnswer = (text: string, kind: 'content' | 'tool' = 'content'): void => {
     if (text.length === 0) return;
@@ -1174,6 +1245,23 @@ const parseStreamingSuccess = async (
     if (isRecord(parsed.error)) {
       const message = typeof parsed.error.message === 'string' ? parsed.error.message : 'provider stream error';
       frameFailure = { kind: 'provider_error', retryable: true, httpStatus: 200, message: `${providerName}: ${message}` };
+      return;
+    }
+
+    if (wire === 'openai_responses') {
+      if (responsesTerminal !== undefined) { malformed('event after Responses terminal event'); return; }
+      if (parsed.type === 'response.output_text.delta') {
+        if (typeof parsed.delta !== 'string') malformed('Responses delta is not text');
+        else appendAnswer(parsed.delta);
+      } else if (parsed.type === 'response.completed' || parsed.type === 'response.incomplete' || parsed.type === 'response.failed') {
+        if (!isRecord(parsed.response) || parsed.type !== `response.${String(parsed.response.status)}`) {
+          malformed('Responses terminal event disagrees with response status');
+          return;
+        }
+        responsesTerminal = parseResponsesSuccess(parsed.response, providerName);
+      } else if (parsed.type === 'error') {
+        frameFailure = { kind: 'provider_error', retryable: false, httpStatus: 200, message: `${providerName}: Responses stream error: ${String(parsed.message ?? parsed.code)}` };
+      }
       return;
     }
 
@@ -1250,6 +1338,10 @@ const parseStreamingSuccess = async (
   });
 
   if (frameFailure !== null) return { ok: false, failure: frameFailure };
+  if (wire === 'openai_responses') {
+    if (responsesTerminal !== undefined) return responsesTerminal;
+    return { ok: false, failure: { kind: 'provider_error', retryable: true, httpStatus: 200, message: `${providerName}: Responses stream ended before a terminal event` } };
+  }
   const rawContent = toolArguments.length > 0 ? toolArguments : content;
   if (rawContent.length === 0) {
     return {
@@ -1341,7 +1433,8 @@ export async function runOpenAICompatStructuredCall<T>(
   const wantsStream = req.onOutput !== undefined;
   const base = cfg.baseUrl.replace(/\/+$/, '');
   const url =
-    wire === 'anthropic' ? `${base}/v1/messages`
+    wire === 'openai_responses' ? `${base}/responses`
+    : wire === 'anthropic' ? `${base}/v1/messages`
     : wire === 'gemini'
       ? `${base}/v1beta/models/${encodeURIComponent(cfg.modelId)}:${wantsStream ? 'streamGenerateContent?alt=sse' : 'generateContent'}`
     : `${base}/chat/completions`;
@@ -1365,10 +1458,13 @@ export async function runOpenAICompatStructuredCall<T>(
     }
     return {
       headers: { 'content-type': 'application/json', accept: wantsStream ? 'text/event-stream' : 'application/json', authorization: `Bearer ${cfg.apiKey}` },
-      body: buildRequestBody(cfg.modelId, messages, req, wantsStream),
+      body: wire === 'openai_responses'
+        ? buildResponsesRequestBody(cfg.modelId, messages, req, wantsStream)
+        : buildRequestBody(cfg.modelId, messages, req, wantsStream),
     };
   };
   const parseWireSuccess = (bodyText: string): ChatAttempt => {
+    if (wire === 'openai_responses') return parseResponsesSuccessBody(bodyText, cfg.providerName);
     if (wire === 'anthropic') return parseAnthropicSuccessBody(bodyText, cfg.providerName);
     if (wire === 'gemini') return parseGeminiSuccessBody(bodyText, cfg.providerName);
     return parseSuccessBody(bodyText, cfg.providerName);

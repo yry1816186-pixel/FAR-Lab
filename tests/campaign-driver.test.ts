@@ -143,4 +143,27 @@ describe('driveCampaign lifecycle', () => {
     expect(out.unitStates).toHaveLength(2);
     expect(out.stopped).toBe(false);
   });
+
+  it('e_value_accumulation stops immediately after the product crosses its threshold', async () => {
+    const { store, artifacts } = mkEnv();
+    mkRun(store);
+    const spec = mkCampaign(
+      { policy: 'e_value_accumulation', eValueThreshold: 4 },
+      [{ kind: 'e_value_threshold' }],
+    );
+    const calls: string[] = [];
+    const fakeSpecs = Object.fromEntries(Object.entries(labelBySpec).map(([id, label]) => [label, { id, runId: spec.runId } as unknown as ExperimentSpec]));
+    const out = await driveCampaign(store, artifacts, spec, {
+      executeUnit: async (unitSpec) => {
+        const label = labelBySpec[unitSpec.id] ?? unitSpec.id;
+        calls.push(label);
+        return { state: 'completed', eValue: 2, experimentRunId: `xrun_${label}` };
+      },
+      resolveSpec: (id) => fakeSpecs[labelBySpec[id] ?? ''] ?? null,
+    });
+    expect(calls).toEqual(['root', 'child']);
+    expect(out.stopped).toBe(true);
+    expect(out.stopReason).toContain('e_value_threshold');
+    expect(out.eValue).toBe(4);
+  });
 });

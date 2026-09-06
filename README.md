@@ -137,9 +137,15 @@ an infinite loop.
   verified semantics (error-class fail-over, cooldown, serving route visible in
   every receipt) and a receipt-derived usage ledger. Built-in routes:
   **`zai` (default), `dashscope`, `deepseek`, `universal`**, plus custom routes;
-  `universal` speaks arbitrary OpenAI-compatible, Anthropic-compatible and
-  Gemini-native gateways. Qwen/DashScope is only one optional route, used for
-  competition/test evidence when required.
+  `universal` accepts any gateway URL that implements one of FAR-Lab's verified
+  wire contracts: OpenAI Chat Completions-compatible, OpenAI Responses API,
+  Anthropic Messages-compatible, or Gemini `generateContent`-native. Qwen/DashScope is only one optional route,
+  used for competition/test evidence when required. Other protocols require a
+  dedicated adapter and are rejected rather than silently treated as compatible.
+  Responses routes use `openai_responses`, a base URL such as `https://api.openai.com/v1`,
+  and the endpoint's actual model ID. They support streaming, structured output, and
+  declared `reasoning_effort` (sent as `reasoning.effort`). Live external Responses
+  service validation remains `UNVERIFIED_EXTERNAL`; local contracts are not service certification.
 - **Resident conversation agent** — runs on the agent kernel with a read-tool
   plane over the workspace, `propose_action` approval cards, and an automations
   engine (schedule + run-completed triggers) whose proposals always gate on the
@@ -275,7 +281,7 @@ from real evidence tallies — never invented.
 ZAI_API_KEY=                # Zhipu GLM (default)
 DASHSCOPE_API_KEY=          # Alibaba DashScope / Qwen
 DEEPSEEK_API_KEY=           # DeepSeek (base https://api.deepseek.com)
-FARLAB_UNIVERSAL_WIRE=openai # openai | anthropic | gemini
+FARLAB_UNIVERSAL_WIRE=openai # openai | openai_responses | anthropic | gemini
 FARLAB_UNIVERSAL_BASE_URL=
 FARLAB_UNIVERSAL_MODEL=
 FARLAB_UNIVERSAL_API_KEY=

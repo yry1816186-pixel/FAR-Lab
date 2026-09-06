@@ -20,7 +20,7 @@
  *   editing, no embellishment.
  *
  * Usage: node eval/mlr-bench.mjs [--skip-runs]   (writes eval/results/mlr-bench.jsonl)
- * Env: MLRBENCH_REPO (default .cache/repos/mlrbench); provider via makeProvider (GLM default, FARLAB_BASELINE_PROVIDER=glm|zai|dashscope; deepseek banned).
+ * Env: MLRBENCH_REPO (default .cache/repos/mlrbench); provider via makeProvider (GLM default, FARLAB_BASELINE_PROVIDER=glm|zai|dashscope; benchmark allowlist).
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { resolve, join, dirname, basename } from 'node:path';
@@ -349,7 +349,7 @@ async function main() {
   const IDEA_RUBRIC = extractRubric(join(REPO, 'mlrbench/evals/review_idea.py'), 'RESEARCH_IDEA_RUBRIC');
   const PROPOSAL_RUBRIC = extractRubric(join(REPO, 'mlrbench/evals/review_proposal.py'), 'RESEARCH_PROPOSAL_RUBRIC');
   const provider = await makeProvider();
-  if (!provider.liveReady && !RENDER_ONLY) die('live route not ready (check FARLAB_BASELINE_PROVIDER/ZAI key per makeProvider — deepseek is banned)');
+  if (!provider.liveReady && !RENDER_ONLY) die('live route not ready (check FARLAB_BASELINE_PROVIDER/ZAI key per makeProvider benchmark allowlist)');
 
 const eligible = eligibleTasks();
 if (eligible.length < SAMPLE_N) die(`only ${eligible.length} eligible tasks with full anchor coverage`);

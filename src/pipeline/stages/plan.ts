@@ -43,10 +43,10 @@ const PLAN_SYSTEM_PROMPT = [
     'presenting invented numbers as if they were evidence-derived.',
   'Multiple-testing discipline (POPPER-extracted): when the plan discriminates between MORE THAN ONE hypothesis, several ' +
     'inferential checks will run and the chance that something looks falsified/supportive by luck grows with their number. ' +
-    'State multipleTestingPolicy explicitly — "single_primary" (designate THE primary comparison that carries the decision; ' +
-    'everything else is secondary/descriptive) or "alpha_spending" (split a pre-declared error budget across staged checks) — ' +
-    'and justify the allocation in multipleTestingNote. Do NOT declare "e_value_accumulation": no e-value estimator is ' +
-    'implemented, such plans fail validation. Single-hypothesis plans may omit it (one primary comparison by construction).',
+  'State multipleTestingPolicy explicitly — "single_primary" (designate THE primary comparison that carries the decision; ' +
+    'everything else is secondary/descriptive), "alpha_spending" (split a pre-declared error budget across staged checks), ' +
+    'or "e_value_accumulation" (use only bounded accuracy rows with an anytime-valid e-process and a declared threshold) — ' +
+    'and justify the allocation in multipleTestingNote. Single-hypothesis plans may omit it (one primary comparison by construction).',
   'Structured preregistration (Wave-S): alongside the prose fields, provide metricSpecs (name/definition/role primary|secondary/' +
     'direction higher_better|lower_better|two_sided), testSpecs (metric binding + statistic bootstrap_ci|descriptive — ONLY these ' +
     'have executors today, do NOT promise permutation/wilson/kappa/mde_gate; such specs fail the preregistration-integrity gate — ' +

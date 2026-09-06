@@ -22,6 +22,8 @@ import {
   OdeSpec,
   FemSpec,
   WorkflowPlanSchema,
+  ScientificWorldModel,
+  KernelControlState,
 } from '../domain/index.js';
 import { z } from 'zod';
 import { STAGE_ORDER } from '../domain/run.js';
@@ -73,6 +75,8 @@ const KIND_SCHEMAS = {
   screening_session: ScreeningSession,
   screening_decision: ScreeningDecision,
   workflow_plan: WorkflowPlanSchema,
+  scientific_world_model: ScientificWorldModel,
+  kernel_control: KernelControlState,
 } as const;
 
 export type ObjectKind = keyof typeof KIND_SCHEMAS & (string & {});

@@ -64,7 +64,7 @@ export interface RoutingPolicy {
   mode: RoutingPolicyMode;
   /**
    * task class → route name pin. Wins over scoring; still subject to hard gates
-   * (competition qwen-only in that mode, task-class hard requirements like vision).
+   * (competition mode has a Qwen/Bailian evidence requirement; task-class hard requirements like vision still apply).
    */
   overrides?: Partial<Record<TaskClass, string>>;
 }

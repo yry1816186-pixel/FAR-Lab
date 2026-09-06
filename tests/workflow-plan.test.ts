@@ -40,6 +40,29 @@ describe('defaultWorkflow (plan-order ≡ STAGE_ORDER)', () => {
       fs.rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it('rejects malformed dependency graphs before execution', () => {
+    const base = defaultWorkflow('run_invalid');
+    expect(() => WorkflowPlanSchema.parse({
+      ...base,
+      steps: [{ ...base.steps[0]!, id: 'a', after: ['missing'] }],
+    })).toThrow(/does not reference a declared step/);
+    expect(() => WorkflowPlanSchema.parse({
+      ...base,
+      steps: [{ ...base.steps[0]!, id: 'a', after: ['a'] }],
+    })).toThrow(/cannot depend on itself/);
+    expect(() => WorkflowPlanSchema.parse({
+      ...base,
+      steps: [
+        { ...base.steps[0]!, id: 'a', after: ['b'] },
+        { ...base.steps[0]!, id: 'b', after: ['a'] },
+      ],
+    })).toThrow(/acyclic/);
+    expect(() => WorkflowPlanSchema.parse({
+      ...base,
+      steps: [base.steps[0]!, { ...base.steps[0]!, id: base.steps[0]!.id }],
+    })).toThrow(/duplicate workflow step id/);
+  });
 });
 
 describe('nextWorkflowStage (cursor equivalence)', () => {

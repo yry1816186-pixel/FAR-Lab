@@ -45,8 +45,8 @@ describe('CampaignSpec validation', () => {
     expect(() => CampaignSpec.parse({ ...base, priorAlphaSpent: 0.02, crossUnitTesting: { policy: 'alpha_spending', familyAlpha: 0.05, alphaByUnit: { 'primary comparison': 0.03, 'ablation: depth': 0.01 } }, stopRules: [{ kind: 'all_units_terminal' }] })).toThrow(/alpha_spending/);
   });
 
-  it('e_value_accumulation: REJECTED fail-closed — no e-value estimator exists (SCIENCE lane 2026-08-24)', () => {
-    expect(() => CampaignSpec.parse({ ...base, crossUnitTesting: { policy: 'e_value_accumulation', eValueThreshold: 4 }, stopRules: [{ kind: 'units_exhausted' }] })).toThrow(/no e-value estimator/);
+  it('e_value_accumulation: accepts a valid campaign threshold and rejects sub-unit thresholds', () => {
+    expect(CampaignSpec.parse({ ...base, crossUnitTesting: { policy: 'e_value_accumulation', eValueThreshold: 4 }, stopRules: [{ kind: 'e_value_threshold' }] }).crossUnitTesting.policy).toBe('e_value_accumulation');
     expect(() => CampaignSpec.parse({ ...base, crossUnitTesting: { policy: 'e_value_accumulation', eValueThreshold: 0 }, stopRules: [{ kind: 'units_exhausted' }] })).toThrow();
   });
 

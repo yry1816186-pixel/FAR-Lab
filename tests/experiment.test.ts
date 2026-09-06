@@ -199,15 +199,15 @@ describe('E1 spec validation (fail-closed)', () => {
     expect(r.missing.join(' ')).toContain('exactly one primary');
     expect(r.missing.join(' ')).toContain('multipleTestingPolicy');
   });
-  it('rejects e_value_accumulation loudly (unimplemented policy is never silently downgraded)', () => {
+  it('accepts e_value_accumulation for bounded accuracy comparisons', () => {
     const r = checkExperimentSpec(base, { hypothesisIds: [hyp as never], allowLocalDatasets: true });
     const ev = checkExperimentSpec(
       { ...base, statistics: { ...base.statistics, multipleTestingPolicy: 'e_value_accumulation' } },
       { hypothesisIds: [hyp as never], allowLocalDatasets: true },
     );
     expect(r.passed).toBe(true);
-    expect(ev.passed).toBe(false);
-    expect(ev.missing.join(' ')).toContain('e_value_accumulation');
+    expect(ev.passed).toBe(true);
+    expect(ev.missing).toEqual([]);
   });
   it('passes a fully valid spec with approval and flag', () => {
     const r = checkExperimentSpec(base, { hypothesisIds: [hyp as never], allowLocalDatasets: true });

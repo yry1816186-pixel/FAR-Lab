@@ -69,6 +69,45 @@ export const WorkflowPlanSchema = z.object({
   steps: z.array(WorkflowStepSchema).min(1),
   /** Set on revision plans; the audit event carries the revision reason. */
   revisedFrom: z.string().min(1).optional(),
+}).superRefine((plan, ctx) => {
+  const ids = new Set<string>();
+  const byId = new Map<string, WorkflowStep>();
+  for (const [index, step] of plan.steps.entries()) {
+    if (ids.has(step.id)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['steps', index, 'id'], message: `duplicate workflow step id '${step.id}'` });
+    }
+    ids.add(step.id);
+    byId.set(step.id, step);
+  }
+  for (const [index, step] of plan.steps.entries()) {
+    for (const dep of step.after) {
+      if (!byId.has(dep)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['steps', index, 'after'], message: `workflow dependency '${dep}' does not reference a declared step` });
+      }
+      if (dep === step.id) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['steps', index, 'after'], message: `workflow step '${step.id}' cannot depend on itself` });
+      }
+    }
+  }
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const visit = (id: string): boolean => {
+    if (visiting.has(id)) return false;
+    if (visited.has(id)) return true;
+    const step = byId.get(id);
+    if (step === undefined) return false;
+    visiting.add(id);
+    for (const dep of step.after) if (!visit(dep)) return false;
+    visiting.delete(id);
+    visited.add(id);
+    return true;
+  };
+  for (const step of plan.steps) {
+    if (!visit(step.id)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['steps'], message: 'workflow dependencies must form an acyclic graph' });
+      break;
+    }
+  }
 });
 export type WorkflowPlan = z.infer<typeof WorkflowPlanSchema>;
 
@@ -98,8 +137,9 @@ export function defaultWorkflow(runId: string, at = new Date().toISOString()): W
  * First runnable step in PLAN ORDER whose stage record is not done/skipped and whose
  * `after` deps are all terminal — the plan-order equivalent of the array cursor.
  * A missing stage record counts as pending (matches the array loop: only done/skipped
- * are skipped). `skipWithoutHandler` excludes steps whose handler is absent in this
- * build (the plan-loop equivalent of `cursor += 1`).
+ * are skipped). `skipTargets` is retained for plan projections that intentionally
+ * suppress a step; the authoritative orchestrator fails fast before using it for
+ * missing runtime handlers.
  */
 export function nextWorkflowStep(
   plan: WorkflowPlan,
@@ -107,11 +147,8 @@ export function nextWorkflowStep(
   skipTargets: ReadonlySet<string>,
 ): WorkflowStep | undefined {
   // A dependency is satisfied when its step reached a terminal state (stage record
-  // done/skipped, or an agent step that finished — ok or not), or when the executor
-  // passed over it this pass (record stays pending-but-visible; blocking the chain
-  // would diverge from the array loop's `cursor += 1` behavior). A FAILED dependency
-  // does not gate downstream steps — the stage machine stops at failures itself;
-  // agent failures are recorded on the step's outcome and are terminal for it.
+  // done/skipped, or an agent step that finished). A FAILED dependency does not gate
+  // downstream steps because the authoritative stage machine stops at failures.
   for (const step of plan.steps) {
     if (skipTargets.has(step.target)) continue;
     if (stepState(step) === 'terminal') continue;

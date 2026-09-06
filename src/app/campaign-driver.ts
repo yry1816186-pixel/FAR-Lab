@@ -20,13 +20,15 @@ export interface CampaignOutcome {
   stopReason: string | null;
   unitStates: UnitRuntimeState[];
   executedRunIds: string[];
+  /** Product of unit e-values observed so far (e_value_accumulation only). */
+  eValue?: number;
 }
 
 export interface DriveCampaignOptions {
   allowLocalDatasets?: boolean;
   shouldCancel?: () => boolean;
   /** Test seam: per-unit execution override (deterministic harnesses). */
-  executeUnit?: (spec: ExperimentSpec) => Promise<{ state: UnitTerminalState; alphaSpent?: number; experimentRunId: string; falsified?: boolean }>;
+  executeUnit?: (spec: ExperimentSpec) => Promise<{ state: UnitTerminalState; alphaSpent?: number; eValue?: number; experimentRunId: string; falsified?: boolean }>;
   /** Test seam: spec resolution override (default: store lookup by frozen id). */
   resolveSpec?: (specId: string) => ExperimentSpec | null;
 }
@@ -61,15 +63,22 @@ export const driveCampaign = async (
       shouldCancel: opts.shouldCancel,
     });
     const mapped = stateFromReports(executed.run, executed.statReports.map((r) => r.verdict as string));
-    return { state: mapped.state, falsified: mapped.falsified, alphaSpent: undefined, experimentRunId: executed.run.id };
+    const eValues = executed.statReports.map((r) => r.eValue).filter((v): v is number => v !== undefined);
+    const eValue = eValues.length > 0 ? eValues.reduce((product, value) => product * value, 1) : undefined;
+    return { state: mapped.state, falsified: mapped.falsified, alphaSpent: undefined, eValue, experimentRunId: executed.run.id };
   });
+
+  const combinedEValue = (): number => states.reduce((product, state) => product * (state.eValue ?? 1), 1);
+  const eValueReached = (): boolean => spec.crossUnitTesting.policy === 'e_value_accumulation'
+    && combinedEValue() >= spec.crossUnitTesting.eValueThreshold;
+  const nextDecision = () => decideCampaign(spec, states, { eValueReached: eValueReached() });
 
   for (let round = 0; round < spec.units.length; round += 1) {
     if (opts.shouldCancel?.() === true) break;
-    const decision = decideCampaign(spec, states);
+    const decision = nextDecision();
     if (decision.stopped) {
       store.appendEvent(spec.runId, { type: 'note', detail: { kind: 'campaign_stopped', campaignId: spec.id, stopReason: decision.stopReason } });
-      return { campaignId: spec.id, stopped: true, stopReason: decision.stopReason, unitStates: states, executedRunIds };
+      return { campaignId: spec.id, stopped: true, stopReason: decision.stopReason, unitStates: states, executedRunIds, eValue: combinedEValue() };
     }
     if (decision.runnable.length === 0) {
       // deadlock (failed dependency with pending dependents) — honest stop, disclosed
@@ -82,10 +91,10 @@ export const driveCampaign = async (
       if (opts.shouldCancel?.() === true) break;
       // mid-round stop check: a stop rule (e.g. primary just falsified) must
       // prevent further enqueues IMMEDIATELY, not at the next round boundary
-      const mid = decideCampaign(spec, states);
+      const mid = nextDecision();
       if (mid.stopped) {
         store.appendEvent(spec.runId, { type: 'note', detail: { kind: 'campaign_stopped', campaignId: spec.id, stopReason: mid.stopReason } });
-        return { campaignId: spec.id, stopped: true, stopReason: mid.stopReason, unitStates: states, executedRunIds };
+        return { campaignId: spec.id, stopped: true, stopReason: mid.stopReason, unitStates: states, executedRunIds, eValue: combinedEValue() };
       }
       const unit = spec.units.find((u) => u.label === label)!;
       const unitSpecRaw = (opts.resolveSpec ?? ((id: string) => store.getObject('experiment_spec', id)))(unit.experimentSpecId);
@@ -123,6 +132,7 @@ export const driveCampaign = async (
       if (terminal !== undefined) {
         terminal.state = result.state;
         terminal.alphaSpent = alphaSpent;
+        terminal.eValue = result.eValue;
       }
       store.appendEvent(spec.runId, {
         type: 'note',
@@ -134,11 +144,12 @@ export const driveCampaign = async (
           // statistical falsification vs operational failure stay distinguishable
           ...(result.falsified === true ? { falsified: true, note: 'preregistered analysis produced a falsifies verdict — failed experiments are findings' } : {}),
           ...(alphaSpent !== undefined ? { alphaSpent } : {}),
+          ...(result.eValue !== undefined ? { eValue: result.eValue, combinedEValue: combinedEValue() } : {}),
         },
       });
     }
   }
-  const finalDecision = decideCampaign(spec, states);
+  const finalDecision = nextDecision();
   if (finalDecision.stopped) {
     store.appendEvent(spec.runId, { type: 'note', detail: { kind: 'campaign_stopped', campaignId: spec.id, stopReason: finalDecision.stopReason } });
   }
@@ -148,5 +159,6 @@ export const driveCampaign = async (
     stopReason: finalDecision.stopReason,
     unitStates: states,
     executedRunIds,
+    eValue: spec.crossUnitTesting.policy === 'e_value_accumulation' ? combinedEValue() : undefined,
   };
 };

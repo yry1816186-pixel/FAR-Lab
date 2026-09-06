@@ -114,3 +114,10 @@ work/
 
 # live-run runtime data dirs (xiaomi-route probes, universal smoke)
 .tmp-*/
+
+# Python bytecode caches (build artifacts, never tracked)
+__pycache__/
+*.py[cod]
+
+# AI-writing tool local scratch (~140MB snapshots of repo paths; process artifacts, local only)
+.writing/

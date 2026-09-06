@@ -805,9 +805,9 @@ export interface ResearchActionResponse {
 /**
  * Transport wire of a stored model config. 'offline' is NOT a transport and NOT a
  * product route: it is the in-process test double, visible only on a test-harness
- * server (FARLAB_TEST_DOUBLE=1). The settings UI can create openai/anthropic/gemini.
+ * server (FARLAB_TEST_DOUBLE=1). The settings UI exposes only production transports.
  */
-export type ProviderWireProtocol = 'openai' | 'anthropic' | 'gemini' | 'offline';
+export type ProviderWireProtocol = 'openai' | 'openai_responses' | 'anthropic' | 'gemini' | 'offline';
 
 /** Preset provider template (server catalog.ts) — one-click prefill, not a whitelist. */
 export interface ProviderTemplate {
@@ -873,7 +873,7 @@ export interface EnvDefaultInfo {
   defaultSource?: 'ui' | 'env';
 }
 
-/** One built-in env route (zai/dashscope live; archived = banned, display-only). */
+/** One built-in environment route; unavailable routes remain explicitly non-live. */
 export interface BuiltinRouteSummary {
   name: string;
   kind: 'live' | 'test';
