@@ -16,7 +16,7 @@ dependencies = [
     "pandas>=3,<4",
     "matplotlib>=3.9,<4",
     "statsmodels>=0.14,<1",
-    "pyarrow>=18,<23",
+    "pyarrow>=18,<24",
     "h5py>=3.12,<4",
     "torch>=2.4,<3",
 ]
