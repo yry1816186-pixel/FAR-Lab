@@ -330,9 +330,11 @@
     ]
   },
   "src/pipeline/stages/plan.ts::PLAN_SYSTEM_PROMPT[18]": {
-    "intent": "e_value_accumulation banned (no estimator)",
+    "intent": "e_value_accumulation allowed only via anytime-valid e-process on bounded rows with declared threshold",
     "anchors": [
-      "no e-value estimator"
+      "e_value_accumulation",
+      "anytime-valid e-process",
+      "declared threshold"
     ]
   },
   "src/pipeline/stages/plan.ts::PLAN_SYSTEM_PROMPT[19]": {

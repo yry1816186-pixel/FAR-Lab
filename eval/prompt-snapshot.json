@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-05T19:24:56.396Z",
+  "generatedAt": "2026-09-06T15:31:09.771Z",
   "prompts": [
     {
       "file": "src/pipeline/stages/scope.ts",
@@ -21,17 +21,23 @@
     {
       "file": "src/pipeline/stages/scope.ts",
       "name": "PROBLEM_MODEL_PROMPT",
-      "chars": 3550,
-      "sha256": "479bdb7323271942",
+      "chars": 3931,
+      "sha256": "69d960caba83b9da",
       "sample": "You formalize a research question into a Scientific Problem ",
-      "version": 2,
-      "provenance": "line-ending normalization: extracted literals are platform-invariant (CRLF working trees hash identically to LF checkouts); no prompt content changed",
+      "version": 3,
+      "provenance": "scope stage: reject empty validationPlan/undecidedReason (SJTU-125 batch schema failures); plan stage: scientific-compute layer wording (commit b0df17e)",
       "history": [
         {
           "sha256": "53b392bc2edc0074",
           "chars": 3568,
           "version": 1,
           "at": "2026-09-04T01:35:57.290Z"
+        },
+        {
+          "sha256": "479bdb7323271942",
+          "chars": 3550,
+          "version": 2,
+          "at": "2026-09-05T19:24:56.396Z"
         }
       ]
     },
@@ -616,32 +622,53 @@
     {
       "file": "src/pipeline/stages/plan.ts",
       "name": "PLAN_SYSTEM_PROMPT[17]",
-      "chars": 121,
-      "sha256": "e24277cee89c2ae2",
-      "sample": "everything else is secondary/descriptive) or \"alpha_spending",
-      "version": 1,
-      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
-      "history": []
+      "chars": 118,
+      "sha256": "1445e189dc1781e2",
+      "sample": "everything else is secondary/descriptive), \"alpha_spending\" ",
+      "version": 2,
+      "provenance": "scope stage: reject empty validationPlan/undecidedReason (SJTU-125 batch schema failures); plan stage: scientific-compute layer wording (commit b0df17e)",
+      "history": [
+        {
+          "sha256": "e24277cee89c2ae2",
+          "chars": 121,
+          "version": 1,
+          "at": "2026-09-05T19:24:56.396Z"
+        }
+      ]
     },
     {
       "file": "src/pipeline/stages/plan.ts",
       "name": "PLAN_SYSTEM_PROMPT[18]",
-      "chars": 114,
-      "sha256": "250f862db99216d8",
-      "sample": "and justify the allocation in multipleTestingNote. Do NOT de",
-      "version": 1,
-      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
-      "history": []
+      "chars": 118,
+      "sha256": "ec4e181bee3071de",
+      "sample": "or \"e_value_accumulation\" (use only bounded accuracy rows wi",
+      "version": 2,
+      "provenance": "scope stage: reject empty validationPlan/undecidedReason (SJTU-125 batch schema failures); plan stage: scientific-compute layer wording (commit b0df17e)",
+      "history": [
+        {
+          "sha256": "250f862db99216d8",
+          "chars": 114,
+          "version": 1,
+          "at": "2026-09-05T19:24:56.396Z"
+        }
+      ]
     },
     {
       "file": "src/pipeline/stages/plan.ts",
       "name": "PLAN_SYSTEM_PROMPT[19]",
-      "chars": 118,
-      "sha256": "34196c7b58d97cd9",
-      "sample": "implemented, such plans fail validation. Single-hypothesis p",
-      "version": 1,
-      "provenance": "pre-versioning baseline (bfba1ee 2026-08-23 / re-anchored 2026-09-03)",
-      "history": []
+      "chars": 128,
+      "sha256": "0581077b6c35f1de",
+      "sample": "and justify the allocation in multipleTestingNote. Single-hy",
+      "version": 2,
+      "provenance": "scope stage: reject empty validationPlan/undecidedReason (SJTU-125 batch schema failures); plan stage: scientific-compute layer wording (commit b0df17e)",
+      "history": [
+        {
+          "sha256": "34196c7b58d97cd9",
+          "chars": 118,
+          "version": 1,
+          "at": "2026-09-05T19:24:56.396Z"
+        }
+      ]
     },
     {
       "file": "src/pipeline/stages/plan.ts",

@@ -16,14 +16,24 @@ if (args.includes('--key-stdin')) {
 process.env.FARLAB_DASHSCOPE_MODEL = 'qwen3.7-max';
 process.env.FARLAB_DASHSCOPE_THINKING = 'off';
 process.env.FARLAB_MODEL_PROVIDER = 'dashscope';
-process.env.FARLAB_MODEL_CONCURRENCY = arg('model-concurrency', '40');
+process.env.FARLAB_MODEL_CONCURRENCY = arg('model-concurrency', '80');
 process.env.FARLAB_TOTAL_BUDGET_MS = '180000';
 process.env.FARLAB_MIN_CALL_INTERVAL_MS = '0';
 process.env.FARLAB_MAX_ITERATION_ROUNDS = '1';
-process.env.FARLAB_RUN_TOKEN_BUDGET = '180000';
+process.env.FARLAB_RUN_TOKEN_BUDGET = arg('token-budget', '500000');
+const useFallbackForQuota = reason => {
+  if (!/quota_exceeded|insufficient.*(?:balance|quota)|balance.*insufficient/i.test(reason ?? '') || !process.env.FARLAB_DASHSCOPE_FALLBACK_API_KEY) return false;
+  process.env.DASHSCOPE_API_KEY = process.env.FARLAB_DASHSCOPE_FALLBACK_API_KEY;
+  delete process.env.FARLAB_DASHSCOPE_FALLBACK_API_KEY;
+  fs.appendFileSync(path.join(root, 'credential-events.jsonl'), JSON.stringify({ at: new Date().toISOString(), event: 'switched_to_user_authorized_backup_after_quota_error' }) + '\n');
+  console.log('Quota exhausted: switching to user-authorized backup credential.');
+  return true;
+};
 const { createDashScopeProvider } = await import('../dist/providers/dashscope.js');
-const provider = createDashScopeProvider();
-const probe = await provider.structuredCall({ task: 'Return JSON {"ready":true}.', userPayload: {}, outputKind: 'json', purpose: 'sjtu-batch-preflight', maxTokens: 100, signal: AbortSignal.timeout(45000) }, raw => raw?.ready === true ? raw : new Error('Expected ready=true'));
+let provider = createDashScopeProvider();
+const preflight = () => provider.structuredCall({ task: 'Return JSON {"ready":true}.', userPayload: {}, outputKind: 'json', purpose: 'sjtu-batch-preflight', maxTokens: 100, signal: AbortSignal.timeout(45000) }, raw => raw?.ready === true ? raw : new Error('Expected ready=true'));
+let probe = await preflight();
+if (!probe.ok && useFallbackForQuota(`${probe.error?.kind}: ${probe.error?.message}`)) { provider = createDashScopeProvider(); probe = await preflight(); }
 json('preflight.json', { at: new Date().toISOString(), ok: probe.ok, error: probe.error, receipt: probe.receipt, baseUrl: provider.baseUrl });
 console.log(JSON.stringify({ preflight: probe.ok, error: probe.error, receipt: probe.receipt }));
 if (!probe.ok) { process.exitCode = 2; } else if (!args.includes('--probe')) {
@@ -35,7 +45,7 @@ if (!probe.ok) { process.exitCode = 2; } else if (!args.includes('--probe')) {
   if (questions.length !== 125 || new Set(questions.map(q => q.id)).size !== 125) throw new Error('Expected 125 distinct questions');
   const limit = Number(arg('limit', '125'));
   const concurrency = Number(arg('concurrency', '20'));
-  if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 40) throw new Error('Concurrency must be 1..40');
+  if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 80) throw new Error('Concurrency must be 1..80');
   const started = Date.now();
   const records = fs.existsSync(path.join(root, 'runs.json')) ? JSON.parse(fs.readFileSync(path.join(root, 'runs.json'), 'utf8')) : {};
   let cursor = 0;
@@ -54,7 +64,7 @@ if (!probe.ok) { process.exitCode = 2; } else if (!args.includes('--probe')) {
   }
   const snapshot = () => { json('runs.json', records); const states = {}; for (const r of Object.values(records)) states[r.status] = (states[r.status] ?? 0) + 1; const progress = { updatedAt: new Date().toISOString(), elapsedSeconds: Math.round((Date.now() - started) / 1000), total: questions.length, started: Object.keys(records).length, states }; json('progress.json', progress); console.log(JSON.stringify(progress)); };
   const timer = setInterval(snapshot, 30000);
-  json('configuration.json', { pid: process.pid, model: provider.modelId, provider: provider.name, baseUrl: provider.baseUrl, concurrency, modelConcurrency: Number(process.env.FARLAB_MODEL_CONCURRENCY), iterationRounds: 1, runTokenBudget: 180000, commit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), workspaceHasExistingChanges: true, startedAt: new Date(started).toISOString(), scope: 'Full FAR-Lab pipeline, one autonomous iteration; scientific findings remain unverified until independent validation.' });
+  json('configuration.json', { pid: process.pid, model: provider.modelId, provider: provider.name, baseUrl: provider.baseUrl, concurrency, modelConcurrency: Number(process.env.FARLAB_MODEL_CONCURRENCY), iterationRounds: 1, runTokenBudget: Number(process.env.FARLAB_RUN_TOKEN_BUDGET), commit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), workspaceHasExistingChanges: true, startedAt: new Date(started).toISOString(), scope: 'Full FAR-Lab pipeline, one autonomous iteration; scientific findings remain unverified until independent validation.' });
   try {
     await Promise.all(Array.from({ length: concurrency }, async () => {
       while (cursor < Math.min(limit, questions.length)) {
@@ -77,6 +87,7 @@ if (!probe.ok) { process.exitCode = 2; } else if (!args.includes('--probe')) {
             run = await app.orchestrator.execute(run.id);
             records[id] = { ...records[id], status: run.status, runStatus: run.status, attempt, error: run.lastError, stages: run.stages };
             snapshot();
+            if (run.stages.some(s => s.state === 'failed') && useFallbackForQuota(run.lastError)) { attempt--; continue; }
             if (!run.stages.some(s => s.state === 'failed') || /auth|quota|401|403/i.test(run.lastError ?? '')) break;
           }
           const dir = path.join(root, 'results', id.padStart(3, '0'));

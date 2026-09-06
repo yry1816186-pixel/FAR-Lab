@@ -14,7 +14,10 @@ export const executeScientificCompute = async (
   } = {},
 ): Promise<Record<string, unknown>> => {
   const parsed = ScientificComputeRequest.parse(request);
-  const timeoutMs = opts.timeoutMs ?? 30_000;
+  // 120s: warmup pays a cold `uv` environment sync (no shared sidecar pool
+  // yet), and CI runners under matrix contention measurably cross 30s — the
+  // old default turned slow-but-valid computations into spurious 400s.
+  const timeoutMs = opts.timeoutMs ?? 120_000;
   const signal = opts.signal;
   const abortError = (): Error => Object.assign(new Error('scientific computation aborted by caller'), { name: 'AbortError' });
   const assertActive = (): void => { if (signal?.aborted) throw abortError(); };

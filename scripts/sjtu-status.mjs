@@ -23,7 +23,7 @@ try {
     modelCalls: model.length, usage,
     modelRoutes: [...new Set(model.map(r => `${r.modelCall.provider}:${r.modelCall.modelId}:${r.executionMode}`))],
     sourceStatuses: sources,
-    failures: runs.filter(r => r.lastError).map(r => ({ runId: r.id, stage: r.currentStage, error: r.lastError.slice(0, 700) })),
+    failures: runs.filter(r => r.stages.some(s => s.state === 'failed')).map(r => ({ runId: r.id, stage: r.currentStage, error: (r.lastError ?? '').slice(0, 700) })),
   };
   console.log(JSON.stringify(result, null, 2));
 } finally { db.close(); }
