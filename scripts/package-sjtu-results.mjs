@@ -74,15 +74,20 @@ async function main() {
     delivery = fs.mkdtempSync(path.join(deliveryParent, 'FAR-Lab_SJTU_125_Results-'));
     fs.mkdirSync(path.join(delivery, 'runtime'));
     await backup(sourceDb, path.join(delivery, 'runtime', 'far.db'));
+    const cacheFile = path.join(root, 'runtime', 'source-cache.db');
+    if (fs.existsSync(cacheFile)) {
+      const cacheDb = new DatabaseSync(cacheFile, { readOnly: true });
+      try { integrity(cacheDb); await backup(cacheDb, path.join(delivery, 'runtime', 'source-cache.db')); } finally { cacheDb.close(); }
+    }
     for (const name of ['source', 'results']) {
       if (fs.existsSync(path.join(root, name))) fs.cpSync(path.join(root, name), path.join(delivery, name), { recursive: true, dereference: false });
     }
     fs.cpSync(path.join(root, 'runtime', 'artifacts'), path.join(delivery, 'runtime', 'artifacts'), { recursive: true, dereference: false });
-    for (const name of ['configuration.json', 'preflight.json', 'runs.json', 'progress.json']) {
+    for (const name of ['configuration.json', 'preflight.json', 'runs.json', 'progress.json', 'credential-events.jsonl']) {
       if (fs.existsSync(path.join(root, name))) fs.copyFileSync(path.join(root, name), path.join(delivery, name));
     }
     fs.mkdirSync(path.join(delivery, 'scripts'));
-    for (const name of ['extract-sjtu-questions.py', 'sjtu-batch.mjs', 'package-sjtu-results.mjs']) {
+    for (const name of ['extract-sjtu-questions.py', 'sjtu-batch.mjs', 'sjtu-status.mjs', 'package-sjtu-results.mjs', 'render-sjtu-book.mjs']) {
       fs.copyFileSync(path.resolve('scripts', name), path.join(delivery, 'scripts', name));
     }
     for (const name of ['package.json', 'package-lock.json', 'pnpm-lock.yaml']) {
@@ -130,6 +135,8 @@ async function main() {
         result.sourceCount = sources.length;
         result.claimCount = app.store.listObjects('claim', run.id).length;
         result.hypothesisCount = hypotheses.length;
+        result.planCount = app.store.listObjects('plan', run.id).length;
+        result.evidenceInsufficient = run.tags.includes('evidence-insufficient');
         result.hypotheses = hypotheses.map((h) => ({ id: h.id, statement: h.statement, noveltyLabel: h.noveltyLabel }));
         result.sources = sources.map((s) => ({ id: s.id, title: s.title, identifiers: s.identifiers, url: s.oaUrl, year: s.publicationYear, contentDepth: s.contentDepth }));
         result.executionStage = run.stages.find((s) => s.stage === 'execute') ?? null;
@@ -184,6 +191,9 @@ async function main() {
     missingOrUnverifiedQuestionIds: results.filter((r) => r.deliveryStatus !== 'VERIFIED_ARTIFACTS').map((r) => r.id),
     scientificStatus: 'UNVERIFIED', databaseIntegrity: 'ok', model: 'qwen3.7-max', partialMode: partial,
     modelCalls: results.reduce((n, r) => n + (r.modelCalls ?? 0), 0),
+    reportsWithHypotheses: results.filter(r => r.hypothesisCount > 0).length,
+    reportsWithPlans: results.filter(r => r.planCount > 0).length,
+    evidenceInsufficientReports: results.filter(r => r.evidenceInsufficient).length,
     totalTokens: results.reduce((n, r) => n + (r.totalTokens ?? 0), 0),
     limitations: [
       '工件核验通过表示引用、回执、哈希和对象关系通过项目的确定性检查，不表示科学问题已解决。',
@@ -202,11 +212,13 @@ async function main() {
   fs.writeFileSync(path.join(delivery, 'README.zh-CN.md'), `# FAR-Lab · SJTU 125 个科学问题\n\n${statusText}。\n\n模型：qwen3.7-max。流水线完成 ${completed}/125 题。\n\n入口：index.html；汇总：RESULTS.json、RESULTS.csv、SUMMARY.json。逐题文件在 results/001 至 results/125，含原始报告、研究提纲、引用、回执和 verification.json（存在可核验 bundle 时）。\n\n${summary.limitations.map((s) => `- ${s}`).join('\n')}\n\n数据库 runtime/far.db 是停止后通过 SQLite backup API 创建的一致性快照，并已执行 integrity_check；runtime/artifacts 保存内容寻址工件。source 保存原始 PDF、125 题清单、页文本和提取审计。\n\nSHA256SUMS.txt 覆盖所有交付文件，但不包含清单自身。ZIP 生成后逐条解压读取并核对全部文件 SHA-256；ZIP 外的 .sha256 记录归档整体摘要。\n\n重跑命令（在完整 FAR-Lab 项目根目录，需现有 Node 24+ 和构建产物）：\n\n\`node scripts/package-sjtu-results.mjs --out artifacts/sjtu-125\`\n\n只有确有未完成题且需要交付实际产物时追加 \`--partial\`；此选项不会放宽运行中数据库、损坏数据库或密钥扫描限制。\n`);
   const rows = results.map((r) => {
     const prefix = `results/${String(r.id).padStart(3, '0')}`;
-    const links = ['report.md', 'paper.md', 'verification.json', 'delivery-status.json'].filter((name) => fs.existsSync(path.join(delivery, prefix, name))).map((name) => `<a href="${prefix}/${name}">${({ 'report.md': '报告', 'paper.md': '研究提纲', 'verification.json': '核验', 'delivery-status.json': '状态' })[name]}</a>`).join(' · ');
+    const links = `<a href="FAR-Lab_125_Reports.html#question-${String(r.id).padStart(3, '0')}">阅读</a> · ` + ['report.md', 'paper.md', 'verification.json', 'delivery-status.json'].filter((name) => fs.existsSync(path.join(delivery, prefix, name))).map((name) => `<a href="${prefix}/${name}">${({ 'report.md': '报告', 'paper.md': '研究提纲', 'verification.json': '核验', 'delivery-status.json': '状态' })[name]}</a>`).join(' · ');
     return `<tr><td>${r.id}</td><td>${escapeHtml(r.title)}<small>${escapeHtml(r.category)} · PDF ${r.pages.join(', ')}</small></td><td>${escapeHtml(r.runStatus)}<small>${escapeHtml(r.bundleVerdict)}</small></td><td>${r.sourceCount ?? 0} / ${r.hypothesisCount ?? 0}</td><td>${links}${r.errors.length ? `<small class="error">${escapeHtml(r.errors.join('; '))}</small>` : ''}</td></tr>`;
   }).join('\n');
   fs.writeFileSync(path.join(delivery, 'index.html'), `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FAR-Lab · SJTU 125 个科学问题</title><style>body{font:15px/1.6 system-ui,sans-serif;margin:24px;color:#202522;background:#fff}main{max-width:1300px;margin:auto}h1{font-size:26px}p{max-width:980px}table{border-collapse:collapse;width:100%;table-layout:fixed}th,td{text-align:left;vertical-align:top;padding:10px;border-bottom:1px solid #d4d9d6;overflow-wrap:anywhere}th{background:#eef4ef}small{display:block;color:#59635c}a{color:#066a73}.error{color:#a42836}nav{margin:20px 0}th:nth-child(1){width:35px}th:nth-child(2){width:40%}th:nth-child(3){width:100px}th:nth-child(4){width:75px}@media(max-width:700px){body{margin:12px}table{table-layout:auto;font-size:13px}th,td{padding:7px}th:nth-child(n){width:auto}h1{font-size:22px}}</style><main><h1>FAR-Lab · SJTU 125 个科学问题</h1><p>${escapeHtml(statusText)}。模型 qwen3.7-max；流水线完成 ${completed}/125 题。</p><p>以下结果属于探索性研究产物。工件核验并不证明科学结论成立；实验跳过、外部协议和待人工验证均保留在原始记录中。</p><nav><a href="README.zh-CN.md">交付说明</a> · <a href="RESULTS.csv">CSV 汇总</a> · <a href="RESULTS.json">JSON 汇总</a> · <a href="source/sjtu-booklet.pdf">来源手册</a> · <a href="SHA256SUMS.txt">SHA-256 清单</a></nav><table><thead><tr><th>题号</th><th>科学问题</th><th>运行 / 核验</th><th>来源 / 假设</th><th>产物</th></tr></thead><tbody>${rows}</tbody></table></main></html>`);
   if (verified !== 125 && !partial) throw new Error(`Only ${verified}/125 questions verified. Review ${delivery}; use --partial to package actual incomplete results.`);
+  console.log(execFileSync(process.execPath, [path.resolve('scripts/render-sjtu-book.mjs'), delivery], { encoding: 'utf8', windowsHide: true, timeout: 300000 }));
+  fs.appendFileSync(path.join(delivery, 'README.zh-CN.md'), '\n完整报告汇编：FAR-Lab_125_Reports.docx（Word）和 FAR-Lab_125_Reports.html（浏览器阅读，含目录）。原始报告字节保持不变；汇编仅调整文档标题和表格块间空行。\n');
   const entries = filesUnder(delivery).map((filename) => {
     assertNoSecrets(filename);
     return { name: path.relative(delivery, filename).split(path.sep).join('/'), sha256: digest(fs.readFileSync(filename)) };
