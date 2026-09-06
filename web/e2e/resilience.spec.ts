@@ -111,7 +111,5 @@ test('structure regression: §26 negative-acceptance invariants hold on the ship
   await page.getByRole('button', { name: /^启动研究$|^Launch study$/ }).click();
   await expect(page).toHaveURL(/#study\/run_[a-z0-9]+/, { timeout: 30_000 });
   await expect(page.locator('.map-state')).toBeVisible({ timeout: 120_000 });
-  const spine = await page.locator('.map-question, .map-state, .map-action, [class*="map-"]').all();
-  expect(spine.length).toBeGreaterThan(0);
   expect(await page.locator('[role="tablist"]').count()).toBe(0);
 });

@@ -22,9 +22,20 @@ const STOPWORDS = new Set([
   'also', 'however', 'therefore', 'thus', 'hence', 'via', 'due', 'using', 'used', 'use',
 ]);
 
-/** Lowercase, strip punctuation/digits-only tokens, drop stopwords, crude plural fold. */
+/** Lowercase, strip punctuation/digits-only tokens, drop stopwords, crude plural fold.
+ * PDF ligatures (ﬀﬁﬂﬃﬄ) fold to ascii FIRST — backported 2026-09-06 from the
+ * production anchor (src/domain/claim-direction.ts, live-measured on the econ
+ * probe corpus 2026-09-05: PDF abstracts carry "eﬀects"/"ﬁnd" and the unfolded
+ * form silently breaks token equality against ascii sources). */
+const LIGATURES = [[/ﬀ/g, 'ff'], [/ﬁ/g, 'fi'], [/ﬂ/g, 'fl'], [/ﬃ/g, 'ffi'], [/ﬄ/g, 'ffl']];
+export const normalizeLigatures = (s) => {
+  let out = String(s ?? '');
+  for (const [re, rep] of LIGATURES) out = out.replace(re, rep);
+  return out;
+};
+
 export const contentTokens = (s) => {
-  const raw = String(s ?? '').toLowerCase().match(/[a-z][a-z-]{1,}/g) ?? [];
+  const raw = normalizeLigatures(s).toLowerCase().match(/[a-z][a-z-]{1,}/g) ?? [];
   const out = new Set();
   for (let t of raw) {
     if (STOPWORDS.has(t)) continue;
@@ -33,6 +44,9 @@ export const contentTokens = (s) => {
   }
   return out;
 };
+
+/** Single owner of "is this raw token a content word" (stopword + length floor). */
+export const isContentToken = (t) => typeof t === 'string' && t.length >= 2 && !STOPWORDS.has(t);
 
 /** Jaccard over content-token sets: |A∩B| / |A∪B|. */
 export const jaccard = (a, b) => {
@@ -113,26 +127,28 @@ export const MATCH_DEFAULTS = Object.freeze({ high: 0.40, low: 0.10 });
 // outside the [low, high) band (the extremes are already zero-error locked).
 
 // Directional verbs in post-contentTokens fold form (crude plural fold strips
-// a trailing 's'; tense variants stay distinct, so each is listed).
+// a trailing 's'; tense variants stay distinct, so each is listed). Gerund forms
+// backported 2026-09-06 from the production anchor (claim-direction.ts) so the
+// instrument and the product detect the same operator set.
 const DIRECTION_UP = new Set([
-  'increase', 'increases', 'increased', 'promote', 'promotes', 'promoted',
-  'enhance', 'enhances', 'enhanced', 'activate', 'activates', 'activated',
-  'induce', 'induces', 'induced', 'restore', 'restores', 'restored',
-  'raise', 'raises', 'raised', 'stimulate', 'stimulates', 'stimulated',
-  'augment', 'augments', 'augmented', 'elevate', 'elevates', 'elevated',
-  'improve', 'improves', 'improved', 'boost', 'boosts', 'boosted',
-  'accelerate', 'accelerates', 'accelerated', 'upregulate', 'upregulates', 'upregulated',
+  'increase', 'increases', 'increased', 'increasing', 'promote', 'promotes', 'promoted', 'promoting',
+  'enhance', 'enhances', 'enhanced', 'enhancing', 'activate', 'activates', 'activated', 'activating',
+  'induce', 'induces', 'induced', 'inducing', 'restore', 'restores', 'restored', 'restoring',
+  'raise', 'raises', 'raised', 'raising', 'stimulate', 'stimulates', 'stimulated', 'stimulating',
+  'augment', 'augments', 'augmented', 'augmenting', 'elevate', 'elevates', 'elevated', 'elevating',
+  'improve', 'improves', 'improved', 'improving', 'boost', 'boosts', 'boosted', 'boosting',
+  'accelerate', 'accelerates', 'accelerated', 'accelerating', 'upregulate', 'upregulates', 'upregulated', 'upregulating',
 ]);
 const DIRECTION_DOWN = new Set([
-  'reduce', 'reduces', 'reduced', 'decrease', 'decreases', 'decreased',
-  'inhibit', 'inhibits', 'inhibited', 'lower', 'lowers', 'lowered',
-  'suppress', 'suppresses', 'suppressed', 'disrupt', 'disrupts', 'disrupted',
-  'prevent', 'prevents', 'prevented', 'eliminate', 'eliminates', 'eliminated',
-  'deplete', 'depletes', 'depleted', 'block', 'blocks', 'blocked',
-  'remove', 'removes', 'removed', 'kill', 'kills', 'killed',
-  'impair', 'impairs', 'impaired', 'diminish', 'diminishes', 'diminished',
-  'attenuate', 'attenuates', 'attenuated', 'abolish', 'abolishes', 'abolished',
-  'abrogate', 'abrogates', 'abrogated',
+  'reduce', 'reduces', 'reduced', 'reducing', 'decrease', 'decreases', 'decreased', 'decreasing',
+  'inhibit', 'inhibits', 'inhibited', 'inhibiting', 'lower', 'lowers', 'lowered', 'lowering',
+  'suppress', 'suppresses', 'suppressed', 'suppressing', 'disrupt', 'disrupts', 'disrupted', 'disrupting',
+  'prevent', 'prevents', 'prevented', 'preventing', 'eliminate', 'eliminates', 'eliminated', 'eliminating',
+  'deplete', 'depletes', 'depleted', 'depleting', 'block', 'blocks', 'blocked', 'blocking',
+  'remove', 'removes', 'removed', 'removing', 'kill', 'kills', 'killed', 'killing',
+  'impair', 'impairs', 'impaired', 'impairing', 'diminish', 'diminishes', 'diminished', 'diminishing',
+  'attenuate', 'attenuates', 'attenuated', 'attenuating', 'abolish', 'abolishes', 'abolished', 'abolishing',
+  'abrogate', 'abrogates', 'abrogated', 'abrogating',
 ]);
 // When the operator's SUBJECT is a negated entity ("loss of X inhibits Y"),
 // the effective polarity is not the verb's polarity — abstain the whole claim.
@@ -188,6 +204,16 @@ const claimDirection = (text) => {
 // Exported for judge-calibration.mjs's superlative-complement signal (single owner).
 export const PREDICATE_NEGATION_RE = /\b(?:not|cannot|can\s?not|doesn'?t|does\s?not|don'?t|didn'?t|did\s?not|fails?\s+to|failed\s+to|unable\s+to|neither|nor)\b/;
 
+// "not only X but also Y" AFFIRMS X — the negator is idiomatic, not predicate negation
+// (backported 2026-09-06 from the production anchor, live-measured 2026-09-05:
+// "cannot only eliminate offshoring but also..." must NOT read as negated). Blank the
+// idiom before negation testing; single owner of this normalization.
+const NOT_ONLY_IDIOM = /\b(?:not|cannot|can\s?not)\s+(?:only|just|merely)\b/g;
+
+/** Predicate-negation test on idiom-normalized lowercase text. */
+export const predicateNegated = (low) =>
+  PREDICATE_NEGATION_RE.test(normalizeLigatures(String(low ?? '').toLowerCase()).replace(NOT_ONLY_IDIOM, ' '));
+
 const hasAny = (low, phrases) => phrases.some((p) => low.includes(p));
 
 /**
@@ -204,7 +230,7 @@ export const deterministicBandVerdict = (claim, counterpart) => {
   const db = claimDirection(counterpart);
   if (da !== null && db !== null && da !== db) return false; // "A restores X" vs "A reduces X"
   if (da !== null && db !== null && da === db
-    && PREDICATE_NEGATION_RE.test(la) !== PREDICATE_NEGATION_RE.test(lb)) {
+    && predicateNegated(la) !== predicateNegated(lb)) {
     return false; // "A does not inhibit X" vs "A inhibits X" — negated vs asserted
   }
   const aCorr = hasAny(la, CORRELATION_KIND);

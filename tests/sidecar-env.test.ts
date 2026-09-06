@@ -27,12 +27,20 @@ describe('sidecar env minimization (endgame audit)', () => {
     const { buildSidecarEnv } = await import('../src/experiment/python.js');
     const prevZai = process.env.ZAI_API_KEY;
     const prevPoison = process.env.__FARLAB_TEST_POISON_SECRET;
+    const prevUniversal = process.env.FARLAB_UNIVERSAL_API_KEY;
+    const prevToken = process.env.FARLAB_HTTP_TOKEN;
     process.env.ZAI_API_KEY = 'sk-POISON-123';
     process.env.__FARLAB_TEST_POISON_SECRET = 'POISON';
+    process.env.FARLAB_UNIVERSAL_API_KEY = 'sk-POISON-UNIVERSAL';
+    process.env.FARLAB_HTTP_TOKEN = 'POISON-TOKEN';
     try {
       const env = buildSidecarEnv();
       expect(env.ZAI_API_KEY).toBeUndefined();
       expect(env.__FARLAB_TEST_POISON_SECRET).toBeUndefined();
+      // The FARLAB_ prefix must forward fence config, never credential-shaped vars
+      // (the universal provider's live key is FARLAB_UNIVERSAL_API_KEY).
+      expect(env.FARLAB_UNIVERSAL_API_KEY).toBeUndefined();
+      expect(env.FARLAB_HTTP_TOKEN).toBeUndefined();
       expect(env.PATH ?? env.Path).toBeDefined();
       expect(env.PYTHONHASHSEED).toBe('0');
       expect(env.OMP_NUM_THREADS).toBe('1');
@@ -42,6 +50,10 @@ describe('sidecar env minimization (endgame audit)', () => {
       else process.env.ZAI_API_KEY = prevZai;
       if (prevPoison === undefined) delete process.env.__FARLAB_TEST_POISON_SECRET;
       else process.env.__FARLAB_TEST_POISON_SECRET = prevPoison;
+      if (prevUniversal === undefined) delete process.env.FARLAB_UNIVERSAL_API_KEY;
+      else process.env.FARLAB_UNIVERSAL_API_KEY = prevUniversal;
+      if (prevToken === undefined) delete process.env.FARLAB_HTTP_TOKEN;
+      else process.env.FARLAB_HTTP_TOKEN = prevToken;
     }
   });
 

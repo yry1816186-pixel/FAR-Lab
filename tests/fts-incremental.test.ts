@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -11,8 +11,12 @@ import { ResearchQuestion, newId } from '../src/domain/index.js';
 // createRun (their search leg joins the run row — pre-existing semantics);
 // updates then go through putObject like every production rewrite.
 
+const tmpDirs: string[] = [];
+afterAll(() => { for (const d of tmpDirs) { try { fs.rmSync(d, { recursive: true, force: true }); } catch { /* open handle lag on Windows */ } } });
+
 const mkStore = (): Store => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'far-fts-inc-'));
+  tmpDirs.push(dir);
   return new Store(openDb(path.join(dir, 'far.db')));
 };
 

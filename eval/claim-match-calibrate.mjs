@@ -99,5 +99,5 @@ const s2 = sigStats('subject-complement      ', subjectComplementSignal);
 const s4 = sigStats('superlative-complement  ', superlativeComplementSignal);
 const su = sigStats('union (shipped profile) ', complementRescueSignal);
 const unionClean = s2.onFalse === 0 && s4.onFalse === 0 && su.onFalse === 0;
-console.log(`union verdict: ${unionClean ? `ZERO gold-false fires — profile 'complement-minority-v1' stays shippable (rescue potential ${su.onTrue} gold-true band pairs)` : 'GOLD-FALSE FIRE — profile must be withdrawn or narrowed'}`);
+console.log(`union verdict: ${unionClean ? `ZERO gold-false fires — profile 'complement-minority-v2' stays shippable (rescue potential ${su.onTrue} gold-true band pairs)` : 'GOLD-FALSE FIRE — profile must be withdrawn or narrowed'}`);
 console.log('Note: the rescue lowers the LLM yes-threshold to the profile minimum (never mints from 0 yes votes); its LIVE effect on TPR/FPR is measured by re-running adjudication-accuracy with FARLAB_ADJ_CALIBRATION=<profile>.');

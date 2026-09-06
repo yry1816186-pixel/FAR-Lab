@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -25,8 +25,12 @@ const mkItem = (over: Partial<Parameters<typeof MemoryItemSchema.parse>[0]> = {}
     ...over,
   });
 
+const tmpDirs: string[] = [];
+afterAll(() => { for (const d of tmpDirs) { try { fs.rmSync(d, { recursive: true, force: true }); } catch { /* open handle lag on Windows */ } } });
+
 const mkApp = async (): Promise<{ app: App; dir: string }> => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'farlab-memops-'));
+  tmpDirs.push(dir);
   const app = await createApp({ dataDir: dir, providerOverride: createTestStubProvider([]) });
   return { app, dir };
 };
@@ -34,6 +38,7 @@ const mkApp = async (): Promise<{ app: App; dir: string }> => {
 describe('archiveMemory (store + op)', () => {
   it('marks an active item archived with a spine edge, closes the activation surface', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'far-memops-'));
+    tmpDirs.push(dir);
     const store = new Store(openDb(path.join(dir, 'far.db')));
     const item = mkItem();
     store.putMemory(item);
@@ -47,6 +52,7 @@ describe('archiveMemory (store + op)', () => {
 
   it('rejects terminal lifecycle transitions (archived has no exits)', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'far-memops-'));
+    tmpDirs.push(dir);
     const store = new Store(openDb(path.join(dir, 'far.db')));
     const item = mkItem();
     store.putMemory(item);

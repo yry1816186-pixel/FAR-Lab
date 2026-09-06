@@ -90,12 +90,18 @@ const SIDECAR_ENV_ALLOW_EXACT = new Set([
   'NUMBER_OF_PROCESSORS', 'PROCESSOR_ARCHITECTURE', 'OS',
 ]);
 const SIDECAR_ENV_ALLOW_PREFIX = ['UV_', 'PYTHON', 'FARLAB_', 'XDG_', 'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'ALL_PROXY'];
+// Deny rule above the FARLAB_ prefix: the prefix exists for the op layer's fence
+// config (FARLAB_DATA_ROOT / FARLAB_SANDBOX_POLICY_PATH), but provider keys also
+// live under FARLAB_* (e.g. FARLAB_UNIVERSAL_API_KEY) and must never reach
+// agent-drafted code. Keyword carve-out keeps the fence config intact.
+const SIDECAR_ENV_DENY_KEYWORDS = /(KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL)/;
 
 export const buildSidecarEnv = (): NodeJS.ProcessEnv => {
   const env: NodeJS.ProcessEnv = {};
   for (const [k, v] of Object.entries(process.env)) {
     if (v === undefined) continue;
     const upper = k.toUpperCase();
+    if (SIDECAR_ENV_DENY_KEYWORDS.test(upper)) continue;
     if (SIDECAR_ENV_ALLOW_EXACT.has(upper) || SIDECAR_ENV_ALLOW_PREFIX.some((p) => upper.startsWith(p))) {
       env[k] = v;
     }

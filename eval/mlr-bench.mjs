@@ -23,7 +23,7 @@
  * Env: MLRBENCH_REPO (default .cache/repos/mlrbench); provider via makeProvider (GLM default, FARLAB_BASELINE_PROVIDER=glm|zai|dashscope; deepseek banned).
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
-import { resolve, join } from 'node:path';
+import { resolve, join, dirname, basename } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
@@ -113,10 +113,11 @@ const eligibleTasks = () => {
 // run report carries `id`, not `runId`; the old last-line `.runId` read silently
 // wrote runId-less rows for completed runs, invisible to resume and judging).
 const farRun = (task, question) => {
-  const stdout = execFileSync('node', [
-    'dist/cli/main.js', 'research', 'start', question,
-    '--domain', 'machine learning', '--goal', 'exploratory', '--json',
-  ], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: Number(process.env.MLR_RUN_TIMEOUT_MIN ?? 45) * 60_000 });
+  const { args, env } = farRunArgs(question);
+  const stdout = execFileSync('node', args, {
+    encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: Number(process.env.MLR_RUN_TIMEOUT_MIN ?? 45) * 60_000, env,
+  });
   const r = parseRunOutput(stdout);
   if (r.runId === undefined) throw new Error(`research start returned no runId (status=${String(r.status)}) — output shape drifted, refusing to write a runId-less row`);
   return r;
@@ -125,7 +126,29 @@ const farRun = (task, question) => {
 // Runs db: default .far-run/far.db (historical banked runs live there). Override
 // with FARLAB_MLR_DB for isolated re-generation batches (2026-09-05: the 72h soak
 // owns .far-run — new runs must not write there; snapshot it and generate elsewhere).
+// The override governs BOTH ends: where renderers READ and where the spawned
+// research runs WRITE (the child CLI is redirected with --data-dir + FARLAB_DATA_DIR,
+// 2026-09-06 fix — previously the read side was isolated while the child still wrote
+// .far-run, so every farlab row silently degraded to "no farlab output").
 const DB_PATH = resolve(process.cwd(), process.env.FARLAB_MLR_DB ?? '.far-run/far.db');
+
+/** Spawn args + env for one FAR-Lab research run, data-dir-consistent with DB_PATH. */
+export const farRunArgs = (question) => {
+  if (process.env.FARLAB_MLR_DB !== undefined && basename(DB_PATH) !== 'far.db') {
+    throw new Error(
+      `FARLAB_MLR_DB must point at a 'far.db' inside the intended data dir (the CLI redirects by directory) — got ${DB_PATH}`,
+    );
+  }
+  const dataDir = dirname(DB_PATH);
+  return {
+    args: [
+      'dist/cli/main.js', 'research', 'start', question,
+      '--domain', 'machine learning', '--goal', 'exploratory', '--json',
+      '--data-dir', dataDir,
+    ],
+    env: { ...process.env, FARLAB_DATA_DIR: dataDir },
+  };
+};
 
 const renderIdea = (runId) => {
   const db = new DatabaseSync(DB_PATH, { readOnly: true });

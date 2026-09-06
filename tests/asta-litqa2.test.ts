@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sampleQuestions, buildChoices, buildSearchQuery, parseAnswer, scoreAnswer, aggregate, hashString, parseQueries, mergePools } from '../eval/asta-litqa2.mjs';
+import { sampleQuestions, buildChoices, buildSearchQuery, parseAnswer, scoreAnswer, aggregate, scoreRowsForMetrics, hashString, parseQueries, mergePools } from '../eval/asta-litqa2.mjs';
 
 /**
  * FA-SCI-07 adapter unit tests: the deterministic core (sampling, choice permutation,
@@ -112,5 +112,18 @@ describe('scoreAnswer / aggregate (AstaBench metric semantics)', () => {
     expect(aggregate(rows)).toMatchObject({ n: 3, correct: 1, sure: 2, accuracy: 1 / 3, precision: 1 / 2, coverage: 2 / 3 });
     expect(aggregate([{ is_correct: false, is_sure: false }])).toMatchObject({ n: 1, precision: 0, coverage: 0 });
     expect(aggregate([])).toMatchObject({ n: 0, accuracy: 0, accuracyStderr: 0 });
+  });
+  it('fail-closed denominator: recorded provider/parse failures score incorrect, never vanish', () => {
+    // 2026-09-06 audit fix: dropping failed rows from the denominator inflated
+    // accuracy exactly when the model produced garbage (5 garbage rows used to
+    // leave accuracy computed over the 15 good ones only).
+    const scored = scoreRowsForMetrics([
+      { ok: true, answer: 'A', score: { is_correct: true, is_sure: true } },
+      { ok: false, answer: null, score: undefined },               // provider failure
+      { ok: true, answer: null, score: undefined, error: { kind: 'parse' } }, // unparseable
+    ]);
+    expect(aggregate(scored)).toMatchObject({ n: 3, correct: 1, sure: 3, accuracy: 1 / 3, coverage: 1 });
+    expect(scored[1]).toEqual({ is_correct: false, is_sure: true, failed: true });
+    expect(scored[2]).toEqual({ is_correct: false, is_sure: true, failed: true });
   });
 });

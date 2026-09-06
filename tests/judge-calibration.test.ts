@@ -44,6 +44,19 @@ describe('complement-rescue signals (validated 2026-09-06 offline probe)', () =>
     expect(complementRescueSignal('Antibiotics disrupt the gut microbiota.', 'Antibiotic treatment disturbs gut microbial communities.')).toBe(false);
     expect(complementRescueSignal('A restores X.', 'B reduces Y.')).toBe(false);
   });
+  it('v2 specificity: same-shape pairs about DIFFERENT subjects do not fire (adversarial audit 2026-09-06)', () => {
+    // Function-word glue only ("in the", "of the", "the population") — v1 fired here.
+    expect(subjectComplementSignal(
+      'Loss of suitable habitat reduces the population of songbirds in the region.',
+      'Loss of wetlands reduces the population of amphibians in the region.',
+    )).toBe(false);
+    // Single shared topical token (>= 5 chars) between differently-negated superlative
+    // claims about different findings — v1 fired on one shared token, v2 needs two.
+    expect(superlativeComplementSignal(
+      'Habitat disturbance does not reach the riparian zone.',
+      'Salinity tolerance is highest in the riparian zone.',
+    )).toBe(false);
+  });
   it('mutation-lock: ZERO fires on gold-FALSE band pairs; fires exist on gold-TRUE (157-pair gold)', () => {
     const rows = ['eval/claim-pair-gold.jsonl', 'eval/claim-pair-gold-v21.jsonl']
       .flatMap((f) => readFileSync(resolve(process.cwd(), f), 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)));
@@ -62,8 +75,8 @@ describe('profile registry and resolution', () => {
     expect(resolveCalibration(undefined)).toBe(CALIBRATION_PROFILES.none);
     expect(resolveCalibration('none').rescueThreshold).toBeNull();
   });
-  it('complement-minority-v1 declares its threshold and is frozen', () => {
-    const p = resolveCalibration('complement-minority-v1');
+  it('complement-minority-v2 declares its threshold and is frozen', () => {
+    const p = resolveCalibration('complement-minority-v2');
     expect(p.active).toBe(true);
     expect(p.rescueThreshold).toBe(2);
     expect(Object.isFrozen(CALIBRATION_PROFILES)).toBe(true);
@@ -72,10 +85,18 @@ describe('profile registry and resolution', () => {
   it('unknown profile name fails visibly (a typo must never silently fall back)', () => {
     expect(() => resolveCalibration('complement-minority')).toThrow(/unknown judge calibration profile/);
   });
+  it('prototype-inherited keys are NOT profiles (toString/__proto__ fail visibly, not silently none)', () => {
+    expect(() => resolveCalibration('toString')).toThrow(/unknown judge calibration profile/);
+    expect(() => resolveCalibration('__proto__')).toThrow(/unknown judge calibration profile/);
+    expect(() => resolveCalibration('constructor')).toThrow(/unknown judge calibration profile/);
+  });
+  it('retired v1 name fails visibly (signal semantics changed with v2 — no silent meaning drift)', () => {
+    expect(() => resolveCalibration('complement-minority-v1')).toThrow(/unknown judge calibration profile/);
+  });
 });
 
 describe('bandCalibrationMatch aggregation semantics', () => {
-  const profile = resolveCalibration('complement-minority-v1');
+  const profile = resolveCalibration('complement-minority-v2');
   it('inactive profile never fires — caller keeps majority semantics', () => {
     const r = bandCalibrationMatch({ profile: CALIBRATION_PROFILES.none, claim: FN_SUBJECT_COMPLEMENT[0], counterpart: FN_SUBJECT_COMPLEMENT[1], yesCount: 4, validCount: 5 });
     expect(r).toEqual({ fired: false, matched: null });
@@ -166,11 +187,11 @@ describe('judgeRediscovery calibration integration (mock provider)', () => {
       expect(agentVote).toBeDefined();
     }
   });
-  it('complement-minority-v1: the same 2-of-5 yes votes rescue the signaled pair — matched, fired/flipped stamped', async () => {
-    const res = await judgeRediscovery({ agentText: 't', gtClaims: gt, call: makeCall([2, 2, 2, 2, 2]), calibration: 'complement-minority-v1' });
+  it('complement-minority-v2: the same 2-of-5 yes votes rescue the signaled pair — matched, fired/flipped stamped', async () => {
+    const res = await judgeRediscovery({ agentText: 't', gtClaims: gt, call: makeCall([2, 2, 2, 2, 2]), calibration: 'complement-minority-v2' });
     expect(res.ok).toBe(true);
     if (res.ok) {
-      expect(res.calibration.profile).toBe('complement-minority-v1');
+      expect(res.calibration.profile).toBe('complement-minority-v2');
       expect(res.calibration.fired).toBeGreaterThan(0);
       expect(res.calibration.flipped).toBeGreaterThan(0);
       expect(res.counts.agentMatched).toBe(1);
@@ -180,7 +201,7 @@ describe('judgeRediscovery calibration integration (mock provider)', () => {
     }
   });
   it('unanimous no (0-of-5) stays unmatched under the rescue profile (never mints)', async () => {
-    const res = await judgeRediscovery({ agentText: 't', gtClaims: gt, call: makeCall([0, 0, 0, 0, 0]), calibration: 'complement-minority-v1' });
+    const res = await judgeRediscovery({ agentText: 't', gtClaims: gt, call: makeCall([0, 0, 0, 0, 0]), calibration: 'complement-minority-v2' });
     expect(res.ok).toBe(true);
     if (res.ok) {
       expect(res.calibration.fired).toBeGreaterThan(0);

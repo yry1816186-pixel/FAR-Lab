@@ -59,15 +59,22 @@ const readBodyCapped = async (res: FetchResponseLike, context: HttpGetContext, u
   const reader = res.body.getReader();
   const parts: Uint8Array[] = [];
   let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (value === undefined) continue;
-    total += value.byteLength;
-    if (total > MAX_RESPONSE_BYTES) {
-      throw new Error(`response body exceeds ${MAX_RESPONSE_BYTES} bytes (${context.family} ${url}) — refusing to buffer`);
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value === undefined) continue;
+      total += value.byteLength;
+      if (total > MAX_RESPONSE_BYTES) {
+        throw new Error(`response body exceeds ${MAX_RESPONSE_BYTES} bytes (${context.family} ${url}) — refusing to buffer`);
+      }
+      parts.push(value);
     }
-    parts.push(value);
+  } catch (err) {
+    // Abandoning the reader without cancel() leaves the unconsumed body pinning the
+    // undici socket — on repeated over-cap responses the pool exhausts.
+    await reader.cancel().catch(() => undefined);
+    throw err;
   }
   return new TextDecoder('utf-8').decode(Buffer.concat(parts));
 };

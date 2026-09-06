@@ -237,9 +237,17 @@ const searchWithRetry = async (adapter, query, attempts = 3) => {
   return { ok: false, error: String(lastErr?.message ?? lastErr) };
 };
 
+/** Fail-closed row scoring for metrics (2026-09-06): a RECORDED row whose provider
+ * call failed or whose answer did not parse is a capability failure, not a
+ * measurement exclusion — it scores incorrect (and sure: it is not the unsure
+ * letter). The pre-2026-09-06 behavior dropped such rows from the denominator,
+ * biasing accuracy upward exactly when the model output garbage. Rows never
+ * attempted (absent from the runs file) are not scored at all. */
+export const scoreRowsForMetrics = (rows) => rows.map((x) =>
+  (x.ok && x.answer && x.score !== undefined ? x.score : { is_correct: false, is_sure: true, failed: true }));
+
 const writeSummary = (summaryFile, rows, extra = {}) => {
-  const scored = rows.filter((x) => x.ok && x.answer);
-  const metrics = aggregate(scored.map((x) => x.score));
+  const metrics = aggregate(scoreRowsForMetrics(rows));
   writeFileSync(summaryFile, JSON.stringify({
     at: new Date().toISOString(),
     instrument: 'eval/asta-litqa2.mjs',
@@ -253,6 +261,7 @@ const writeSummary = (summaryFile, rows, extra = {}) => {
         dateDiscipline: DATE_CLAUSE + ' — year precision; AstaBench uses day precision 2024-10-17, ours is effectively 2024-12-31',
       },
       answerTemplate: 'AstaBench DEFAULT_MULTICHOICE_TEMPLATE verbatim + evidence field (additive, disclosed)',
+      failedRowScoring: 'fail-closed (2026-09-06): recorded rows with provider/parse failures score incorrect+sure, never excluded from the denominator; unattempted questions are absent (n reports the attempted count)',
     },
     metrics,
     rows: rows.map((x) => ({
