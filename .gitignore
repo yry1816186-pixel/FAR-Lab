@@ -69,6 +69,18 @@ eval/results/
 /.planning/
 /spikes/
 
+# Agent-runtime state, mission files and agent tooling (local only, 2026-09-06)
+/.agent_brain/
+/.control/
+/.claude/
+/.impeccable/
+/skills/
+/FINAL_EVIDENCE/
+/FINAL_ACCEPTANCE.json
+/FINAL_GAPS.md
+/OMEGA-ULTRA-CONTRACT.md
+/AGENTS.md
+
 # Transient runtime junk
 *.err
 /test-results/
