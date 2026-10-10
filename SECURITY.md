@@ -56,7 +56,7 @@ gitignored `.far-run/secrets.env`). Rules:
 | Local server exposure | Loopback bind by default; Host/Origin/Content-Type guards; 1 MB body cap. |
 | CI credential exfiltration | Minimal `GITHUB_TOKEN` permissions, `persist-credentials: false`. |
 | Malicious/hung external tool (MCP server, JS plugin) | Plugins and MCP servers run as separate subprocesses with timeout bounds (30 s/tool, 2 s/hook) — isolation against **crashes and hangs only, not malicious code**; they execute with the researcher's own OS privileges (industry-standard MCP trust model). Controls: local-directory-only plugin import with a `reviewed:true` gate, staged **DISABLED** on import, per-integration explicit activation, `execute` risk-class default (explore mode denies non-read tools), env/header secrets write-only (masked in every API projection). |
-| Agent shell execution (`run_command` proposals) | The agent may only **propose** a command; the approval card shows the exact command text; execution happens after researcher approval (per-conversation remembered grants are explicit opt-ins). Runs in a login shell confined to the workspace root, 30–120 s timeout with process-tree kill, output capped. No sandbox claim — it runs with the researcher's privileges. |
+| Agent shell execution (`run_command` proposals) | The agent may only **propose** a command; the approval card shows the exact command text; execution happens after researcher approval (per-conversation remembered grants are explicit opt-ins). Runs in a login shell confined to the workspace root, 30–120 s timeout with process-tree kill, output capped. Three defenses keep approved output from leaking credentials into the model-bound transcript: credential-shaped env vars are filtered from the child environment (`FARLAB_SHELL_KEEP_ENV` opts specific names back in), the result string is scrubbed (credential shapes + configured secret values) before it is persisted, and the persistence chokepoint masks secret-shaped payloads. No sandbox claim — it runs with the researcher's privileges. |
 | Integrated terminal (`/api/v1/terminal/*`) | Full shell access by design (the researcher's own login shell on their own machine). Loopback discipline applies; `FARLAB_TERMINAL=off` disables the surface; concurrent-session cap + idle TTL; never exposed on a non-loopback bind without `FARLAB_ALLOW_REMOTE=1`. |
 | Proxy / custom CA (`FARLAB_HTTPS_PROXY`, `FARLAB_CA_CERT`) | These change the TLS trust root and the path of every outbound request — treated as credential-grade config. `FARLAB_CA_CERT` is refused when `NODE_EXTRA_CA_CERTS` is already set at boot (no silent double trust roots); `far probe net` verifies the resulting chain with a loopback self-test. |
 | Thinking display (reasoning capture) | Model reasoning text is **display-only**: persisted on conversation messages, capped (8k/call, 12k/message), never fed back into prompts, never written into receipts (receipts carry hashes only). |
@@ -73,8 +73,13 @@ deployment (decision FA-DAT-03, 2026-09-02). The local SQLite workspaces
   **full-disk encryption** (BitLocker / FileVault / LUKS) — an application-layer
   cipher adds no boundary the OS does not already enforce, while introducing a
   key-management surface.
-- API keys are not stored in the databases (environment / local secrets file;
-  receipts carry hashes only).
+- API keys at rest, stated honestly: builtin provider keys live in environment
+  variables / the local gitignored `.far-run/secrets.env` and are never stored
+  by FAR-Lab. Custom model-route keys ARE stored PLAINTEXT inside the local
+  SQLite workspace (`far.db` `model_config` objects) — masked (`maskApiKey`)
+  in every API/UI projection, never written to prompts or receipts (receipts
+  carry hashes only). This is the same single-user local threat model as
+  `secrets.env`: anyone who can read `far.db` can already read `secrets.env`.
 - **Reopen trigger:** any multi-user, shared-workspace, or server deployment mode
   makes per-workspace encryption (SQLCipher / AES-GCM artifact envelopes) **required**
   before that mode ships. Until such a mode exists, no at-rest-encryption claim is
