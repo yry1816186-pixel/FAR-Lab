@@ -3,7 +3,7 @@
 // Modes:
 //   (default)            print the ledger markdown to stdout
 //   --out <file>         write the ledger to <file>
-//   --check              regenerate and diff against submission/OSS_LEDGER.md; exit 1 on drift
+//   --check              regenerate and diff against OSS_LEDGER.md (repo root); exit 1 on drift
 // Gate rule: any copyleft license (GPL/AGPL/LGPL/SSPL/Sleepycat) FAILS unless the
 // package is listed in ALLOWED_EXCEPTIONS with a recorded justification.
 import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import process from 'node:process';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const LEDGER_PATH = join(repoRoot, 'submission', 'OSS_LEDGER.md');
+const LEDGER_PATH = join(repoRoot, 'OSS_LEDGER.md');
 
 const WORKSPACES = [
   { dir: '.', label: 'Root (backend + CLI)' },
@@ -154,7 +154,7 @@ function render(wsResults, copyleftHits) {
   lines.push('');
   lines.push('```bash');
   lines.push('npm ci && (cd web && npm ci) && (cd packages/tui && npm ci) && (cd desktop && npm ci)');
-  lines.push('node zcode-harness/scripts/license-ledger.mjs --out submission/OSS_LEDGER.md');
+  lines.push('node zcode-harness/scripts/license-ledger.mjs --out OSS_LEDGER.md');
   lines.push('node zcode-harness/scripts/license-ledger.mjs --check   # CI gate: exit 0 = ledger current, no unapproved copyleft');
   lines.push('```');
   lines.push('');
@@ -263,7 +263,7 @@ if (mode === '--out') {
   }
   const committed = readFileSync(LEDGER_PATH, 'utf8');
   if (committed !== markdown) {
-    console.error('FAIL: submission/OSS_LEDGER.md is out of date with the installed dependency tree — regenerate it (see header commands).');
+    console.error('FAIL: OSS_LEDGER.md is out of date with the installed dependency tree — regenerate it (see header commands).');
     // Diagnosis aid (2026-08-30 blind-drift incident): a bare FAIL is
     // undebuggable cross-platform. Print the first differing lines both ways.
     const a = committed.split('\n');
