@@ -46,7 +46,7 @@ import {
   setConversationReasoningGear, ConversationError, type ConversationDeps,
 } from './conversations.js';
 import { startAutomationEngine, type AutomationEngine } from './automations.js';
-import { ConversationTurnHub, type SequencedConversationStreamEvent } from './conversation-stream.js';
+import { ConversationTurnHub } from './conversation-stream.js';
 import { TerminalManager } from './terminal.js';
 import { resolveInsideRoot } from '../agent/capabilities/workspace-tools.js';
 import { aggregateRunUsage, aggregateWorkspaceUsage } from '../app/usage-ledger.js';
@@ -60,7 +60,6 @@ import {
   ProviderWireProtocol,
   ResearchQuestion,
   ScientificGoalType,
-  SourceDocument,
   ToolIntegrationSchema,
   calibrationReport,
   integrationSemanticIssues,
@@ -81,7 +80,27 @@ import { consolidateConversationProfile } from '../app/memory.js';
 import { archiveMemory, editMemory, MemoryOpError } from './memory-ops.js';
 import { EvidenceRelation, EvidenceRelationType } from '../domain/evidence.js';
 import { diagnosticityScores, removalSensitivity } from '../domain/ach.js';
-import { canonicalSha256, sha256Hex } from '../shared/crypto.js';
+import {
+  HttpError,
+  alreadyRunning,
+  assertModelConfigId,
+  assertRunId,
+  conversationTurnStream,
+  decodeSegments,
+  internal,
+  notFound,
+  readBody,
+  readJsonObject,
+  runEventStream,
+  sendError,
+  sendJson,
+  sendText,
+  terminalEventStream,
+  validation,
+  type RouteCtx,
+} from './http-kit.js';
+import { serveStatic } from './static-files.js';
+import { createRunWithSeeds as createRunWithSeedsCore } from './run-launch.js';
 import { deriveNextActions, projectScientificState, deriveScientificWorldModel } from '../domain/index.js';
 import type { ScientificWorldModel } from '../domain/index.js';
 import type { ScientificClaim, HypothesisCandidate, Revision, ExperimentRun, StatReport } from '../domain/index.js';
@@ -103,12 +122,7 @@ import { executeScientificCompute } from '../experiment/scientific-compute.js';
  * Errors always use the shared envelope: {error:{code, message, retryable, runId?}}.
  */
 
-export interface ApiServerError {
-  code: 'not_found' | 'validation' | 'already_running' | 'run_active' | 'not_started' | 'internal' | 'target_not_found' | 'lifecycle' | 'question_required' | 'action_model_failed' | 'action_budget_exhausted' | 'invalid_action_request' | 'invalid_counter_search' | 'provider_unreachable' | 'conversation_model_failed' | 'conversation_full' | 'turn_in_flight' | 'turn_cancelled' | 'no_active_turn' | 'no_corpus' | 'session_stopped' | 'src_not_in_pool' | 'run_not_found' | 'already_launched' | 'scope_proposal_failed' | 'scope_proposal_unavailable' | 'lease_held' | 'feature_disabled' | 'terminal_limit' | 'terminal_not_writable';
-  message: string;
-  retryable: boolean;
-  runId?: string;
-}
+export type { ApiServerError } from './http-kit.js';
 
 export interface ApiServerOptions {
   port?: number;
@@ -150,30 +164,6 @@ export interface ApiServer {
   stop(): Promise<void>;
 }
 
-const MAX_BODY_BYTES = 1_000_000;
-
-const MIME_TYPES: Record<string, string> = {
-  html: 'text/html; charset=utf-8',
-  htm: 'text/html; charset=utf-8',
-  js: 'text/javascript; charset=utf-8',
-  mjs: 'text/javascript; charset=utf-8',
-  css: 'text/css; charset=utf-8',
-  json: 'application/json; charset=utf-8',
-  map: 'application/json; charset=utf-8',
-  svg: 'image/svg+xml',
-  png: 'image/png',
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  gif: 'image/gif',
-  webp: 'image/webp',
-  ico: 'image/x-icon',
-  txt: 'text/plain; charset=utf-8',
-  md: 'text/markdown; charset=utf-8',
-  woff: 'font/woff',
-  woff2: 'font/woff2',
-  wasm: 'application/wasm',
-};
-
 /** Kinds that a feedback target may reference AND that we can existence-check in the store. */
 const TARGET_STORE_KINDS = {
   hypothesis: 'hypothesis',
@@ -182,72 +172,6 @@ const TARGET_STORE_KINDS = {
   question: 'question',
   evidence_relation: 'evidence_relation',
 } as const;
-
-class HttpError extends Error {
-  constructor(
-    readonly status: number,
-    readonly payload: ApiServerError,
-  ) {
-    super(payload.message);
-  }
-}
-
-const notFound = (message: string, runId?: string): HttpError =>
-  new HttpError(404, {
-    code: 'not_found',
-    message,
-    retryable: false,
-    ...(runId !== undefined ? { runId } : {}),
-  });
-
-const validation = (message: string): HttpError =>
-  new HttpError(400, { code: 'validation', message, retryable: false });
-
-const alreadyRunning = (runId: string): HttpError =>
-  new HttpError(409, {
-    code: 'already_running',
-    message: `run ${runId} is already executing in this server — one execution per run; poll GET /api/v1/runs/${runId} instead`,
-    retryable: false,
-    runId,
-  });
-
-const internal = (message: string): HttpError =>
-  new HttpError(500, { code: 'internal', message, retryable: true });
-
-/** Split a pathname into decoded segments; null when any segment is malformed. */
-const decodeSegments = (pathname: string): string[] | null => {
-  const out: string[] = [];
-  for (const seg of pathname.split('/')) {
-    if (seg === '') continue;
-    try {
-      out.push(decodeURIComponent(seg));
-    } catch {
-      return null;
-    }
-  }
-  return out;
-};
-
-/**
- * Safe static path resolution. Returns 'unsafe' for traversal/absolute/encoded-separator
- * attempts (must 404, never silently fall back), a resolved absolute path when the target
- * is a file inside the root, or null for a safe path that is not a file (SPA-fallback
- * candidate).
- */
-const safeStaticFile = (staticRoot: string, pathname: string): string | 'unsafe' | null => {
-  const segments = decodeSegments(pathname);
-  if (segments === null) return 'unsafe';
-  for (const seg of segments) {
-    if (seg === '..' || seg.includes('/') || seg.includes('\\') || seg.includes('\0') || /:/.test(seg)) return 'unsafe';
-  }
-  const abs = path.resolve(staticRoot, ...segments);
-  if (abs !== staticRoot && !abs.startsWith(staticRoot + path.sep)) return 'unsafe';
-  if (fs.existsSync(abs) && fs.statSync(abs).isFile()) return abs;
-  return null;
-};
-
-const mimeFor = (file: string): string =>
-  MIME_TYPES[path.extname(file).slice(1).toLowerCase()] ?? 'application/octet-stream';
 
 export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServer {
   const executor = opts.executor ?? ((runId: string, execOpts?: { stopAfter?: RunStageName }) => app.orchestrator.execute(runId, execOpts));
@@ -343,225 +267,12 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
     watchdogTimer.unref();
   }
 
-  // ---- response helpers ----
-
-  const sendJson = (res: http.ServerResponse, status: number, body: unknown): void => {
-    if (res.writableEnded) return;
-    const payload = JSON.stringify(body);
-    res.writeHead(status, {
-      'Content-Type': 'application/json; charset=utf-8',
-      'Content-Length': Buffer.byteLength(payload),
-    });
-    res.end(payload);
-  };
-
-  const sendError = (res: http.ServerResponse, err: HttpError): void =>
-    sendJson(res, err.status, { error: err.payload });
-
-  const sendText = (res: http.ServerResponse, status: number, contentType: string, body: string): void => {
-    if (res.writableEnded) return;
-    res.writeHead(status, {
-      'Content-Type': contentType,
-      'Content-Length': Buffer.byteLength(body),
-    });
-    res.end(body);
-  };
-
-  // ---- request body (cap 1MB, drain-and-reject on overflow) ----
-
-  const readBody = (req: http.IncomingMessage): Promise<Buffer> =>
-    new Promise((resolve, reject) => {
-      const chunks: Buffer[] = [];
-      let received = 0;
-      let overflowed = false;
-      req.on('data', (chunk: Buffer) => {
-        received += chunk.length;
-        if (received > MAX_BODY_BYTES) {
-          overflowed = true;
-          chunks.length = 0; // stop buffering but keep draining so the response is deliverable
-          return;
-        }
-        if (!overflowed) chunks.push(chunk);
-      });
-      req.on('end', () => {
-        if (overflowed) {
-          reject(validation(`request body exceeds the ${MAX_BODY_BYTES}-byte limit`));
-        } else {
-          resolve(Buffer.concat(chunks));
-        }
-      });
-      req.on('error', (e: Error) => reject(validation(`request body read failed: ${e.message}`)));
-    });
-
-  const readJsonObject = async (req: http.IncomingMessage): Promise<Record<string, unknown>> => {
-    const body = (await readBody(req)).toString('utf8');
-    if (body.trim().length === 0) throw validation('request body required: a JSON object');
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(body);
-    } catch (e) {
-      throw validation(`request body is not valid JSON: ${e instanceof Error ? e.message : String(e)}`);
-    }
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-      throw validation('request body must be a JSON object');
-    }
-    return parsed as Record<string, unknown>;
-  };
-
   // ---- run lookups ----
 
   const mustGetRun = (runId: string) => {
     const run = app.store.getRun(runId);
     if (!run) throw notFound(`run not found: ${runId}`, runId);
     return run;
-  };
-
-  /** run ids are prefix-branded by construction; reject malformed path params before they cross into the store layer. */
-  const RUN_ID_RE = /^run_[0-9a-z]{20,32}$/;
-  const assertRunId = (runId: string): void => {
-    if (!RUN_ID_RE.test(runId)) throw validation(`invalid runId format: ${runId}`);
-  };
-
-  /**
-   * B3 SSE push channel for run events — Node-native, zero dependencies.
-   * Server push replaces the 2s polling cadence; clients keep polling as the
-   * fallback for environments where EventSource is unavailable. Cursor comes
-   * from Last-Event-ID (reconnects) or ?afterSeq (first open). Bounded
-   * lifetime (10 min): EventSource auto-reconnects and resumes from its cursor.
-   */
-  const runEventStream = (req: http.IncomingMessage, res: http.ServerResponse, runId: string, url: URL): void => {
-    mustGetRun(runId);
-    const fromHeader = Number.parseInt(String(req.headers['last-event-id'] ?? ''), 10);
-    const fromQuery = Number.parseInt(url.searchParams.get('afterSeq') ?? '0', 10);
-    let cursor = Number.isFinite(fromHeader) && fromHeader > 0
-      ? fromHeader
-      : Number.isFinite(fromQuery) && fromQuery > 0 ? fromQuery : 0;
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream; charset=utf-8',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-      // Reverse proxies must not buffer the stream.
-      'X-Accel-Buffering': 'no',
-    });
-    res.write(': stream open\n\n');
-    let closed = false;
-    const close = (): void => {
-      if (closed) return;
-      closed = true;
-      clearInterval(timer);
-      clearTimeout(lifetime);
-      res.end();
-    };
-    const lifetime = setTimeout(close, 10 * 60_000);
-    // close() only ever runs from async events (connection close, stream error,
-    // lifetime) — by then both timers below are initialized; no TDZ window.
-    const timer = setInterval(() => {
-      if (closed) return;
-      try {
-        const fresh = app.store.listEventsAfter(runId, cursor);
-        for (const e of fresh) {
-          res.write(`id: ${e.seq}\nevent: run-event\ndata: ${JSON.stringify(e)}\n\n`);
-          cursor = e.seq;
-        }
-        if (fresh.length === 0) res.write(': ping\n\n');
-      } catch {
-        close();
-      }
-    }, 1_000);
-    req.on('close', close);
-    res.on('error', close);
-  };
-
-  /**
-   * Terminal SSE (extensibility lane): ring-buffer replay then live shell output.
-   * The terminal is a GLOBAL panel, so a stream is a long-lived session view:
-   * no hard 30-minute cut (the session's own idle TTL governs lifetime), and
-   * every `out` frame carries its stream offset (`pos`) so an EventSource
-   * reconnect replays without duplicating the transcript.
-   */
-  const terminalEventStream = (req: http.IncomingMessage, res: http.ServerResponse, id: string): void => {
-    const onEvent = (event: { type: 'out'; data: string; pos: number } | { type: 'exit'; code: number | null }): void => {
-      if (event.type === 'out') res.write(`event: terminal-out\ndata: ${JSON.stringify({ data: event.data, pos: event.pos })}\n\n`);
-      else {
-        res.write(`event: terminal-exit\ndata: ${JSON.stringify({ code: event.code })}\n\n`);
-        close();
-      }
-    };
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream; charset=utf-8',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-      'X-Accel-Buffering': 'no',
-    });
-    res.write(': stream open\n\n');
-    let closed = false;
-    const close = (): void => {
-      if (closed) return;
-      closed = true;
-      clearInterval(timer);
-      terminals.unsubscribe(id, onEvent);
-      res.end();
-    };
-    const timer = setInterval(() => { if (!closed) res.write(': ping\n\n'); }, 5_000);
-    const sub = terminals.subscribe(id, onEvent);
-    if (sub === null) {
-      res.write(`event: terminal-exit\ndata: ${JSON.stringify({ code: null, reason: 'session not found (expired or killed)' })}\n\n`);
-      close();
-      return;
-    }
-    if (sub.droppedChars > 0) res.write(`: ring evicted ${sub.droppedChars} older chars\n\n`);
-    req.on('close', close);
-    res.on('error', close);
-  };
-
-  /** Resident-agent stream: seq replay + live public progress. A response
-   * socket closing only unsubscribes; explicit /cancel owns cancellation. */
-  const conversationTurnStream = (
-    res: http.ServerResponse,
-    conversationId: string,
-    url: URL,
-  ): void => {
-    const headerSeq = Number.parseInt(String(res.req.headers['last-event-id'] ?? ''), 10);
-    const querySeq = Number.parseInt(url.searchParams.get('afterSeq') ?? '0', 10);
-    const afterSeq = Number.isFinite(headerSeq) && headerSeq > 0
-      ? headerSeq
-      : Number.isFinite(querySeq) && querySeq > 0 ? querySeq : 0;
-    let closed = false;
-    let heartbeat: NodeJS.Timeout | null = null;
-    let unsubscribe = (): void => {};
-    const terminal = (event: SequencedConversationStreamEvent): boolean =>
-      event.payload.type === 'completed' || event.payload.type === 'failed' || event.payload.type === 'cancelled';
-    const write = (event: SequencedConversationStreamEvent): void => {
-      if (closed || res.writableEnded) return;
-      res.write(`id: ${event.seq}\nevent: conversation-turn\ndata: ${JSON.stringify(event)}\n\n`);
-      if (terminal(event)) queueMicrotask(close);
-    };
-    const close = (): void => {
-      if (closed) return;
-      closed = true;
-      if (heartbeat !== null) clearInterval(heartbeat);
-      unsubscribe();
-      if (!res.writableEnded) res.end();
-    };
-    const sub = conversationTurns.subscribe(conversationId, afterSeq, write);
-    if (sub === null) throw notFound(`no active or recently completed conversation turn for ${conversationId}`);
-    unsubscribe = sub.unsubscribe;
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream; charset=utf-8',
-      'Cache-Control': 'no-cache, no-transform',
-      Connection: 'keep-alive',
-      'X-Accel-Buffering': 'no',
-    });
-    res.write(': conversation stream open\n\n');
-    for (const event of sub.replay) write(event);
-    if (!sub.running && !sub.replay.some(terminal)) {
-      // The caller already consumed the terminal event (afterSeq is current).
-      close();
-      return;
-    }
-    heartbeat = setInterval(() => { if (!closed) res.write(': ping\n\n'); }, 10_000);
-    res.on('close', close);
-    res.on('error', close);
   };
 
   /** B2 universal search: cross-run lookup by researcher-meaningful text (question/hypothesis/claim). */
@@ -652,9 +363,6 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
   };
 
 
-/** R1: validate+normalize the optional `seeds` array (user-provided sources). String return = error. */
-const SEED_TEXT_MAX = 50_000;
-
 /** Library dedup key: the strongest persistent identifier a stored source
  *  carries, normalized (doi lowercased, resolver prefixes stripped). Falls
  *  back to the content hash — two records with no shared identifier and the
@@ -680,156 +388,15 @@ function libraryDedupKey(doc: { identifiers: { kind: string; value: string }[]; 
   return `hash:${doc.contentHash}`;
 }
 
-function parseSeedSources(raw: unknown): string | {
-  title: string;
-  identifiers: { kind: 'doi' | 'arxiv' | 'url' | 'other'; value: string }[];
-  text?: string;
-  year?: number;
-  authors: string[];
-}[] {
-  if (raw === undefined) return [];
-  // An EMPTY array is legitimate: the conversation launch bridge always passes
-  // collectConversationSeeds(conv), and a seedless conversation must be able to
-  // launch a run (2026-08-27 journey: rejecting [] broke every seedless launch
-  // since the bridge landed). Only a non-array or >50 shape is invalid.
-  if (!Array.isArray(raw) || raw.length > 50) {
-    return 'field "seeds" must be an array of at most 50 seed sources';
-  }
-  const out: {
-    title: string; identifiers: { kind: 'doi' | 'arxiv' | 'url' | 'other'; value: string }[];
-    text?: string; year?: number; authors: string[];
-  }[] = [];
-  for (const [i, item] of raw.entries()) {
-    if (typeof item !== 'object' || item === null || Array.isArray(item)) return `seeds[${i}]: must be an object`;
-    const rec = item as Record<string, unknown>;
-    const title = typeof rec.title === 'string' && rec.title.trim().length > 0
-      ? rec.title.trim().slice(0, 500)
-      : `User-provided source ${i + 1}`;
-    let text: string | undefined;
-    if (rec.text !== undefined) {
-      if (typeof rec.text !== 'string' || rec.text.trim().length === 0) return `seeds[${i}].text: must be a non-empty string`;
-      if (rec.text.length > SEED_TEXT_MAX) return `seeds[${i}].text: exceeds ${SEED_TEXT_MAX} chars`;
-      text = rec.text;
-    }
-    const identifiers: { kind: 'doi' | 'arxiv' | 'url' | 'other'; value: string }[] = [];
-    if (rec.identifiers !== undefined) {
-      if (!Array.isArray(rec.identifiers)) return `seeds[${i}].identifiers: must be an array`;
-      for (const idu of rec.identifiers) {
-        if (typeof idu !== 'object' || idu === null) return `seeds[${i}].identifiers: entries must be objects`;
-        const { kind, value } = idu as Record<string, unknown>;
-        if (kind !== 'doi' && kind !== 'arxiv' && kind !== 'url') return `seeds[${i}].identifiers[].kind: doi|arxiv|url`;
-        if (typeof value !== 'string' || value.trim().length === 0 || value.length > 500) return `seeds[${i}].identifiers[].value: 1-500 chars`;
-        identifiers.push({ kind, value: value.trim() });
-      }
-    }
-    if (identifiers.length === 0) {
-      // SourceDocument requires >=1 identifier; an unidentifiable seed gets an
-      // honest synthetic marker (verify_sources will report it unresolvable).
-      identifiers.push({ kind: 'other', value: `user-seed:${i + 1}:${title.slice(0, 80)}` });
-    }
-    let year: number | undefined;
-    if (rec.year !== undefined) {
-      if (typeof rec.year !== 'number' || !Number.isInteger(rec.year) || rec.year < 1400 || rec.year > 2100) {
-        return `seeds[${i}].year: integer 1400-2100`;
-      }
-      year = rec.year;
-    }
-    let authors: string[] = [];
-    if (rec.authors !== undefined) {
-      if (!Array.isArray(rec.authors) || rec.authors.some((a) => typeof a !== 'string')) return `seeds[${i}].authors: string array`;
-      authors = (rec.authors as string[]).slice(0, 20).map((a) => a.slice(0, 200));
-    }
-    out.push({ title, identifiers, ...(text !== undefined ? { text } : {}), ...(year !== undefined ? { year } : {}), authors });
-  }
-  return out;
-}
-
   const createRun = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
     const body = await readJsonObject(req);
     const runId = await createRunWithSeeds(body);
     sendJson(res, 202, { runId, ...(body.draft === true ? { draft: true } : {}) });
   };
 
-  /**
-   * Shared run-creation core (POST /runs and conversation launch): question
-   * validation, optional model route, seed ingestion and async start. With
-   * draft:true (§8.2) the run + seeds persist but execution does NOT start —
-   * scope-proposal / PATCH question / resume complete the pre-launch journey.
-   */
-  const createRunWithSeeds = async (body: Record<string, unknown>): Promise<string> => {
-    const { text, domain, goalType } = body as { text?: unknown; domain?: unknown; goalType?: unknown };
-    if (body.draft !== undefined && typeof body.draft !== 'boolean') {
-      throw validation('field "draft" must be a boolean when given');
-    }
-    if (typeof text !== 'string' || text.trim().length === 0) {
-      throw validation('field "text" is required (non-empty string: the research question)');
-    }
-    const dom = domain === undefined ? 'unspecified' : domain;
-    if (typeof dom !== 'string' || dom.trim().length === 0) {
-      throw validation('field "domain" must be a non-empty string when given');
-    }
-    const goal = goalType === undefined ? 'explanatory' : goalType;
-    const parsedGoal = ScientificGoalType.safeParse(goal);
-    if (!parsedGoal.success) {
-      throw validation(`invalid goalType "${String(goal)}" — must be one of: ${ScientificGoalType.options.join(', ')}`);
-    }
-    const question = ResearchQuestion.parse({
-      id: newId('q'),
-      text,
-      background: '',
-      goalType: parsedGoal.data,
-      scope: { domain: dom, phenomena: [text] },
-      constraints: {},
-      createdAt: new Date().toISOString(),
-    });
-    // Optional user-selected model route for THIS run (resolution: run > active default > env chain).
-    const runOpts: { providerConfigId?: string } = {};
-    if (body.providerConfigId !== undefined) {
-      const providerConfigId = body.providerConfigId;
-      if (typeof providerConfigId !== 'string' || !MODEL_CONFIG_ID_RE.test(providerConfigId)) {
-        throw validation('field "providerConfigId" must be a model config id (mcfg_...)');
-      }
-      if (app.store.getObject('model_config', providerConfigId) === null) {
-        throw notFound(`model config not found: ${providerConfigId}`);
-      }
-      runOpts.providerConfigId = providerConfigId;
-    }
-    const run = app.store.createRun(question, runOpts);
-    // R1 entry upgrade: user-provided seed sources (PDF text / a parsed
-    // citation / a Zotero item) join the corpus as guaranteed, provenance-
-    // marked documents — the retrieve stage never searches for them, it
-    // includes them and the verify stage resolves their identifiers honestly.
-    const seeds = parseSeedSources(body.seeds);
-    if (typeof seeds === 'string') throw validation(seeds);
-    for (const seed of seeds) {
-      app.store.putObject('source_document', SourceDocument.parse({
-        id: newId('src'),
-        runId: run.id,
-        family: 'user_provided',
-        identifiers: seed.identifiers,
-        title: seed.title,
-        ...(seed.year !== undefined ? { publicationYear: seed.year } : {}),
-        ...(seed.authors.length > 0 ? { authors: seed.authors } : {}),
-        contentDepth: seed.text !== undefined ? 'abstract' : 'metadata_only',
-        accessState: 'unknown',
-        contentHash: canonicalSha256({ title: seed.title, text: seed.text, identifiers: seed.identifiers }),
-        retrievedAt: new Date().toISOString(),
-        parseStatus: 'ok',
-        ...(seed.text !== undefined ? { abstractText: seed.text } : {}),
-      }));
-    }
-    if (body.draft === true) {
-      // §8.2 draft: persisted, NOT started — the studies index sees status
-      // 'created' and the pre-launch journey (proposal/edit/resume) owns it.
-      app.store.appendEvent(run.id, {
-        type: 'note',
-        detail: { reason: 'run_created_draft', actor: 'human' },
-      });
-      return run.id;
-    }
-    startRun(run.id); // async execution — the 202 returns immediately; failures land in run state
-    return run.id;
-  };
+  // Shared run-creation core moved to run-launch.ts (BC-002 single owner).
+  const createRunWithSeeds = (body: Record<string, unknown>): Promise<string> =>
+    createRunWithSeedsCore(app, startRun, body);
 
   // Resident-agent action bridge: approved conversation proposals launch runs
   // through the SAME creation path as POST /runs and the manual launch route.
@@ -849,6 +416,23 @@ function parseSeedSources(raw: unknown): string | {
       ...(opts.automations.tickMs !== undefined ? { tickMs: opts.automations.tickMs } : {}),
     });
   }
+
+  // Shared per-server context for every route family (BC-002): the composer in
+  // route() hands each registrar this object; families never reach back into
+  // private server state.
+  const ctx: RouteCtx = {
+    app,
+    executor,
+    executing,
+    startRun,
+    mustGetRun,
+    terminals,
+    conversationTurns,
+    conversationDeps,
+    createRunWithSeeds,
+    consecutiveSweepFailures: () => consecutiveSweepFailures,
+    ...(opts.counterSearchSourceFor !== undefined ? { counterSearchSourceFor: opts.counterSearchSourceFor } : {}),
+  };
 
   const runDetail = (res: http.ServerResponse, runId: string): void => {
     const run = mustGetRun(runId);
@@ -1762,84 +1346,12 @@ function parseSeedSources(raw: unknown): string | {
     throw notFound(`ingest artifact not found: ${ref}`);
   };
 
-  // ---- static frontend (only when web/dist exists; never pretend otherwise) ----
-
-  const serveStatic = (
-    req: http.IncomingMessage,
-    res: http.ServerResponse,
-    method: string,
-    pathname: string,
-    headOnly: boolean,
-  ): void => {
-    if (!fs.existsSync(staticRoot)) {
-      if (pathname === '/' && (method === 'GET' || method === 'HEAD')) {
-        sendJson(res, 200, {
-          service: 'far-lab',
-          api: '/api/v1',
-          frontend: { built: false, reason: `static root not found (${staticRoot}) — build the web workbench first` },
-        });
-      } else {
-        throw notFound(`no route: ${method} ${pathname}`);
-      }
-      return;
-    }
-    const resolved = safeStaticFile(staticRoot, pathname);
-    if (resolved === 'unsafe') {
-      throw notFound(`no route: ${method} ${pathname}`); // traversal/malformed: 404, never a fallback
-    }
-    let target: string | null = resolved; // non-null only when it is a file inside the root
-    // The workbench is hash-routed (useHashRoute: "hash routes need no server
-    // support"), so only '/' needs index.html. Any other extension-less path
-    // (e.g. a missing /models/* asset probe) 404s honestly — a 200 HTML body
-    // here once made the ASR worker treat a missing model as present.
-    if (target === null && pathname === '/') {
-      const index = path.join(staticRoot, 'index.html');
-      if (fs.existsSync(index)) target = index;
-    }
-    if (target === null) throw notFound(`no route: ${method} ${pathname}`);
-    const body = fs.readFileSync(target);
-    const etag = `"sha256-${sha256Hex(body)}"`;
-    // Vite owns /assets and content-hashes every emitted filename. Those bytes
-    // are immutable across deployments; the HTML and optional /models tree are
-    // stable paths whose contents can change and therefore revalidate every
-    // reuse. A strong content validator makes both policies deterministic.
-    const cacheControl = pathname.startsWith('/assets/')
-      ? 'public, max-age=31536000, immutable'
-      : 'no-cache';
-    const representationHeaders = {
-      'Content-Type': mimeFor(target),
-      'Cache-Control': cacheControl,
-      ETag: etag,
-      'X-Content-Type-Options': 'nosniff',
-    };
-    const ifNoneMatch = req.headers['if-none-match'];
-    const validators = (Array.isArray(ifNoneMatch) ? ifNoneMatch.join(',') : ifNoneMatch ?? '')
-      .split(',')
-      .map((value) => value.trim());
-    if (validators.includes('*') || validators.includes(etag)) {
-      res.writeHead(304, representationHeaders);
-      res.end();
-      return;
-    }
-    const headers = { ...representationHeaders, 'Content-Length': body.length };
-    if (headOnly) {
-      res.writeHead(200, headers);
-      res.end();
-    } else {
-      res.writeHead(200, headers);
-      res.end(body);
-    }
-  };
+  // ---- static frontend: moved to static-files.ts (BC-002 single owner) ----
 
   // ---- model configs (user-defined model routes) ----
 
   /** Model configs are workspace-global: stored under the '__none__' run bucket (like questions). */
   const listModelConfigsAll = () => app.store.listObjects('model_config', '__none__');
-
-  const MODEL_CONFIG_ID_RE = /^mcfg_[0-9a-z]{20,32}$/;
-  const assertModelConfigId = (id: string): void => {
-    if (!MODEL_CONFIG_ID_RE.test(id)) throw validation(`invalid model config id format: ${id}`);
-  };
 
   const mustGetModelConfig = (id: string) => {
     const cfg = app.store.getObject('model_config', id);
@@ -2341,7 +1853,7 @@ function parseSeedSources(raw: unknown): string | {
     // static / hint surface (non-/api paths)
     if (segments[0] !== 'api') {
       if (method === 'GET' || method === 'HEAD') {
-        serveStatic(req, res, method, url.pathname, method === 'HEAD');
+        serveStatic(req, res, staticRoot, method, url.pathname, method === 'HEAD');
         return;
       }
       throw notFound(`no route: ${method} ${url.pathname}`);
@@ -2441,7 +1953,7 @@ function parseSeedSources(raw: unknown): string | {
         return;
       }
       if (segments.length === 6 && segments[5] === 'events' && method === 'GET') {
-        return terminalEventStream(req, res, id);
+        return terminalEventStream(req, res, id, ctx);
       }
       throw notFound(`no route: ${method} ${url.pathname}`);
     }
@@ -2456,7 +1968,7 @@ function parseSeedSources(raw: unknown): string | {
       if (runId === undefined) throw notFound(`no route: ${method} ${url.pathname}`);
       assertRunId(runId); // format gate before any store-layer use (WP2 F-003)
       if (segments.length === 6 && segments[4] === 'events' && segments[5] === 'stream') {
-        if (method === 'GET') return runEventStream(req, res, runId, url);
+        if (method === 'GET') return runEventStream(req, res, runId, url, ctx);
         throw notFound(`method ${method} not allowed for ${url.pathname}`);
       }
       // B5 hypothesis lifecycle (R3) + BP-2 direct edit: POST /runs/:id/hypotheses/:hypId/<op>.
@@ -3061,7 +2573,7 @@ function parseSeedSources(raw: unknown): string | {
       if (segments[4] === 'turns' && segments[5] === 'active' && segments[6] === 'stream' && segments.length === 7 && method === 'GET') {
         return convRoute(() => {
           getConversation(app, convId);
-          conversationTurnStream(res, convId, url);
+          conversationTurnStream(res, convId, url, ctx);
         });
       }
       if (segments[4] === 'turns' && segments[5] === 'active' && segments[6] === 'cancel' && segments.length === 7 && method === 'POST') {
@@ -3096,7 +2608,7 @@ function parseSeedSources(raw: unknown): string | {
             convId,
             (runtime) => postConversationMessage(app, convId, body, conversationDeps, runtime),
           );
-          conversationTurnStream(res, convId, url);
+          conversationTurnStream(res, convId, url, ctx);
         });
       }
       if (segments[4] === 'messages' && segments.length === 8 && segments[6] === 'retry' && segments[7] === 'stream' && method === 'POST') {
@@ -3109,7 +2621,7 @@ function parseSeedSources(raw: unknown): string | {
             convId,
             (runtime) => retryConversationTurn(app, convId, segments[5]!, conversationDeps, runtime),
           );
-          conversationTurnStream(res, convId, url);
+          conversationTurnStream(res, convId, url, ctx);
         });
       }
       if (segments[4] === 'messages' && segments.length === 5 && method === 'POST') {
