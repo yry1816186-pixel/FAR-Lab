@@ -14,6 +14,8 @@ import {
 } from './conversation-agent.js';
 import { runInLoginShell } from '../shared/login-shell.js';
 import { resolveInsideRoot } from '../agent/capabilities/workspace-tools.js';
+import { redactSecrets } from '../providers/http.js';
+import { collectEnvSecrets, redactSecretValues } from '../shared/exfil-guard.js';
 
 /**
  * Conversation service (resident-agent flow, PROPOSAL-resident-agent): the
@@ -672,15 +674,26 @@ const executeProposal = async (
         timeoutMs: args.timeoutMs,
         maxOutputChars: 20_000,
       });
-      const out = r.stdout.length > 0 ? `\n stdout:\n${r.stdout}` : '';
-      const err = r.stderr.length > 0 ? `\n stderr:\n${r.stderr}` : '';
+      // SEC-001 layer 1: approved command output is replayed as model history on
+      // later turns — scrub credential SHAPES (the provider pattern table) and the
+      // actually-configured env secret VALUES (named placeholders) before the
+      // result string is built. Layer 2 (filtered child env) keeps env-sourced
+      // keys out at the source; this catches secrets surfacing via any other
+      // channel (catted files, network echoes, tool logs).
+      const envSecrets = collectEnvSecrets();
+      const scrub = (s: string): string => redactSecretValues(redactSecrets(s), { secrets: envSecrets });
+      const out = r.stdout.length > 0 ? `\n stdout:\n${scrub(r.stdout)}` : '';
+      const err = r.stderr.length > 0 ? `\n stderr:\n${scrub(r.stderr)}` : '';
       const verdict = r.timedOut
         ? `命令超时（${args.timeoutMs}ms）后被终止`
         : `退出码 ${r.exitCode ?? 'unknown'}`;
       return {
         // spawnFailed is an execution failure — never reported as success.
         ok: !r.timedOut && !('spawnFailed' in r) && (r.exitCode === 0 || r.exitCode === null),
-        result: `命令：${args.command}\n${verdict}，耗时 ${r.durationMs}ms${r.truncated ? '（输出已截断）' : ''}${out}${err}`,
+        // The composed string — including the command echo — is the copy that
+        // gets persisted and replayed as model history; scrub it as a whole so
+        // no replayed copy carries a secret (scrubbing is idempotent).
+        result: scrub(`命令：${args.command}\n${verdict}，耗时 ${r.durationMs}ms${r.truncated ? '（输出已截断）' : ''}${out}${err}`),
       };
     }
     const args = CancelAutomationArgsSchema.parse(proposal.args);
