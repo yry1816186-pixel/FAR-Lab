@@ -15,7 +15,7 @@ import {
 import { runInLoginShell } from '../shared/login-shell.js';
 import { resolveInsideRoot } from '../agent/capabilities/workspace-tools.js';
 import { redactSecrets } from '../providers/http.js';
-import { collectEnvSecrets, redactSecretValues } from '../shared/exfil-guard.js';
+import { collectEnvSecrets, redactSecretValues, scanOutbound } from '../shared/exfil-guard.js';
 
 /**
  * Conversation service (resident-agent flow, PROPOSAL-resident-agent): the
@@ -555,6 +555,16 @@ export function appendAutomationRecord(app: App, conversationId: string, content
   if (conv.messages.length >= MAX_MESSAGES) {
     throw new ConversationError(409, 'conversation_full', 'conversation reached the message limit — start a new conversation');
   }
+  // SEC-001 layer 3 — persistence chokepoint: automation records are replayed as
+  // model history on later turns. The agent-loop plane trips on outbound secrets
+  // (loop.ts scanOutbound at the tool boundary); this plane enforces the SAME
+  // policy at the write: a payload carrying a configured secret value is masked
+  // with a named placeholder instead of persisted, whatever path produced it.
+  // Masking (not refusal) keeps the record visible and honest.
+  const envSecrets = collectEnvSecrets();
+  const safeContent = scanOutbound(content, { secrets: envSecrets }) === null
+    ? content
+    : redactSecretValues(content, { secrets: envSecrets });
   const updated = ConversationSchema.parse({
     ...conv,
     messages: [
@@ -562,7 +572,7 @@ export function appendAutomationRecord(app: App, conversationId: string, content
       ConversationSchema.shape.messages.element.parse({
         id: newId('cmsg'),
         role: 'automation',
-        content: content.slice(0, 2000),
+        content: safeContent.slice(0, 2000),
         createdAt: new Date().toISOString(),
       }),
     ],

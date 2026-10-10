@@ -5,8 +5,7 @@ import path from 'node:path';
 import { createApp } from '../src/app/composition.js';
 import type { App } from '../src/app/composition.js';
 import { createTestStubProvider } from '../src/providers/test-stub.js';
-import { resolveConversationProposal } from '../src/server/conversations.js';
-import { createConversation } from '../src/server/conversations.js';
+import { resolveConversationProposal, appendAutomationRecord, createConversation } from '../src/server/conversations.js';
 import { ConversationSchema } from '../src/domain/index.js';
 import type { Conversation } from '../src/domain/index.js';
 import { runInLoginShell, shellChildEnv } from '../src/shared/login-shell.js';
@@ -188,4 +187,30 @@ describe('approved run_command transcript (layer 1)', () => {
     expect(proposal?.result).toContain('clean-scientific-text-42');
     expect(proposal?.result).not.toContain('REDACTED');
   }, 60_000);
+});
+
+// ---- layer 3: the persistence chokepoint masks secret-shaped payloads ----
+
+const lastAutomationMessage = (convId: string): string => {
+  const conv = app.store.getObject('conversation', convId);
+  const msgs = conv?.messages ?? [];
+  const last = msgs.length > 0 ? msgs[msgs.length - 1] : undefined;
+  return last !== undefined && last.role === 'automation' ? last.content : '';
+};
+
+describe('appendAutomationRecord persistence gate (layer 3)', () => {
+  it('a secret-shaped payload is masked with a named placeholder at the write', () => {
+    process.env[ENV_NAME] = ENV_VALUE;
+    const conv = createConversation(app, { title: '咽喉门验证' });
+    appendAutomationRecord(app, conv.id, `外部工具回报：key=${ENV_VALUE}，状态正常`);
+    const stored = lastAutomationMessage(conv.id);
+    expect(stored).toContain(`[REDACTED:${ENV_NAME}]`);
+    expect(stored).not.toContain(ENV_VALUE);
+  });
+
+  it('clean automation records land byte-identical (no gate false positives)', () => {
+    const conv = createConversation(app, { title: '咽喉门阴性对照' });
+    appendAutomationRecord(app, conv.id, '研究 run_abc 已完成，产物已入档');
+    expect(lastAutomationMessage(conv.id)).toBe('研究 run_abc 已完成，产物已入档');
+  });
 });
