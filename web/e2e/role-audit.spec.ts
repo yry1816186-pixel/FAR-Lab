@@ -28,7 +28,17 @@ test('§27 a11y: decision surfaces (inspector claim/hyp, deep plan panel) have n
   await request.post(`/api/v1/runs/${runId}/scope-proposal`, {});
   await request.post(`/api/v1/runs/${runId}/resume`, {});
   await expect
-    .poll(async () => (await (await request.get(`/api/v1/runs/${runId}`)).json() as { status: string }).status, { timeout: 120_000, interval: 3_000 })
+    .poll(async () => {
+      // Offline-run execution can block the server event loop long enough for
+      // the runner OS to RST a keep-alive connection — a transport blip is
+      // pending, not a failure; the assertion still requires a final
+      // 'completed' (same documented shape every other poll helper in this
+      // suite tolerates; hosted CI hit the unwrapped read twice in run
+      // 38054862132 while the surrounding 34 tests stayed green).
+      try {
+        return (await (await request.get(`/api/v1/runs/${runId}`)).json() as { status?: string }).status ?? 'no-status';
+      } catch { return 'conn-error'; }
+    }, { timeout: 120_000, interval: 3_000 })
     .toBe('completed');
 
   // Claim inspector open
