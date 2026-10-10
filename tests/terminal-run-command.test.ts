@@ -95,6 +95,17 @@ describe('runInLoginShell (real processes)', () => {
       if (prev === undefined) delete process.env.FARLAB_SHELL; else process.env.FARLAB_SHELL = prev;
     }
   }, 30_000);
+
+  it('signal death is never a zero exit (LOG-001)', async () => {
+    const r = await runInLoginShell({
+      command: 'node -e "process.kill(process.pid, \'SIGKILL\')"',
+      cwd: tmp,
+      timeoutMs: 30_000,
+      maxOutputChars: 4000,
+    });
+    expect(r.timedOut).toBe(false);
+    expect(r.exitCode).not.toBe(0);
+  }, 45_000);
 });
 
 describe('TerminalManager (real sessions)', () => {
@@ -198,5 +209,18 @@ describe('run_command proposal (approval-gated shell execution)', () => {
     const proposal = updated.messages.flatMap((m) => m.proposals ?? []).find((p) => p.id === proposalId);
     expect(proposal?.status).toBe('failed');
     expect(proposal?.result).toContain('退出码 2');
+  }, 60_000);
+
+  it('signal-killed commands are never reported as executed-ok (LOG-001)', async () => {
+    // POSIX: exitCode is null when the child dies by signal; the old predicate
+    // treated null as success. Windows: the kill surfaces as a nonzero exit.
+    const { convId, proposalId } = seedRunCommand({
+      command: 'node -e "process.kill(process.pid, \'SIGKILL\')"',
+      timeoutMs: 30_000,
+    });
+    const updated = await resolveConversationProposal(app, convId, proposalId, { approve: true });
+    const proposal = updated.messages.flatMap((m) => m.proposals ?? []).find((p) => p.id === proposalId);
+    expect(proposal?.status).toBe('failed');
+    expect(proposal?.result).not.toContain('退出码 0');
   }, 60_000);
 });

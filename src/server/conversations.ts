@@ -699,7 +699,10 @@ const executeProposal = async (
         : `退出码 ${r.exitCode ?? 'unknown'}`;
       return {
         // spawnFailed is an execution failure — never reported as success.
-        ok: !r.timedOut && !('spawnFailed' in r) && (r.exitCode === 0 || r.exitCode === null),
+        // LOG-001: success is exitCode === 0 ONLY — a null exit code means the
+        // child died by SIGNAL (output-overflow killTree or an external kill),
+        // which is a failure, not an honest "executed ok".
+        ok: !r.timedOut && !('spawnFailed' in r) && r.exitCode === 0,
         // The composed string — including the command echo — is the copy that
         // gets persisted and replayed as model history; scrub it as a whole so
         // no replayed copy carries a secret (scrubbing is idempotent).
