@@ -98,6 +98,32 @@ export interface SearchHit {
   rank?: number;
 }
 
+/**
+ * LOG-003: one corrupt / partially-written events row (disk corruption, crash
+ * mid-write, manual edit) must not take down EVERY reader of that run — the
+ * bare JSON.parse inside listEvents/queryEvents made GET /runs/:id, the CLI
+ * run view and watchdog adoption throw permanently until manual sqlite
+ * surgery. Parse per-row; on failure emit a synthetic well-formed note
+ * carrying the seq — the hole stays visible and countable in-band (one marker
+ * event per corrupt row) instead of fatal. The neighboring deleted-row hole
+ * (`if (!row) continue`) is the same tolerance discipline.
+ */
+const parseEventRow = (row: Record<string, unknown>, runId: string): RunEvent => {
+  const seq = Number(row.seq);
+  try {
+    const p = JSON.parse(String(row.payload)) as Record<string, unknown>;
+    return RunEvent.parse({ ...p, seq });
+  } catch {
+    return RunEvent.parse({
+      seq,
+      runId,
+      at: new Date().toISOString(),
+      type: 'note',
+      detail: { reason: 'corrupt_event_payload_skipped' },
+    });
+  }
+};
+
 export class Store {
   private ftsReady = false;
   private trigramReady = false;
@@ -462,27 +488,20 @@ export class Store {
     for (const r of rows) {
       const row = fetchEvent.get(String(r.run_id), Number(r.seq));
       if (!row) continue; // deleted-event hole: skip honestly
-      const p = JSON.parse(String(row.payload)) as Record<string, unknown>;
-      out.push(RunEvent.parse({ ...p, seq: Number(row.seq) }));
+      out.push(parseEventRow(row, String(r.run_id)));
     }
     return out;
   }
 
   listEvents(runId: string): RunEvent[] {
     return this.db.prepare('SELECT seq, payload FROM events WHERE run_id=? ORDER BY seq ASC').all(runId)
-      .map((r) => {
-        const p = JSON.parse(String(r.payload)) as Record<string, unknown>;
-        return RunEvent.parse({ ...p, seq: Number(r.seq) });
-      });
+      .map((r) => parseEventRow(r, runId));
   }
 
   /** Events with seq strictly greater than the cursor (B3 SSE incremental feed). */
   listEventsAfter(runId: string, afterSeq: number): RunEvent[] {
     return this.db.prepare('SELECT seq, payload FROM events WHERE run_id=? AND seq>? ORDER BY seq ASC').all(runId, afterSeq)
-      .map((r) => {
-        const p = JSON.parse(String(r.payload)) as Record<string, unknown>;
-        return RunEvent.parse({ ...p, seq: Number(r.seq) });
-      });
+      .map((r) => parseEventRow(r, runId));
   }
 
   // ---- generic canonical object storage ----
