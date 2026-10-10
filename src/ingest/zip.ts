@@ -1,4 +1,5 @@
 import { deflateRawSync, inflateRawSync } from 'node:zlib';
+import { centralDirectoryHeader, crc32, endOfCentralDirectory, localFileHeader, type ZipDosTimestamp } from '../shared/zip-format.js';
 
 /**
  * Minimal ZIP container reader (MULTIMODAL lane). Shared by every zip-based
@@ -97,82 +98,35 @@ export const readZip = (buf: Buffer): ZipReadResult => {
 };
 
 /** Test/benchmark helper: build a real zip container (store or deflate) so the
- *  suites exercise the actual container format, not a mock of it. */
+ *  suites exercise the actual container format, not a mock of it. Header bytes
+ *  come from shared/zip-format.ts (ARCH-003 single owner); the ENTRY policy
+ *  here is: caller-chosen compression per part, no name flags, zero DOS dates. */
 export const writeZip = (parts: Array<{ name: string; data: Buffer | string; deflate?: boolean }>): Buffer => {
   const chunks: Buffer[] = [];
   const central: Buffer[] = [];
   let offset = 0;
+  const ZERO_TS: ZipDosTimestamp = { time: 0, date: 0 };
   const enc = (s: string): Buffer => Buffer.from(s, 'utf8');
   for (const part of parts) {
     const nameBuf = enc(part.name);
     const raw = typeof part.data === 'string' ? enc(part.data) : part.data;
     const method = part.deflate === true ? 8 : 0;
-    let stored: Buffer;
-    let crc: number;
-    if (method === 8) {
-      stored = deflateRawSync(raw);
-      crc = crc32(raw);
-    } else {
-      stored = raw;
-      crc = crc32(raw);
-    }
-    const lfh = Buffer.alloc(30);
-    lfh.writeUInt32LE(0x0403_4b50, 0);
-    lfh.writeUInt16LE(20, 4);          // version needed
-    lfh.writeUInt16LE(0, 6);           // flags
-    lfh.writeUInt16LE(method, 8);
-    lfh.writeUInt16LE(0, 10); lfh.writeUInt16LE(0, 12); // dos time/date
-    lfh.writeUInt32LE(crc, 14);
-    lfh.writeUInt32LE(stored.length, 18);
-    lfh.writeUInt32LE(raw.length, 22);
-    lfh.writeUInt16LE(nameBuf.length, 26);
-    lfh.writeUInt16LE(0, 28);
+    const stored = method === 8 ? deflateRawSync(raw) : raw;
+    const crc = crc32(raw);
+    const sizes = {
+      method,
+      crc,
+      compressedSize: stored.length,
+      uncompressedSize: raw.length,
+      nameLength: nameBuf.length,
+    };
+    const lfh = localFileHeader(sizes, ZERO_TS, 0);
     chunks.push(lfh, nameBuf, stored);
-    const cdh = Buffer.alloc(46);
-    cdh.writeUInt32LE(0x0201_4b50, 0);
-    cdh.writeUInt16LE(20, 4);          // version made by
-    cdh.writeUInt16LE(20, 6);          // version needed
-    cdh.writeUInt16LE(0, 8);
-    cdh.writeUInt16LE(method, 10);
-    cdh.writeUInt16LE(0, 12); cdh.writeUInt16LE(0, 14);
-    cdh.writeUInt32LE(crc, 16);
-    cdh.writeUInt32LE(stored.length, 20);
-    cdh.writeUInt32LE(raw.length, 24);
-    cdh.writeUInt16LE(nameBuf.length, 28);
-    cdh.writeUInt16LE(0, 30); cdh.writeUInt16LE(0, 32);
-    cdh.writeUInt16LE(0, 34);          // disk number start
-    cdh.writeUInt16LE(0, 36);          // internal attrs
-    cdh.writeUInt32LE(0, 38);          // external attrs
-    cdh.writeUInt32LE(offset, 42);     // local header offset
+    const cdh = centralDirectoryHeader(sizes, ZERO_TS, 0, offset);
     central.push(Buffer.concat([cdh, nameBuf]));
-    offset += 30 + nameBuf.length + stored.length;
+    offset += lfh.length + nameBuf.length + stored.length;
   }
   const cd = Buffer.concat(central);
-  const eocd = Buffer.alloc(22);
-  eocd.writeUInt32LE(0x0605_4b50, 0);
-  eocd.writeUInt16LE(0, 4); eocd.writeUInt16LE(0, 6);
-  eocd.writeUInt16LE(parts.length, 8);
-  eocd.writeUInt16LE(parts.length, 10);
-  eocd.writeUInt32LE(cd.length, 12);
-  eocd.writeUInt32LE(offset, 16);
-  eocd.writeUInt16LE(0, 20);
+  const eocd = endOfCentralDirectory(parts.length, cd.length, offset);
   return Buffer.concat([...chunks, cd, eocd]);
-};
-
-const CRC_TABLE = (() => {
-  const t = new Uint32Array(256);
-  for (let n = 0; n < 256; n += 1) {
-    let c = n;
-    for (let k = 0; k < 8; k += 1) c = (c & 1) !== 0 ? 0xEDB8_8320 ^ (c >>> 1) : c >>> 1;
-    t[n] = c >>> 0;
-  }
-  return t;
-})();
-
-const crc32 = (buf: Buffer): number => {
-  let c = 0xFFFF_FFFF;
-  for (let i = 0; i < buf.length; i += 1) {
-    c = (CRC_TABLE[(c ^ buf[i]!) & 0xFF] ?? 0) ^ (c >>> 8);
-  }
-  return (c ^ 0xFFFF_FFFF) >>> 0;
 };
