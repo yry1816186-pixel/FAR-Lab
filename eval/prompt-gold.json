@@ -330,9 +330,9 @@
     ]
   },
   "src/pipeline/stages/plan.ts::PLAN_SYSTEM_PROMPT[18]": {
-    "intent": "e_value_accumulation banned (no estimator)",
+    "intent": "e_value_accumulation allowed only as an anytime-valid e-process with a declared threshold (estimator landed: src/domain/e-process.js)",
     "anchors": [
-      "no e-value estimator"
+      "anytime-valid e-process"
     ]
   },
   "src/pipeline/stages/plan.ts::PLAN_SYSTEM_PROMPT[19]": {
