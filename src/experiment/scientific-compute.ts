@@ -14,7 +14,13 @@ export const executeScientificCompute = async (
   } = {},
 ): Promise<Record<string, unknown>> => {
   const parsed = ScientificComputeRequest.parse(request);
-  const timeoutMs = opts.timeoutMs ?? 30_000;
+  // Budget sized to the measured real cold start: every request spawns a fresh
+  // `uv run --frozen` sidecar whose startup (env check + interpreter import of
+  // the scientific stack) measured 23.4-25.7s on hosted windows/macos and >30s
+  // under ubuntu suite load (CI run 34042315989 red: a healthy cold start came
+  // back as a bogus 400). 120s matches the dataset-netcdf sidecar convention
+  // and leaves ~4x margin over the worst observed cold start.
+  const timeoutMs = opts.timeoutMs ?? 120_000;
   const signal = opts.signal;
   const abortError = (): Error => Object.assign(new Error('scientific computation aborted by caller'), { name: 'AbortError' });
   const assertActive = (): void => { if (signal?.aborted) throw abortError(); };

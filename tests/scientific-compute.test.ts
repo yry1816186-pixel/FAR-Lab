@@ -91,6 +91,28 @@ describe('scientific compute primitives', () => {
     expect(() => plotSvg({ kind: 'scatter', x: [1], y: [1, 2] })).toThrow(/equal length/);
   });
 
+  it('sizes the default sidecar budget to real cold starts (hosted ubuntu CI red at 30s)', async () => {
+    // Regression lock for CI run 34042315989: every science/compute request
+    // spawns a fresh `uv run --frozen` sidecar whose cold start (env check +
+    // interpreter import of the scientific stack) measured 23.4-25.7s on hosted
+    // windows/macos and >30s under ubuntu suite load — a 30s default turned a
+    // healthy cold start into a bogus 400. The budget must stay >= the
+    // dataset-netcdf sidecar convention (120s).
+    const budgets: number[] = [];
+    await executeScientificCompute(
+      { operation: 'bayesian_beta_binomial', input: { priorAlpha: 1, priorBeta: 1, successes: 1, trials: 2 } },
+      {
+        sidecar: () => ({
+          warmup: async (timeoutMs: number) => { budgets.push(timeoutMs); return { pythonVersion: 'test', versions: {} }; },
+          call: async (_op: string, _payload: unknown, timeoutMs: number) => { budgets.push(timeoutMs); return { ok: true, result: { provenance: 'COMPUTED' } }; },
+          logs: () => [], envInfo: () => null, lockfileHash: () => null, close: () => {},
+        }),
+      },
+    );
+    expect(budgets.length).toBe(2); // warmup + op call both carry the budget
+    expect(Math.min(...budgets)).toBeGreaterThanOrEqual(120_000);
+  });
+
   it('bridges production calls through the sidecar operation contract', async () => {
     let closed = false;
     const result = await executeScientificCompute(
