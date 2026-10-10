@@ -105,3 +105,19 @@ export const redactOutbound = <T>(value: T, ctx: { secrets?: ReadonlyArray<Exfil
     return value;
   }
 };
+
+/**
+ * SEC-001 (BC-001): string-native value redaction for PLAIN-TEXT surfaces —
+ * approved command output and automation records. Same named-placeholder
+ * policy as redactOutbound (detection stays possible, leakage does not),
+ * without the JSON round-trip structured values need.
+ */
+export const redactSecretValues = (
+  text: string,
+  ctx: { secrets?: ReadonlyArray<ExfilSecret>; canaries?: ReadonlyArray<{ id: string; value: string }> },
+): string => {
+  let out = text;
+  for (const s of ctx.secrets ?? []) out = out.split(s.value).join(`[REDACTED:${s.name}]`);
+  for (const c of ctx.canaries ?? []) out = out.split(c.value).join('[REDACTED:session-marker]');
+  return out;
+};

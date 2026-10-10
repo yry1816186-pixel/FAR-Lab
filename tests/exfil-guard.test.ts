@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { z } from 'zod';
 import {
-  collectEnvSecrets, describeViolation, makeSessionCanary, scanOutbound,
+  collectEnvSecrets, describeViolation, makeSessionCanary, redactSecretValues, scanOutbound,
 } from '../src/shared/exfil-guard.js';
 import { invokeStructured } from '../src/pipeline/llm.js';
 import { runAgentLoop, type AgentLoopConfig, type AgentLoopDeps } from '../src/agent/loop.js';
@@ -47,6 +47,22 @@ describe('exfil-guard pure functions', () => {
   it('makeSessionCanary: stable shape, unpredictable per session', () => {
     expect(makeSessionCanary('ags_a')).toMatch(/^FARCANARY-[0-9a-f]{24}$/);
     expect(makeSessionCanary('ags_a')).not.toBe(makeSessionCanary('ags_a')); // randomized per call
+  });
+
+  it('redactSecretValues: string-native value redaction with named placeholders (SEC-001)', () => {
+    const secrets = [{ name: 'ZAI_API_KEY', value: 'zai-live-value-abcdef123456' }];
+    const out = redactSecretValues('probe: ZAI_API_KEY=zai-live-value-abcdef123456 end', { secrets });
+    expect(out).toContain('[REDACTED:ZAI_API_KEY]');
+    expect(out).not.toContain('zai-live-value-abcdef123456');
+    // every occurrence is replaced, plaintext fully gone
+    const twice = redactSecretValues('a zai-live-value-abcdef123456 b zai-live-value-abcdef123456 c', { secrets });
+    expect(twice.match(/\[REDACTED:ZAI_API_KEY\]/g)).toHaveLength(2);
+    expect(twice).not.toContain('zai-live-value');
+    // canary values share the policy
+    const canary = { id: 'session', value: makeSessionCanary('ags_redact') };
+    expect(redactSecretValues(`x${canary.value}y`, { canaries: [canary] })).toBe('x[REDACTED:session-marker]y');
+    // clean text passes through byte-identical
+    expect(redactSecretValues('plain scientific text about vitamin D', { secrets })).toBe('plain scientific text about vitamin D');
   });
 });
 
