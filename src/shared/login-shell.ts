@@ -94,6 +94,36 @@ const posixShell = (program: string): LoginShell => {
   };
 };
 
+/**
+ * SEC-001 (BC-001) layer 2: one-shot shell children do NOT inherit
+ * credential-shaped env vars — an innocuous approved command (`env`,
+ * `printenv`, `node -p process.env`) would otherwise print every provider key
+ * loaded from env/secrets.env straight into the model-bound transcript.
+ * Deny-list by NAME shape (KEY/TOKEN/SECRET/PASSWORD and the known provider
+ * families); FARLAB_SHELL_KEEP_ENV=NAME1,NAME2 explicitly opts named variables
+ * back in for workflows that need one. Terminal SESSIONS (the researcher's
+ * own interactive shell, output never model-bound) intentionally keep the
+ * full environment — see SECURITY.md. Output redaction (layer 1) and the
+ * persistence gate (layer 3) backstop names this list has not met yet.
+ */
+const SECRET_ENV_NAME_RE = /KEY|TOKEN|SECRET|PASSWORD|ANTHROPIC|ZAI|DEEPSEEK|DASHSCOPE/i;
+
+export const shellChildEnv = (env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv => {
+  const keep = new Set(
+    (env.FARLAB_SHELL_KEEP_ENV ?? '')
+      .split(',')
+      .map((name) => name.trim())
+      .filter((name) => name.length > 0),
+  );
+  const child: Record<string, string> = {};
+  for (const [name, value] of Object.entries(env)) {
+    if (value === undefined) continue;
+    if (!keep.has(name) && SECRET_ENV_NAME_RE.test(name)) continue;
+    child[name] = value;
+  }
+  return child;
+};
+
 /** One command, one bounded run in the login shell. Exit code and output are honest. */
 export const runInLoginShell = async (opts: {
   command: string;
@@ -157,25 +187,28 @@ export const runInLoginShell = async (opts: {
  * child's exit code is the command's own.
  */
 const spawnForOneShot = (shell: LoginShell, command: string, cwd: string): { child: ChildProcess; stdinScript: string | null } => {
+  // SEC-001 layer 2: credential-shaped env never reaches an agent-proposed
+  // command's child (FARLAB_SHELL_KEEP_ENV opt-in handled inside shellChildEnv).
+  const childEnv = shellChildEnv();
   switch (shell.family) {
     case 'posix':
       return {
         child: spawn(shell.program, [...shell.sessionArgs, '-c', command], {
-          cwd, env: process.env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, detached: process.platform !== 'win32',
+          cwd, env: childEnv, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, detached: process.platform !== 'win32',
         }),
         stdinScript: null,
       };
     case 'cmd':
       return {
         child: spawn(shell.program, ['/Q'], {
-          cwd, env: process.env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, detached: process.platform !== 'win32',
+          cwd, env: childEnv, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, detached: process.platform !== 'win32',
         }),
         stdinScript: `chcp 65001>nul\r\n${command}\r\nexit %ERRORLEVEL%\r\n`,
       };
     default:
       return {
         child: spawn(shell.program, ['-NoLogo', '-NonInteractive', '-Command', '-'], {
-          cwd, env: process.env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, detached: process.platform !== 'win32',
+          cwd, env: childEnv, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, detached: process.platform !== 'win32',
         }),
         stdinScript: '[Console]::OutputEncoding=[System.Text.Encoding]::UTF8\n' +
           `${command}\n` +
