@@ -61,8 +61,8 @@
     "vite": "^6.0.3"
   },
   "overrides": {
-    "sharp": "0.35.4",
-    "adm-zip": "0.6.0",
+    "sharp": "0.35.5",
+    "adm-zip": "0.6.1",
     "jszip": "3.10.1",
     "mammoth": "1.12.1",
     "pdfjs-dist": "6.2.108"
