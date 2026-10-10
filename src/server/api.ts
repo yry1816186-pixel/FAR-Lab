@@ -16,6 +16,7 @@ import { analyzeTrajectory } from '../app/supervisor.js';
 import { runTruthProfile } from '../app/truth-profile.js';
 import { RunLeaseHeldError } from '../app/orchestrator.js';
 import { runCounterSearch, CounterSearchError } from './counter-search.js';
+import { pruneAdoptionBackoff } from './adoption-backoff.js';
 import { buildZip, type ZipEntry } from './zip.js';
 import { buildLineageGraph } from '../app/lineage.js';
 import { runEvaluators } from '../app/evaluators.js';
@@ -303,7 +304,12 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
   const sweepExpiredLeases = (): void => {
     try {
       const now = Date.now();
-      for (const stale of app.store.listExpiredLeaseRuns(new Date().toISOString())) {
+      const stales = app.store.listExpiredLeaseRuns(new Date().toISOString());
+      // LOG-004: backoff entries for runs that left the expired-lease set are
+      // stale (terminal state or restore) — prune them so the map stays bounded
+      // by the live expired-run population, not the server's lifetime.
+      pruneAdoptionBackoff(lastAdoptedAt, new Set(stales.map((s) => s.id)), now, adoptionBackoffMs);
+      for (const stale of stales) {
         if (executing.has(stale.id)) continue;
         // Parking-intent guard: a run tagged 'parking:*' is a deliberately-stopped
         // draft (scope proposal / CLI --stop-after) whose worker died before parking.
