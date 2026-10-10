@@ -1,7 +1,7 @@
 name: ci
 
 # Quality gate for every push and PR: the same deterministic checks the local
-# harness runs (AGENTS.md §2/§8) — typecheck, lint, full vitest suite (incl. the
+# harness runs — typecheck, lint, full vitest suite (incl. the
 # real-uv experiment sidecar), TUI package tests, CLI smoke, secret/path scans,
 # license ledger, and the web production build (which typechecks first).
 # No live model routes are touched: tests are offline by design; any test that

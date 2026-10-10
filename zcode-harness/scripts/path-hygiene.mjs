@@ -1,5 +1,5 @@
 // Deterministic workspace-path hygiene checks for the FAR-Lab workspace.
-// Verifies: required state files valid; ACCEPTANCE_STATUS vocabulary; no .env;
+// Verifies: required spec files present; ACCEPTANCE_STATUS vocabulary; no .env;
 // no test fixtures or demo/mock markers inside production roots; generated-artifact
 // and oversized-file warnings; .gitignore coverage.
 // Errors => exit 1. Warnings/info reported but do not fail.
@@ -33,15 +33,11 @@ const isTestFile = name => /(?:\.|_)(?:test|spec)\.[^.]+$/i.test(name);
 const exists = rel => fs.existsSync(path.join(root, rel));
 
 // 1. Required files
+// Repo governance 2026-10-10: the required set is the tracked product spec
+// corpus only. Developer-workspace state (agent kernels, execution-state
+// ledgers, build prompts) is intentionally NOT a repo invariant — a fresh
+// checkout must pass this gate without any local workspace scaffolding.
 const REQUIRED = [
-  'AGENTS.md',
-  'START_HERE.md',
-  'FINAL_BUILD_PROMPT.md',
-  '.control/EXECUTION_STATE.json',
-  '.control/ACCEPTANCE_STATUS.json',
-  '.control/BLOCKERS.json',
-  '.control/DECISIONS.jsonl',
-  'research/EVIDENCE_INDEX.md',
   'project-spec/policies/README.md',
   'project-spec/policies/ENGINEERING_CONDUCT.md',
   'project-spec/policies/PRODUCT_HCI.md',
@@ -50,21 +46,9 @@ const REQUIRED = [
   'project-spec/policies/RELIABILITY_SECURITY.md',
   'project-spec/policies/RELEASE_OPERATIONS.md',
 ];
-// Workspace-process state that the repository no longer carries (repo
-// governance 2026-08-28: source + necessary files only — these are gitignored
-// and live only in the working workspace). Missing them is still a LOCAL
-// workspace invariant; CI checkouts of the public repo degrade to a warning
-// exactly like .control/.
-const WORKSPACE_ONLY_REQUIRED = new Set(['START_HERE.md', 'FINAL_BUILD_PROMPT.md', 'research/EVIDENCE_INDEX.md']);
 for (const rel of REQUIRED) {
   if (!exists(rel)) {
-    // CI checkouts have no .control/ or other gitignored workspace state by
-    // design — missing-required is a workspace invariant, not a repo one.
-    if (process.env.CI !== undefined && (rel.startsWith('.control/') || WORKSPACE_ONLY_REQUIRED.has(rel))) {
-      warnings.push(`ci-skipped-missing-required:${rel}`);
-    } else {
-      errors.push(`missing-required:${rel}`);
-    }
+    errors.push(`missing-required:${rel}`);
   }
 }
 
@@ -72,8 +56,8 @@ for (const rel of REQUIRED) {
 const parseJson = rel => {
   try { return JSON.parse(fs.readFileSync(path.join(root, rel), 'utf8')); }
   catch (e) {
-    // Absence is section 1's concern (missing-required / CI degradation); the
-    // invalid-json class is strictly for files that EXIST but fail to parse.
+    // Absence is not this section's concern; the invalid-json class is
+    // strictly for files that EXIST but fail to parse.
     if (e.code === 'ENOENT') return null;
     errors.push(`invalid-json:${rel}:${e.message}`); return null;
   }
