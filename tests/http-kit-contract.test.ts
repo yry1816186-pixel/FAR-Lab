@@ -163,7 +163,7 @@ describe('health projection never leaks the plaintext key (BC-011)', () => {
       wire: 'openai',
       baseUrl: 'https://example.invalid/v1',
       modelId: 'probe-model',
-      apiKey: 'sk-plaintext-secret-value-123456',
+      apiKey: 'plaintext-secret-value-123456',
       fallbackConfigIds: [],
       pricing: undefined,
       createdAt: new Date().toISOString(),
@@ -175,7 +175,7 @@ describe('health projection never leaks the plaintext key (BC-011)', () => {
     const body = JSON.parse(res.body) as { activeRoute?: { apiKeySet: boolean; apiKeyMasked: string } };
     expect(body.activeRoute).toBeDefined();
     expect(body.activeRoute?.apiKeySet).toBe(true);
-    expect(res.body).not.toContain('sk-plaintext-secret-value-123456');
+    expect(res.body).not.toContain('plaintext-secret-value-123456');
     expect(body.activeRoute?.apiKeyMasked).not.toContain('plaintext');
   });
 });
