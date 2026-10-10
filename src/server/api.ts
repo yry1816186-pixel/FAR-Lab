@@ -1,17 +1,7 @@
 import http from 'node:http';
-import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import type { App } from '../app/composition.js';
-import { verifyBundle } from '../app/verify.js';
-import { listProviders, LIVE_PROVIDER_NAMES } from '../providers/index.js';
-import { PROVIDER_TEMPLATES } from '../providers/catalog.js';
-import {
-  BuiltinRoutePrice, builtinDefaultName, builtinModelIdFor, envModelIdFor,
-  readBuiltinOverrides, setBuiltinDefaultName, writeBuiltinOverrides,
-} from '../providers/builtin-overrides.js';
-import { createCustomProvider } from '../providers/custom.js';
 import { analyzeTrajectory } from '../app/supervisor.js';
 import { runTruthProfile } from '../app/truth-profile.js';
 import { RunLeaseHeldError } from '../app/orchestrator.js';
@@ -27,11 +17,6 @@ import { MethodOpError, overrideMethodSelection } from './method-ops.js';
 import {
   annotateClaim, ClaimOpError, excludeClaim, excludedClaimIdsOf, pinClaim, reclassifyClaim, reinstateClaim,
 } from './claim-ops.js';
-import { ACTIVE_MODEL_CONFIG_META_KEY, readCompetitionRouteMode, writeCompetitionRouteMode } from '../app/provider-resolver.js';
-import { discoverModels } from '../providers/discovery.js';
-import { ingestPdfTextPayload, ingestSdm, ingestTextToSdm, ingestBytes, persistDatasetProfile, loadSdmByRef, loadDatasetProfileByRef, ingestSvgPlot, loadPlotPointsByRef, jsonRefusalReason, type IngestOutcome } from '../ingest/service.js';
-import type { DatasetProfileDoc } from '../ingest/dataset.js';
-import { fetchZoteroAnnotations, fetchZoteroLibrary, ZoteroUnavailableError } from './zotero.js';
 import {
   buildScreeningView,
   getOrCreateScreeningSession,
@@ -48,23 +33,14 @@ import {
 import { startAutomationEngine, type AutomationEngine } from './automations.js';
 import { ConversationTurnHub } from './conversation-stream.js';
 import { TerminalManager } from './terminal.js';
-import { resolveInsideRoot } from '../agent/capabilities/workspace-tools.js';
-import { aggregateRunUsage, aggregateWorkspaceUsage } from '../app/usage-ledger.js';
-import { workspaceSpendStatus, writeSpendLimit } from '../app/spend-limit.js';
+import { aggregateRunUsage } from '../app/usage-ledger.js';
 import {
-  ConversationSchema,
   FeedbackSignal,
   FeedbackSourceKind,
-  ModelProviderConfig,
   ObjectRef,
-  ProviderWireProtocol,
   ResearchQuestion,
   ScientificGoalType,
-  ToolIntegrationSchema,
   calibrationReport,
-  integrationSemanticIssues,
-  maskApiKey,
-  maskIntegrationSecrets,
   newId,
   runProgress,
 } from '../domain/index.js';
@@ -72,44 +48,49 @@ import { isTemplateHypothesis } from '../domain/scientific-state.js';
 import { latestBundleTemplateTainted } from '../pipeline/stages/export.js';
 import { ConstraintSet } from '../domain/question.js';
 import type { RunStageName } from '../domain/run.js';
-import { McpManager } from '../agent/mcp-manager.js';
-import { importPlugin, PluginImportError, PluginImportInputSchema } from '../plugins/import.js';
 import type { FeedbackSourceKind as FeedbackSource } from '../domain/index.js';
 import { toProvJsonLd } from '../domain/prov-o.js';
 import { consolidateConversationProfile } from '../app/memory.js';
-import { archiveMemory, editMemory, MemoryOpError } from './memory-ops.js';
 import { EvidenceRelation, EvidenceRelationType } from '../domain/evidence.js';
 import { diagnosticityScores, removalSensitivity } from '../domain/ach.js';
 import {
   HttpError,
   alreadyRunning,
-  assertModelConfigId,
   assertRunId,
   conversationTurnStream,
   decodeSegments,
   internal,
   notFound,
-  readBody,
   readJsonObject,
   runEventStream,
   sendError,
   sendJson,
   sendText,
-  terminalEventStream,
   validation,
   type RouteCtx,
+  type RouteFamily,
 } from './http-kit.js';
 import { serveStatic } from './static-files.js';
 import { createRunWithSeeds as createRunWithSeedsCore } from './run-launch.js';
+import { registerIngestRoutes } from './routes/ingest.js';
+import { registerLibraryRoutes } from './routes/library.js';
+import { registerScienceRoutes } from './routes/science.js';
+import { registerTerminalRoutes } from './routes/terminal.js';
+import { registerToolsRoutes } from './routes/tools.js';
+import { registerZoteroRoutes } from './routes/zotero.js';
+import { registerAutomationsRoutes } from './routes/automations.js';
+import { registerAgentPolicyRoutes } from './routes/agent-policy.js';
+import { registerCompetitionRouteRoutes } from './routes/competition-route.js';
+import { registerSystemRoutes } from './routes/system.js';
+import { registerMemoryRoutes } from './routes/memory.js';
+import { registerBuiltinRoutesRoutes } from './routes/builtin-routes.js';
+import { registerModelConfigsRoutes } from './routes/model-configs.js';
 import { deriveNextActions, projectScientificState, deriveScientificWorldModel } from '../domain/index.js';
 import type { ScientificWorldModel } from '../domain/index.js';
 import type { ScientificClaim, HypothesisCandidate, Revision, ExperimentRun, StatReport } from '../domain/index.js';
 import { projectStateDeltas } from '../domain/state-delta.js';
 import { experimentLegStatus } from '../app/iteration.js';
 import { checkPlanExecutability } from '../pipeline/stages/plan.js';
-import { ScientificComputeRequest } from '../domain/scientific-compute.js';
-import { scientificCapabilityCatalog } from '../domain/scientific-registry.js';
-import { executeScientificCompute } from '../experiment/scientific-compute.js';
 
 /**
  * Versioned HTTP API over the single application kernel (zero framework: native http +
@@ -275,25 +256,6 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
     return run;
   };
 
-  /** B2 universal search: cross-run lookup by researcher-meaningful text (question/hypothesis/claim). */
-  const search = (res: http.ServerResponse, url: URL): void => {
-    const q = (url.searchParams.get('q') ?? '').trim();
-    if (q.length < 2 || q.length > 200) {
-      throw validation(`query length must be 2-200 chars (got ${q.length})`);
-    }
-    const clamp = (raw: string | null, dflt: number, max: number): number => {
-      const n = Number.parseInt(raw ?? '', 10);
-      return Number.isFinite(n) ? Math.min(Math.max(n, 0), max) : dflt;
-    };
-    const result = app.store.searchText(q, {
-      questions: clamp(url.searchParams.get('questions'), 8, 25),
-      hypotheses: clamp(url.searchParams.get('hypotheses'), 8, 25),
-      claims: clamp(url.searchParams.get('claims'), 8, 25),
-      conversations: clamp(url.searchParams.get('conversations'), 5, 25),
-    });
-    sendJson(res, 200, { query: q, ...result });
-  };
-
   /** Whether a revision landed after the newest bundle (the export stage's own re-export rule). */
   const revisionNewerThanBundle = (runId: string, latestBundle: { createdAt: string } | undefined): boolean => {
     if (!latestBundle) return false;
@@ -325,68 +287,6 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
     });
     sendJson(res, 200, { runs });
   };
-
-  /** GET /v1/library/sources — workspace-wide literature aggregation for the
-   *  library page. Deduplicates by the strongest persistent identifier each
-   *  document carries (doi > arxiv > pubmed > openalex > url), so the same
-   *  paper retrieved by two studies appears once with both runIds. Pure read
-   *  over stored objects — no fabrication, absent fields stay absent. */
-  const librarySources = (res: http.ServerResponse): void => {
-    const docs = app.store.listObjectsAcrossRuns('source_document');
-    const byKey = new Map<string, { doc: (typeof docs)[number]; runIds: Set<string> }>();
-    for (const doc of docs) {
-      const key = libraryDedupKey(doc);
-      const existing = byKey.get(key);
-      if (existing !== undefined) existing.runIds.add(doc.runId);
-      else byKey.set(key, { doc, runIds: new Set([doc.runId]) });
-    }
-    // Most-referenced first, then newest retrieval — the library's reading order.
-    const entries = [...byKey.values()].sort((a, b) =>
-      b.runIds.size - a.runIds.size || Date.parse(b.doc.retrievedAt) - Date.parse(a.doc.retrievedAt));
-    const sources = entries.map(({ doc, runIds }) => ({
-      id: doc.id,
-      title: doc.title,
-      publicationYear: doc.publicationYear ?? null,
-      authors: doc.authors.slice(0, 6),
-      authorCount: doc.authors.length,
-      venue: doc.venue ?? null,
-      family: doc.family,
-      contentDepth: doc.contentDepth,
-      accessState: doc.accessState,
-      publicationType: doc.publicationType ?? null,
-      identifiers: doc.identifiers,
-      retrievedAt: doc.retrievedAt,
-      ...(doc.retractionStatus !== undefined ? { retractionStatus: doc.retractionStatus } : {}),
-      runIds: [...runIds],
-    }));
-    sendJson(res, 200, { sources, stored: docs.length, distinct: sources.length });
-  };
-
-
-/** Library dedup key: the strongest persistent identifier a stored source
- *  carries, normalized (doi lowercased, resolver prefixes stripped). Falls
- *  back to the content hash — two records with no shared identifier and the
- *  same canonical payload are the same document; a truly unidentified record
- *  dedups only against itself. */
-const IDENTIFIER_RANK = ['doi', 'arxiv', 'pubmed', 'openalex', 'url'] as const;
-function libraryDedupKey(doc: { identifiers: { kind: string; value: string }[]; contentHash: string }): string {
-  for (const kind of IDENTIFIER_RANK) {
-    const hit = doc.identifiers.find((i) => i.kind === kind);
-    if (hit === undefined) continue;
-    if (kind === 'doi') {
-      const norm = hit.value.trim().toLowerCase().replace(/^https?:\/\/(dx\.)?doi\.org\//, '').replace(/^doi:/, '');
-      if (norm.length > 0) return `doi:${norm}`;
-    }
-    if (kind === 'url') {
-      try {
-        const u = new URL(hit.value);
-        return `url:${u.host}${u.pathname.replace(/\/+$/, '')}`;
-      } catch { /* fall through to the next identifier */ }
-    }
-    return `${kind}:${hit.value.trim().toLowerCase()}`;
-  }
-  return `hash:${doc.contentHash}`;
-}
 
   const createRun = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
     const body = await readJsonObject(req);
@@ -433,6 +333,27 @@ function libraryDedupKey(doc: { identifiers: { kind: string; value: string }[]; 
     consecutiveSweepFailures: () => consecutiveSweepFailures,
     ...(opts.counterSearchSourceFor !== undefined ? { counterSearchSourceFor: opts.counterSearchSourceFor } : {}),
   };
+
+  // Extracted route families (BC-002), composed below in registration order.
+  // The runs / model-configs / conversations families are still inline in
+  // route() pending their own extraction commits.
+  const families: RouteFamily[] = [
+    registerIngestRoutes(ctx),
+    registerLibraryRoutes(ctx),
+    registerScienceRoutes(ctx),
+    registerTerminalRoutes(ctx),
+    registerToolsRoutes(ctx),
+    // Same-prefix pair: builtin-routes must be tried before the generic
+    // model-configs /:id branch (see its module doc).
+    registerBuiltinRoutesRoutes(ctx),
+    registerModelConfigsRoutes(ctx),
+    registerZoteroRoutes(ctx),
+    registerAutomationsRoutes(ctx),
+    registerAgentPolicyRoutes(ctx),
+    registerCompetitionRouteRoutes(ctx),
+    registerSystemRoutes(ctx),
+    registerMemoryRoutes(ctx),
+  ];
 
   const runDetail = (res: http.ServerResponse, runId: string): void => {
     const run = mustGetRun(runId);
@@ -746,71 +667,6 @@ function libraryDedupKey(doc: { identifiers: { kind: string; value: string }[]; 
     sendJson(res, 200, { corpus });
   };
 
-  /**
-   * Real health (D-060 phase-3): DB actually readable + model-route readiness
-   * (env-presence only — never key values) + build revision. 503 when the DB
-   * check fails; never a fake "ok".
-   */
-  // Re-audit fix (final blind-spot #4): the audit chain was write-only —
-  // verifyEventChain had no production caller. Verified lazily ONCE per server
-  // process (O(total events), sub-second at workspace scale) and surfaced in /health.
-  let auditChainCache: { ok: boolean; brokenRuns: string[]; verifiedAt: string } | null = null;
-  const auditChainStatus = (): { ok: boolean; brokenRuns: string[]; verifiedAt: string } => {
-    if (auditChainCache === null) {
-      const broken: string[] = [];
-      for (const r of app.store.listRuns(500)) {
-        const v = app.store.verifyEventChain(r.id);
-        if (!v.ok) broken.push(r.id);
-      }
-      auditChainCache = { ok: broken.length === 0, brokenRuns: broken, verifiedAt: new Date().toISOString() };
-    }
-    return auditChainCache;
-  };
-
-  const health = (res: http.ServerResponse): void => {
-    const providers = listProviders().map((p) => ({ name: p.name, kind: p.kind, liveReady: p.liveReady }));
-    // B12-G1: the health strip must reflect the ACTIVE route — when the user's
-    // active default is a CUSTOM config, the env-route list alone misrepresents
-    // readiness. Project the active route (masked key, never the value).
-    const activeConfigId = app.store.getMeta(ACTIVE_MODEL_CONFIG_META_KEY);
-    let activeRoute: Record<string, unknown> | null = null;
-    if (typeof activeConfigId === 'string' && activeConfigId.length > 0) {
-      const cfg = app.store.getObject('model_config', activeConfigId);
-      if (cfg !== null) {
-        activeRoute = {
-          id: cfg.id, label: cfg.label, wire: cfg.wire, baseUrl: cfg.baseUrl,
-          modelId: cfg.modelId, apiKeySet: cfg.apiKey.length > 0, apiKeyMasked: maskApiKey(cfg.apiKey),
-        };
-      }
-    }
-    const watchdog = consecutiveSweepFailures === 0
-      ? 'ok'
-      : `degraded (${consecutiveSweepFailures} consecutive sweep failures — frozen-run adoption stalled)`;
-    try {
-      app.store.listRuns();
-      sendJson(res, 200, {
-        status: 'ok',
-        db: 'ok',
-        auditChain: auditChainStatus(),
-        watchdog,
-        providers,
-        ...(activeRoute !== null ? { activeRoute } : {}),
-        gitCommit: process.env.FARLAB_GIT_COMMIT ?? null,
-        time: new Date().toISOString(),
-      });
-    } catch (e) {
-      sendJson(res, 503, {
-        status: 'degraded',
-        db: 'error',
-        watchdog,
-        detail: e instanceof Error ? e.message : String(e),
-        providers,
-        ...(activeRoute !== null ? { activeRoute } : {}),
-        gitCommit: process.env.FARLAB_GIT_COMMIT ?? null,
-        time: new Date().toISOString(),
-      });
-    }
-  };
 
   const runEvents = (res: http.ServerResponse, runId: string, url: URL): void => {
     mustGetRun(runId);
@@ -1210,636 +1066,6 @@ function libraryDedupKey(doc: { identifiers: { kind: string; value: string }[]; 
     sendJson(res, 202, { runId });
   };
 
-  const verify = async (res: http.ServerResponse, bundleId: string): Promise<void> => {
-    // verifyBundle is fail-closed by design: a missing bundle yields a report with
-    // verdict 'failed' (all checks passed=false) — the report itself is the answer.
-    const report = await verifyBundle(bundleId, { store: app.store, artifacts: app.artifacts });
-    // Trust surface (S2b): the bundle's own declared reproduction limits ride with
-    // the report — "what this bundle cannot reproduce" is part of the verdict.
-    const bundle = app.store.getObject('bundle', bundleId);
-    const limitations = bundle?.limitations.filter((l) => l.trim().length > 0) ?? [];
-    sendJson(res, 200, { ...report, ...(limitations.length > 0 ? { limitations } : {}) });
-  };
-
-  // ---- MULTIMODAL ingest (2026-08-24): deterministic artifact understanding ----
-  // POST /api/v1/ingest — one endpoint, two producer shapes:
-  //   { kind: 'pdf_text', fileName, payload }  ← web pdfjs collector output
-  //   { kind: 'text', fileName, text }         ← server-side parse by extension
-  // Returns the SDM (or dataset profile), its immutable artifact ref, and the
-  // seeds-pipeline text projection. Failures are 422 with precise field errors.
-
-  const ingestRoute = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
-    const body = await readJsonObject(req);
-    const kind = body['kind'];
-    const fileName = typeof body['fileName'] === 'string' ? body['fileName'] : '';
-    if (typeof fileName !== 'string' || fileName.length === 0 || fileName.length > 300 || fileName.includes('/') || fileName.includes('\\') || fileName.includes('\0')) {
-      throw validation('ingest: fileName must be a 1-300 char basename (no path separators)');
-    }
-    // Shared response for both producers of dataset profiles (text/csv|tsv and bytes/xlsx).
-    const sendDatasetProfile = async (profile: DatasetProfileDoc): Promise<void> => {
-      const artifactRef = await persistDatasetProfile(app.artifacts, profile);
-      sendJson(res, 200, {
-        artifactRef,
-        type: 'dataset_profile',
-        profile: {
-          schemaVersion: profile.schemaVersion,
-          format: profile.format,
-          rowCount: profile.rowCount,
-          columnCount: profile.columnCount,
-          columns: profile.columns.map((c) => ({ name: c.name, inferredType: c.inferredType, missingCount: c.missingCount, ...(c.unitHint !== undefined ? { unitHint: c.unitHint } : {}), significanceNotation: c.significanceNotation })),
-          quality: profile.quality,
-          diagnostics: profile.diagnostics,
-        },
-      });
-    };
-    if (kind === 'pdf_text') {
-      const r = ingestPdfTextPayload(body['payload'], fileName);
-      if (!r.ok) throw validation(`ingest pdf_text payload rejected: ${r.errors.slice(0, 5).join('; ')}`);
-      const out = await ingestSdm(app.artifacts, r.sdm);
-      sendJson(res, 200, ingestSummary(out));
-      return;
-    }
-    if (kind === 'text') {
-      const text = body['text'];
-      if (typeof text !== 'string' || text.length === 0) throw validation('ingest: text must be a non-empty string');
-      if (text.length > 10 * 1024 * 1024) throw validation('ingest: text exceeds 10MB');
-      if (/\.svg$/i.test(fileName)) {
-        const r = await ingestSvgPlot(app.artifacts, fileName, text);
-        if (!r.ok) throw validation(`ingest: ${r.reason}`);
-        sendJson(res, 200, { ...ingestSummary(r.outcome), ...(r.pointsRef !== undefined ? { pointsRef: r.pointsRef, seriesCount: r.points.series.length } : {}) });
-        return;
-      }
-      const routed = ingestTextToSdm(fileName, text);
-      if (routed === null) {
-        const detail = /\.json$/i.test(fileName) ? ` — ${jsonRefusalReason(text)}` : ' — see MULTIMODAL.md for the format matrix';
-        throw validation(`ingest: unsupported file kind for ${fileName}${detail}`);
-      }
-      if (routed.type === 'dataset') {
-        await sendDatasetProfile(routed.profile);
-        return;
-      }
-      const out = await ingestSdm(app.artifacts, routed.doc);
-      sendJson(res, 200, ingestSummary(out));
-      return;
-    }
-    if (kind === 'bytes') {
-      // Binary supplements (xlsx): base64 body, binary router by extension.
-      const base64 = body['base64'];
-      if (typeof base64 !== 'string' || base64.length === 0) throw validation('ingest: base64 must be a non-empty string');
-      const bytes = Buffer.from(base64, 'base64');
-      if (bytes.length === 0) throw validation('ingest: base64 did not decode to any bytes');
-      if (bytes.length > 15 * 1024 * 1024) throw validation('ingest: bytes exceed 15MB');
-      const routed = ingestBytes(fileName, bytes);
-      if (routed.type === 'refused') throw validation(`ingest: ${routed.reason}`);
-      if (routed.type === 'sdm') {
-        const out = await ingestSdm(app.artifacts, routed.doc);
-        sendJson(res, 200, ingestSummary(out));
-        return;
-      }
-      await sendDatasetProfile(routed.profile);
-      return;
-    }
-    throw validation('ingest: kind must be "pdf_text", "text" or "bytes"');
-  };
-
-  const ingestSummary = (out: IngestOutcome): Record<string, unknown> => ({
-    artifactRef: out.artifactRef,
-    seedTextTruncated: out.seedTextTruncated,
-    type: 'sdm',
-    sdm: {
-      schemaVersion: out.sdm.schemaVersion,
-      extractor: out.sdm.extractor,
-      meta: out.sdm.meta,
-      counts: {
-        blocks: out.sdm.blocks.length,
-        figures: out.sdm.figures.length,
-        tables: out.sdm.tables.length,
-        equations: out.sdm.equations.length,
-        citations: out.sdm.citations.length,
-        xrefs: out.sdm.xrefs.length,
-        xrefsResolved: out.sdm.xrefs.filter((x) => x.status === 'resolved').length,
-      },
-      diagnostics: out.sdm.diagnostics,
-    },
-  });
-
-  // GET /api/v1/ingest/:ref — fetch a stored ingest artifact back (HCI renders
-  // from the immutable store instead of caching payloads in client state).
-  // Serves sdm-1 and dsdp-1; any other ref under this namespace is an honest 404.
-  const ingestGetByRef = async (res: http.ServerResponse, ref: string): Promise<void> => {
-    if (!/^sha256:[0-9a-f]{64}$/.test(ref)) throw validation('ingest: ref must be a sha256:<64 hex> artifact ref');
-    const sdm = await loadSdmByRef(app.artifacts, ref);
-    if (sdm.ok) {
-      sendJson(res, 200, { kind: 'sdm', sdm: sdm.doc });
-      return;
-    }
-    const profile = await loadDatasetProfileByRef(app.artifacts, ref);
-    if (profile.ok) {
-      sendJson(res, 200, { kind: 'dataset_profile', profile: profile.doc });
-      return;
-    }
-    const plotPoints = await loadPlotPointsByRef(app.artifacts, ref);
-    if (plotPoints.ok) {
-      sendJson(res, 200, { kind: 'plot_points', points: plotPoints.doc });
-      return;
-    }
-    throw notFound(`ingest artifact not found: ${ref}`);
-  };
-
-  // ---- static frontend: moved to static-files.ts (BC-002 single owner) ----
-
-  // ---- model configs (user-defined model routes) ----
-
-  /** Model configs are workspace-global: stored under the '__none__' run bucket (like questions). */
-  const listModelConfigsAll = () => app.store.listObjects('model_config', '__none__');
-
-  const mustGetModelConfig = (id: string) => {
-    const cfg = app.store.getObject('model_config', id);
-    if (cfg === null) throw notFound(`model config not found: ${id}`);
-    return cfg;
-  };
-
-  /** Response projection — the plaintext key NEVER leaves the server. */
-  const modelConfigSummary = (cfg: ModelProviderConfig, activeId: string | null) => ({
-    id: cfg.id,
-    label: cfg.label,
-    wire: cfg.wire,
-    baseUrl: cfg.baseUrl,
-    modelId: cfg.modelId,
-    apiKeySet: cfg.apiKey.length > 0,
-    apiKeyMasked: maskApiKey(cfg.apiKey),
-    active: activeId === cfg.id,
-    fallbackConfigIds: cfg.fallbackConfigIds,
-    pricing: cfg.pricing,
-    createdAt: cfg.createdAt,
-    updatedAt: cfg.updatedAt,
-  });
-
-  const listModelConfigs = (res: http.ServerResponse): void => {
-    // Test-double configs (wire 'offline') are test fixtures, not product routes:
-    // the settings surface never lists them unless this server IS a test harness.
-    const testDouble = process.env.FARLAB_TEST_DOUBLE === '1';
-    // A leftover test-double default must not survive the filter as a dangling
-    // pointer: report it as "no product default" so the env chain (a real route)
-    // serves instead of a fixture the researcher can no longer see.
-    const storedActive = app.store.getMeta(ACTIVE_MODEL_CONFIG_META_KEY);
-    const activeHidden = storedActive !== null && !testDouble
-      && (app.store.getObject('model_config', storedActive)?.wire ?? null) === 'offline';
-    const activeId = activeHidden ? null : storedActive;
-    const configs = listModelConfigsAll()
-      .filter((c) => c.wire !== 'offline' || testDouble)
-      .map((c) => modelConfigSummary(c, activeId));
-    // Effective product-plane default: UI default switch > env chain, with the UI
-    // modelId override applied — the panel shows what a call would actually use.
-    const envDefaultView = (): { name: string; modelId: string; liveReady: boolean; defaultSource: 'ui' | 'env' } | null => {
-      try {
-        const { name, source } = builtinDefaultName(app.store);
-        const info = listProviders().find((p) => p.name === name);
-        return {
-          name,
-          modelId: builtinModelIdFor(app.store, name) ?? info?.modelId ?? '(unknown)',
-          liveReady: info?.liveReady ?? false,
-          defaultSource: source,
-        };
-      } catch {
-        return null; // env names an unknown provider — health owns that failure story
-      }
-    };
-    sendJson(res, 200, { configs, activeModelConfigId: activeId, envDefault: envDefaultView() });
-  };
-
-  /** Preset provider templates (catalog.ts) — one-click prefills, not a whitelist. */
-  const listProviderTemplates = (res: http.ServerResponse): void => {
-    sendJson(res, 200, { templates: PROVIDER_TEMPLATES });
-  };
-
-  const getModelConfig = (res: http.ServerResponse, id: string): void => {
-    assertModelConfigId(id);
-    const cfg = mustGetModelConfig(id);
-    sendJson(res, 200, { config: modelConfigSummary(cfg, app.store.getMeta(ACTIVE_MODEL_CONFIG_META_KEY)) });
-  };
-
-  const invalidConfigMessage = (issues: { path: (string | number)[]; message: string }[]): string =>
-    `invalid model config: ${issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`).join('; ')}`;
-
-  /**
-   * wire 'offline' is the IN-PROCESS TEST DOUBLE (providers/test-double.ts): an
-   * isolated test fixture that lets automated tests and the browser E2E suite
-   * drive the real pipeline without model quota. It is NOT a product route and
-   * serves no demonstration or acceptance purpose — a server not started with
-   * FARLAB_TEST_DOUBLE=1 (only scripts/serve-e2e.mjs sets it) refuses to create,
-   * edit, activate or probe such a config.
-   */
-  const assertTestDoubleAllowed = (wire: unknown): void => {
-    if (wire !== 'offline') return;
-    if (process.env.FARLAB_TEST_DOUBLE === '1') return;
-    throw validation(
-      'wire "offline" is the in-process test double, not a product route: it exists only for automated tests and the browser E2E suite and can be used on a server started with FARLAB_TEST_DOUBLE=1',
-    );
-  };
-
-  const createModelConfig = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
-    const body = await readJsonObject(req);
-    assertTestDoubleAllowed(body.wire);
-    const now = new Date().toISOString();
-    const parsed = ModelProviderConfig.safeParse({
-      id: newId('mcfg'),
-      label: body.label,
-      wire: body.wire,
-      baseUrl: body.baseUrl,
-      modelId: body.modelId,
-      apiKey: body.apiKey ?? '',
-      ...(Array.isArray(body.fallbackConfigIds) ? { fallbackConfigIds: body.fallbackConfigIds } : {}),
-      ...(body.pricing !== undefined ? { pricing: body.pricing } : {}),
-      ...(body.reasoning !== undefined ? { reasoning: body.reasoning } : {}),
-      createdAt: now,
-      updatedAt: now,
-    });
-    if (!parsed.success) throw validation(invalidConfigMessage(parsed.error.issues));
-    app.store.putObject('model_config', parsed.data);
-    sendJson(res, 201, { config: modelConfigSummary(parsed.data, app.store.getMeta(ACTIVE_MODEL_CONFIG_META_KEY)) });
-  };
-
-  const updateModelConfig = async (req: http.IncomingMessage, res: http.ServerResponse, id: string): Promise<void> => {
-    assertModelConfigId(id);
-    const existing = mustGetModelConfig(id);
-    const body = await readJsonObject(req);
-    // A test-double config is untouchable off a test-double server — editing is
-    // the same product surface as creating it (and is how the double would leak
-    // into a researcher's workspace).
-    assertTestDoubleAllowed(body.wire ?? existing.wire);
-    // apiKey semantics: absent field = keep stored value; present string (even empty) = replace.
-    let apiKey: string;
-    if (body.apiKey === undefined) {
-      apiKey = existing.apiKey;
-    } else {
-      if (typeof body.apiKey !== 'string') throw validation('field "apiKey" must be a string when present');
-      apiKey = body.apiKey;
-    }
-    const parsed = ModelProviderConfig.safeParse({
-      ...existing,
-      ...(typeof body.label === 'string' ? { label: body.label } : {}),
-      ...(body.wire !== undefined ? { wire: body.wire } : {}),
-      ...(typeof body.baseUrl === 'string' ? { baseUrl: body.baseUrl } : {}),
-      ...(typeof body.modelId === 'string' ? { modelId: body.modelId } : {}),
-      ...(Array.isArray(body.fallbackConfigIds) ? { fallbackConfigIds: body.fallbackConfigIds } : {}),
-      ...(body.pricing !== undefined ? { pricing: body.pricing } : {}),
-      // Reasoning declaration semantics follow pricing: present = replace (schema
-      // validates style/wire compatibility), absent = keep the stored one.
-      ...(body.reasoning !== undefined ? { reasoning: body.reasoning } : {}),
-      apiKey,
-      updatedAt: new Date().toISOString(),
-    });
-    if (!parsed.success) throw validation(invalidConfigMessage(parsed.error.issues));
-    if (parsed.data.fallbackConfigIds.includes(parsed.data.id)) {
-      throw validation('a config cannot list itself as its own fallback (direct cycle)');
-    }
-    app.store.putObject('model_config', parsed.data);
-    sendJson(res, 200, { config: modelConfigSummary(parsed.data, app.store.getMeta(ACTIVE_MODEL_CONFIG_META_KEY)) });
-  };
-
-  // ---- tool integrations (TIS: researcher-wired external tools) ----
-
-  /** Tool integrations are workspace-global, like model configs ('__none__' run bucket). */
-  const listToolIntegrationsAll = () => app.store.listObjects('tool_integration', '__none__');
-
-  const TOOL_INTEGRATION_ID_RE = /^tint_[0-9a-z]{20,32}$/;
-  const assertToolIntegrationId = (id: string): void => {
-    if (!TOOL_INTEGRATION_ID_RE.test(id)) throw validation(`invalid tool integration id format: ${id}`);
-  };
-
-  const mustGetToolIntegration = (id: string) => {
-    const integration = app.store.getObject('tool_integration', id);
-    if (integration === null) throw notFound(`tool integration not found: ${id}`);
-    return integration;
-  };
-
-  /** Response projection — secret env/header values NEVER leave the server verbatim. */
-  const toolIntegrationView = (integration: ReturnType<typeof listToolIntegrationsAll>[number]) => ({
-    ...maskIntegrationSecrets(integration),
-    envSet: integration.kind === 'mcp_server' ? Object.keys(integration.env) : [],
-    headersSet: integration.kind === 'mcp_server' ? Object.keys(integration.headers) : [],
-  });
-
-  const invalidIntegrationMessage = (issues: { path: (string | number)[]; message: string }[]): string =>
-    `invalid tool integration: ${issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`).join('; ')}`;
-
-  const createToolIntegration = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
-    const body = await readJsonObject(req);
-    const now = new Date().toISOString();
-    const parsed = ToolIntegrationSchema.safeParse({
-      ...body,
-      id: newId('tint'),
-      enabled: typeof body.enabled === 'boolean' ? body.enabled : true,
-      createdBy: 'researcher',
-      createdAt: now,
-      updatedAt: now,
-    });
-    if (!parsed.success) throw validation(invalidIntegrationMessage(parsed.error.issues));
-    const semantic = integrationSemanticIssues(parsed.data);
-    if (semantic.length > 0) throw validation(`invalid tool integration: ${semantic.join('; ')}`);
-    app.store.putObject('tool_integration', parsed.data);
-    sendJson(res, 201, { integration: toolIntegrationView(parsed.data) });
-  };
-
-  /**
-   * Secret-preserving update semantics (apiKey lineage): an absent env/headers field keeps
-   * the stored map; a present map keeps keys it omits (masked round-trip) and replaces
-   * keys it names with the given string values.
-   */
-  const mergeSecretMap = (stored: Record<string, string>, incoming: unknown): Record<string, string> => {
-    if (incoming === undefined) return stored;
-    if (typeof incoming !== 'object' || incoming === null || Array.isArray(incoming)) {
-      throw validation('env/headers must be an object of string values when present');
-    }
-    const out: Record<string, string> = {};
-    for (const [k, v] of Object.entries(incoming as Record<string, unknown>)) {
-      if (typeof v !== 'string') throw validation(`env/headers value for '${k}' must be a string`);
-      out[k] = v;
-    }
-    return { ...stored, ...out };
-  };
-
-  const updateToolIntegration = async (req: http.IncomingMessage, res: http.ServerResponse, id: string): Promise<void> => {
-    assertToolIntegrationId(id);
-    const existing = mustGetToolIntegration(id);
-    const body = await readJsonObject(req);
-    const merged = {
-      ...existing,
-      ...(typeof body.label === 'string' ? { label: body.label } : {}),
-      ...(typeof body.enabled === 'boolean' ? { enabled: body.enabled } : {}),
-      ...(body.kind === existing.kind ? body : {}),
-      env: existing.kind === 'mcp_server' ? mergeSecretMap(existing.env, body.env) : undefined,
-      headers: existing.kind === 'mcp_server' ? mergeSecretMap(existing.headers, body.headers) : undefined,
-      updatedAt: new Date().toISOString(),
-    };
-    const parsed = ToolIntegrationSchema.safeParse(merged);
-    if (!parsed.success) throw validation(invalidIntegrationMessage(parsed.error.issues));
-    const semantic = integrationSemanticIssues(parsed.data);
-    if (semantic.length > 0) throw validation(`invalid tool integration: ${semantic.join('; ')}`);
-    app.store.putObject('tool_integration', parsed.data);
-    sendJson(res, 200, { integration: toolIntegrationView(parsed.data) });
-  };
-
-  /**
-   * Real connectivity test for mcp_server integrations: initialize + tools/list round
-   * trip through the same clients sessions use, persisted as the integration's honest
-   * lastTest. Non-MCP kinds get a truthful 400 — there is nothing to dial.
-   */
-  const testToolIntegration = async (req: http.IncomingMessage, res: http.ServerResponse, id: string): Promise<void> => {
-    assertToolIntegrationId(id);
-    const integration = mustGetToolIntegration(id);
-    if (integration.kind !== 'mcp_server') {
-      throw validation(`test is only meaningful for mcp_server integrations (kind: ${integration.kind})`);
-    }
-    const manager = new McpManager({ listServers: () => [integration] });
-    try {
-      const record = await manager.testIntegration(integration);
-      const updated = ToolIntegrationSchema.parse({ ...integration, lastTest: record, updatedAt: new Date().toISOString() });
-      app.store.putObject('tool_integration', updated);
-      sendJson(res, 200, { test: record });
-    } finally {
-      await manager.close();
-    }
-  };
-
-  /**
-   * Plugin import (TIS T5): expand a reviewed local plugin directory into
-   * DISABLED tool integrations (the researcher activates after review). The
-   * request must carry reviewed:true — an honesty gate recording that the
-   * plugin files were reviewed before staging, not a sandbox claim.
-   */
-  const importPluginRoute = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
-    const body = await readJsonObject(req);
-    const parsedInput = PluginImportInputSchema.safeParse(body);
-    if (!parsedInput.success) {
-      throw validation(`plugin import requires { dir, reviewed: true } — staging unreviewed plugins is refused: ${parsedInput.error.issues[0]?.message}`);
-    }
-    let result;
-    try {
-      result = importPlugin(parsedInput.data);
-    } catch (e) {
-      if (e instanceof PluginImportError) throw validation(e.message);
-      throw e;
-    }
-    for (const integration of result.integrations) app.store.putObject('tool_integration', integration);
-    sendJson(res, 201, {
-      plugin: { name: result.manifest.name, version: result.manifest.version, license: result.manifest.license },
-      integrations: result.integrations.map(toolIntegrationView),
-      warnings: result.warnings,
-    });
-  };
-
-  /** BP-4 usage ledger: workspace-wide receipt-derived usage (tokens; cost only when user-priced). */
-  const listWorkspaceUsage = (res: http.ServerResponse): void => {
-    sendJson(res, 200, { aggregates: aggregateWorkspaceUsage(app.store) });
-  };
-
-  /**
-   * BP-4 model discovery: list the models an endpoint serves (GET {base}/models or
-   * /v1/models per wire). Accepts a stored configId or a draft {wire, baseUrl, apiKey?}.
-   * Failures are honest 502s, never an empty-catalog success.
-   */
-  const discoverFromModelConfig = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
-    const body = await readJsonObject(req);
-    let wire: ProviderWireProtocol;
-    let baseUrl: string;
-    let apiKey: string;
-    if (typeof body.configId === 'string') {
-      const stored = mustGetModelConfig(body.configId);
-      wire = stored.wire;
-      baseUrl = stored.baseUrl;
-      apiKey = typeof body.apiKey === 'string' && body.apiKey.length > 0 ? body.apiKey : stored.apiKey;
-    } else {
-      const parsedWire = ProviderWireProtocol.safeParse(body.wire);
-      if (!parsedWire.success || parsedWire.data === 'offline') throw validation('discovery requires a supported model wire and baseUrl, or a stored configId');
-      if (typeof body.baseUrl !== 'string' || body.baseUrl.length === 0) throw validation('discovery requires baseUrl');
-      wire = parsedWire.data;
-      baseUrl = body.baseUrl;
-      apiKey = typeof body.apiKey === 'string' ? body.apiKey : '';
-    }
-    const controller = new AbortController();
-    const onClose = (): void => {
-      if (!res.writableEnded) controller.abort();
-    };
-    res.once('close', onClose);
-    try {
-      const result = await discoverModels({ wire, baseUrl, apiKey, signal: controller.signal }, fetch);
-      sendJson(res, 200, result);
-    } catch (e) {
-      throw new HttpError(502, {
-        code: 'provider_unreachable',
-        message: `model discovery failed: ${e instanceof Error ? e.message : String(e)}`,
-        retryable: true,
-      });
-    } finally {
-      res.off('close', onClose);
-    }
-  };
-
-  const deleteModelConfig = (res: http.ServerResponse, id: string): void => {
-    assertModelConfigId(id);
-    const existed = app.store.deleteObject('model_config', id);
-    if (!existed) throw notFound(`model config not found: ${id}`);
-    // Deleting the active default clears it (falls back to the env chain); runs that
-    // reference the deleted config keep their reference and fail closed at call time.
-    if (app.store.getMeta(ACTIVE_MODEL_CONFIG_META_KEY) === id) {
-      app.store.deleteMeta(ACTIVE_MODEL_CONFIG_META_KEY);
-    }
-    sendJson(res, 200, { deleted: id });
-  };
-
-  // ---- built-in env routes (zai/dashscope): product-layer overrides ----
-  // The env chain itself stays untouched; these endpoints manage the UI-declared
-  // modelId override, list pricing and the default-route switch on top of it.
-
-  const builtinRoutesView = () => {
-    const overrides = readBuiltinOverrides(app.store);
-    const def = builtinDefaultName(app.store);
-    return listProviders()
-      .filter((p) => p.kind !== 'test') // the scripted stub is not a route
-      .map((p) => {
-        const override = p.kind === 'live' ? overrides[p.name as keyof typeof overrides] : undefined;
-        const envModel = envModelIdFor(p.name);
-        return {
-          name: p.name,
-          kind: p.kind, // 'live' | 'test'
-          liveReady: p.liveReady,
-          baseUrl: p.baseUrl,
-          apiKeyEnvVar: p.apiKeyEnvVar,
-          envModelId: envModel,
-          effectiveModelId: override?.modelId ?? envModel,
-          pricing: override?.pricing,
-          isBuiltinDefault: p.name === def.name,
-        };
-      });
-  };
-
-  const listBuiltinRoutes = (res: http.ServerResponse): void => {
-    sendJson(res, 200, {
-      routes: builtinRoutesView(),
-      defaultSource: builtinDefaultName(app.store).source,
-    });
-  };
-
-  const assertLiveBuiltinRoute = (name: string): void => {
-    if (!(LIVE_PROVIDER_NAMES as readonly string[]).includes(name)) {
-      throw validation(`unknown or non-editable built-in route: ${name} (live routes: ${LIVE_PROVIDER_NAMES.join(', ')})`);
-    }
-  };
-
-  const updateBuiltinRoute = async (req: http.IncomingMessage, res: http.ServerResponse, name: string): Promise<void> => {
-    assertLiveBuiltinRoute(name);
-    const body = await readJsonObject(req);
-    const overrides = readBuiltinOverrides(app.store);
-    const next: Record<string, unknown> = { ...(overrides[name as keyof typeof overrides] ?? {}) };
-    // modelId: string = override; null or '' = clear back to env/default selection.
-    if (body.modelId !== undefined) {
-      if (body.modelId === null || body.modelId === '') delete next.modelId;
-      else if (typeof body.modelId === 'string') next.modelId = body.modelId;
-      else throw validation('field "modelId" must be a non-empty string or null');
-    }
-    // pricing: object = declare real list prices; null = clear (cost falls back to unknown).
-    if (body.pricing !== undefined) {
-      if (body.pricing === null) {
-        delete next.pricing;
-      } else {
-        const parsed = BuiltinRoutePrice.safeParse(body.pricing);
-        if (!parsed.success) throw validation(`invalid pricing: ${parsed.error.issues.map((i) => i.message).join('; ')}`);
-        next.pricing = parsed.data;
-      }
-    }
-    if (Object.keys(body).some((k) => k !== 'modelId' && k !== 'pricing')) {
-      throw validation('only "modelId" and "pricing" are editable on a built-in route (wire/baseUrl/key come from the env layer)');
-    }
-    try {
-      writeBuiltinOverrides(app.store, { ...overrides, [name]: next });
-    } catch (e) {
-      throw validation(e instanceof Error ? e.message : String(e));
-    }
-    sendJson(res, 200, { routes: builtinRoutesView(), defaultSource: builtinDefaultName(app.store).source });
-  };
-
-  const setBuiltinDefaultRoute = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
-    const body = await readJsonObject(req);
-    if (body.name === null) {
-      setBuiltinDefaultName(app.store, null);
-      sendJson(res, 200, { routes: builtinRoutesView(), defaultSource: builtinDefaultName(app.store).source });
-      return;
-    }
-    if (typeof body.name !== 'string' || body.name.length === 0) {
-      throw validation('field "name" is required (a live built-in route name, or null to fall back to the env chain)');
-    }
-    assertLiveBuiltinRoute(body.name);
-    setBuiltinDefaultName(app.store, body.name);
-    sendJson(res, 200, { routes: builtinRoutesView(), defaultSource: 'ui' });
-  };
-
-  const setActiveModelConfig = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
-    const body = await readJsonObject(req);
-    if (!('id' in body)) throw validation('field "id" is required (a model config id, or null to clear the default)');
-    const id = body.id;
-    if (id === null) {
-      app.store.deleteMeta(ACTIVE_MODEL_CONFIG_META_KEY);
-      sendJson(res, 200, { activeModelConfigId: null });
-      return;
-    }
-    if (typeof id !== 'string') throw validation('field "id" must be a model config id string or null');
-    assertModelConfigId(id);
-    const cfg = mustGetModelConfig(id);
-    assertTestDoubleAllowed(cfg.wire);
-    app.store.setMeta(ACTIVE_MODEL_CONFIG_META_KEY, id);
-    sendJson(res, 200, { activeModelConfigId: id });
-  };
-
-  /**
-   * Connectivity probe: ONE tiny live call (maxTokens 16) against the given route.
-   * Accepts a stored config id (server supplies its key) or an unsaved draft with
-   * the key in the body — the form can test before saving.
-   */
-  const testModelConfig = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
-    const body = await readJsonObject(req);
-    let cfg: ModelProviderConfig;
-    if (typeof body.configId === 'string') {
-      const stored = mustGetModelConfig(body.configId);
-      assertTestDoubleAllowed(stored.wire);
-      cfg = typeof body.apiKey === 'string' && body.apiKey.length > 0 ? { ...stored, apiKey: body.apiKey } : stored;
-    } else {
-      assertTestDoubleAllowed(body.wire);
-      const now = new Date().toISOString();
-      const parsed = ModelProviderConfig.safeParse({
-        id: newId('mcfg'), // throwaway identity for this probe only; nothing is persisted
-        label: typeof body.label === 'string' && body.label.trim().length > 0 ? body.label : '(draft)',
-        wire: body.wire,
-        baseUrl: body.baseUrl,
-        modelId: body.modelId,
-        apiKey: body.apiKey ?? '',
-        createdAt: now,
-        updatedAt: now,
-      });
-      if (!parsed.success) throw validation(invalidConfigMessage(parsed.error.issues));
-      cfg = parsed.data;
-    }
-    const provider = createCustomProvider(cfg);
-    const result = await provider.structuredCall(
-      {
-        task: 'model config connectivity test',
-        userPayload: { instruction: 'Reply with exactly the JSON object {"ok":true} and nothing else.' },
-        outputKind: 'json',
-        maxTokens: 16,
-        purpose: 'model-config-test',
-      },
-      (raw) => raw,
-    );
-    sendJson(res, 200, {
-      ok: result.ok,
-      modelId: cfg.modelId,
-      latencyMs: result.receipt.latencyMs,
-      ...(result.ok && result.data !== undefined ? { sample: result.data } : {}),
-      ...(!result.ok && result.error !== undefined ? { error: result.error } : {}),
-    });
-  };
-
   // ---- router ----
 
   const route = async (
@@ -1859,105 +1085,6 @@ function libraryDedupKey(doc: { identifiers: { kind: string; value: string }[]; 
       throw notFound(`no route: ${method} ${url.pathname}`);
     }
     if (segments[1] !== 'v1') throw notFound(`no route: ${method} ${url.pathname}`);
-
-    // MULTIMODAL ingest: deterministic artifact understanding (SDM contract).
-    if (segments[2] === 'ingest') {
-      if (segments.length === 3 && method === 'POST') {
-        return ingestRoute(req, res);
-      }
-      if (segments.length === 4 && method === 'GET') {
-        const ref = segments[3];
-        if (ref === undefined) throw notFound(`no route: ${method} ${url.pathname}`);
-        return ingestGetByRef(res, ref);
-      }
-      throw notFound(`no route: ${method} ${url.pathname}`);
-    }
-
-    if (segments[2] === 'library') {
-      if (segments.length === 4 && segments[3] === 'sources' && method === 'GET') {
-        return librarySources(res);
-      }
-      throw notFound(`no route: ${method} ${url.pathname}`);
-    }
-
-    // Deterministic scientific-computing plane. Inputs are schema-validated and
-    // results are explicitly marked COMPUTED; no model or network call occurs.
-    if (segments[2] === 'science' && segments[3] === 'operations' && segments.length === 4 && method === 'GET') {
-      const catalog = scientificCapabilityCatalog();
-      // `operations` is retained as a compatibility projection for existing
-      // clients; `capabilities` is the authoritative, versioned registry.
-      return sendJson(res, 200, {
-        ...catalog,
-        operations: catalog.capabilities,
-        execution: 'local-deterministic',
-        note: 'Each capability declares its output provenance, runtime surface and validation evidence; execution still requires the operation-specific schema and surface.',
-      });
-    }
-    if (segments[2] === 'science' && segments[3] === 'compute' && segments.length === 4 && method === 'POST') {
-      const body = await readJsonObject(req);
-      const parsed = ScientificComputeRequest.safeParse(body);
-      if (!parsed.success) throw validation(`invalid scientific compute request: ${parsed.error.issues.map((i) => i.message).join('; ')}`);
-      try {
-        // Route through the pinned scientific sidecar so the HTTP surface and
-        // experiment executor share one runtime/library authority and measured
-        // environment. Validation remains on the Node boundary.
-        const result = await executeScientificCompute(parsed.data);
-        return sendJson(res, 200, { operation: parsed.data.operation, result });
-      } catch (e) {
-        throw validation(e instanceof Error ? e.message : String(e));
-      }
-    }
-
-    // ---- terminal sessions (extensibility lane): persistent login shells ----
-    if (segments[2] === 'terminal' && segments[3] === 'sessions') {
-      if (!terminals.enabled()) {
-        throw new HttpError(403, { code: 'feature_disabled', message: 'terminal disabled: FARLAB_TERMINAL=off', retryable: false });
-      }
-      if (segments.length === 4) {
-        if (method === 'GET') { sendJson(res, 200, { sessions: terminals.list(), maxSessions: terminals.maxSessions() }); return; }
-        if (method === 'POST') {
-          // Empty POST body is legal here (no cwd = workspace root) — only read
-          // JSON when a body is actually present.
-          const hasBody = (Number(req.headers['content-length'] ?? 0) > 0) || req.headers['transfer-encoding'] !== undefined;
-          const body = hasBody ? await readJsonObject(req) : {};
-          const rawCwd = typeof body.cwd === 'string' ? body.cwd : '.';
-          const cwd = resolveInsideRoot(process.cwd(), rawCwd);
-          if (cwd === null) throw validation(`cwd escapes the workspace root: ${rawCwd}`);
-          try {
-            sendJson(res, 201, terminals.create(cwd));
-          } catch (e) {
-            throw new HttpError(409, { code: 'terminal_limit', message: e instanceof Error ? e.message : String(e), retryable: false });
-          }
-          return;
-        }
-        throw notFound(`method ${method} not allowed for ${url.pathname}`);
-      }
-      const id = segments[4];
-      if (id === undefined) throw notFound(`no route: ${method} ${url.pathname}`);
-      if (segments.length === 5) {
-        if (method === 'GET') { sendJson(res, 200, terminals.get(id)); return; }
-        if (method === 'DELETE') { sendJson(res, 200, { killed: terminals.kill(id) }); return; }
-        throw notFound(`method ${method} not allowed for ${url.pathname}`);
-      }
-      if (segments.length === 6 && segments[5] === 'input' && method === 'POST') {
-        const body = await readJsonObject(req);
-        if (typeof body.text !== 'string' || body.text.length === 0) {
-          throw validation('field "text" must be a non-empty string');
-        }
-        try {
-          terminals.write(id, body.text);
-          sendJson(res, 200, { ok: true });
-        } catch (e) {
-          throw new HttpError(409, { code: 'terminal_not_writable', message: e instanceof Error ? e.message : String(e), retryable: false });
-        }
-        return;
-      }
-      if (segments.length === 6 && segments[5] === 'events' && method === 'GET') {
-        return terminalEventStream(req, res, id, ctx);
-      }
-      throw notFound(`no route: ${method} ${url.pathname}`);
-    }
-
     if (segments[2] === 'runs') {
       if (segments.length === 3) {
         if (method === 'GET') return listRuns(res);
@@ -2436,106 +1563,6 @@ function libraryDedupKey(doc: { identifiers: { kind: string; value: string }[]; 
       throw notFound(`no route: ${method} ${url.pathname}`);
     }
 
-    if (segments[2] === 'tools') {
-      if (segments.length === 3) {
-        if (method === 'GET') return sendJson(res, 200, { integrations: listToolIntegrationsAll().map(toolIntegrationView) });
-        if (method === 'POST') return createToolIntegration(req, res);
-        throw notFound(`method ${method} not allowed for ${url.pathname}`);
-      }
-      if (segments[3] === 'import-plugin' && segments.length === 4 && method === 'POST') return importPluginRoute(req, res);
-      const leaf = segments[3]!;
-      if (segments[4] === 'test' && segments.length === 5 && method === 'POST') return testToolIntegration(req, res, leaf);
-      if (segments.length === 4) {
-        if (method === 'GET') {
-          assertToolIntegrationId(leaf);
-          return sendJson(res, 200, { integration: toolIntegrationView(mustGetToolIntegration(leaf)) });
-        }
-        if (method === 'PUT') return updateToolIntegration(req, res, leaf);
-        if (method === 'DELETE') {
-          assertToolIntegrationId(leaf);
-          mustGetToolIntegration(leaf);
-          app.store.deleteObject('tool_integration', leaf);
-          return sendJson(res, 200, { deleted: leaf });
-        }
-      }
-      throw notFound(`no route: ${method} ${url.pathname}`);
-    }
-
-    if (segments[2] === 'model-configs') {
-      if (segments.length === 3) {
-        if (method === 'GET') return listModelConfigs(res);
-        if (method === 'POST') return createModelConfig(req, res);
-        throw notFound(`method ${method} not allowed for ${url.pathname}`);
-      }
-      const leaf = segments[3]!;
-      if (leaf === 'active' && segments.length === 4 && method === 'PUT') return setActiveModelConfig(req, res);
-      if (leaf === 'test' && segments.length === 4 && method === 'POST') return testModelConfig(req, res);
-      if (leaf === 'usage' && segments.length === 4 && method === 'GET') return listWorkspaceUsage(res);
-      if (leaf === 'templates' && segments.length === 4 && method === 'GET') return listProviderTemplates(res);
-      if (leaf === 'spend-limit' && segments.length === 4) {
-        if (method === 'GET') {
-          sendJson(res, 200, workspaceSpendStatus(app.store));
-          return;
-        }
-        if (method === 'PUT') {
-          const body = await readJsonObject(req);
-          const limitUsd = body.limitUsd;
-          if (limitUsd !== null && (typeof limitUsd !== 'number' || !Number.isFinite(limitUsd) || limitUsd <= 0)) {
-            throw new HttpError(400, { code: 'validation', message: 'field "limitUsd" must be a positive number or null', retryable: false });
-          }
-          writeSpendLimit(app.store, limitUsd);
-          sendJson(res, 200, { ok: true, ...workspaceSpendStatus(app.store) });
-          return;
-        }
-        throw notFound(`method ${method} not allowed for ${url.pathname}`);
-      }
-      if (leaf === 'discover' && segments.length === 4 && method === 'POST') return discoverFromModelConfig(req, res);
-      if (leaf === 'builtin-routes') {
-        if (segments.length === 4) {
-          if (method === 'GET') return listBuiltinRoutes(res);
-          if (method === 'PUT') return setBuiltinDefaultRoute(req, res);
-          throw notFound(`method ${method} not allowed for ${url.pathname}`);
-        }
-        if (segments.length === 5 && method === 'PUT') return updateBuiltinRoute(req, res, segments[4]!);
-        throw notFound(`no route: ${method} ${url.pathname}`);
-      }
-      if (segments.length === 4) {
-        if (method === 'GET') return getModelConfig(res, leaf);
-        if (method === 'PUT') return updateModelConfig(req, res, leaf);
-        if (method === 'DELETE') return deleteModelConfig(res, leaf);
-      }
-      throw notFound(`no route: ${method} ${url.pathname}`);
-    }
-
-    if (segments[2] === 'zotero') {
-      // Local-library bridge: the page cannot fetch Zotero directly (no CORS
-      // headers on 127.0.0.1:23119), so the server proxies the full snapshot.
-      if (segments[3] === 'library' && segments.length === 4 && method === 'GET') {
-        try {
-          sendJson(res, 200, await fetchZoteroLibrary());
-        } catch (e) {
-          if (e instanceof ZoteroUnavailableError) {
-            throw new HttpError(503, { code: 'provider_unreachable', message: e.message, retryable: true });
-          }
-          throw e;
-        }
-        return;
-      }
-      if (segments[3] === 'annotations' && segments.length === 4 && method === 'GET') {
-        // Researcher annotations (highlights/notes) — seed material for studies.
-        try {
-          sendJson(res, 200, await fetchZoteroAnnotations());
-        } catch (e) {
-          if (e instanceof ZoteroUnavailableError) {
-            throw new HttpError(503, { code: 'provider_unreachable', message: e.message, retryable: true });
-          }
-          throw e;
-        }
-        return;
-      }
-      throw notFound(`no route: ${method} ${url.pathname}`);
-    }
-
     if (segments[2] === 'conversations') {
       const convRoute = async (fn: () => Promise<void> | void): Promise<void> => {
         try {
@@ -2707,205 +1734,14 @@ function libraryDedupKey(doc: { identifiers: { kind: string; value: string }[]; 
       throw notFound(`no route: ${method} ${url.pathname}`);
     }
 
-    if (segments[2] === 'automations') {
-      if (segments.length === 3) {
-        if (method === 'GET') {
-          const automations = app.store.listObjects('automation', '__none__')
-            .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
-          return sendJson(res, 200, { automations });
-        }
-        throw notFound(`method ${method} not allowed for ${url.pathname}`);
-      }
-      const automationId = segments[3]!;
-      if (automationId === undefined || !/^auto_[a-z0-9]+$/.test(automationId)) throw validation('invalid automation id');
-      if (segments.length === 4 && method === 'GET') {
-        const automation = app.store.getObject('automation', automationId);
-        if (automation === null) throw notFound(`automation not found: ${automationId}`);
-        return sendJson(res, 200, { automation });
-      }
-      if (segments.length === 4 && method === 'PATCH') {
-        const automation = app.store.getObject('automation', automationId);
-        if (automation === null) throw notFound(`automation not found: ${automationId}`);
-        const body = await readJsonObject(req);
-        if (typeof body.enabled !== 'boolean') throw validation('field "enabled" must be a boolean');
-        app.store.putObject('automation', { ...automation, enabled: body.enabled, updatedAt: new Date().toISOString() });
-        return sendJson(res, 200, { automation: app.store.getObject('automation', automationId) });
-      }
-      if (segments.length === 4 && method === 'DELETE') {
-        if (app.store.getObject('automation', automationId) === null) throw notFound(`automation not found: ${automationId}`);
-        app.store.deleteObject('automation', automationId);
-        return sendJson(res, 200, { deleted: automationId });
-      }
-      throw notFound(`no route: ${method} ${url.pathname}`);
+    // Route families (BC-002): composed in registration order; a family returns
+    // false when the path is not its own, and the composer owns the fallthrough
+    // 404 with the shared envelope. Family order is behavior-neutral: every
+    // family guards on a distinct segments[2] prefix (the sole same-prefix pair,
+    // builtin-routes under model-configs, keeps its registration order).
+    for (const family of families) {
+      if (await family(req, res, url, segments)) return;
     }
-
-    if (segments[2] === 'agent-policy') {
-      // Resident-agent approval posture (settings surface): the engine is
-      // fail-closed by design — every tool-class action asks once per
-      // conversation, and "remember" adds that action KIND to that one
-      // conversation's autoApprove (bounded at 10). This endpoint makes the
-      // posture visible and lets the researcher revoke remembered kinds.
-      const policyRoute = (fn: () => void): void => {
-        try {
-          fn();
-        } catch (e) {
-          if (e instanceof ConversationError) {
-            throw new HttpError(e.status, { code: e.code, message: e.message, retryable: false });
-          }
-          throw e;
-        }
-      };
-      if (segments.length === 3 && method === 'GET') {
-        return policyRoute(() => {
-          const remembered = listConversations(app)
-            .filter((c) => c.autoApprove.length > 0)
-            .map((c) => ({ conversationId: c.id, conversationTitle: c.title, kinds: c.autoApprove }));
-          sendJson(res, 200, { defaultPolicy: 'ask_per_conversation', remembered });
-        });
-      }
-      if (segments[3] === 'remember' && segments.length === 5 && method === 'DELETE') {
-        const convId = segments[4]!;
-        return policyRoute(() => {
-          const conv = getConversation(app, convId); // 404 when unknown
-          if (conv.autoApprove.length === 0) {
-            sendJson(res, 200, { conversationId: convId, kinds: [] });
-            return;
-          }
-          const updated = ConversationSchema.parse({ ...conv, autoApprove: [], updatedAt: new Date().toISOString() });
-          app.store.putObject('conversation', updated);
-          sendJson(res, 200, { conversationId: convId, kinds: [] });
-        });
-      }
-      throw notFound(`no route: ${method} ${url.pathname}`);
-    }
-
-    if (segments[2] === 'competition-route' && segments.length === 3) {
-      // 11→12 handoff 2026-08-25: competition route gate switch (settings surface).
-      // GET → current mode; PUT {on:boolean} → idempotent write. Semantics live in
-      // provider-resolver (ON holds every resolved route to the official Qwen-via-Bailian
-      // rule, fail-closed on violation; re-read per resolution so edits hit live runs).
-      if (method === 'GET') {
-        return sendJson(res, 200, { competitionRouteMode: readCompetitionRouteMode(app.store) ? 'on' : 'off' });
-      }
-      if (method === 'PUT') {
-        const raw = (await readBody(req)).toString('utf8');
-        let body: unknown;
-        try { body = JSON.parse(raw); } catch { body = undefined; }
-        if (typeof body !== 'object' || body === null || typeof (body as { on?: unknown }).on !== 'boolean') {
-          throw new HttpError(400, { code: 'validation', message: 'PUT /api/v1/competition-route expects {"on": boolean}', retryable: false });
-        }
-        writeCompetitionRouteMode(app.store, (body as { on: boolean }).on);
-        return sendJson(res, 200, { competitionRouteMode: (body as { on: boolean }).on ? 'on' : 'off' });
-      }
-      throw notFound(`no route: ${method} ${url.pathname}`);
-    }
-
-        if (segments[2] === 'health' && segments.length === 3 && method === 'GET') {
-      return health(res);
-    }
-
-    if (segments[2] === 'meta' && segments.length === 3 && method === 'GET') {
-      // Server/workspace facts for the settings About section: version + data
-      // location. Env var NAMES and paths only — secret values never leave.
-      let version = 'unknown';
-      try {
-        const pkgPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'package.json');
-        version = String(JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version ?? 'unknown');
-      } catch {
-        // honest unknown — never fabricate a version
-      }
-      return sendJson(res, 200, { version, dataDir: app.dataDir });
-    }
-
-    if (segments[2] === 'search' && segments.length === 3 && method === 'GET') {
-      return search(res, url);
-    }
-
-    // FA-HAR-06: the researcher memory-management surface (web #memory). The
-    // 2026-08-29 removal note below was true then (zero product callers); the
-    // management UI is now that caller. Reads are projections over the store;
-    // edit/archive go through memory-ops.ts (audited, append-only, trust-fenced).
-    // `far memory` CLI search keeps its own path unchanged.
-    if (segments[2] === 'memory') {
-      if (segments.length === 3 && method === 'GET') {
-        const kind = url.searchParams.get('kind');
-        const status = url.searchParams.get('status');
-        const runId = url.searchParams.get('runId');
-        const kindValues = ['episodic', 'semantic', 'experiment_outcome', 'profile'] as const;
-        const statusValues = ['active', 'superseded', 'archived'] as const;
-        let parsedKind: (typeof kindValues)[number] | undefined;
-        if (kind !== null) {
-          if (!(kindValues as readonly string[]).includes(kind)) throw validation(`kind must be one of ${kindValues.join('|')} (got ${kind})`);
-          parsedKind = kind as (typeof kindValues)[number];
-        }
-        let parsedStatus: (typeof statusValues)[number] | undefined;
-        if (status !== null) {
-          if (!(statusValues as readonly string[]).includes(status)) throw validation(`status must be one of ${statusValues.join('|')} (got ${status})`);
-          parsedStatus = status as (typeof statusValues)[number];
-        }
-        // Same honest-cap contract as /export below: the list enumerates up to
-        // 500 items and says so in the payload — `total: items.length` would
-        // dress a capped subset up as the workspace total.
-        const items = app.store.listMemory({
-          ...(parsedKind !== undefined ? { kind: parsedKind } : {}),
-          ...(parsedStatus !== undefined ? { status: parsedStatus } : {}),
-          ...(runId !== null ? { runId } : {}),
-          limit: 500,
-        });
-        return sendJson(res, 200, { items, count: items.length, cap: 500, complete: items.length < 500 });
-      }
-      if (segments.length === 4 && segments[3] === 'export' && method === 'GET') {
-        // Honest enumeration cap (listMemory clamps at 500) is disclosed in the
-        // payload itself — an export never pretends to be exhaustive silently.
-        const items = app.store.listMemory({ limit: 500 });
-        const body = Buffer.from(JSON.stringify({
-          exportedAt: new Date().toISOString(),
-          count: items.length,
-          cap: 500,
-          complete: items.length < 500,
-          items,
-        }, null, 2), 'utf8');
-        res.writeHead(200, {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Content-Length': String(body.length),
-          'Content-Disposition': 'attachment; filename="farlab-memory.json"',
-        });
-        res.end(body);
-        return;
-      }
-      if (segments.length === 4 && method === 'GET') {
-        const id = segments[3]!;
-        if (!/^mem_[a-z0-9]+$/.test(id)) throw validation(`malformed memory id: ${id}`);
-        const item = app.store.getMemory(id);
-        if (item === null) throw notFound(`memory item ${id} not found`);
-        return sendJson(res, 200, { item });
-      }
-      if (segments.length === 5 && method === 'POST' && (segments[4] === 'edit' || segments[4] === 'archive')) {
-        const body = await readJsonObject(req);
-        try {
-          const result = segments[4] === 'edit'
-            ? editMemory(app, segments[3]!, body)
-            : archiveMemory(app, segments[3]!, body);
-          sendJson(res, 200, result);
-          return;
-        } catch (e) {
-          if (e instanceof MemoryOpError) {
-            throw new HttpError(e.status, { code: e.code, message: e.message, retryable: false });
-          }
-          throw e;
-        }
-      }
-      throw notFound(`no route: ${method} ${url.pathname}`);
-    }
-
-    // (GET /api/v1/memory removed 2026-08-29: zero product callers across
-    // web/CLI/TUI — superseded by the management block above, which now HAS a
-    // product caller; the store API stays available for the `far memory` CLI.)
-
-    if (segments[2] === 'verify' && segments.length === 4 && method === 'GET') {
-      return verify(res, segments[3]!);
-    }
-
     throw notFound(`no route: ${method} ${url.pathname}`);
   };
 

@@ -95,6 +95,9 @@ const probe = (method: string, pathname: string, body?: unknown, headers?: Recor
       },
     );
     req.on('error', reject);
+    req.setTimeout(20_000, () => {
+      req.destroy(new Error(`probe timeout: ${method} ${pathname}`));
+    });
     req.end(payload);
   });
 
