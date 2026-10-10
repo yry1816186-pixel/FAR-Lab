@@ -106,6 +106,34 @@ describe('runInLoginShell (real processes)', () => {
     expect(r.timedOut).toBe(false);
     expect(r.exitCode).not.toBe(0);
   }, 45_000);
+
+  it('marks stderr overflow with an honest elision note (LOG-002)', async () => {
+    const r = await runInLoginShell({
+      command: 'node -e "process.stderr.write(\'e\'.repeat(9000))"',
+      cwd: tmp,
+      timeoutMs: 30_000,
+      maxOutputChars: 400,
+    });
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toBe('');
+    expect(r.stderr).toContain('…[stderr over cap,');
+    expect(r.stderr).toMatch(/8\d{3} chars elided\]/); // ~9000 received, 400 kept
+    expect(r.truncated).toBe(true); // stderr truncation ORs into the top-level flag
+    // the retained stderr body is bounded by the cap
+    expect(r.stderr.length).toBeLessThan(1200);
+  }, 45_000);
+
+  it('small stderr passes through with no truncation marker', async () => {
+    const r = await runInLoginShell({
+      command: 'node -e "process.stderr.write(\'small-diagnostic\')"',
+      cwd: tmp,
+      timeoutMs: 30_000,
+      maxOutputChars: 4000,
+    });
+    expect(r.stderr).toContain('small-diagnostic');
+    expect(r.stderr).not.toContain('over cap');
+    expect(r.truncated).toBe(false);
+  }, 45_000);
 });
 
 describe('TerminalManager (real sessions)', () => {

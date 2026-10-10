@@ -148,13 +148,18 @@ export const runInLoginShell = async (opts: {
   let stderr = '';
   let truncated = false;
   let spawnError: string | null = null;
+  // LOG-002: stderr beyond the 2x accumulation buffer is dropped as it arrives —
+  // count it so the elision note can state the honest total, not just the retained part.
+  let stderrDropped = 0;
   child.on('error', (e: Error) => { spawnError = e.message; });
   child.stdout?.on('data', (c: Buffer) => {
     if (stdout.length <= opts.maxOutputChars * 2) stdout += c.toString('utf8');
     else if (!truncated) { truncated = true; killTree(child); }
   });
   child.stderr?.on('data', (c: Buffer) => {
-    if (stderr.length <= opts.maxOutputChars * 2) stderr += c.toString('utf8');
+    const chunk = c.toString('utf8');
+    if (stderr.length <= opts.maxOutputChars * 2) stderr += chunk;
+    else stderrDropped += chunk.length;
   });
   const timedOut = await new Promise<boolean>((resolve) => {
     const timer = setTimeout(() => { killTree(child); resolve(true); }, opts.timeoutMs);
@@ -167,10 +172,19 @@ export const runInLoginShell = async (opts: {
     const half = Math.floor(opts.maxOutputChars / 2);
     return `${stdout.slice(0, half)}\n…[output over cap, ${stdout.length - opts.maxOutputChars} chars elided]…\n${stdout.slice(-half)}`;
   };
+  // LOG-002: stderr over cap gets the SAME elision note as stdout (head/tail
+  // kept, honest count) instead of a silent slice — and ORs into `truncated`.
+  const renderStderr = (): string => {
+    if (stderr.length <= opts.maxOutputChars && stderrDropped === 0) return stderr;
+    truncated = true;
+    const half = Math.floor(opts.maxOutputChars / 2);
+    const elided = stderr.length + stderrDropped - opts.maxOutputChars;
+    return `${stderr.slice(0, half)}\n…[stderr over cap, ${elided} chars elided]…\n${stderr.slice(-half)}`;
+  };
   return {
     exitCode: child.exitCode,
     stdout: render(),
-    stderr: (spawnError !== null ? `spawn failed: ${spawnError}\n` : '') + stderr.slice(0, opts.maxOutputChars),
+    stderr: (spawnError !== null ? `spawn failed: ${spawnError}\n` : '') + renderStderr(),
     timedOut,
     durationMs: Date.now() - started,
     truncated,
