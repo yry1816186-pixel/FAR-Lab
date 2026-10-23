@@ -34,7 +34,7 @@
     "diff": "9.0.0",
     "echarts": "^6.1.0",
     "jszip": "3.10.1",
-    "katex": "0.16.47",
+    "katex": "0.18.2",
     "lucide-react": "^1.33.0",
     "mammoth": "1.12.1",
     "pdfjs-dist": "6.2.108",
